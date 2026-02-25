@@ -174,6 +174,10 @@ export class AgentManager extends EventEmitter {
     this.maxConcurrent = n;
   }
 
+  getRoleRegistry(): RoleRegistry {
+    return this.roleRegistry;
+  }
+
   setAutoRestart(enabled: boolean): void {
     this.autoRestart = enabled;
   }

@@ -35,9 +35,11 @@ export class TaskQueue extends EventEmitter {
     this.db = db;
     this.agentManager = agentManager;
 
-    // When an agent becomes idle, try to assign next task
-    this.agentManager.on('agent:exit', () => {
-      this.tryAutoAssign();
+    // Try to assign tasks when agents become available
+    this.agentManager.on('agent:exit', () => this.tryAutoAssign());
+    this.agentManager.on('agent:spawned', () => {
+      // Give the agent a moment to initialize before assigning
+      setTimeout(() => this.tryAutoAssign(), 2000);
     });
   }
 
@@ -50,6 +52,10 @@ export class TaskQueue extends EventEmitter {
     );
     const task = this.getById(id)!;
     this.emit('task:updated', task);
+
+    // Immediately try to assign this new task
+    this.tryAutoAssign();
+
     return task;
   }
 
@@ -94,6 +100,9 @@ export class TaskQueue extends EventEmitter {
 
   remove(id: string): boolean {
     const result = this.db.run('DELETE FROM tasks WHERE id = ?', [id]);
+    if (result.changes > 0) {
+      this.emit('task:removed', id);
+    }
     return result.changes > 0;
   }
 
@@ -116,20 +125,39 @@ export class TaskQueue extends EventEmitter {
     const pending = this.getPending();
     if (pending.length === 0) return;
 
-    // Find idle agents or check if we can spawn new ones
     const agents = this.agentManager.getAll();
+
     for (const task of pending) {
-      const idleAgent = agents.find(
+      // 1. First try: find an agent that's running but has no task assigned
+      let candidate = agents.find(
         (a) =>
-          a.status === 'idle' &&
+          (a.status === 'running' || a.status === 'idle') &&
+          !a.taskId &&
           (!task.assignedRole || a.role.id === task.assignedRole),
       );
-      if (idleAgent) {
+
+      // 2. Second try: auto-spawn a new agent if under concurrency limit
+      if (!candidate) {
+        const roleId = task.assignedRole || 'developer';
+        const role = this.agentManager.getRoleRegistry()?.get(roleId);
+        if (role) {
+          try {
+            candidate = this.agentManager.spawn(role, task.id);
+          } catch {
+            // Concurrency limit reached, skip
+            continue;
+          }
+        }
+      }
+
+      if (candidate) {
         this.update(task.id, {
-          status: 'assigned',
-          assignedAgentId: idleAgent.id,
+          status: 'in_progress',
+          assignedAgentId: candidate.id,
         });
-        idleAgent.write(`\nNew task assigned: ${task.title}\n${task.description}\n`);
+        candidate.taskId = task.id;
+        const prompt = `## Task Assigned\n**${task.title}**\n\n${task.description}\n\nPlease work on this task now.`;
+        candidate.write(prompt);
       }
     }
   }

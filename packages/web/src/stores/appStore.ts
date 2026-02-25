@@ -17,6 +17,7 @@ interface AppState {
 
   setTasks: (tasks: Task[]) => void;
   updateTask: (task: Task) => void;
+  removeTask: (id: string) => void;
 
   setRoles: (roles: Role[]) => void;
   setConfig: (config: ServerConfig) => void;
@@ -53,6 +54,10 @@ export const useAppStore = create<AppState>((set) => ({
       tasks: s.tasks.some((t) => t.id === task.id)
         ? s.tasks.map((t) => (t.id === task.id ? task : t))
         : [...s.tasks, task],
+    })),
+  removeTask: (id) =>
+    set((s) => ({
+      tasks: s.tasks.filter((t) => t.id !== id),
     })),
 
   clearPermission: (agentId) =>

@@ -58,6 +58,8 @@ export function useApi() {
   }, []);
 
   const deleteTask = useCallback(async (id: string) => {
+    // Optimistic removal from store
+    useAppStore.getState().removeTask(id);
     return fetchJSON(`/tasks/${id}`, { method: 'DELETE' });
   }, []);
 

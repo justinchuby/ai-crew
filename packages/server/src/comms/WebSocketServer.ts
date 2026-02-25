@@ -106,6 +106,10 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'task:updated', task });
     });
 
+    taskQueue.on('task:removed', (taskId: string) => {
+      this.broadcastAll({ type: 'task:removed', taskId });
+    });
+
     // Forward coordination events
     lockRegistry.on('lock:acquired', (data: any) => {
       this.broadcastAll({ type: 'lock:acquired', ...data });

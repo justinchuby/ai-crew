@@ -5,7 +5,7 @@ import type { WsMessage } from '../types';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
-  const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask } =
+  const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask } =
     useAppStore();
 
   const connect = useCallback(() => {
@@ -83,9 +83,12 @@ export function useWebSocket() {
         case 'task:updated':
           updateTask(msg.task);
           break;
+        case 'task:removed':
+          removeTask(msg.taskId);
+          break;
       }
     };
-  }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask]);
+  }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask]);
 
   useEffect(() => {
     connect();
