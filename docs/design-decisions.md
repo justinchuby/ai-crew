@@ -164,3 +164,22 @@ ai-crew/
 ├── tsconfig.base.json  # Shared TS config
 └── package.json        # Workspace root
 ```
+
+## 13. Testing Strategy
+
+**Decision:** Two-tier testing: Vitest unit tests for server logic, Playwright E2E tests for UI workflows.
+
+**Unit tests (76 cases, 8 suites):**
+- Run in-memory SQLite (`:memory:`) for test isolation — no shared state between tests
+- Mock external dependencies (AgentManager stubs via `vi.fn()`) to test subsystems in isolation
+- Suites: FileLockRegistry, ActivityLedger, RoleRegistry, TaskQueue, MessageBus, ConversationStore, ContextRefresher, AgentManager output parsing
+
+**E2E tests (67+ cases, 9 suites):**
+- Playwright with Chromium, dual webServer config (server:3001, web:5173)
+- Tests use `page.request` for API calls to avoid dependency on Copilot CLI binary
+- Terminal panel tests use conditional checks since Copilot CLI may not be installed
+- Suites: smoke, agent dashboard, task queue, settings, terminal panel, coordination, task lifecycle, multi-agent coordination, error states
+
+**Rationale:** Unit tests catch logic regressions fast (<3s). E2E tests validate the full stack integration including WebSocket events, API responses, and UI state. Together they cover both correctness and user workflows.
+
+**Trade-off:** E2E tests are slower and require both servers running. Mitigated by Playwright's webServer config which starts them automatically.
