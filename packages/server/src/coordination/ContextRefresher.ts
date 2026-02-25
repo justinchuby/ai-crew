@@ -1,0 +1,107 @@
+import type { AgentManager } from '../agents/AgentManager.js';
+import type { AgentContextInfo } from '../agents/Agent.js';
+import type { FileLockRegistry } from './FileLockRegistry.js';
+import type { ActivityLedger } from './ActivityLedger.js';
+
+export interface ContextRefresherConfig {
+  intervalMs?: number;
+}
+
+export class ContextRefresher {
+  private agentManager: AgentManager;
+  private lockRegistry: FileLockRegistry;
+  private activityLedger: ActivityLedger;
+  private intervalMs: number;
+  private intervalHandle: ReturnType<typeof setInterval> | null = null;
+  private debounceHandle: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    agentManager: AgentManager,
+    lockRegistry: FileLockRegistry,
+    activityLedger: ActivityLedger,
+    config: ContextRefresherConfig = {},
+  ) {
+    this.agentManager = agentManager;
+    this.lockRegistry = lockRegistry;
+    this.activityLedger = activityLedger;
+    this.intervalMs = config.intervalMs ?? 30_000;
+
+    // Listen to significant events with debounce
+    const debouncedRefresh = () => this.scheduleRefresh();
+    this.agentManager.on('agent:spawned', debouncedRefresh);
+    this.agentManager.on('agent:killed', debouncedRefresh);
+    this.agentManager.on('agent:exit', debouncedRefresh);
+    this.lockRegistry.on('lock:acquired', debouncedRefresh);
+    this.lockRegistry.on('lock:released', debouncedRefresh);
+  }
+
+  start(): void {
+    if (this.intervalHandle) return;
+    this.intervalHandle = setInterval(() => this.refreshAll(), this.intervalMs);
+  }
+
+  stop(): void {
+    if (this.intervalHandle) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+    if (this.debounceHandle) {
+      clearTimeout(this.debounceHandle);
+      this.debounceHandle = null;
+    }
+  }
+
+  refreshAll(): void {
+    const peers = this.buildPeerList();
+    const recentActivity = this.buildRecentActivity();
+
+    for (const agent of this.agentManager.getAll()) {
+      if (agent.status !== 'running') continue;
+      const otherPeers = peers.filter((p) => p.id !== agent.id);
+      agent.injectContextUpdate(otherPeers, recentActivity);
+    }
+  }
+
+  refreshOne(agentId: string): void {
+    const agent = this.agentManager.get(agentId);
+    if (!agent || agent.status !== 'running') return;
+
+    const peers = this.buildPeerList().filter((p) => p.id !== agentId);
+    const recentActivity = this.buildRecentActivity();
+    agent.injectContextUpdate(peers, recentActivity);
+  }
+
+  buildPeerList(): AgentContextInfo[] {
+    const agents = this.agentManager.getAll();
+    const allLocks = this.lockRegistry.getAll();
+
+    return agents.map((agent) => ({
+      id: agent.id,
+      role: agent.role.id,
+      roleName: agent.role.name,
+      status: agent.status,
+      taskId: agent.taskId,
+      lockedFiles: allLocks
+        .filter((lock) => lock.agentId === agent.id)
+        .map((lock) => lock.filePath),
+    }));
+  }
+
+  buildRecentActivity(limit: number = 20): string[] {
+    const entries = this.activityLedger.getRecent(limit);
+    return entries.map((entry) => {
+      const shortId = entry.agentId.slice(0, 8);
+      return `[${entry.timestamp}] Agent ${shortId} (${entry.agentRole}): ${entry.actionType} — ${entry.summary}`;
+    });
+  }
+
+  private scheduleRefresh(): void {
+    if (this.debounceHandle) {
+      clearTimeout(this.debounceHandle);
+    }
+    this.debounceHandle = setTimeout(() => {
+      this.debounceHandle = null;
+      this.refreshAll();
+    }, 2000);
+  }
+}

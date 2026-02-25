@@ -5,6 +5,8 @@ import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
 import { updateConfig } from './config.js';
 import type { Database } from './db/database.js';
+import type { FileLockRegistry } from './coordination/FileLockRegistry.js';
+import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.js';
 
 export function apiRouter(
   agentManager: AgentManager,
@@ -12,6 +14,8 @@ export function apiRouter(
   roleRegistry: RoleRegistry,
   config: ServerConfig,
   _db: Database,
+  lockRegistry: FileLockRegistry,
+  activityLedger: ActivityLedger,
 ): Router {
   const router = Router();
 
@@ -90,6 +94,62 @@ export function apiRouter(
     const updated = updateConfig(req.body);
     agentManager.setMaxConcurrent(updated.maxConcurrentAgents);
     res.json(updated);
+  });
+
+  // --- Coordination ---
+  router.get('/coordination/status', (_req, res) => {
+    res.json({
+      agents: agentManager.getAll().map((a) => a.toJSON()),
+      locks: lockRegistry.getAll(),
+      recentActivity: activityLedger.getRecent(20),
+    });
+  });
+
+  router.get('/coordination/locks', (_req, res) => {
+    res.json(lockRegistry.getAll());
+  });
+
+  router.post('/coordination/locks', (req, res) => {
+    const { agentId, filePath, reason } = req.body;
+    if (!agentId || !filePath) {
+      return res.status(400).json({ error: 'agentId and filePath are required' });
+    }
+    const agent = agentManager.get(agentId);
+    const agentRole = agent?.role?.id ?? 'unknown';
+    const result = lockRegistry.acquire(agentId, agentRole, filePath, reason);
+    if (result.ok) {
+      res.status(201).json({ ok: true });
+    } else {
+      res.status(409).json({ ok: false, holder: result.holder });
+    }
+  });
+
+  router.delete('/coordination/locks/:filePath', (req, res) => {
+    const filePath = decodeURIComponent(req.params.filePath);
+    const agentId = (req.query.agentId as string) ?? req.body?.agentId;
+    if (!agentId) {
+      return res.status(400).json({ error: 'agentId is required' });
+    }
+    const ok = lockRegistry.release(agentId, filePath);
+    res.json({ ok });
+  });
+
+  router.get('/coordination/activity', (req, res) => {
+    const { agentId, type, limit, since } = req.query;
+    const limitNum = limit ? Number(limit) : 50;
+    if (since) {
+      res.json(activityLedger.getSince(since as string));
+    } else if (agentId) {
+      res.json(activityLedger.getByAgent(agentId as string, limitNum));
+    } else if (type) {
+      res.json(activityLedger.getByType(type as ActionType, limitNum));
+    } else {
+      res.json(activityLedger.getRecent(limitNum));
+    }
+  });
+
+  router.get('/coordination/summary', (_req, res) => {
+    res.json(activityLedger.getSummary());
   });
 
   return router;

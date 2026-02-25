@@ -2,6 +2,8 @@ import { Server as HttpServer } from 'http';
 import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { TaskQueue } from '../tasks/TaskQueue.js';
+import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
+import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import { v4 as uuid } from 'uuid';
 
 interface ClientConnection {
@@ -14,7 +16,13 @@ export class WebSocketServer {
   private wss: WsServer;
   private clients: Map<string, ClientConnection> = new Map();
 
-  constructor(server: HttpServer, agentManager: AgentManager, taskQueue: TaskQueue) {
+  constructor(
+    server: HttpServer,
+    agentManager: AgentManager,
+    taskQueue: TaskQueue,
+    lockRegistry: FileLockRegistry,
+    activityLedger: ActivityLedger,
+  ) {
     this.wss = new WsServer({ server, path: '/ws' });
 
     this.wss.on('connection', (ws) => {
@@ -41,6 +49,7 @@ export class WebSocketServer {
           type: 'init',
           agents: agentManager.getAll().map((a) => a.toJSON()),
           tasks: taskQueue.getAll(),
+          locks: lockRegistry.getAll(),
         }),
       );
     });
@@ -71,6 +80,19 @@ export class WebSocketServer {
 
     taskQueue.on('task:updated', (task: any) => {
       this.broadcastAll({ type: 'task:updated', task });
+    });
+
+    // Forward coordination events
+    lockRegistry.on('lock:acquired', (data: any) => {
+      this.broadcastAll({ type: 'lock:acquired', ...data });
+    });
+
+    lockRegistry.on('lock:released', (data: any) => {
+      this.broadcastAll({ type: 'lock:released', ...data });
+    });
+
+    activityLedger.on('activity', (entry: any) => {
+      this.broadcastAll({ type: 'activity', entry });
     });
   }
 

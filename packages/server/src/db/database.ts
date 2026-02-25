@@ -50,6 +50,27 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS file_locks (
+  file_path TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  agent_role TEXT NOT NULL,
+  reason TEXT DEFAULT '',
+  acquired_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_id TEXT NOT NULL,
+  agent_role TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  details TEXT DEFAULT '{}',
+  timestamp TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_activity_agent ON activity_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_log(action_type);
 `;
 
 export class Database {
