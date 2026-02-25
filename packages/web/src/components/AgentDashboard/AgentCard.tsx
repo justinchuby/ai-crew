@@ -89,6 +89,30 @@ export function AgentCard({ agent, api }: Props) {
         </div>
       )}
 
+      {agent.plan && agent.plan.length > 0 && (
+        <div className="mt-1">
+          <div className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
+            <span>Plan: {agent.plan.filter((e) => e.status === 'completed').length}/{agent.plan.length}</span>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-1">
+            <div
+              className="bg-green-500 h-1 rounded-full transition-all"
+              style={{ width: `${(agent.plan.filter((e) => e.status === 'completed').length / agent.plan.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {agent.toolCalls && agent.toolCalls.length > 0 && (() => {
+        const active = agent.toolCalls.filter((tc) => tc.status === 'in_progress' || tc.status === 'pending');
+        const latest = active[active.length - 1] ?? agent.toolCalls[agent.toolCalls.length - 1];
+        return (
+          <div className="text-[10px] text-gray-400 mt-1 truncate">
+            🔧 {latest.title}
+          </div>
+        );
+      })()}
+
       {agent.outputPreview && (
         <pre className="text-xs text-gray-500 mt-2 overflow-hidden h-12 font-mono bg-surface/50 rounded p-1">
           {agent.outputPreview.slice(-200)}
@@ -96,10 +120,15 @@ export function AgentCard({ agent, api }: Props) {
       )}
 
       <div className="flex items-center justify-between mt-2">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-full"
-          style={{ backgroundColor: agent.role.color }}
-        />
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: agent.role.color }}
+          />
+          <span className={`text-[10px] px-1 py-0.5 rounded ${agent.mode === 'acp' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'}`}>
+            {agent.mode === 'acp' ? 'ACP' : 'PTY'}
+          </span>
+        </div>
         <span className="text-[10px] text-gray-500 font-mono">{agent.id.slice(0, 8)}</span>
       </div>
     </div>

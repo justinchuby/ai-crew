@@ -98,6 +98,13 @@ export function useApi() {
     loadConfig();
   }, [loadRoles, loadConfig]);
 
+  const resolvePermission = useCallback(async (agentId: string, approved: boolean) => {
+    return fetchJSON(`/agents/${agentId}/permission`, {
+      method: 'POST',
+      body: JSON.stringify({ approved }),
+    });
+  }, []);
+
   return {
     spawnAgent,
     killAgent,
@@ -108,5 +115,6 @@ export function useApi() {
     updateConfig,
     createRole,
     deleteRole,
+    resolvePermission,
   };
 }

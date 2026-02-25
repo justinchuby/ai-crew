@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
+import { AcpOutput } from './AcpOutput';
 import '@xterm/xterm/css/xterm.css';
 
 interface Props {
@@ -176,7 +177,11 @@ export function ChatPanel({ agentId, ws }: Props) {
         </div>
       </div>
 
-      <div ref={termRef} className="flex-1 overflow-hidden" />
+      {agent?.mode === 'acp' ? (
+        <AcpOutput agentId={agentId} />
+      ) : (
+        <div ref={termRef} className="flex-1 overflow-hidden" />
+      )}
 
       <div className="border-t border-gray-700 p-2 shrink-0 relative">
         {mentionSuggestions.length > 0 && (

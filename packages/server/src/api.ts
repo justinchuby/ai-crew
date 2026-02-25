@@ -25,11 +25,11 @@ export function apiRouter(
   });
 
   router.post('/agents', (req, res) => {
-    const { roleId, taskId } = req.body;
+    const { roleId, taskId, mode } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) return res.status(400).json({ error: `Unknown role: ${roleId}` });
     try {
-      const agent = agentManager.spawn(role, taskId);
+      const agent = agentManager.spawn(role, taskId, undefined, mode);
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       res.status(429).json({ error: err.message });
@@ -52,6 +52,13 @@ export function apiRouter(
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     agent.write(text);
+    res.json({ ok: true });
+  });
+
+  router.post('/agents/:id/permission', (req, res) => {
+    const { approved } = req.body;
+    const ok = agentManager.resolvePermission(req.params.id, approved);
+    if (!ok) return res.status(404).json({ error: 'Agent not found' });
     res.json({ ok: true });
   });
 

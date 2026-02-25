@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
 
 export function useWebSocket() {
@@ -49,6 +50,35 @@ export function useWebSocket() {
               msg.child.id,
             ],
           });
+          break;
+        case 'agent:text': {
+          const state = useAppStore.getState();
+          const existing = state.agents.find((a) => a.id === msg.agentId);
+          const msgs = existing?.messages ?? [];
+          updateAgent(msg.agentId, { messages: [...msgs, { type: 'text', text: msg.text }] });
+          break;
+        }
+        case 'agent:tool_call': {
+          const state = useAppStore.getState();
+          const existing = state.agents.find((a) => a.id === msg.agentId);
+          const calls = existing?.toolCalls ?? [];
+          const idx = calls.findIndex((tc) => tc.toolCallId === msg.toolCall.toolCallId);
+          const updated = idx >= 0
+            ? calls.map((tc, i) => (i === idx ? msg.toolCall : tc))
+            : [...calls, msg.toolCall];
+          updateAgent(msg.agentId, { toolCalls: updated });
+          break;
+        }
+        case 'agent:plan':
+          updateAgent(msg.agentId, { plan: msg.plan });
+          break;
+        case 'agent:permission_request':
+          updateAgent(msg.agentId, { pendingPermission: msg.request });
+          {
+            const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+            const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
+            useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+          }
           break;
         case 'task:updated':
           updateTask(msg.task);

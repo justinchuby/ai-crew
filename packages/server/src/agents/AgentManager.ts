@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { Agent } from './Agent.js';
-import type { AgentContextInfo } from './Agent.js';
+import type { AgentContextInfo, AgentMode } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
@@ -44,7 +44,7 @@ export class AgentManager extends EventEmitter {
     this.autoKillTimeoutMs = null;
   }
 
-  spawn(role: Role, taskId?: string, parentId?: string): Agent {
+  spawn(role: Role, taskId?: string, parentId?: string, mode?: AgentMode): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       throw new Error(
         `Concurrency limit reached (${this.maxConcurrent}). Kill an agent or increase the limit.`,
@@ -60,7 +60,7 @@ export class AgentManager extends EventEmitter {
       lockedFiles: [],
     }));
 
-    const agent = new Agent(role, this.config, taskId, parentId, peers);
+    const agent = new Agent(role, this.config, taskId, parentId, peers, mode);
 
     // Track parent-child relationship
     if (parentId) {
@@ -79,6 +79,18 @@ export class AgentManager extends EventEmitter {
       this.detectLockRequest(agent, data);
       this.detectLockRelease(agent, data);
       this.detectActivity(agent, data);
+    });
+
+    agent.onToolCall((info) => {
+      this.emit('agent:tool_call', { agentId: agent.id, ...info });
+    });
+
+    agent.onPlan((entries) => {
+      this.emit('agent:plan', { agentId: agent.id, entries });
+    });
+
+    agent.onPermissionRequest((request) => {
+      this.emit('agent:permission_request', { agentId: agent.id, ...request });
     });
 
     agent.onExit((code) => {
@@ -173,6 +185,13 @@ export class AgentManager extends EventEmitter {
   /** Set auto-kill timeout (ms) for hung agents. Pass null to disable. */
   setAutoKillTimeout(ms: number | null): void {
     this.autoKillTimeoutMs = ms;
+  }
+
+  resolvePermission(agentId: string, approved: boolean): boolean {
+    const agent = this.agents.get(agentId);
+    if (!agent) return false;
+    agent.resolvePermission(approved);
+    return true;
   }
 
   private clearHungTimer(agentId: string): void {

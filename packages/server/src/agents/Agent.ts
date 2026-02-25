@@ -1,8 +1,11 @@
 import { v4 as uuid } from 'uuid';
 import { PtyManager } from '../pty/PtyManager.js';
+import { AcpConnection } from '../acp/AcpConnection.js';
+import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 
+export type AgentMode = 'pty' | 'acp';
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
 
 export interface AgentContextInfo {
@@ -18,37 +21,51 @@ export interface AgentJSON {
   id: string;
   role: Role;
   status: AgentStatus;
+  mode: AgentMode;
   taskId?: string;
   parentId?: string;
   childIds: string[];
   createdAt: string;
   outputPreview: string;
+  plan?: PlanEntry[];
+  toolCalls?: ToolCallInfo[];
+  sessionId?: string | null;
 }
 
 export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
+  public readonly mode: AgentMode;
   public status: AgentStatus = 'creating';
   public taskId?: string;
   public parentId?: string;
   public childIds: string[] = [];
+  public plan: PlanEntry[] = [];
+  public toolCalls: ToolCallInfo[] = [];
+  public messages: string[] = [];
+  public sessionId: string | null = null;
   private killed = false;
 
   private pty: PtyManager;
+  private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
   private dataListeners: Array<(data: string) => void> = [];
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
+  private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
+  private planListeners: Array<(entries: PlanEntry[]) => void> = [];
+  private permissionRequestListeners: Array<(request: any) => void> = [];
   private peers: AgentContextInfo[];
 
-  constructor(role: Role, config: ServerConfig, taskId?: string, parentId?: string, peers: AgentContextInfo[] = []) {
+  constructor(role: Role, config: ServerConfig, taskId?: string, parentId?: string, peers: AgentContextInfo[] = [], mode?: AgentMode) {
     this.id = uuid();
     this.role = role;
     this.config = config;
     this.taskId = taskId;
     this.parentId = parentId;
     this.createdAt = new Date();
+    this.mode = mode ?? config.defaultAgentMode;
     this.pty = new PtyManager();
     this.peers = peers;
   }
@@ -58,6 +75,14 @@ export class Agent {
     const rolePrompt = `${this.role.systemPrompt}\n\nYou are acting as the "${this.role.name}" role. ${this.taskId ? `Your assigned task ID is: ${this.taskId}` : 'Awaiting task assignment.'}`;
     const initialPrompt = `${contextManifest}\n\n${rolePrompt}`;
 
+    if (this.mode === 'acp') {
+      this.startAcp(initialPrompt);
+    } else {
+      this.startPty(initialPrompt);
+    }
+  }
+
+  private startPty(initialPrompt: string): void {
     this.pty.spawn({
       command: this.config.cliCommand,
       args: [...this.config.cliArgs],
@@ -83,7 +108,6 @@ export class Agent {
     });
 
     this.pty.on('exit', (code: number) => {
-      // If kill() was called, keep 'completed' status instead of overwriting
       if (!this.killed) {
         this.status = code === 0 ? 'completed' : 'failed';
       }
@@ -96,6 +120,76 @@ export class Agent {
       this.status = 'idle';
       for (const listener of this.hungListeners) {
         listener(elapsedMs);
+      }
+    });
+  }
+
+  private startAcp(initialPrompt: string): void {
+    this.acpConnection = new AcpConnection();
+    this.status = 'running';
+
+    this.acpConnection.on('text', (text: string) => {
+      this.messages.push(text);
+      for (const listener of this.dataListeners) {
+        listener(text);
+      }
+    });
+
+    this.acpConnection.on('tool_call', (info: ToolCallInfo) => {
+      const idx = this.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
+      if (idx >= 0) {
+        this.toolCalls[idx] = info;
+      } else {
+        this.toolCalls.push(info);
+      }
+      for (const listener of this.toolCallListeners) {
+        listener(info);
+      }
+    });
+
+    this.acpConnection.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => {
+      const idx = this.toolCalls.findIndex((t) => t.toolCallId === update.toolCallId);
+      if (idx >= 0) {
+        this.toolCalls[idx] = { ...this.toolCalls[idx], ...update };
+      }
+      for (const listener of this.toolCallListeners) {
+        listener(this.toolCalls[idx] ?? update as ToolCallInfo);
+      }
+    });
+
+    this.acpConnection.on('plan', (entries: PlanEntry[]) => {
+      this.plan = entries;
+      for (const listener of this.planListeners) {
+        listener(entries);
+      }
+    });
+
+    this.acpConnection.on('permission_request', (request: any) => {
+      for (const listener of this.permissionRequestListeners) {
+        listener(request);
+      }
+    });
+
+    this.acpConnection.on('exit', (code: number) => {
+      if (!this.killed) {
+        this.status = code === 0 ? 'completed' : 'failed';
+      }
+      for (const listener of this.exitListeners) {
+        listener(code);
+      }
+    });
+
+    this.acpConnection.start({
+      cliCommand: this.config.cliCommand,
+      cliArgs: this.config.cliArgs,
+      cwd: process.cwd(),
+    }).then((sessionId) => {
+      this.sessionId = sessionId;
+      return this.acpConnection!.prompt(initialPrompt);
+    }).catch((err) => {
+      this.status = 'failed';
+      for (const listener of this.exitListeners) {
+        listener(1);
       }
     });
   }
@@ -153,31 +247,59 @@ ${peerLines || '(no other agents)'}
 ${activityLines}
 CREW_UPDATE -->`;
 
-    if (this.pty.isRunning) {
-      this.pty.write(update + '\n');
+    if (this.mode === 'acp') {
+      if (this.acpConnection?.isConnected) {
+        this.acpConnection.prompt(update).catch(() => {});
+      }
+    } else {
+      if (this.pty.isRunning) {
+        this.pty.write(update + '\n');
+      }
     }
   }
 
   write(data: string): void {
-    if (this.pty.isRunning) {
-      this.pty.write(data);
+    if (this.mode === 'acp') {
+      if (this.acpConnection?.isConnected) {
+        this.acpConnection.prompt(data).catch(() => {});
+      }
+    } else {
+      if (this.pty.isRunning) {
+        this.pty.write(data);
+      }
+    }
+  }
+
+  resolvePermission(approved: boolean): void {
+    if (this.acpConnection) {
+      this.acpConnection.resolvePermission(approved);
     }
   }
 
   kill(): void {
     this.killed = true;
     this.status = 'completed';
-    this.pty.kill();
+    if (this.mode === 'acp' && this.acpConnection) {
+      this.acpConnection.kill();
+      this.acpConnection = null;
+    } else {
+      this.pty.kill();
+    }
   }
 
   dispose(): void {
     this.dataListeners.length = 0;
     this.exitListeners.length = 0;
     this.hungListeners.length = 0;
+    this.toolCallListeners.length = 0;
+    this.planListeners.length = 0;
+    this.permissionRequestListeners.length = 0;
   }
 
   resize(cols: number, rows: number): void {
-    this.pty.resize(cols, rows);
+    if (this.mode === 'pty') {
+      this.pty.resize(cols, rows);
+    }
   }
 
   onData(listener: (data: string) => void): void {
@@ -192,21 +314,40 @@ CREW_UPDATE -->`;
     this.hungListeners.push(listener);
   }
 
+  onToolCall(listener: (info: ToolCallInfo) => void): void {
+    this.toolCallListeners.push(listener);
+  }
+
+  onPlan(listener: (entries: PlanEntry[]) => void): void {
+    this.planListeners.push(listener);
+  }
+
+  onPermissionRequest(listener: (request: any) => void): void {
+    this.permissionRequestListeners.push(listener);
+  }
+
   getBufferedOutput(): string {
+    if (this.mode === 'acp') {
+      return this.messages.join('');
+    }
     return this.pty.getBufferedOutput();
   }
 
   toJSON(): AgentJSON {
-    const output = this.pty.getBufferedOutput();
+    const output = this.mode === 'pty' ? this.pty.getBufferedOutput() : this.messages.join('');
     return {
       id: this.id,
       role: this.role,
       status: this.status,
+      mode: this.mode,
       taskId: this.taskId,
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
       outputPreview: output.slice(-500),
+      plan: this.plan,
+      toolCalls: this.toolCalls,
+      sessionId: this.sessionId,
     };
   }
 }

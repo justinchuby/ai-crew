@@ -90,6 +90,18 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:sub_spawned', parentId, child: childJson });
     });
 
+    agentManager.on('agent:tool_call', (data: any) => {
+      this.broadcastAll({ type: 'agent:tool_call', ...data });
+    });
+
+    agentManager.on('agent:plan', (data: any) => {
+      this.broadcastAll({ type: 'agent:plan', ...data });
+    });
+
+    agentManager.on('agent:permission_request', (data: any) => {
+      this.broadcastAll({ type: 'agent:permission_request', ...data });
+    });
+
     taskQueue.on('task:updated', (task: any) => {
       this.broadcastAll({ type: 'task:updated', task });
     });
@@ -153,6 +165,12 @@ export class WebSocketServer {
           if (agent) {
             agent.resize(msg.cols, msg.rows);
           }
+        }
+        break;
+
+      case 'permission_response':
+        if (msg.agentId) {
+          agentManager.resolvePermission(msg.agentId, msg.approved);
         }
         break;
     }

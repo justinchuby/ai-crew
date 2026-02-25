@@ -1,0 +1,200 @@
+import { EventEmitter } from 'events';
+import { spawn, ChildProcess } from 'child_process';
+import { Readable, Writable } from 'stream';
+import * as acp from '@agentclientprotocol/sdk';
+
+export interface AcpConnectionOptions {
+  cliCommand: string;
+  cliArgs?: string[];
+  cwd?: string;
+}
+
+export interface ToolCallInfo {
+  toolCallId: string;
+  title: string;
+  kind?: acp.ToolKind;
+  status?: acp.ToolCallStatus;
+  content?: acp.ToolCallContent[];
+}
+
+export interface PlanEntry {
+  content: string;
+  priority: acp.PlanEntryPriority;
+  status: acp.PlanEntryStatus;
+}
+
+export class AcpConnection extends EventEmitter {
+  private process: ChildProcess | null = null;
+  private connection: acp.ClientSideConnection | null = null;
+  private sessionId: string | null = null;
+  private _isConnected = false;
+  private _isPrompting = false;
+  private pendingPermission: {
+    resolve: (result: acp.RequestPermissionResponse) => void;
+    options: acp.PermissionOption[];
+  } | null = null;
+
+  get isConnected(): boolean { return this._isConnected; }
+  get isPrompting(): boolean { return this._isPrompting; }
+  get currentSessionId(): string | null { return this.sessionId; }
+
+  async start(opts: AcpConnectionOptions): Promise<string> {
+    const args = ['--acp', '--stdio', ...(opts.cliArgs || [])];
+    this.process = spawn(opts.cliCommand, args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      cwd: opts.cwd || process.cwd(),
+    });
+
+    if (!this.process.stdin || !this.process.stdout) {
+      throw new Error('Failed to start Copilot ACP process');
+    }
+
+    this.process.on('exit', (code) => {
+      this._isConnected = false;
+      this.emit('exit', code);
+    });
+
+    const output = Writable.toWeb(this.process.stdin) as WritableStream<Uint8Array>;
+    const input = Readable.toWeb(this.process.stdout) as ReadableStream<Uint8Array>;
+    const stream = acp.ndJsonStream(output, input);
+
+    const client: acp.Client = {
+      requestPermission: async (params) => {
+        return new Promise<acp.RequestPermissionResponse>((resolve) => {
+          this.pendingPermission = { resolve, options: params.options };
+          this.emit('permission_request', {
+            params,
+          });
+
+          // Auto-approve after 60s timeout if no response
+          setTimeout(() => {
+            if (this.pendingPermission?.resolve === resolve) {
+              this.pendingPermission = null;
+              const allowOption = params.options.find(
+                (o: acp.PermissionOption) => o.kind === 'allow_once'
+              );
+              resolve({
+                outcome: allowOption
+                  ? { outcome: 'selected', optionId: allowOption.optionId }
+                  : { outcome: 'cancelled' },
+              });
+            }
+          }, 60_000);
+        });
+      },
+
+      sessionUpdate: async (params) => {
+        const update = params.update;
+
+        switch (update.sessionUpdate) {
+          case 'agent_message_chunk':
+            if (update.content.type === 'text') {
+              this.emit('text', update.content.text);
+            }
+            break;
+
+          case 'tool_call':
+            this.emit('tool_call', {
+              toolCallId: update.toolCallId,
+              title: update.title,
+              kind: update.kind,
+              status: update.status,
+              content: update.content,
+            } as ToolCallInfo);
+            break;
+
+          case 'tool_call_update':
+            this.emit('tool_call_update', {
+              toolCallId: update.toolCallId,
+              status: update.status,
+              content: update.content,
+            });
+            break;
+
+          case 'plan':
+            this.emit('plan', update.entries as PlanEntry[]);
+            break;
+        }
+      },
+    };
+
+    this.connection = new acp.ClientSideConnection((_agent) => client, stream);
+
+    await this.connection.initialize({
+      protocolVersion: acp.PROTOCOL_VERSION,
+      clientCapabilities: {},
+    });
+
+    const sessionResult = await this.connection.newSession({
+      cwd: opts.cwd || process.cwd(),
+      mcpServers: [],
+    });
+
+    const { sessionId } = sessionResult;
+    this.sessionId = sessionId;
+    this._isConnected = true;
+    this.emit('connected', sessionId);
+
+    return sessionId;
+  }
+
+  async prompt(text: string): Promise<{ stopReason: acp.StopReason }> {
+    if (!this.connection || !this.sessionId) {
+      throw new Error('ACP connection not established');
+    }
+
+    this._isPrompting = true;
+    this.emit('prompting', true);
+
+    try {
+      const result = await this.connection.prompt({
+        sessionId: this.sessionId,
+        prompt: [{ type: 'text', text }],
+      });
+
+      this._isPrompting = false;
+      this.emit('prompting', false);
+      this.emit('prompt_complete', result.stopReason);
+
+      return { stopReason: result.stopReason };
+    } catch (err) {
+      this._isPrompting = false;
+      this.emit('prompting', false);
+      throw err;
+    }
+  }
+
+  resolvePermission(approved: boolean): void {
+    if (this.pendingPermission) {
+      const { resolve, options } = this.pendingPermission;
+      this.pendingPermission = null;
+
+      if (approved) {
+        const allowOption = options.find((o) => o.kind === 'allow_once');
+        resolve({
+          outcome: allowOption
+            ? { outcome: 'selected', optionId: allowOption.optionId }
+            : { outcome: 'cancelled' },
+        });
+      } else {
+        resolve({ outcome: { outcome: 'cancelled' } });
+      }
+    }
+  }
+
+  async cancel(): Promise<void> {
+    if (this.connection && this.sessionId) {
+      await this.connection.cancel({ sessionId: this.sessionId });
+    }
+  }
+
+  kill(): void {
+    if (this.process) {
+      this.process.stdin?.end();
+      this.process.kill('SIGTERM');
+      this.process = null;
+    }
+    this._isConnected = false;
+    this._isPrompting = false;
+  }
+}

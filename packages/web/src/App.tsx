@@ -8,6 +8,7 @@ import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
+import { PermissionDialog } from './components/PermissionDialog';
 import { useEffect } from 'react';
 
 export function App() {
@@ -67,6 +68,7 @@ export function App() {
         )}
       </div>
       <ToastContainer />
+      <PermissionDialog />
     </div>
   );
 }

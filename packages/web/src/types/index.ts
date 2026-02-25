@@ -1,5 +1,42 @@
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
 
+// ACP Protocol Types
+
+export type AgentMode = 'pty' | 'acp';
+
+export interface AcpTextChunk {
+  type: 'text';
+  text: string;
+}
+
+export interface AcpToolCall {
+  toolCallId: string;
+  title: string;
+  kind: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  content?: string;
+}
+
+export interface AcpPlanEntry {
+  content: string;
+  priority: 'high' | 'medium' | 'low';
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface AcpPermissionRequest {
+  id: string;
+  agentId: string;
+  toolName: string;
+  arguments: Record<string, any>;
+  timestamp: string;
+}
+
+export interface AcpSessionInfo {
+  sessionId: string;
+  mode: AgentMode;
+  isPrompting: boolean;
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -19,6 +56,12 @@ export interface AgentInfo {
   childIds: string[];
   createdAt: string;
   outputPreview: string;
+  mode: AgentMode;
+  session?: AcpSessionInfo;
+  plan?: AcpPlanEntry[];
+  toolCalls?: AcpToolCall[];
+  messages?: AcpTextChunk[];
+  pendingPermission?: AcpPermissionRequest;
 }
 
 export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';
@@ -46,6 +89,14 @@ export interface ServerConfig {
 }
 
 export interface WsMessage {
-  type: string;
+  type:
+    | 'agent:output'
+    | 'agent:status'
+    | 'agent:text'
+    | 'agent:tool_call'
+    | 'agent:plan'
+    | 'agent:permission_request'
+    | 'agent:permission_response'
+    | string;
   [key: string]: any;
 }
