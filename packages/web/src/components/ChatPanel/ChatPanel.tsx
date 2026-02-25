@@ -133,6 +133,17 @@ export function ChatPanel({ agentId, ws }: Props) {
 
   const handleSend = () => {
     if (!inputText.trim()) return;
+
+    // Record user message in store for ACP agents
+    if (agent?.mode === 'acp') {
+      const state = useAppStore.getState();
+      const existing = state.agents.find((a) => a.id === agentId);
+      const msgs = existing?.messages ?? [];
+      useAppStore.getState().updateAgent(agentId, {
+        messages: [...msgs, { type: 'text', text: inputText, sender: 'user' }],
+      });
+    }
+
     if (broadcast) {
       const allAgents = useAppStore.getState().agents;
       const running = allAgents.filter((a) => a.status === 'running');

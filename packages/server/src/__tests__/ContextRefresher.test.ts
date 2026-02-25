@@ -226,7 +226,7 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('start sets up interval that calls refreshAll periodically', () => {
+    it('start does not set up periodic interval (event-driven only)', () => {
       const a1 = makeAgent({ id: 'a1', status: 'running' });
       mocks.agentManager.getAll.mockReturnValue([a1]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
@@ -234,44 +234,30 @@ describe('ContextRefresher', () => {
 
       refresher.start();
 
-      // No call yet before interval fires
+      // No periodic calls — context refresh is event-driven only
+      vi.advanceTimersByTime(60000);
       expect(a1.injectContextUpdate).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(5000);
-      expect(a1.injectContextUpdate).toHaveBeenCalledTimes(1);
-
-      vi.advanceTimersByTime(5000);
-      expect(a1.injectContextUpdate).toHaveBeenCalledTimes(2);
     });
 
-    it('stop clears the interval', () => {
+    it('stop clears any pending debounce', () => {
       const a1 = makeAgent({ id: 'a1', status: 'running' });
       mocks.agentManager.getAll.mockReturnValue([a1]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
 
       refresher.start();
-      vi.advanceTimersByTime(5000);
-      expect(a1.injectContextUpdate).toHaveBeenCalledTimes(1);
-
+      // Trigger debounced refresh via event
+      mocks.agentManager.emit('agent:spawned', {});
       refresher.stop();
       vi.advanceTimersByTime(10000);
-      // No additional calls after stop
-      expect(a1.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Debounce was cleared — no calls
+      expect(a1.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('start is idempotent (calling twice does not create duplicate intervals)', () => {
-      const a1 = makeAgent({ id: 'a1', status: 'running' });
-      mocks.agentManager.getAll.mockReturnValue([a1]);
-      mocks.lockRegistry.getAll.mockReturnValue([]);
-      mocks.activityLedger.getRecent.mockReturnValue([]);
-
+    it('start can be called multiple times safely', () => {
       refresher.start();
       refresher.start();
-
-      vi.advanceTimersByTime(5000);
-      // Should only fire once, not twice
-      expect(a1.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // No error thrown
     });
   });
 });

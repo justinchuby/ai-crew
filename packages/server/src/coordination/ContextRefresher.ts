@@ -36,8 +36,9 @@ export class ContextRefresher {
   }
 
   start(): void {
-    if (this.intervalHandle) return;
-    this.intervalHandle = setInterval(() => this.refreshAll(), this.intervalMs);
+    // Event-driven refresh only — no periodic timer.
+    // Context updates are pushed on significant events (spawn, kill, lock changes)
+    // to avoid wasting tokens on idle heartbeats.
   }
 
   stop(): void {
