@@ -48,14 +48,22 @@ export function LeadDashboard({ api, ws }: Props) {
   // Subscribe to selected lead agent WS stream
   useEffect(() => {
     if (!selectedLeadId) return;
+    chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
     ws.subscribe(selectedLeadId);
     return () => ws.unsubscribe(selectedLeadId);
   }, [selectedLeadId, ws]);
 
   // Auto-scroll on new messages only if near bottom
+  const chatInitialScroll = useRef(false);
   useEffect(() => {
     const el = chatContainerRef.current;
     if (!el) return;
+    // On first render or lead change, scroll to bottom unconditionally
+    if (!chatInitialScroll.current) {
+      chatInitialScroll.current = true;
+      messagesEndRef.current?.scrollIntoView();
+      return;
+    }
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -650,9 +658,15 @@ function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations
 
 function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
+  const initialScroll = useRef(false);
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
+    if (!initialScroll.current) {
+      initialScroll.current = true;
+      el.scrollTo({ top: el.scrollHeight });
+      return;
+    }
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (isNearBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
@@ -689,9 +703,15 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
 
 function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
+  const initialScroll = useRef(false);
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
+    if (!initialScroll.current) {
+      initialScroll.current = true;
+      el.scrollTo({ top: el.scrollHeight });
+      return;
+    }
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (isNearBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
