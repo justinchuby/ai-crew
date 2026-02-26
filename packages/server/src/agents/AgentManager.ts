@@ -354,12 +354,15 @@ export class AgentManager extends EventEmitter {
       const anyRunning = children.some((a) => a.status === 'running');
       if (anyRunning) continue;
 
-      // All children are idle/completed — team is stalled
-      const idleChildren = children.filter((a) => a.status === 'idle');
-      const completedChildren = children.filter((a) => a.status === 'completed' || a.status === 'failed');
+      // Check if there are active (incomplete) delegations — if none, work is done
       const activeDelegations = Array.from(this.delegations.values()).filter(
         (d) => d.fromAgentId === lead.id && d.status === 'active'
       );
+      if (activeDelegations.length === 0) continue; // all delegations completed → legitimately idle
+
+      // All children are idle/completed but there are uncompleted delegations — team is stalled
+      const idleChildren = children.filter((a) => a.status === 'idle');
+      const completedChildren = children.filter((a) => a.status === 'completed' || a.status === 'failed');
 
       const nudgeCount = (this.leadNudgeCount.get(lead.id) ?? 0) + 1;
       this.leadNudgeCount.set(lead.id, nudgeCount);
