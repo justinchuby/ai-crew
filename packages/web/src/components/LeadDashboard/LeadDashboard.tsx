@@ -180,7 +180,7 @@ export function LeadDashboard({ api, ws }: Props) {
             fromRole: msg.fromRole || fromAgent?.role?.name || 'Unknown',
             toId: msg.to,
             toRole: msg.toRole || toAgent?.role?.name || 'Unknown',
-            content: msg.content?.slice(0, 300) ?? '',
+            content: msg.content ?? '',
             timestamp: Date.now(),
           });
 
@@ -659,6 +659,7 @@ function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations
 function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const initialScroll = useRef(false);
+  const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
@@ -676,28 +677,71 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const recent = comms.slice(-50);
 
   return (
-    <div ref={feedRef}>
-      {recent.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
-      ) : (
-        recent.map((c) => {
-          const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          return (
-            <div key={c.id} className="px-3 py-1.5 border-b border-gray-700/30">
-              <div className="flex items-center gap-1 text-xs">
-                <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
-                <span className="text-gray-500">→</span>
-                <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
-                <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+    <>
+      <div ref={feedRef}>
+        {recent.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
+        ) : (
+          recent.map((c) => {
+            const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return (
+              <div
+                key={c.id}
+                className="px-3 py-1.5 border-b border-gray-700/30 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                onClick={() => setSelectedComm(c)}
+              >
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
+                  <span className="text-gray-500">→</span>
+                  <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
+                  <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+                </div>
+                <p className="text-xs font-mono text-gray-300 mt-0.5 truncate">
+                  {c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content}
+                </p>
               </div>
-              <p className="text-xs font-mono text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
-                {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
-              </p>
+            );
+          })
+        )}
+      </div>
+
+      {/* Full message popup */}
+      {selectedComm && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedComm(null)}
+        >
+          <div
+            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
+                <span className="text-gray-500">→</span>
+                <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-gray-500">
+                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                </span>
+                <button
+                  onClick={() => setSelectedComm(null)}
+                  className="text-gray-400 hover:text-white text-lg leading-none"
+                >
+                  ×
+                </button>
+              </div>
             </div>
-          );
-        })
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                {selectedComm.content}
+              </pre>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
