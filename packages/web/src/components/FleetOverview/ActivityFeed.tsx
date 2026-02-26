@@ -67,8 +67,8 @@ export function ActivityFeed({ activity, agents }: Props) {
                     </div>
                   )}
                   {entry.details && (
-                    <div className="text-[10px] text-gray-500 truncate" title={entry.details}>
-                      {entry.details}
+                    <div className="text-[10px] text-gray-500 truncate" title={typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}>
+                      {typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}
                     </div>
                   )}
                 </div>

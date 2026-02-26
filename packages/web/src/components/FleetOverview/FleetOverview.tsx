@@ -26,7 +26,7 @@ export interface ActivityEntry {
   agentRole: string;
   actionType: string;
   filePath?: string;
-  details?: string;
+  details?: string | Record<string, unknown>;
   timestamp: string;
 }
 
