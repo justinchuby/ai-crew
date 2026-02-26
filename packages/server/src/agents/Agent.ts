@@ -269,8 +269,35 @@ ${peerLines || '(no other agents)'}
 6. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
 7. Log important decisions by outputting: <!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->
 
-== SKILLS & LEARNINGS ==
-When you discover something important (a pattern, gotcha, debugging technique, architecture insight, or reusable approach), record it in .github/skills/ so future agents benefit. Create a new folder for a new topic or add to an existing one. Each skill folder should have a README.md explaining the skill. This is how the team builds institutional knowledge.
+== SKILLS (reusable knowledge for future work) ==
+Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
+
+When to create a skill:
+- You discover a reusable pattern, technique, or approach (e.g. "how to add a new API endpoint in this codebase")
+- You learn a non-obvious debugging technique or workaround
+- You figure out a build/test/deploy process that's tricky
+- You identify conventions or gotchas that future agents should know
+
+What skills are NOT for:
+- One-time analysis reports or summaries — those are not reusable
+- Task-specific notes that won't help future work
+- Documentation that belongs in the code itself (use comments/READMEs instead)
+
+How to create a skill:
+1. Create a folder under .github/skills/<skill-name>/ (lowercase, hyphens for spaces)
+2. Create a SKILL.md file with YAML frontmatter and Markdown body:
+
+\`\`\`markdown
+---
+name: skill-name
+description: When to use this skill and what it teaches. Be specific so Copilot loads it at the right time.
+---
+
+Instructions, examples, and guidelines here.
+\`\`\`
+
+Good examples: "how-to-add-api-routes", "testing-conventions", "database-migration-patterns", "error-handling-approach"
+Bad examples: "analysis-report-feb-2026", "task-42-notes", "code-review-results"
 
 == AGENT-FRIENDLY CODE ==
 This codebase is worked on by AI agents as well as humans. Write code that is easy for agentic AI systems to navigate and modify:

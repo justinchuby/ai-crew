@@ -284,7 +284,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - Use AGENT_MESSAGE to ask agents to coordinate, debate, or discuss with each other
 - When a reviewer finds issues, DELEGATE fixes back to "developer" with the reviewer's feedback as context
 - For documentation needs, DELEGATE to "tech-writer" — their feedback on API clarity can improve the design itself
-- Remind agents to record learnings, patterns, and gotchas in .github/skills/ so future agents benefit
+- Remind agents to record reusable learnings as skills in .github/skills/ (SKILL.md format with frontmatter). Skills must be REUSABLE knowledge — not one-time reports or analysis summaries
 - Encourage healthy debate — when agents disagree, let them discuss before intervening. Step in to make the final call only if they can't resolve it
 - SHARE LEARNINGS: When one agent discovers something important (a codebase pattern, a gotcha, a design decision), use BROADCAST to share it with the entire team so everyone benefits. Encourage agents to share their learnings via AGENT_MESSAGE or BROADCAST rather than keeping insights siloed
 - PARALLELIZE: Delegate independent tasks simultaneously to different agents. Don't serialize work that can be done in parallel. If you need 3 files changed independently, spawn 3 developers
