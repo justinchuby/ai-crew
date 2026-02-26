@@ -652,6 +652,7 @@ export function LeadDashboard({ api, ws }: Props) {
 function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const initialScroll = useRef(false);
+  const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
@@ -667,24 +668,80 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   }, [decisions.length]);
 
   return (
-    <div ref={feedRef} className="h-full overflow-y-auto p-2 space-y-2">
-      {decisions.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4 font-mono">No decisions yet</p>
-      ) : (
-        decisions.map((d: any, i: number) => (
-          <div key={d.id || `dec-${i}`} className="bg-gray-800 border border-gray-700 rounded p-2">
-            <div className="flex items-start gap-2">
-              <Lightbulb className="w-3.5 h-3.5 text-yellow-400 mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-mono font-semibold text-gray-200">{d.title}</p>
-                {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1">{d.rationale}</p>}
-                <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+    <>
+      <div ref={feedRef} className="h-full overflow-y-auto p-2 space-y-2">
+        {decisions.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-4 font-mono">No decisions yet</p>
+        ) : (
+          decisions.map((d: any, i: number) => (
+            <div
+              key={d.id || `dec-${i}`}
+              className="bg-gray-800 border border-gray-700 rounded p-2 cursor-pointer hover:bg-gray-700/50 transition-colors"
+              onClick={() => setSelectedDecision(d)}
+            >
+              <div className="flex items-start gap-2">
+                <Lightbulb className="w-3.5 h-3.5 text-yellow-400 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-mono font-semibold text-gray-200 truncate">{d.title}</p>
+                  {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
+                  <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+                </div>
               </div>
             </div>
+          ))
+        )}
+      </div>
+
+      {/* Decision detail popup */}
+      {selectedDecision && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedDecision(null); }}
+        >
+          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-yellow-400" />
+                <span className="text-sm font-semibold text-gray-100">Decision</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-gray-500">
+                  {new Date(selectedDecision.timestamp).toLocaleString()}
+                </span>
+                <button onClick={() => setSelectedDecision(null)} className="text-gray-400 hover:text-gray-200">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <h3 className="text-base font-mono font-semibold text-gray-100 mb-3">{selectedDecision.title}</h3>
+              {selectedDecision.rationale && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-gray-400 mb-1">Rationale</p>
+                  <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap">{selectedDecision.rationale}</p>
+                </div>
+              )}
+              {selectedDecision.alternatives && selectedDecision.alternatives.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-gray-400 mb-1">Alternatives considered</p>
+                  <ul className="list-disc list-inside text-sm font-mono text-gray-400 space-y-1">
+                    {selectedDecision.alternatives.map((alt: string, i: number) => (
+                      <li key={i}>{alt}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedDecision.impact && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-1">Impact</p>
+                  <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap">{selectedDecision.impact}</p>
+                </div>
+              )}
+            </div>
           </div>
-        ))
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
