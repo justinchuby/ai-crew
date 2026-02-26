@@ -69,6 +69,37 @@ export class AcpConnection extends EventEmitter {
   get currentSessionId(): string | null { return this.sessionId; }
 
   async start(opts: AcpConnectionOptions): Promise<string> {
+    await this.spawnAndConnect(opts);
+
+    const sessionResult = await this.connection!.newSession({
+      cwd: opts.cwd || process.cwd(),
+      mcpServers: [],
+    });
+
+    const { sessionId } = sessionResult;
+    this.sessionId = sessionId;
+    this._isConnected = true;
+    this.emit('connected', sessionId);
+
+    return sessionId;
+  }
+
+  async resumeSession(opts: AcpConnectionOptions, sessionId: string): Promise<string> {
+    await this.spawnAndConnect(opts);
+
+    const result = await (this.connection as any).unstable_resumeSession({
+      sessionId,
+      cwd: opts.cwd || process.cwd(),
+    });
+
+    this.sessionId = sessionId;
+    this._isConnected = true;
+    this.emit('connected', sessionId);
+
+    return sessionId;
+  }
+
+  private async spawnAndConnect(opts: AcpConnectionOptions): Promise<void> {
     const args = ['--acp', '--stdio', ...(opts.cliArgs || [])];
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -196,18 +227,6 @@ export class AcpConnection extends EventEmitter {
       protocolVersion: acp.PROTOCOL_VERSION,
       clientCapabilities: {},
     });
-
-    const sessionResult = await this.connection.newSession({
-      cwd: opts.cwd || process.cwd(),
-      mcpServers: [],
-    });
-
-    const { sessionId } = sessionResult;
-    this.sessionId = sessionId;
-    this._isConnected = true;
-    this.emit('connected', sessionId);
-
-    return sessionId;
   }
 
   async prompt(text: string): Promise<{ stopReason: acp.StopReason }> {

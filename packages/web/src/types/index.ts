@@ -74,6 +74,7 @@ export interface AgentInfo {
   mode: AgentMode;
   autopilot: boolean;
   session?: AcpSessionInfo;
+  sessionId?: string | null;
   plan?: AcpPlanEntry[];
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];

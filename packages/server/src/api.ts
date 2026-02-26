@@ -8,6 +8,7 @@ import type { Database } from './db/database.js';
 import type { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.js';
 import { logger } from './utils/logger.js';
+import { writeAgentFiles } from './agents/agentFiles.js';
 
 export function apiRouter(
   agentManager: AgentManager,
@@ -108,6 +109,7 @@ export function apiRouter(
 
   router.post('/roles', (req, res) => {
     const role = roleRegistry.register(req.body);
+    writeAgentFiles([role]);
     res.status(201).json(role);
   });
 
@@ -185,17 +187,18 @@ export function apiRouter(
 
   // --- Project Lead ---
   router.post('/lead/start', (req, res) => {
-    const { task, name, model, cwd } = req.body;
+    const { task, name, model, cwd, sessionId: resumeSessionId } = req.body;
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
     try {
-      const agent = agentManager.spawn(role, task, undefined, 'acp', true, model, cwd);
+      const agent = agentManager.spawn(role, task, undefined, 'acp', true, model, cwd, resumeSessionId);
       agent.projectName = name || task?.slice(0, 60) || `Project ${new Date().toLocaleDateString()}`;
-      logger.info('lead', `Started project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
+      logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,
         cwd: cwd || process.cwd(),
+        resumeSessionId,
       });
       if (task) {
         setTimeout(() => {

@@ -20,6 +20,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
   const [newProjectCwd, setNewProjectCwd] = useState('');
+  const [resumeSessionId, setResumeSessionId] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -284,13 +285,13 @@ export function LeadDashboard({ api, ws }: Props) {
     document.addEventListener('mouseup', onMouseUp);
   }, [sidebarWidth]);
 
-  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string) => {
+  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string) => {
     setStarting(true);
     try {
       const resp = await fetch('/api/lead/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, task, model: model || undefined, cwd: cwd || undefined }),
+        body: JSON.stringify({ name, task, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
       });
       const data = await resp.json();
       if (data.id) {
@@ -304,6 +305,7 @@ export function LeadDashboard({ api, ws }: Props) {
         setNewProjectTask('');
         setNewProjectModel('');
         setNewProjectCwd('');
+        setResumeSessionId('');
       }
     } catch {
       // ignore
@@ -475,6 +477,16 @@ export function LeadDashboard({ api, ws }: Props) {
                     className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1 font-medium">Resume Session <span className="text-gray-600">(optional — paste a session ID to continue previous work)</span></label>
+                  <input
+                    type="text"
+                    value={resumeSessionId}
+                    onChange={(e) => setResumeSessionId(e.target.value)}
+                    placeholder="session-id-from-previous-lead"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
@@ -485,12 +497,12 @@ export function LeadDashboard({ api, ws }: Props) {
                 Cancel
               </button>
               <button
-                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined)}
+                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined, resumeSessionId.trim() || undefined)}
                 disabled={starting}
                 className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
               >
                 {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                {starting ? 'Starting...' : 'Create Project'}
+                {starting ? 'Starting...' : resumeSessionId.trim() ? 'Resume Project' : 'Create Project'}
               </button>
             </div>
           </div>
@@ -557,6 +569,26 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Working directory bar */}
             <CwdBar leadId={selectedLeadId!} cwd={leadAgent?.cwd} />
+
+            {/* Session ID bar — copyable for resume */}
+            {leadAgent?.sessionId && (
+              <div className="border-b border-gray-700 px-4 py-1 flex items-center gap-2 text-xs font-mono bg-gray-800/20">
+                <GitBranch className="w-3 h-3 text-gray-500 shrink-0" />
+                <span className="text-gray-500">Session:</span>
+                <span className="text-gray-400 truncate" title={leadAgent.sessionId}>{leadAgent.sessionId}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(leadAgent.sessionId!);
+                    const btn = document.activeElement as HTMLElement;
+                    btn.textContent = 'copied!';
+                    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+                  }}
+                  className="text-gray-500 hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
+                >
+                  copy
+                </button>
+              </div>
+            )}
 
             {/* Agent Reports — separate from lead output */}
             {agentReports.length > 0 && (

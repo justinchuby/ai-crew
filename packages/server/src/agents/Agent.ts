@@ -5,6 +5,7 @@ import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { agentFlagForRole } from './agentFiles.js';
 
 export type AgentMode = 'pty' | 'acp';
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
@@ -71,6 +72,9 @@ export class Agent {
   private permissionRequestListeners: Array<(request: any) => void> = [];
   private peers: AgentContextInfo[];
 
+  /** Resume a previous session by its Copilot session ID */
+  public resumeSessionId?: string;
+
   constructor(role: Role, config: ServerConfig, taskId?: string, parentId?: string, peers: AgentContextInfo[] = [], mode?: AgentMode, autopilot?: boolean) {
     this.id = uuid();
     this.role = role;
@@ -86,11 +90,17 @@ export class Agent {
 
   start(): void {
     const contextManifest = this.buildContextManifest(this.peers);
-    const rolePrompt = `${this.role.systemPrompt}\n\nYou are acting as the "${this.role.name}" role. ${this.taskId ? `Your assigned task ID is: ${this.taskId}` : 'Awaiting task assignment.'}`;
-    const initialPrompt = `${contextManifest}\n\n${rolePrompt}`;
+    // System prompt is now in the .agent.md file loaded via --agent flag.
+    // Only send the context manifest and task assignment as the initial prompt.
+    const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.taskId ? `Your assigned task ID is: ${this.taskId}` : 'Awaiting task assignment.'}`;
+    const initialPrompt = `${contextManifest}\n\n${taskAssignment}`;
 
     if (this.mode === 'acp') {
-      this.startAcp(initialPrompt);
+      if (this.resumeSessionId) {
+        this.startAcpResume(this.resumeSessionId, initialPrompt);
+      } else {
+        this.startAcp(initialPrompt);
+      }
     } else {
       this.startPty(initialPrompt);
     }
@@ -101,6 +111,7 @@ export class Agent {
       command: this.config.cliCommand,
       args: [
         ...this.config.cliArgs,
+        `--agent=${agentFlagForRole(this.role.id)}`,
         ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
       ],
       cwd: this.cwd,
@@ -145,21 +156,67 @@ export class Agent {
   private startAcp(initialPrompt: string): void {
     this.acpConnection = new AcpConnection({ autopilot: this.autopilot });
     this.status = 'running';
+    this.wireAcpEvents();
 
-    this.acpConnection.on('text', (text: string) => {
+    this.acpConnection.start({
+      cliCommand: this.config.cliCommand,
+      cliArgs: [
+        ...this.config.cliArgs,
+        `--agent=${agentFlagForRole(this.role.id)}`,
+        ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
+      ],
+      cwd: this.cwd || process.cwd(),
+    }).then((sessionId) => {
+      this.sessionId = sessionId;
+      return this.acpConnection!.prompt(initialPrompt);
+    }).catch((err) => {
+      this.status = 'failed';
+      for (const listener of this.exitListeners) {
+        listener(1);
+      }
+    });
+  }
+
+  private startAcpResume(resumeId: string, initialPrompt: string): void {
+    this.acpConnection = new AcpConnection({ autopilot: this.autopilot });
+    this.status = 'running';
+    this.wireAcpEvents();
+
+    this.acpConnection.resumeSession({
+      cliCommand: this.config.cliCommand,
+      cliArgs: [
+        ...this.config.cliArgs,
+        `--agent=${agentFlagForRole(this.role.id)}`,
+        ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
+      ],
+      cwd: this.cwd || process.cwd(),
+    }, resumeId).then((sessionId) => {
+      this.sessionId = sessionId;
+      return this.acpConnection!.prompt(initialPrompt);
+    }).catch((err) => {
+      logger.warn('agent', `Session resume failed (${resumeId}), falling back to new session: ${err.message}`);
+      // Fallback to new session if resume fails
+      this.startAcp(initialPrompt);
+    });
+  }
+
+  private wireAcpEvents(): void {
+    const conn = this.acpConnection!;
+
+    conn.on('text', (text: string) => {
       this.messages.push(text);
       for (const listener of this.dataListeners) {
         listener(text);
       }
     });
 
-    this.acpConnection.on('content', (content: any) => {
+    conn.on('content', (content: any) => {
       for (const listener of this.contentListeners) {
         listener(content);
       }
     });
 
-    this.acpConnection.on('tool_call', (info: ToolCallInfo) => {
+    conn.on('tool_call', (info: ToolCallInfo) => {
       const idx = this.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
       if (idx >= 0) {
         this.toolCalls[idx] = info;
@@ -171,7 +228,7 @@ export class Agent {
       }
     });
 
-    this.acpConnection.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => {
+    conn.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => {
       const idx = this.toolCalls.findIndex((t) => t.toolCallId === update.toolCallId);
       if (idx >= 0) {
         this.toolCalls[idx] = { ...this.toolCalls[idx], ...update };
@@ -181,20 +238,20 @@ export class Agent {
       }
     });
 
-    this.acpConnection.on('plan', (entries: PlanEntry[]) => {
+    conn.on('plan', (entries: PlanEntry[]) => {
       this.plan = entries;
       for (const listener of this.planListeners) {
         listener(entries);
       }
     });
 
-    this.acpConnection.on('permission_request', (request: any) => {
+    conn.on('permission_request', (request: any) => {
       for (const listener of this.permissionRequestListeners) {
         listener(request);
       }
     });
 
-    this.acpConnection.on('exit', (code: number) => {
+    conn.on('exit', (code: number) => {
       if (!this.killed) {
         this.status = code === 0 ? 'completed' : 'failed';
       }
@@ -204,7 +261,7 @@ export class Agent {
     });
 
     // When a prompt finishes, mark delegated agents as idle (task done, awaiting next)
-    this.acpConnection.on('prompt_complete', (_stopReason: string) => {
+    conn.on('prompt_complete', (_stopReason: string) => {
       if (this.status === 'running' && !this.acpConnection?.isPrompting) {
         this.status = 'idle';
         for (const listener of this.statusListeners) {
@@ -217,29 +274,12 @@ export class Agent {
     });
 
     // When a prompt starts (including queued/drained prompts), ensure status is 'running'
-    this.acpConnection.on('prompting', (active: boolean) => {
+    conn.on('prompting', (active: boolean) => {
       if (active && this.status !== 'running') {
         this.status = 'running';
         for (const listener of this.statusListeners) {
           listener(this.status);
         }
-      }
-    });
-
-    this.acpConnection.start({
-      cliCommand: this.config.cliCommand,
-      cliArgs: [
-        ...this.config.cliArgs,
-        ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
-      ],
-      cwd: this.cwd || process.cwd(),
-    }).then((sessionId) => {
-      this.sessionId = sessionId;
-      return this.acpConnection!.prompt(initialPrompt);
-    }).catch((err) => {
-      this.status = 'failed';
-      for (const listener of this.exitListeners) {
-        listener(1);
       }
     });
   }

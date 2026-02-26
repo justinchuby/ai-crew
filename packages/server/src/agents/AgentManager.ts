@@ -8,6 +8,7 @@ import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
 import { logger } from '../utils/logger.js';
+import { writeAgentFiles } from './agentFiles.js';
 
 // JSON pattern agents can emit to request sub-agent spawning
 const SPAWN_REQUEST_REGEX = /<!--\s*SPAWN_AGENT\s*(\{.*?\})\s*-->/s;
@@ -81,6 +82,9 @@ export class AgentManager extends EventEmitter {
     // Start heartbeat timer to detect stalled teams
     this.heartbeatTimer = setInterval(() => this.heartbeatCheck(), 120_000);
 
+    // Write .agent.md files for all roles so Copilot CLI can load them
+    writeAgentFiles(this.roleRegistry.getAll());
+
     // Route incoming bus messages to target agents
     this.messageBus.on('message', (msg) => {
       if (msg.to === '*') return; // broadcasts handled elsewhere
@@ -98,7 +102,7 @@ export class AgentManager extends EventEmitter {
     });
   }
 
-  spawn(role: Role, taskId?: string, parentId?: string, mode?: AgentMode, autopilot?: boolean, model?: string, cwd?: string): Agent {
+  spawn(role: Role, taskId?: string, parentId?: string, mode?: AgentMode, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
       throw new Error(
@@ -118,6 +122,7 @@ export class AgentManager extends EventEmitter {
     const agent = new Agent(role, this.config, taskId, parentId, peers, mode, autopilot);
     if (model) agent.model = model;
     if (cwd) agent.cwd = cwd;
+    if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
 
     // Track parent-child relationship
     if (parentId) {
