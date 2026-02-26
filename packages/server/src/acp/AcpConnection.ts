@@ -197,6 +197,7 @@ export class AcpConnection extends EventEmitter {
     } catch (err) {
       this._isPrompting = false;
       this.emit('prompting', false);
+      this.emit('prompt_complete', 'error');
       this.drainQueue();
       throw err;
     }

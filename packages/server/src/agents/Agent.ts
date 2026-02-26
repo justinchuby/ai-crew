@@ -4,6 +4,7 @@ import { AcpConnection } from '../acp/AcpConnection.js';
 import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 export type AgentMode = 'pty' | 'acp';
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
@@ -323,7 +324,16 @@ CREW_UPDATE -->`;
         for (const listener of this.statusListeners) {
           listener(this.status);
         }
-        this.acpConnection.prompt(data).catch(() => {});
+        this.acpConnection.prompt(data).catch((err) => {
+          logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
+          // Reset status so agent doesn't get stuck as 'running'
+          if (this.status === 'running') {
+            this.status = 'idle';
+            for (const listener of this.statusListeners) {
+              listener(this.status);
+            }
+          }
+        });
       }
     } else {
       if (this.pty.isRunning) {
