@@ -643,9 +643,9 @@ export class AgentManager extends EventEmitter {
         child = existingAgent;
         logger.info('delegation', `Reusing idle ${role.name} (${child.id.slice(0, 8)}) for new task from ${agent.role.name}`);
       } else {
-        // No idle agent available — spawn a new one, with optional model override from lead
-        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd);
-        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${req.task.slice(0, 80)}`);
+        // No idle agent available — spawn a new one, with optional model/session override from lead
+        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd, req.sessionId);
+        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}${req.model ? ` (model: ${req.model})` : ''}${req.sessionId ? ` (resume: ${req.sessionId.slice(0, 12)})` : ''}: ${req.task.slice(0, 80)}`);
       }
 
       // Track delegation
@@ -815,7 +815,8 @@ CREW_ROSTER -->`;
     const rawOutput = agent.getBufferedOutput().slice(-8000);
     // Strip <!-- ... --> command blocks from output
     const cleanPreview = rawOutput.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').trim().slice(-6000);
-    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${cleanPreview || '(no output)'}`;
+    const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
+    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
     parent.sendMessage(summary);
@@ -846,7 +847,8 @@ CREW_ROSTER -->`;
     const status = exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
     const rawOutput2 = agent.getBufferedOutput().slice(-8000);
     const cleanPreview2 = rawOutput2.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').trim().slice(-6000);
-    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
+    const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
+    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.taskId || 'none'}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
     parent.sendMessage(summary);

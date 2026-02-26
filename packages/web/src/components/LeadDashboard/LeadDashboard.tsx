@@ -992,39 +992,40 @@ export function LeadDashboard({ api, ws }: Props) {
 }
 
 /** Parse [Agent Report] or [Agent ACK] formatted content into structured parts */
-function parseAgentReport(content: string): { header: string; task: string; output: string; isReport: boolean; isAck: boolean } {
+function parseAgentReport(content: string): { header: string; task: string; output: string; sessionId: string; isReport: boolean; isAck: boolean } {
   // Check for ACK first
   const ackMatch = content.match(/^\[Agent ACK\]\s*(.+?)(?:\n|$)/);
   if (ackMatch) {
     const header = ackMatch[1].trim();
-    // ACK format: "[Agent ACK] RoleName (id) acknowledged task: ..."
     const taskMatch = header.match(/acknowledged task:\s*(.*)/);
     return {
       header: header.replace(/\s*acknowledged task:.*/, ''),
       task: taskMatch ? taskMatch[1].trim() : '',
       output: '',
+      sessionId: '',
       isReport: true,
       isAck: true,
     };
   }
 
   const reportMatch = content.match(/^\[Agent Report\]\s*(.+?)(?:\n|$)/);
-  if (!reportMatch) return { header: '', task: '', output: '', isReport: false, isAck: false };
+  if (!reportMatch) return { header: '', task: '', output: '', sessionId: '', isReport: false, isAck: false };
 
   const header = reportMatch[1].trim();
   const taskMatch = content.match(/\nTask:\s*(.*?)(?:\n|$)/);
+  const sessionMatch = content.match(/\nSession ID:\s*(.*?)(?:\n|$)/);
   const outputMatch = content.match(/\nOutput summary:\s*([\s\S]*)$/);
 
   // Clean output: strip <!-- ... --> fragments and normalize whitespace
   let output = outputMatch ? outputMatch[1].trim() : '';
   output = output.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').replace(/^[\s\S]*?-->/g, '').trim();
-  // Collapse fragmented streaming chunks (single words/chars on separate lines)
   output = output.replace(/\n\s(?=\S)/g, ' ');
 
   return {
     header,
     task: taskMatch ? taskMatch[1].trim() : '',
     output,
+    sessionId: sessionMatch ? sessionMatch[1].trim() : '',
     isReport: true,
     isAck: false,
   };
@@ -1073,6 +1074,18 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
         <div>
           <span className="text-[10px] text-gray-500 uppercase tracking-wider">Output</span>
           <pre className="text-gray-300 whitespace-pre-wrap break-words mt-0.5 bg-gray-900/50 rounded p-2 text-xs max-h-60 overflow-y-auto">{parsed.output}</pre>
+        </div>
+      )}
+      {parsed.sessionId && (
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="text-gray-500 uppercase tracking-wider">Session</span>
+          <code className="text-gray-400 bg-gray-900/50 px-1.5 py-0.5 rounded">{parsed.sessionId}</code>
+          <button
+            onClick={() => navigator.clipboard.writeText(parsed.sessionId)}
+            className="text-gray-500 hover:text-yellow-400"
+          >
+            copy
+          </button>
         </div>
       )}
     </div>
