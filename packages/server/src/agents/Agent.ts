@@ -188,6 +188,8 @@ export class Agent {
     this.status = 'running';
     this.wireAcpEvents();
 
+    logger.info('agent', `Attempting session resume for ${this.role.name} (${this.id.slice(0, 8)}): ${resumeId}`);
+
     this.acpConnection.resumeSession({
       cliCommand: this.config.cliCommand,
       cliArgs: [
@@ -197,12 +199,19 @@ export class Agent {
       ],
       cwd: this.cwd || process.cwd(),
     }, resumeId).then((sessionId) => {
+      logger.info('agent', `Session resume succeeded for ${this.role.name} (${this.id.slice(0, 8)}): ${sessionId}`);
       this.sessionId = sessionId;
       for (const listener of this.sessionReadyListeners) listener(sessionId);
       return this.acpConnection!.prompt(initialPrompt);
     }).catch((err) => {
-      logger.warn('agent', `Session resume failed (${resumeId}), falling back to new session: ${err.message}`);
-      // Fallback to new session if resume fails
+      logger.error('agent', `Session resume FAILED for ${this.role.name} (${this.id.slice(0, 8)}): ${err.message}. Falling back to new session.`);
+      // Notify via data listeners so the UI shows the failure
+      const failMsg = `[System] Session resume failed: ${err.message}. Starting a new session instead.\n`;
+      for (const listener of this.dataListeners) listener(failMsg);
+      // Kill the failed connection's process before creating a new one
+      try { this.acpConnection?.kill(); } catch {}
+      this.acpConnection = null as any;
+      // Fallback to new session
       this.startAcp(initialPrompt);
     });
   }
