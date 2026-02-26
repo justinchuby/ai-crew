@@ -155,6 +155,10 @@ export class AgentManager extends EventEmitter {
       this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
     });
 
+    agent.onContent((content) => {
+      this.emit('agent:content', { agentId: agent.id, content });
+    });
+
     agent.onPlan((entries) => {
       this.emit('agent:plan', { agentId: agent.id, plan: entries });
     });

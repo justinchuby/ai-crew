@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import type { AcpToolCall, AcpPlanEntry } from '../../types';
-import { ChevronDown, ChevronRight, User, Bot } from 'lucide-react';
+import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
+import { ChevronDown, ChevronRight, User, Bot, FolderOpen } from 'lucide-react';
 
 interface Props {
   agentId: string;
@@ -162,8 +162,46 @@ export function AcpOutput({ agentId }: Props) {
       {/* Messages Section */}
       {messages.length > 0 && (
         <div className="space-y-2">
-          {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => {
+          {messages.filter((msg) => msg.sender !== 'system' && (msg.text || msg.contentType)).map((msg, i) => {
             const sender = msg.sender ?? 'agent';
+
+            // Rich content (image, audio, resource)
+            if (msg.contentType && msg.contentType !== 'text') {
+              return (
+                <div key={i} className="flex gap-2 justify-start">
+                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-1">
+                    <Bot size={14} className="text-accent" />
+                  </div>
+                  <div className="max-w-[85%]">
+                    {msg.contentType === 'image' && msg.data && (
+                      <div>
+                        <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-gray-700" />
+                        {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
+                      </div>
+                    )}
+                    {msg.contentType === 'audio' && msg.data && (
+                      <audio controls className="max-w-full">
+                        <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
+                      </audio>
+                    )}
+                    {msg.contentType === 'resource' && (
+                      <div className="rounded-lg px-3 py-2 bg-surface-raised border border-gray-700">
+                        {msg.uri && (
+                          <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
+                            <FolderOpen size={12} />
+                            <span className="font-mono">{msg.uri}</span>
+                          </div>
+                        )}
+                        {msg.text && (
+                          <pre className="text-xs font-mono text-gray-300 max-h-40 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={i}

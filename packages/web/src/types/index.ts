@@ -13,6 +13,14 @@ export interface AcpTextChunk {
   timestamp?: number;
   /** Whether a user message is still queued (not yet processed by agent) */
   queued?: boolean;
+  /** Content type for rich media (default: 'text') */
+  contentType?: 'text' | 'image' | 'audio' | 'resource';
+  /** MIME type for image/audio content */
+  mimeType?: string;
+  /** Base64-encoded data for image/audio */
+  data?: string;
+  /** URI for resource content */
+  uri?: string;
 }
 
 export interface AcpToolCall {

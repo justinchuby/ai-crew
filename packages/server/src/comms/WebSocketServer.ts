@@ -102,6 +102,10 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:text', agentId, text });
     });
 
+    agentManager.on('agent:content', (data: any) => {
+      this.broadcastAll({ type: 'agent:content', ...data });
+    });
+
     agentManager.on('agent:plan', (data: any) => {
       this.broadcastAll({ type: 'agent:plan', ...data });
     });
