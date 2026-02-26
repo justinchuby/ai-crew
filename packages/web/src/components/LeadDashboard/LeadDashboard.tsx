@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
+import type { AcpTextChunk } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 
 interface Props {
@@ -111,6 +112,19 @@ export function LeadDashboard({ api, ws }: Props) {
       if (msg.type === 'agent:text' && msg.agentId === selectedLeadId) {
         const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
         store.appendToLastAgentMessage(msg.agentId, rawText);
+      }
+
+      // Stream PL rich content into chat
+      if (msg.type === 'agent:content' && msg.agentId === selectedLeadId) {
+        store.addMessage(msg.agentId, {
+          type: 'text',
+          text: msg.content.text || '',
+          sender: 'agent',
+          contentType: msg.content.contentType,
+          mimeType: msg.content.mimeType,
+          data: msg.content.data,
+          uri: msg.content.uri,
+        });
       }
 
       // When lead goes back to running after idle, promote queued messages and start a new message bubble
@@ -523,6 +537,18 @@ export function LeadDashboard({ api, ws }: Props) {
                 }
 
                 // Agent (lead) messages: no bubble, just flowing text
+                if (msg.contentType && msg.contentType !== 'text') {
+                  return (
+                    <div key={i} className="py-1">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <RichContentBlock msg={msg} />
+                        </div>
+                        <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={i} className="py-1">
                     <div className="flex items-start gap-2">
@@ -1178,6 +1204,48 @@ function InlineMarkdown({ text }: { text: string }) {
 }
 
 /** Renders agent text, separating <!-- command --> blocks from normal markdown */
+function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
+  if (msg.contentType === 'image' && msg.data) {
+    return (
+      <div className="py-1">
+        <img
+          src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`}
+          alt="Agent image"
+          className="max-w-full max-h-96 rounded-lg border border-gray-700"
+        />
+        {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
+      </div>
+    );
+  }
+  if (msg.contentType === 'audio' && msg.data) {
+    return (
+      <div className="py-1">
+        <audio controls className="max-w-full">
+          <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
+        </audio>
+      </div>
+    );
+  }
+  if (msg.contentType === 'resource') {
+    return (
+      <div className="py-1">
+        {msg.uri && (
+          <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
+            <FolderOpen className="w-3 h-3" />
+            <span className="font-mono">{msg.uri}</span>
+          </div>
+        )}
+        {msg.text && (
+          <pre className="text-xs font-mono text-gray-300 bg-gray-800 border border-gray-700 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+            {msg.text}
+          </pre>
+        )}
+      </div>
+    );
+  }
+  return null;
+}
+
 function AgentTextBlock({ text }: { text: string }) {
   // Split on <!-- ... --> blocks
   const segments = text.split(/(<!--[\s\S]*?-->)/g);

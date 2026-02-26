@@ -119,13 +119,27 @@ export class AcpConnection extends EventEmitter {
               }
               this.emit('text', text);
             } else if (update.content.type === 'resource') {
-              // Embedded file/resource — extract text content
               const res = update.content.resource;
-              const label = res?.uri ? `📎 ${res.uri}` : '📎 Resource';
-              const body = res?.text ?? '';
-              this.emit('text', `\n${label}\n${body}\n`);
+              this.emit('content', {
+                contentType: 'resource',
+                text: res?.text ?? '',
+                uri: res?.uri ?? '',
+                mimeType: res?.mimeType,
+              });
+            } else if (update.content.type === 'image') {
+              this.emit('content', {
+                contentType: 'image',
+                data: update.content.data,
+                mimeType: update.content.mimeType ?? 'image/png',
+                uri: update.content.uri,
+              });
+            } else if (update.content.type === 'audio') {
+              this.emit('content', {
+                contentType: 'audio',
+                data: update.content.data,
+                mimeType: update.content.mimeType ?? 'audio/wav',
+              });
             } else {
-              // image, audio, or unknown — emit a placeholder
               this.emit('text', `\n[${update.content.type} content]\n`);
             }
             break;

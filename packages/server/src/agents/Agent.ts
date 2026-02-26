@@ -62,6 +62,7 @@ export class Agent {
   private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
   private dataListeners: Array<(data: string) => void> = [];
+  private contentListeners: Array<(content: any) => void> = [];
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
   private statusListeners: Array<(status: AgentStatus) => void> = [];
@@ -149,6 +150,12 @@ export class Agent {
       this.messages.push(text);
       for (const listener of this.dataListeners) {
         listener(text);
+      }
+    });
+
+    this.acpConnection.on('content', (content: any) => {
+      for (const listener of this.contentListeners) {
+        listener(content);
       }
     });
 
@@ -413,6 +420,7 @@ CREW_UPDATE -->`;
 
   dispose(): void {
     this.dataListeners.length = 0;
+    this.contentListeners.length = 0;
     this.exitListeners.length = 0;
     this.hungListeners.length = 0;
     this.toolCallListeners.length = 0;
@@ -428,6 +436,10 @@ CREW_UPDATE -->`;
 
   onData(listener: (data: string) => void): void {
     this.dataListeners.push(listener);
+  }
+
+  onContent(listener: (content: any) => void): void {
+    this.contentListeners.push(listener);
   }
 
   onExit(listener: (code: number) => void): void {

@@ -110,6 +110,23 @@ export function useWebSocket() {
           updateAgent(msg.agentId, { toolCalls: updated });
           break;
         }
+        case 'agent:content': {
+          const state = useAppStore.getState();
+          const existing = state.agents.find((a) => a.id === msg.agentId);
+          const msgs = [...(existing?.messages ?? [])];
+          msgs.push({
+            type: 'text',
+            text: msg.content.text || '',
+            sender: 'agent',
+            timestamp: Date.now(),
+            contentType: msg.content.contentType,
+            mimeType: msg.content.mimeType,
+            data: msg.content.data,
+            uri: msg.content.uri,
+          });
+          updateAgent(msg.agentId, { messages: msgs });
+          break;
+        }
         case 'agent:plan':
           updateAgent(msg.agentId, { plan: msg.plan });
           break;
