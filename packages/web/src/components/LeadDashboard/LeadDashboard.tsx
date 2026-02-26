@@ -637,7 +637,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <ActivityFeedContent activity={activity} agents={agents} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Team" icon={<Bot className="w-3.5 h-3.5 text-blue-400" />} badge={teamAgents.length} defaultHeight={180}>
-                  <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} />
+                  <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} />
                 </CollapsibleSection>
               </div>
             </div>
@@ -671,41 +671,179 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   );
 }
 
-function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations: any[] }) {
+function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[] }) {
   const STATUS_COLOR: Record<string, string> = {
     creating: 'text-gray-400', running: 'text-blue-400', idle: 'text-yellow-400',
     completed: 'text-green-400', failed: 'text-red-400',
   };
+  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
+
+  const selectedDelegation = selectedAgent ? delegations.find((d: any) => d.toAgentId === selectedAgent.id) : null;
+  const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
+  const agentActivity = selectedAgent ? (activity ?? []).filter((e) => e.agentId === selectedAgent.id) : [];
 
   return (
-    <div className="p-2 space-y-2">
-      {agents.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
-      ) : (
-        agents.map((agent: any) => {
-          const delegation = delegations.find((d: any) => d.toAgentId === agent.id);
-          const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
-          return (
-            <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded p-2">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{agent.role.icon}</span>
-                <span className="text-sm font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
-                <span className={`text-xs font-mono ${colorClass} ml-auto`}>{agent.status}</span>
-              </div>
-              {delegation && (
-                <p className="text-xs font-mono text-gray-400 mt-1 truncate" title={delegation.task}>{delegation.task}</p>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                {(agent.model || agent.role.model) && (
-                  <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded">{agent.model || agent.role.model}</span>
+    <>
+      <div className="p-2 space-y-2">
+        {agents.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
+        ) : (
+          agents.map((agent: any) => {
+            const delegation = delegations.find((d: any) => d.toAgentId === agent.id);
+            const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
+            return (
+              <div
+                key={agent.id}
+                className="bg-gray-800 border border-gray-700 rounded p-2 cursor-pointer hover:border-gray-500 transition-colors"
+                onClick={() => setSelectedAgent(agent)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{agent.role.icon}</span>
+                  <span className="text-sm font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
+                  <span className={`text-xs font-mono ${colorClass} ml-auto`}>{agent.status}</span>
+                </div>
+                {delegation && (
+                  <p className="text-xs font-mono text-gray-400 mt-1 truncate" title={delegation.task}>{delegation.task}</p>
                 )}
-                <span className="text-xs font-mono text-gray-400 ml-auto">{agent.id.slice(0, 8)}</span>
+                <div className="flex items-center gap-2 mt-1">
+                  {(agent.model || agent.role.model) && (
+                    <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded">{agent.model || agent.role.model}</span>
+                  )}
+                  <span className="text-xs font-mono text-gray-400 ml-auto">{agent.id.slice(0, 8)}</span>
+                </div>
               </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Agent detail modal */}
+      {selectedAgent && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedAgent(null)}
+        >
+          <div
+            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-700">
+              <span className="text-2xl">{selectedAgent.role.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-semibold text-gray-100">{selectedAgent.role.name}</span>
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${STATUS_COLOR[selectedAgent.status] || 'text-gray-400'} bg-gray-700`}>
+                    {selectedAgent.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 font-mono">
+                  <span>{selectedAgent.id.slice(0, 8)}</span>
+                  {(selectedAgent.model || selectedAgent.role.model) && (
+                    <span className="bg-gray-700/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAgent(null)}
+                className="text-gray-400 hover:text-white text-lg leading-none p-1"
+              >
+                ×
+              </button>
             </div>
-          );
-        })
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Assigned Task */}
+              {selectedDelegation && (
+                <div className="px-5 py-3 border-b border-gray-700">
+                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">Assigned Task</h4>
+                  <p className="text-sm font-mono text-gray-200 whitespace-pre-wrap">{selectedDelegation.task}</p>
+                  {selectedDelegation.status && (
+                    <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      selectedDelegation.status === 'completed' ? 'text-green-400 bg-green-900/30' :
+                      selectedDelegation.status === 'active' ? 'text-blue-400 bg-blue-900/30' :
+                      'text-red-400 bg-red-900/30'
+                    }`}>{selectedDelegation.status}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Agent Output Preview */}
+              {selectedAgent.outputPreview && (
+                <div className="px-5 py-3 border-b border-gray-700">
+                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">Latest Output</h4>
+                  <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-40 overflow-y-auto bg-gray-900/50 rounded p-2">
+                    {selectedAgent.outputPreview}
+                  </pre>
+                </div>
+              )}
+
+              {/* Communications */}
+              {agentComms.length > 0 && (
+                <div className="px-5 py-3 border-b border-gray-700">
+                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-2">
+                    Communications ({agentComms.length})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {agentComms.slice(-20).map((c) => {
+                      const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const isSender = c.fromId === selectedAgent.id;
+                      return (
+                        <div key={c.id} className="text-xs font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className={isSender ? 'text-cyan-400' : 'text-green-400'}>{isSender ? c.fromRole : c.toRole}</span>
+                            <span className="text-gray-600">{isSender ? '→' : '←'}</span>
+                            <span className={isSender ? 'text-green-400' : 'text-cyan-400'}>{isSender ? c.toRole : c.fromRole}</span>
+                            <span className="text-gray-600 ml-auto">{time}</span>
+                          </div>
+                          <p className="text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
+                            {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Activity */}
+              {agentActivity.length > 0 && (
+                <div className="px-5 py-3">
+                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-2">
+                    Activity ({agentActivity.length})
+                  </h4>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {agentActivity.slice(-15).map((evt) => {
+                      const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      return (
+                        <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
+                          <span className="text-gray-500">{time}</span>
+                          <span className="text-gray-300 truncate">{evt.summary}</span>
+                          {evt.status && (
+                            <span className={`ml-auto shrink-0 text-[10px] ${
+                              evt.status === 'completed' ? 'text-green-400' :
+                              evt.status === 'in_progress' ? 'text-blue-400' : 'text-gray-500'
+                            }`}>{evt.status}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!selectedDelegation && !selectedAgent.outputPreview && agentComms.length === 0 && agentActivity.length === 0 && (
+                <div className="px-5 py-8 text-center text-gray-500 text-xs font-mono">
+                  No activity yet for this agent
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
