@@ -25,6 +25,27 @@ export interface PlanEntry {
 
 import { logger } from '../utils/logger.js';
 
+/** Extract displayable text from ACP content (single item, array, or string) */
+function extractContentText(content: any): string | undefined {
+  if (!content) return undefined;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.map((c: any) => {
+      if (typeof c === 'string') return c;
+      if (c?.type === 'text' && typeof c.text === 'string') return c.text;
+      if (typeof c?.text === 'string') return c.text;
+      if (c?.type === 'resource') return `📎 ${c.resource?.uri ?? ''}\n${c.resource?.text ?? ''}`;
+      return JSON.stringify(c);
+    }).join('\n');
+  }
+  if (typeof content === 'object') {
+    if (content.type === 'text' && typeof content.text === 'string') return content.text;
+    if (typeof content.text === 'string') return content.text;
+    return JSON.stringify(content);
+  }
+  return String(content);
+}
+
 export class AcpConnection extends EventEmitter {
   private process: ChildProcess | null = null;
   private connection: acp.ClientSideConnection | null = null;
@@ -147,10 +168,10 @@ export class AcpConnection extends EventEmitter {
           case 'tool_call':
             this.emit('tool_call', {
               toolCallId: update.toolCallId,
-              title: update.title,
-              kind: update.kind,
+              title: typeof update.title === 'string' ? update.title : update.title?.text ?? String(update.title),
+              kind: typeof update.kind === 'string' ? update.kind : update.kind?.text ?? String(update.kind),
               status: update.status,
-              content: update.content,
+              content: extractContentText(update.content),
             } as ToolCallInfo);
             break;
 
@@ -158,7 +179,7 @@ export class AcpConnection extends EventEmitter {
             this.emit('tool_call_update', {
               toolCallId: update.toolCallId,
               status: update.status,
-              content: update.content,
+              content: extractContentText(update.content),
             });
             break;
 
