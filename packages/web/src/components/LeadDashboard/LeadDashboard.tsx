@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 import type { AcpTextChunk } from '../../types';
@@ -184,6 +184,31 @@ export function LeadDashboard({ api, ws }: Props) {
         });
       }
 
+      // Handle PROGRESS updates from the lead
+      if (msg.type === 'lead:progress' && msg.agentId) {
+        const leadId = msg.agentId;
+        if (msg.summary) {
+          store.setProgressSummary(leadId, msg.summary);
+        }
+        // Build a display string for the activity feed
+        const parts: string[] = [];
+        if (msg.summary) parts.push(msg.summary);
+        if (Array.isArray(msg.in_progress) && msg.in_progress.length > 0) {
+          parts.push(`In progress: ${msg.in_progress.join(', ')}`);
+        }
+        if (Array.isArray(msg.blocked) && msg.blocked.length > 0) {
+          parts.push(`Blocked: ${msg.blocked.join(', ')}`);
+        }
+        store.addActivity(leadId, {
+          id: `progress-${Date.now()}`,
+          agentId: leadId,
+          agentRole: 'Project Lead',
+          type: 'progress',
+          summary: parts.join(' · ') || 'Progress update',
+          timestamp: Date.now(),
+        });
+      }
+
       // Track inter-agent messages
       if (msg.type === 'agent:message_sent') {
         const fromAgent = agents.find((a) => a.id === msg.from);
@@ -289,6 +314,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const messages = currentProject?.messages ?? [];
   const decisions = currentProject?.decisions ?? [];
   const progress = currentProject?.progress ?? null;
+  const progressSummary = currentProject?.progressSummary ?? null;
   const activity = currentProject?.activity ?? [];
   const comms = currentProject?.comms ?? [];
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
@@ -498,6 +524,11 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 </div>
                 <span className="text-gray-400">{progress.completionPct}%</span>
+              </div>
+            )}
+            {progressSummary && (
+              <div className="border-b border-gray-700 px-4 py-1.5 text-xs text-gray-400 bg-gray-800/30 font-mono truncate">
+                📋 {progressSummary}
               </div>
             )}
 
@@ -1025,6 +1056,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
     if (type === 'delegation') return <GitBranch className="w-3 h-3 text-yellow-400 shrink-0" />;
     if (type === 'completion') return <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />;
     if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
+    if (type === 'progress') return <BarChart3 className="w-3 h-3 text-purple-400 shrink-0" />;
     if (status === 'in_progress') return <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />;
     if (status === 'completed') return <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />;
     return <Wrench className="w-3 h-3 text-gray-400 shrink-0" />;

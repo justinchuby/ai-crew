@@ -5,7 +5,7 @@ export interface ActivityEvent {
   id: string;
   agentId: string;
   agentRole: string;
-  type: 'tool_call' | 'delegation' | 'completion' | 'message_sent';
+  type: 'tool_call' | 'delegation' | 'completion' | 'message_sent' | 'progress';
   summary: string;
   detail?: string;
   status?: string;
@@ -26,6 +26,7 @@ interface ProjectState {
   messages: AcpTextChunk[];
   decisions: Decision[];
   progress: LeadProgress | null;
+  progressSummary: string | null;
   toolCalls: AcpToolCall[];
   activity: ActivityEvent[];
   comms: AgentComm[];
@@ -48,6 +49,7 @@ interface LeadState {
   setDecisions: (leadId: string, decisions: Decision[]) => void;
   addDecision: (leadId: string, decision: Decision) => void;
   setProgress: (leadId: string, progress: LeadProgress) => void;
+  setProgressSummary: (leadId: string, summary: string) => void;
   addMessage: (leadId: string, msg: AcpTextChunk) => void;
   appendToLastAgentMessage: (leadId: string, text: string) => void;
   promoteQueuedMessages: (leadId: string) => void;
@@ -58,7 +60,7 @@ interface LeadState {
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
+  return { messages: [], decisions: [], progress: null, progressSummary: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -98,6 +100,12 @@ export const useLeadStore = create<LeadState>((set) => ({
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       return { projects: { ...s.projects, [leadId]: { ...proj, progress } } };
+    }),
+
+  setProgressSummary: (leadId, summary) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, progressSummary: summary } } };
     }),
 
   addMessage: (leadId, msg) =>
