@@ -109,7 +109,8 @@ export function LeadDashboard({ api, ws }: Props) {
 
       // Stream PL text into chat
       if (msg.type === 'agent:text' && msg.agentId === selectedLeadId) {
-        store.appendToLastAgentMessage(msg.agentId, msg.text);
+        const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
+        store.appendToLastAgentMessage(msg.agentId, rawText);
       }
 
       // When lead goes back to running after idle, promote queued messages and start a new message bubble

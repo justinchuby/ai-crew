@@ -83,6 +83,7 @@ export function useWebSocket() {
           });
           break;
         case 'agent:text': {
+          const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
@@ -90,9 +91,9 @@ export function useWebSocket() {
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
           if (last && (last.sender ?? 'agent') === 'agent' && !needsNewline) {
-            msgs[msgs.length - 1] = { ...last, text: last.text + msg.text, timestamp: last.timestamp || Date.now() };
+            msgs[msgs.length - 1] = { ...last, text: last.text + rawText, timestamp: last.timestamp || Date.now() };
           } else {
-            msgs.push({ type: 'text', text: msg.text, sender: 'agent', timestamp: Date.now() });
+            msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;
