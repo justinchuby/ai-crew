@@ -113,7 +113,7 @@ export const useLeadStore = create<LeadState>((set) => ({
       const msgs = [...proj.messages];
       const lastIdx = msgs.length - 1;
       if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent' && !proj.pendingNewline) {
-        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + text };
+        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + text, timestamp: msgs[lastIdx].timestamp || Date.now() };
       } else {
         msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
       }

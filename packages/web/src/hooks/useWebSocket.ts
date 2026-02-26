@@ -90,9 +90,9 @@ export function useWebSocket() {
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
           if (last && (last.sender ?? 'agent') === 'agent' && !needsNewline) {
-            msgs[msgs.length - 1] = { ...last, text: last.text + msg.text };
+            msgs[msgs.length - 1] = { ...last, text: last.text + msg.text, timestamp: last.timestamp || Date.now() };
           } else {
-            msgs.push({ type: 'text', text: msg.text, sender: 'agent' });
+            msgs.push({ type: 'text', text: msg.text, sender: 'agent', timestamp: Date.now() });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;
