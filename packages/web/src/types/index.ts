@@ -7,7 +7,12 @@ export type AgentMode = 'pty' | 'acp';
 export interface AcpTextChunk {
   type: 'text';
   text: string;
-  sender?: 'agent' | 'user' | 'system';
+  sender?: 'agent' | 'user' | 'system' | 'external';
+  /** Role name of external sender (e.g. "Developer", "Architect") */
+  fromRole?: string;
+  timestamp?: number;
+  /** Whether a user message is still queued (not yet processed by agent) */
+  queued?: boolean;
 }
 
 export interface AcpToolCall {

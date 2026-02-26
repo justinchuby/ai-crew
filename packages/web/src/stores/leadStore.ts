@@ -50,6 +50,7 @@ interface LeadState {
   setProgress: (leadId: string, progress: LeadProgress) => void;
   addMessage: (leadId: string, msg: AcpTextChunk) => void;
   appendToLastAgentMessage: (leadId: string, text: string) => void;
+  promoteQueuedMessages: (leadId: string) => void;
   updateToolCall: (leadId: string, toolCall: AcpToolCall) => void;
   addActivity: (leadId: string, event: ActivityEvent) => void;
   addComm: (leadId: string, comm: AgentComm) => void;
@@ -102,7 +103,8 @@ export const useLeadStore = create<LeadState>((set) => ({
   addMessage: (leadId, msg) =>
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: [...proj.messages, msg] } } };
+      const withTs = { ...msg, timestamp: msg.timestamp ?? Date.now() };
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: [...proj.messages, withTs] } } };
     }),
 
   appendToLastAgentMessage: (leadId, text) =>
@@ -117,6 +119,13 @@ export const useLeadStore = create<LeadState>((set) => ({
         msgs.push({ type: 'text', text: text, sender: 'agent' });
       }
       return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
+    }),
+
+  promoteQueuedMessages: (leadId) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      const updated = proj.messages.map((m) => m.queued ? { ...m, queued: false } : m);
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: updated } } };
     }),
 
   updateToolCall: (leadId, toolCall) =>

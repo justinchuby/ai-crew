@@ -103,12 +103,13 @@ export function LeadDashboard({ api, ws }: Props) {
         store.appendToLastAgentMessage(msg.agentId, msg.text);
       }
 
-      // When lead goes back to running after idle, start a new message bubble
+      // When lead goes back to running after idle, promote queued messages and start a new message bubble
       if (msg.type === 'agent:status' && msg.agentId === selectedLeadId && msg.status === 'running') {
+        store.promoteQueuedMessages(msg.agentId);
         const proj = store.projects[msg.agentId];
         const lastMsg = proj?.messages?.[proj.messages.length - 1];
         if (lastMsg?.sender === 'agent') {
-          store.addMessage(msg.agentId, { type: 'text', text: '---', sender: 'system' as any });
+          store.addMessage(msg.agentId, { type: 'text', text: '---', sender: 'system' });
         }
       }
 
@@ -174,6 +175,18 @@ export function LeadDashboard({ api, ws }: Props) {
             content: msg.content?.slice(0, 300) ?? '',
             timestamp: Date.now(),
           });
+
+          // Also inject messages sent TO the lead into the chat thread
+          if (msg.to === leadId && msg.from !== 'system') {
+            const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
+            store.addMessage(leadId, {
+              type: 'text',
+              text: msg.content ?? '',
+              sender: 'external',
+              fromRole: senderRole,
+              timestamp: Date.now(),
+            });
+          }
         }
       }
     };
@@ -239,7 +252,7 @@ export function LeadDashboard({ api, ws }: Props) {
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
-    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user' });
+    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: true, timestamp: Date.now() });
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -415,32 +428,52 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Messages */}
-            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 font-mono text-sm whitespace-pre-wrap ${
-                      msg.sender === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-800 text-gray-200 border border-gray-700'
-                    }`}
-                  >
-                    {msg.sender === 'agent' && (
-                      <div className="flex items-center gap-1.5 mb-1 text-yellow-400 text-xs">
-                        <Crown className="w-3 h-3" />
-                        Project Lead
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-1">
+              {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => {
+                if (msg.queued) return null; // queued messages rendered below
+                const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                if (msg.sender === 'user') {
+                  return (
+                    <div key={i} className="flex justify-end items-start gap-2 py-1">
+                      <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                      <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
+                        {msg.text}
                       </div>
-                    )}
-                    <InlineMarkdown text={msg.text} />
+                    </div>
+                  );
+                }
+
+                if (msg.sender === 'external') {
+                  return (
+                    <div key={i} className="flex items-start gap-2 py-1">
+                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-indigo-900/40 border border-indigo-700/50 font-mono text-sm whitespace-pre-wrap text-gray-300">
+                        <div className="flex items-center gap-1.5 mb-1 text-indigo-400 text-xs font-medium">
+                          <MessageSquare className="w-3 h-3" />
+                          {msg.fromRole || 'Agent'}
+                        </div>
+                        <InlineMarkdown text={msg.text} />
+                      </div>
+                      <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                    </div>
+                  );
+                }
+
+                // Agent (lead) messages: no bubble, just flowing text
+                return (
+                  <div key={i} className="py-1">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
+                        <AgentTextBlock text={msg.text} />
+                      </div>
+                      <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {isActive && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 font-mono text-sm text-gray-400 flex items-center gap-2">
+                );
+              })}
+              {isActive && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && !messages[messages.length - 1]?.queued && (
+                <div className="flex justify-start py-1">
+                  <div className="text-gray-400 font-mono text-sm flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />
                     <span>Working...</span>
                   </div>
@@ -448,6 +481,27 @@ export function LeadDashboard({ api, ws }: Props) {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Queued messages (pending) */}
+            {messages.some((m) => m.queued) && (
+              <div className="border-t border-dashed border-gray-600 px-4 py-2 bg-gray-800/50">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Queued
+                </div>
+                {messages.filter((m) => m.queued).map((msg, i) => (
+                  <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
+                    <span className="text-[10px] text-gray-600">
+                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                    <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+                      {msg.text}
+                    </div>
+                    <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Input */}
             <div className="border-t border-gray-700 p-3">
@@ -772,6 +826,27 @@ function InlineMarkdown({ text }: { text: string }) {
           );
         }
         return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+/** Renders agent text, separating <!-- command --> blocks from normal markdown */
+function AgentTextBlock({ text }: { text: string }) {
+  // Split on <!-- ... --> blocks
+  const segments = text.split(/(<!--[\s\S]*?-->)/g);
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('<!--') && seg.endsWith('-->')) {
+          return (
+            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 overflow-x-auto">
+              {seg}
+            </pre>
+          );
+        }
+        if (!seg.trim()) return null;
+        return <InlineMarkdown key={i} text={seg} />;
       })}
     </>
   );
