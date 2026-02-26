@@ -646,7 +646,7 @@ function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations
                 {(agent.model || agent.role.model) && (
                   <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded">{agent.model || agent.role.model}</span>
                 )}
-                <span className="text-xs text-gray-600 ml-auto">{agent.id.slice(0, 8)}</span>
+                <span className="text-xs font-mono text-gray-400 ml-auto">{agent.id.slice(0, 8)}</span>
               </div>
             </div>
           );
@@ -788,6 +788,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-mono text-gray-400">{label}</span>
+                  <span className="text-[10px] font-mono text-gray-500">{evt.agentId?.slice(0, 8)}</span>
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
                 <span className="text-xs font-mono text-gray-300 break-words">{evt.summary}</span>
