@@ -62,17 +62,20 @@ function renderMarkdown(text: string): React.ReactNode[] {
 /** Render a single content item — handles text, resource, image, audio, or unknown */
 function renderContentItem(c: any): string {
   if (typeof c === 'string') return c;
-  if (c?.type === 'text') return c.text ?? '';
-  if (c?.type === 'resource') {
+  if (c == null) return '';
+  // Any object with a .text string field — extract it (covers {text: "...", type: "text"} and similar)
+  if (typeof c.text === 'string' && (c.type === 'text' || !c.type || c.type === undefined)) return c.text;
+  if (c.type === 'text' && typeof c.text === 'string') return c.text;
+  if (c.type === 'resource') {
     const uri = c.resource?.uri ?? '';
     const text = c.resource?.text ?? '';
     return uri ? `📎 ${uri}\n${text}` : text;
   }
-  if (c?.type === 'image') return `[🖼️ image: ${c.mimeType ?? 'unknown'}]`;
-  if (c?.type === 'audio') return `[🔊 audio: ${c.mimeType ?? 'unknown'}]`;
+  if (c.type === 'image') return `[🖼️ image: ${c.mimeType ?? 'unknown'}]`;
+  if (c.type === 'audio') return `[🔊 audio: ${c.mimeType ?? 'unknown'}]`;
   // Fallback: extract common fields
-  if (c?.text) return c.text;
-  if (c?.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
+  if (typeof c.text === 'string') return c.text;
+  if (c.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
   return JSON.stringify(c, null, 2);
 }
 
