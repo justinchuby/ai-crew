@@ -696,8 +696,16 @@ export class AgentManager extends EventEmitter {
       if (!decision.title) return;
 
       this.decisionLog.add(agent.id, agent.role?.id ?? 'unknown', decision.title, decision.rationale ?? '');
-      logger.info('lead', `Decision: "${decision.title}"`, { rationale: decision.rationale?.slice(0, 100) });
-      this.emit('lead:decision', { agentId: agent.id, title: decision.title, rationale: decision.rationale });
+      logger.info('lead', `Decision by ${agent.role.name}: "${decision.title}"`, { rationale: decision.rationale?.slice(0, 100) });
+      // Include leadId so frontend routes to the correct project
+      const leadId = agent.parentId || agent.id;
+      this.emit('lead:decision', {
+        agentId: agent.id,
+        agentRole: agent.role?.name ?? 'Unknown',
+        leadId,
+        title: decision.title,
+        rationale: decision.rationale,
+      });
     } catch {
       // ignore malformed decisions
     }

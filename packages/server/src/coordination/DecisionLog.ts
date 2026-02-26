@@ -34,6 +34,11 @@ export class DecisionLog extends EventEmitter {
     return this.decisions.filter((d) => d.agentId === agentId);
   }
 
+  getByAgents(agentIds: string[]): Decision[] {
+    const idSet = new Set(agentIds);
+    return this.decisions.filter((d) => idSet.has(d.agentId));
+  }
+
   clear(): void {
     this.decisions.length = 0;
   }
