@@ -119,3 +119,8 @@ Agents communicate via HTML comment commands detected in their output stream:
 - **Backend**: Node.js, Express, ws, node-pty
 - **Agent Protocol**: ACP (Agent Communication Protocol) with text buffering for streaming command detection
 - **Database**: SQLite with WAL mode
+
+## Screenshots
+
+<img width="3164" height="1598" alt="image" src="https://github.com/user-attachments/assets/bcf9bb15-be17-4f53-9347-d044dbc0871c" />
+
