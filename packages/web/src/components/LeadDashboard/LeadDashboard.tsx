@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
-import type { ActivityEvent, AgentComm, ProgressSnapshot } from '../../stores/leadStore';
+import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 
@@ -25,6 +25,8 @@ export function LeadDashboard({ api, ws }: Props) {
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
+  const [expandedReport, setExpandedReport] = useState<AgentReport | null>(null);
+  const [reportsExpanded, setReportsExpanded] = useState(true);
   const isResizing = useRef(false);
 
   const leadAgents = agents.filter((a) => a.role.id === 'lead');
@@ -234,14 +236,14 @@ export function LeadDashboard({ api, ws }: Props) {
             timestamp: Date.now(),
           });
 
-          // Also inject messages sent TO the lead into the chat thread
+          // Store messages sent TO the lead as agent reports (separate from lead's output)
           if (msg.to === leadId && msg.from !== 'system') {
             const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
-            store.addMessage(leadId, {
-              type: 'text',
-              text: msg.content ?? '',
-              sender: 'external',
+            store.addAgentReport(leadId, {
+              id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               fromRole: senderRole,
+              fromId: msg.from,
+              content: msg.content ?? '',
               timestamp: Date.now(),
             });
           }
@@ -327,6 +329,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const progressHistory = currentProject?.progressHistory ?? [];
   const activity = currentProject?.activity ?? [];
   const comms = currentProject?.comms ?? [];
+  const agentReports = currentProject?.agentReports ?? [];
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
 
   return (
@@ -552,6 +555,43 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Working directory bar */}
             <CwdBar leadId={selectedLeadId!} cwd={leadAgent?.cwd} />
+
+            {/* Agent Reports — separate from lead output */}
+            {agentReports.length > 0 && (
+              <div className="border-b border-indigo-700/40 bg-indigo-950/20">
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-indigo-400 hover:bg-indigo-900/20 transition-colors"
+                  onClick={() => setReportsExpanded(!reportsExpanded)}
+                >
+                  {reportsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  <MessageSquare className="w-3 h-3" />
+                  <span className="font-mono font-medium">Agent Reports</span>
+                  <span className="bg-indigo-500/20 px-1.5 rounded text-[10px]">{agentReports.length}</span>
+                </button>
+                {reportsExpanded && (
+                  <div className="max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
+                    {agentReports.slice(-20).map((r) => {
+                      const time = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      return (
+                        <div
+                          key={r.id}
+                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-indigo-900/20 border border-indigo-700/30 cursor-pointer hover:bg-indigo-900/30 transition-colors"
+                          onClick={() => setExpandedReport(r)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-xs font-mono font-semibold text-indigo-400">{r.fromRole}</span>
+                              <span className="text-[10px] text-gray-600 ml-auto">{time}</span>
+                            </div>
+                            <p className="text-xs font-mono text-gray-300 truncate">{r.content.length > 150 ? r.content.slice(0, 150) + '…' : r.content}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Messages */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -873,6 +913,37 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Agent report detail popup */}
+      {expandedReport && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setExpandedReport(null); }}
+        >
+          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-400" />
+                <span className="text-sm font-semibold text-indigo-400">{expandedReport.fromRole}</span>
+                <span className="text-xs text-gray-500">→ Project Lead</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-gray-500">
+                  {new Date(expandedReport.timestamp).toLocaleTimeString()}
+                </span>
+                <button onClick={() => setExpandedReport(null)} className="text-gray-400 hover:text-gray-200">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                {expandedReport.content}
+              </pre>
             </div>
           </div>
         </div>
