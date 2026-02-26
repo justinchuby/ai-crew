@@ -156,6 +156,11 @@ export class AgentManager extends EventEmitter {
 
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
+
+      // When a child agent goes idle (prompt complete), notify its parent
+      if (status === 'idle' && agent.parentId) {
+        this.notifyParentOfIdle(agent);
+      }
     });
 
     agent.onExit((code) => {
@@ -617,6 +622,36 @@ CREW_ROSTER -->`;
 
     logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
     agent.sendMessage(response);
+  }
+
+  /** Notify parent when a child agent finishes its prompt (goes idle) */
+  private notifyParentOfIdle(agent: Agent): void {
+    if (!agent.parentId) return;
+    const parent = this.agents.get(agent.parentId);
+    if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
+
+    // Update delegation records
+    for (const [, del] of this.delegations) {
+      if (del.toAgentId === agent.id && del.status === 'active') {
+        del.status = 'completed';
+        del.completedAt = new Date().toISOString();
+        del.result = agent.messages.slice(-3).join('\n').slice(0, 500);
+      }
+    }
+
+    const preview = agent.messages.slice(-3).join('\n').slice(0, 300);
+    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${preview || '(no output)'}`;
+
+    logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
+    parent.sendMessage(summary);
+    this.emit('agent:message_sent', {
+      from: agent.id,
+      fromRole: agent.role.name,
+      to: parent.id,
+      toRole: parent.role.name,
+      content: summary,
+    });
+    this.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status: 'completed' });
   }
 
   private notifyParentOfCompletion(agent: Agent, exitCode: number | null): void {
