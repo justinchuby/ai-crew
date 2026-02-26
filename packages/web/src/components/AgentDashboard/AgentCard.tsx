@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { RefreshCw, Square, Terminal, Hand } from 'lucide-react';
+import { RefreshCw, Square, Terminal, Hand, Check } from 'lucide-react';
 
 interface Props {
   agent: AgentInfo;
@@ -19,6 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function AgentCard({ agent, api }: Props) {
   const { setSelectedAgent, selectedAgentId } = useAppStore();
   const isSelected = selectedAgentId === agent.id;
+  const [confirmKill, setConfirmKill] = useState(false);
 
   return (
     <div
@@ -75,16 +77,32 @@ export function AgentCard({ agent, api }: Props) {
             </button>
           )}
           {(agent.status === 'running' || agent.status === 'idle') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                api.killAgent(agent.id);
-              }}
-              className="p-1 text-gray-400 hover:text-red-400"
-              title="Stop agent"
-            >
-              <Square size={14} />
-            </button>
+            confirmKill ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  api.killAgent(agent.id);
+                  setConfirmKill(false);
+                }}
+                onBlur={() => setConfirmKill(false)}
+                className="p-1 text-red-400 hover:text-red-300 animate-pulse"
+                title="Confirm stop"
+                autoFocus
+              >
+                <Check size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmKill(true);
+                }}
+                className="p-1 text-gray-400 hover:text-red-400"
+                title="Stop agent"
+              >
+                <Square size={14} />
+              </button>
+            )
           )}
         </div>
       </div>

@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, Task } from '../../types';
 import type { FileLock } from './FleetOverview';
-import { Square, RefreshCw, Terminal, Hand } from 'lucide-react';
+import { Square, RefreshCw, Terminal, Hand, Check } from 'lucide-react';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -83,6 +84,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
 
 export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
   const { setSelectedAgent } = useAppStore();
+  const [confirmKillIds, setConfirmKillIds] = useState<Set<string>>(new Set());
 
   if (agents.length === 0) {
     return (
@@ -262,16 +264,32 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                       </button>
                     )}
                     {(agent.status === 'running' || agent.status === 'idle') && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          api.killAgent(agent.id);
-                        }}
-                        className="p-1 text-gray-400 hover:text-red-400"
-                        title="Stop agent"
-                      >
-                        <Square size={14} />
-                      </button>
+                      confirmKillIds.has(agent.id) ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            api.killAgent(agent.id);
+                            setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; });
+                          }}
+                          onBlur={() => setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; })}
+                          className="p-1 text-red-400 hover:text-red-300 animate-pulse"
+                          title="Confirm stop"
+                          autoFocus
+                        >
+                          <Check size={14} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmKillIds((s) => new Set(s).add(agent.id));
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-400"
+                          title="Stop agent"
+                        >
+                          <Square size={14} />
+                        </button>
+                      )
                     )}
                   </div>
                 </td>

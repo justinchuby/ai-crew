@@ -60,11 +60,29 @@ export function AgentDashboard({ api, ws }: Props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {agents.map((agent) => (
-              <AgentCard key={agent.id} agent={agent} api={api} ws={ws} />
-            ))}
-          </div>
+          {/* Active agents */}
+          {agents.filter((a) => a.status !== 'completed' && a.status !== 'failed').length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {agents.filter((a) => a.status !== 'completed' && a.status !== 'failed').map((agent) => (
+                <AgentCard key={agent.id} agent={agent} api={api} ws={ws} />
+              ))}
+            </div>
+          )}
+
+          {/* Stopped / completed agents */}
+          {agents.filter((a) => a.status === 'completed' || a.status === 'failed').length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">
+                Stopped ({agents.filter((a) => a.status === 'completed' || a.status === 'failed').length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 opacity-70">
+                {agents.filter((a) => a.status === 'completed' || a.status === 'failed').map((agent) => (
+                  <AgentCard key={agent.id} agent={agent} api={api} ws={ws} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {hasChildren && <AgentTimeline />}
         </>
       )}
