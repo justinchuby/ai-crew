@@ -78,7 +78,16 @@ function renderContentItem(c: any): string {
 
 /** Safely render tool call content — handles string, array, or object */
 function stringifyContent(content: any): string {
-  if (typeof content === 'string') return content.slice(0, 500);
+  if (typeof content === 'string') {
+    // Try to parse JSON strings that look like content objects
+    if (content.startsWith('{') || content.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(content);
+        return stringifyContent(parsed);
+      } catch { /* not JSON, use as-is */ }
+    }
+    return content.slice(0, 500);
+  }
   if (Array.isArray(content)) {
     return content.map(renderContentItem).join('\n').slice(0, 500);
   }
