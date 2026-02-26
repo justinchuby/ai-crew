@@ -376,7 +376,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   useLeadStore.getState().addProject(lead.id);
                   useLeadStore.getState().selectLead(lead.id);
                 }}
-                className={`w-full text-left px-3 py-2.5 border-b border-gray-700/50 transition-colors ${
+                className={`w-full text-left px-3 py-2.5 border-b border-gray-700/50 transition-colors group ${
                   isSelected
                     ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
                     : 'hover:bg-gray-800 border-l-2 border-l-transparent'
@@ -384,8 +384,23 @@ export function LeadDashboard({ api, ws }: Props) {
               >
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${isRunning ? 'bg-green-400' : 'bg-gray-500'}`} />
-                  <span className="text-sm font-mono truncate">
+                  <span className="text-sm font-mono truncate flex-1">
                     {lead.projectName || lead.taskId?.slice(0, 40) || lead.id.slice(0, 8)}
+                  </span>
+                  <span
+                    role="button"
+                    title="Remove project"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900/40 rounded transition-opacity shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!confirm('Remove this project? Running agents will be stopped.')) return;
+                      // Kill lead + children on server
+                      fetch(`/api/agents/${lead.id}`, { method: 'DELETE' }).catch(() => {});
+                      lead.childIds.forEach((cid: string) => fetch(`/api/agents/${cid}`, { method: 'DELETE' }).catch(() => {}));
+                      useLeadStore.getState().removeProject(lead.id);
+                    }}
+                  >
+                    <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5 pl-4 font-mono">
