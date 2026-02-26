@@ -5,10 +5,19 @@ import type { WsMessage } from '../types';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldReconnectRef = useRef(true);
   const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask } =
     useAppStore();
 
   const connect = useCallback(() => {
+    // Close any existing connection first
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
@@ -16,8 +25,9 @@ export function useWebSocket() {
     ws.onopen = () => setConnected(true);
     ws.onclose = () => {
       setConnected(false);
-      // Reconnect after 2s
-      setTimeout(connect, 2000);
+      if (shouldReconnectRef.current) {
+        reconnectTimerRef.current = setTimeout(connect, 2000);
+      }
     };
 
     ws.onmessage = (event) => {
@@ -97,9 +107,19 @@ export function useWebSocket() {
   }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask]);
 
   useEffect(() => {
+    shouldReconnectRef.current = true;
     connect();
     return () => {
-      wsRef.current?.close();
+      shouldReconnectRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [connect]);
 
