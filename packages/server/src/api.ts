@@ -247,8 +247,19 @@ export function apiRouter(
   });
 
   router.get('/lead/:id/decisions', (req, res) => {
+    const leadId = req.params.id;
     const decisionLog = agentManager.getDecisionLog();
-    res.json(decisionLog.getByAgent(req.params.id));
+    // Include decisions from lead + all child agents
+    const childIds = agentManager.getAll()
+      .filter((a) => a.parentId === leadId)
+      .map((a) => a.id);
+    const decisions = decisionLog.getByAgents([leadId, ...childIds]);
+    // Enrich with human-readable role name from agents
+    const enriched = decisions.map((d) => {
+      const agent = agentManager.getAll().find((a) => a.id === d.agentId);
+      return { ...d, agentRole: agent?.role?.name ?? d.agentRole };
+    });
+    res.json(enriched);
   });
 
   router.get('/lead/:id/delegations', (req, res) => {

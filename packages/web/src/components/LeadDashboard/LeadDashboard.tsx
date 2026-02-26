@@ -108,7 +108,9 @@ export function LeadDashboard({ api, ws }: Props) {
       const store = useLeadStore.getState();
 
       if (msg.type === 'lead:decision' && msg.agentId) {
-        store.addDecision(msg.agentId, msg);
+        // Route to correct lead project (child decisions go under their parent lead)
+        const targetLeadId = msg.leadId || msg.agentId;
+        store.addDecision(targetLeadId, { ...msg, agentRole: msg.agentRole || 'Lead' });
       }
 
       // Stream PL text into chat
@@ -1063,8 +1065,13 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
             >
               <div className="flex items-start gap-2">
                 <Lightbulb className="w-3.5 h-3.5 text-yellow-400 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-mono font-semibold text-gray-200 truncate">{d.title}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-mono font-semibold text-gray-200 truncate">{d.title}</p>
+                    {d.agentRole && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
+                    )}
+                  </div>
                   {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
                   <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
                 </div>
@@ -1085,6 +1092,9 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
               <div className="flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-yellow-400" />
                 <span className="text-sm font-semibold text-gray-100">Decision</span>
+                {selectedDecision.agentRole && (
+                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">by {selectedDecision.agentRole}</span>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-gray-500">
