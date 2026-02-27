@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
-import type { AcpTextChunk } from '../../types';
+import type { AcpTextChunk, ChatGroup, GroupMessage } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 
 interface Props {
@@ -104,6 +104,14 @@ export function LeadDashboard({ api, ws }: Props) {
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
     return () => clearInterval(interval);
+  }, [selectedLeadId]);
+
+  // Fetch groups for selected lead
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
+    }).catch(() => {});
   }, [selectedLeadId]);
 
   // Listen for lead-specific WebSocket events
@@ -252,6 +260,16 @@ export function LeadDashboard({ api, ws }: Props) {
         }
       }
 
+      // Group chat events
+      if (msg.type === 'group:created' && msg.leadId === selectedLeadId) {
+        fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
+          if (Array.isArray(data)) store.setGroups(selectedLeadId!, data);
+        }).catch(() => {});
+      }
+      if (msg.type === 'group:message' && msg.leadId === selectedLeadId) {
+        store.addGroupMessage(selectedLeadId!, msg.groupName, msg.message);
+      }
+
       // Context compaction — add system message to relevant lead's chat
       if (msg.type === 'agent:context_compacted' && msg.agentId) {
         const compactedId = msg.agentId;
@@ -376,6 +394,8 @@ export function LeadDashboard({ api, ws }: Props) {
   const activity = currentProject?.activity ?? [];
   const comms = currentProject?.comms ?? [];
   const agentReports = currentProject?.agentReports ?? [];
+  const groups = currentProject?.groups ?? [];
+  const groupMessages = currentProject?.groupMessages ?? {};
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
 
   return (
@@ -938,6 +958,9 @@ export function LeadDashboard({ api, ws }: Props) {
                 </CollapsibleSection>
                 <CollapsibleSection title="Agent Comms" icon={<MessageSquare className="w-3.5 h-3.5 text-purple-400" />} badge={comms.length} defaultHeight={200}>
                   <CommsPanelContent comms={comms} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Groups" icon={<Users className="w-3.5 h-3.5 text-teal-400" />} badge={groups.length} defaultHeight={200}>
+                  <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Activity" icon={<Wrench className="w-3.5 h-3.5 text-gray-400" />} badge={activity.length} defaultHeight={180}>
                   <ActivityFeedContent activity={activity} agents={agents} />
@@ -1693,6 +1716,116 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Simple hash to pick a color for a role name */
+function roleColor(role: string): string {
+  const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#60a5fa', '#e879f9', '#fb923c'];
+  let hash = 0;
+  for (let i = 0; i < role.length; i++) hash = (hash * 31 + role.charCodeAt(i)) | 0;
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function GroupsPanelContent({
+  groups,
+  groupMessages,
+  leadId,
+}: {
+  groups: ChatGroup[];
+  groupMessages: Record<string, GroupMessage[]>;
+  leadId: string | null;
+}) {
+  const feedRef = useRef<HTMLDivElement>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [fetchedGroups, setFetchedGroups] = useState<Set<string>>(new Set());
+
+  // Reset expanded state when lead changes
+  useEffect(() => {
+    setExpandedGroup(null);
+    setFetchedGroups(new Set());
+  }, [leadId]);
+
+  // Fetch messages when a group is first expanded
+  useEffect(() => {
+    if (!expandedGroup || !leadId || fetchedGroups.has(expandedGroup)) return;
+    setFetchedGroups((prev) => new Set(prev).add(expandedGroup));
+    fetch(`/api/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const store = useLeadStore.getState();
+          // Bulk-set messages for this group
+          const proj = store.projects[leadId];
+          if (proj) {
+            data.forEach((msg: GroupMessage) => {
+              store.addGroupMessage(leadId, expandedGroup, msg);
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [expandedGroup, leadId, fetchedGroups]);
+
+  // Auto-scroll when messages change for expanded group
+  useEffect(() => {
+    if (expandedGroup) {
+      requestAnimationFrame(() => {
+        feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+      });
+    }
+  }, [expandedGroup, groupMessages[expandedGroup ?? '']?.length]);
+
+  return (
+    <div ref={feedRef} className="h-full overflow-y-auto">
+      {groups.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No groups yet</p>
+      ) : (
+        groups.map((g) => {
+          const isExpanded = expandedGroup === g.name;
+          const msgs = groupMessages[g.name] ?? [];
+          return (
+            <div key={g.name} className="border-b border-gray-700/30">
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-700/30 transition-colors flex items-center gap-2"
+                onClick={() => setExpandedGroup(isExpanded ? null : g.name)}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3 h-3 text-gray-500 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3 h-3 text-gray-500 shrink-0" />
+                )}
+                <span className="text-xs font-mono font-semibold text-teal-400 truncate flex-1">{g.name}</span>
+                <span className="text-[10px] font-mono text-gray-500 shrink-0">{g.memberIds.length} members</span>
+              </button>
+              {isExpanded && (
+                <div className="px-2 pb-2 space-y-0.5 max-h-60 overflow-y-auto">
+                  {msgs.length === 0 ? (
+                    <p className="text-[10px] text-gray-600 text-center py-2 font-mono">No messages</p>
+                  ) : (
+                    msgs.map((m) => {
+                      const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      const shortId = m.fromAgentId?.slice(0, 6) ?? '';
+                      return (
+                        <div key={m.id} className="px-2 py-1 rounded bg-gray-800/50 text-xs font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-600 text-[10px] shrink-0">{time}</span>
+                            <span style={{ color: roleColor(m.fromRole) }} className="font-semibold truncate">
+                              {m.fromRole}{shortId ? ` (${shortId})` : ''}:
+                            </span>
+                          </div>
+                          <p className="text-gray-300 break-words mt-0.5 whitespace-pre-wrap">{m.content}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }
 

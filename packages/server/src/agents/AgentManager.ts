@@ -8,6 +8,7 @@ import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
 import type { AgentMemory, MemoryEntry } from '../coordination/AgentMemory.js';
+import type { ChatGroupRegistry, GroupMessage } from '../comms/ChatGroupRegistry.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 
@@ -24,6 +25,11 @@ const PROGRESS_REGEX = /<!--\s*PROGRESS\s*(\{.*?\})\s*-->/s;
 const QUERY_CREW_REGEX = /<!--\s*QUERY_CREW\s*-->/s;
 const BROADCAST_REGEX = /<!--\s*BROADCAST\s*(\{.*?\})\s*-->/s;
 const KILL_AGENT_REGEX = /<!--\s*KILL_AGENT\s*(\{.*?\})\s*-->/s;
+const CREATE_GROUP_REGEX = /<!--\s*CREATE_GROUP\s*(\{.*?\})\s*-->/s;
+const ADD_TO_GROUP_REGEX = /<!--\s*ADD_TO_GROUP\s*(\{.*?\})\s*-->/s;
+const REMOVE_FROM_GROUP_REGEX = /<!--\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*-->/s;
+const GROUP_MESSAGE_REGEX = /<!--\s*GROUP_MESSAGE\s*(\{.*?\})\s*-->/s;
+const LIST_GROUPS_REGEX = /<!--\s*LIST_GROUPS\s*-->/s;
 
 export interface Delegation {
   id: string;
@@ -48,6 +54,7 @@ export class AgentManager extends EventEmitter {
   private messageBus: MessageBus;
   private decisionLog: DecisionLog;
   private agentMemory: AgentMemory;
+  private chatGroupRegistry: ChatGroupRegistry;
   /** If set, auto-kill agents after this many ms past the initial hung detection */
   private autoKillTimeoutMs: number | null;
   private hungTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -70,6 +77,7 @@ export class AgentManager extends EventEmitter {
     messageBus: MessageBus,
     decisionLog: DecisionLog,
     agentMemory: AgentMemory,
+    chatGroupRegistry: ChatGroupRegistry,
     { maxRestarts = 3, autoRestart = true }: { maxRestarts?: number; autoRestart?: boolean } = {},
   ) {
     super();
@@ -80,6 +88,7 @@ export class AgentManager extends EventEmitter {
     this.messageBus = messageBus;
     this.decisionLog = decisionLog;
     this.agentMemory = agentMemory;
+    this.chatGroupRegistry = chatGroupRegistry;
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
@@ -477,6 +486,11 @@ export class AgentManager extends EventEmitter {
       { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => this.handleQueryCrew(a) },
       { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => this.detectBroadcast(a, d) },
       { regex: KILL_AGENT_REGEX, name: 'KILL_AGENT', handler: (a, d) => this.detectKillAgent(a, d) },
+      { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => this.detectCreateGroup(a, d) },
+      { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => this.detectAddToGroup(a, d) },
+      { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => this.detectRemoveFromGroup(a, d) },
+      { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => this.detectGroupMessage(a, d) },
+      { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => this.handleListGroups(a) },
     ];
 
     let found = true;
@@ -1084,6 +1098,175 @@ CREW_ROSTER -->`;
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  getChatGroupRegistry(): ChatGroupRegistry {
+    return this.chatGroupRegistry;
+  }
+
+  private detectCreateGroup(agent: Agent, data: string): void {
+    const match = data.match(CREATE_GROUP_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (agent.role.id !== 'lead') {
+        agent.sendMessage('[System] Only the Project Lead can create groups.');
+        return;
+      }
+      if (!req.name || !req.members || !Array.isArray(req.members)) {
+        agent.sendMessage('[System] CREATE_GROUP requires "name" (string) and "members" (array of agent IDs).');
+        return;
+      }
+      // Resolve member IDs (support short prefixes)
+      const resolvedIds: string[] = [];
+      for (const memberId of req.members) {
+        const resolved = this.getAll().find((a) =>
+          (a.id === memberId || a.id.startsWith(memberId)) && a.parentId === agent.id
+        );
+        if (resolved) {
+          resolvedIds.push(resolved.id);
+        } else {
+          agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
+        }
+      }
+      const group = this.chatGroupRegistry.create(agent.id, req.name, resolvedIds);
+      const memberNames = group.memberIds.map((id) => {
+        const a = this.agents.get(id);
+        return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      }).join(', ');
+      agent.sendMessage(`[System] Group "${req.name}" created with ${group.memberIds.length} members: ${memberNames}.`);
+
+      // Notify all members (except lead)
+      for (const memberId of group.memberIds) {
+        if (memberId === agent.id) continue;
+        const member = this.agents.get(memberId);
+        if (member && (member.status === 'running' || member.status === 'idle')) {
+          member.sendMessage(`[System] You've been added to group "${req.name}". Members: ${memberNames}.\nSend messages: <!-- GROUP_MESSAGE {"group": "${req.name}", "content": "your message"} -->`);
+        }
+      }
+
+      this.emit('group:created', { group, leadId: agent.id });
+      logger.info('groups', `Lead ${agent.id.slice(0, 8)} created group "${req.name}" with ${group.memberIds.length} members`);
+    } catch { /* ignore malformed */ }
+  }
+
+  private detectAddToGroup(agent: Agent, data: string): void {
+    const match = data.match(ADD_TO_GROUP_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (agent.role.id !== 'lead') {
+        agent.sendMessage('[System] Only the Project Lead can manage group members.');
+        return;
+      }
+      if (!req.group || !req.members) return;
+      const resolvedIds = req.members.map((m: string) => {
+        const found = this.getAll().find((a) => (a.id === m || a.id.startsWith(m)) && a.parentId === agent.id);
+        return found?.id;
+      }).filter(Boolean) as string[];
+
+      const added = this.chatGroupRegistry.addMembers(agent.id, req.group, resolvedIds);
+      if (added.length > 0) {
+        // Send recent history to new members
+        const history = this.chatGroupRegistry.getMessages(req.group, agent.id, 20);
+        for (const memberId of added) {
+          const member = this.agents.get(memberId);
+          if (member && (member.status === 'running' || member.status === 'idle')) {
+            const allMembers = this.chatGroupRegistry.getMembers(req.group, agent.id);
+            const memberNames = allMembers.map((id) => {
+              const a = this.agents.get(id);
+              return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+            }).join(', ');
+            let historyText = '';
+            if (history.length > 0) {
+              historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${m.fromAgentId.slice(0, 8)})]: ${m.content}`).join('\n');
+            }
+            member.sendMessage(`[System] You've been added to group "${req.group}". Members: ${memberNames}.${historyText}\nSend messages: <!-- GROUP_MESSAGE {"group": "${req.group}", "content": "..."} -->`);
+          }
+        }
+        const names = added.map((id) => this.agents.get(id)?.role.name || id.slice(0, 8)).join(', ');
+        agent.sendMessage(`[System] Added ${names} to group "${req.group}".`);
+      } else {
+        agent.sendMessage(`[System] No new members added to "${req.group}" (already members or not found).`);
+      }
+    } catch { /* ignore */ }
+  }
+
+  private detectRemoveFromGroup(agent: Agent, data: string): void {
+    const match = data.match(REMOVE_FROM_GROUP_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (agent.role.id !== 'lead') {
+        agent.sendMessage('[System] Only the Project Lead can manage group members.');
+        return;
+      }
+      if (!req.group || !req.members) return;
+      const resolvedIds = req.members.map((m: string) => {
+        const found = this.getAll().find((a) => a.id === m || a.id.startsWith(m));
+        return found?.id;
+      }).filter(Boolean) as string[];
+
+      const removed = this.chatGroupRegistry.removeMembers(agent.id, req.group, resolvedIds);
+      if (removed.length > 0) {
+        const names = removed.map((id) => this.agents.get(id)?.role.name || id.slice(0, 8)).join(', ');
+        agent.sendMessage(`[System] Removed ${names} from group "${req.group}".`);
+      }
+    } catch { /* ignore */ }
+  }
+
+  private detectGroupMessage(agent: Agent, data: string): void {
+    const match = data.match(GROUP_MESSAGE_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (!req.group || !req.content) return;
+
+      // Find the lead for this agent's team
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) {
+        agent.sendMessage('[System] Cannot send group message — no team lead found.');
+        return;
+      }
+
+      const message = this.chatGroupRegistry.sendMessage(req.group, leadId, agent.id, agent.role.name, req.content);
+      if (!message) {
+        agent.sendMessage(`[System] Cannot send to group "${req.group}" — you are not a member. Use LIST_GROUPS to see your groups.`);
+        return;
+      }
+
+      // Deliver to all group members except sender
+      const members = this.chatGroupRegistry.getMembers(req.group, leadId);
+      let delivered = 0;
+      for (const memberId of members) {
+        if (memberId === agent.id) continue;
+        const member = this.agents.get(memberId);
+        if (member && (member.status === 'running' || member.status === 'idle')) {
+          member.sendMessage(`[Group "${req.group}" — ${agent.role.name} (${agent.id.slice(0, 8)})]: ${req.content}`);
+          delivered++;
+        }
+      }
+
+      agent.sendMessage(`[System] Message delivered to ${delivered} group member(s) in "${req.group}".`);
+      this.emit('group:message', { message, groupName: req.group, leadId });
+      logger.info('groups', `Group message in "${req.group}": ${agent.role.name} (${agent.id.slice(0, 8)}) → ${delivered} recipients`);
+    } catch { /* ignore */ }
+  }
+
+  private handleListGroups(agent: Agent): void {
+    const groups = this.chatGroupRegistry.getGroupsForAgent(agent.id);
+    if (groups.length === 0) {
+      agent.sendMessage('[System] You are not a member of any groups.');
+      return;
+    }
+    const lines = groups.map((g) => {
+      const memberNames = g.memberIds.map((id) => {
+        const a = this.agents.get(id);
+        return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      }).join(', ');
+      return `- "${g.name}" — ${g.memberIds.length} members: ${memberNames}`;
+    });
+    agent.sendMessage(`[System] Your groups:\n${lines.join('\n')}\nSend messages: <!-- GROUP_MESSAGE {"group": "name", "content": "..."} -->`);
   }
 
   /** Keep all lead agents' budget info in sync with current state */

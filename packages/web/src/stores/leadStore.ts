@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall } from '../types';
+import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage } from '../types';
 
 export interface ActivityEvent {
   id: string;
@@ -48,6 +48,8 @@ interface ProjectState {
   toolCalls: AcpToolCall[];
   activity: ActivityEvent[];
   comms: AgentComm[];
+  groups: ChatGroup[];
+  groupMessages: Record<string, GroupMessage[]>;
   /** Timestamp of last text received — used to show "working" indicator */
   lastTextAt: number;
   /** When true, the next appended text should start on a new line */
@@ -80,11 +82,13 @@ interface LeadState {
   addActivity: (leadId: string, event: ActivityEvent) => void;
   addComm: (leadId: string, comm: AgentComm) => void;
   addAgentReport: (leadId: string, report: AgentReport) => void;
+  setGroups: (leadId: string, groups: ChatGroup[]) => void;
+  addGroupMessage: (leadId: string, groupName: string, message: GroupMessage) => void;
   reset: () => void;
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
+  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -222,6 +226,31 @@ export const useLeadStore = create<LeadState>((set) => ({
       let reports = [...proj.agentReports, report];
       if (reports.length > 100) reports = reports.slice(-100);
       return { projects: { ...s.projects, [leadId]: { ...proj, agentReports: reports } } };
+    }),
+
+  setGroups: (leadId, groups) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, groups } } };
+    }),
+
+  addGroupMessage: (leadId, groupName, message) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      const existing = proj.groupMessages[groupName] ?? [];
+      // Deduplicate by message id
+      if (existing.some((m) => m.id === message.id)) return s;
+      let msgs = [...existing, message];
+      if (msgs.length > 500) msgs = msgs.slice(-500);
+      return {
+        projects: {
+          ...s.projects,
+          [leadId]: {
+            ...proj,
+            groupMessages: { ...proj.groupMessages, [groupName]: msgs },
+          },
+        },
+      };
     }),
 
   reset: () => set({ projects: {}, selectedLeadId: null }),

@@ -5,6 +5,7 @@ import type { TaskQueue } from '../tasks/TaskQueue.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
+import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { v4 as uuid } from 'uuid';
 
 interface ClientConnection {
@@ -24,6 +25,7 @@ export class WebSocketServer {
     lockRegistry: FileLockRegistry,
     activityLedger: ActivityLedger,
     decisionLog: DecisionLog,
+    chatGroupRegistry: ChatGroupRegistry,
   ) {
     this.wss = new WsServer({ server, path: '/ws' });
 
@@ -173,6 +175,20 @@ export class WebSocketServer {
 
     decisionLog.on('decision:rejected', (decision: any) => {
       this.broadcastAll({ type: 'decision:rejected', decision });
+    });
+
+    // Forward chat group events
+    chatGroupRegistry.on('group:created', (data: any) => {
+      this.broadcastAll({ type: 'group:created', ...data });
+    });
+    chatGroupRegistry.on('group:message', (data: any) => {
+      this.broadcastAll({ type: 'group:message', ...data });
+    });
+    chatGroupRegistry.on('group:member_added', (data: any) => {
+      this.broadcastAll({ type: 'group:member_added', ...data });
+    });
+    chatGroupRegistry.on('group:member_removed', (data: any) => {
+      this.broadcastAll({ type: 'group:member_removed', ...data });
     });
   }
 

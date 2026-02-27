@@ -278,6 +278,18 @@ export function apiRouter(
     res.json(enriched);
   });
 
+  // --- Groups ---
+  router.get('/lead/:id/groups', (req, res) => {
+    const chatGroups = agentManager.getChatGroupRegistry();
+    res.json(chatGroups.getGroups(req.params.id));
+  });
+
+  router.get('/lead/:id/groups/:name/messages', (req, res) => {
+    const chatGroups = agentManager.getChatGroupRegistry();
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    res.json(chatGroups.getMessages(req.params.name, req.params.id, limit));
+  });
+
   router.get('/lead/:id/delegations', (req, res) => {
     res.json(agentManager.getDelegations(req.params.id));
   });

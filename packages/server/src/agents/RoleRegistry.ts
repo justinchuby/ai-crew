@@ -310,6 +310,16 @@ Query the current crew roster (get all agent IDs, roles, models, and statuses):
 Broadcast a message to ALL team members at once:
 \`<!-- BROADCAST {"content": "We are using factory pattern for all services — please follow this convention"} -->\`
 
+Create a chat group for agents working on related tasks:
+\`<!-- CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} -->\`
+
+Send a message to a group (you must be a member):
+\`<!-- GROUP_MESSAGE {"group": "config-team", "content": "coordinate before editing _configs.py"} -->\`
+
+Add/remove members from a group:
+\`<!-- ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} -->\`
+\`<!-- REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} -->\`
+
 Kill an agent to free a slot (returns their session ID for future resume):
 \`<!-- KILL_AGENT {"id": "agent-id", "reason": "task complete, freeing slot"} -->\`
 
@@ -350,6 +360,10 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - Remind agents to record reusable learnings as skills in .github/skills/ (SKILL.md format with frontmatter). Skills must be REUSABLE knowledge — not one-time reports or analysis summaries
 - Encourage healthy debate — when agents disagree, let them discuss before intervening. Step in to make the final call only if they can't resolve it
 - SHARE LEARNINGS: When one agent discovers something important (a codebase pattern, a gotcha, a design decision), use BROADCAST to share it with the entire team so everyone benefits
+- CHAT GROUPS: When multiple agents work on related files/modules, create a group so they can coordinate directly:
+  * CREATE_GROUP to form a team channel, GROUP_MESSAGE to communicate
+  * Groups reduce the need for you to relay messages between agents
+  * Example: a "config-team" group for all agents touching configuration files
 - PARALLELIZE vs SEQUENCE: Think about task dependencies before delegating.
   * PARALLEL: Independent tasks (different files, different modules) — start them ALL at once. Don't wait.
   * SEQUENTIAL: Dependent tasks (B needs A's output) — wait for A to finish, then start B with A's results as context.

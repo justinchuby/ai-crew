@@ -1,3 +1,20 @@
+export interface ChatGroup {
+  name: string;
+  leadId: string;
+  memberIds: string[];
+  createdAt: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  groupName: string;
+  leadId: string;
+  fromAgentId: string;
+  fromRole: string;
+  content: string;
+  timestamp: string;
+}
+
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
 
 // ACP Protocol Types

@@ -379,10 +379,13 @@ All team members have access to this directory. Create your subdirectory before 
 \`<!-- AGENT_MESSAGE {"to": "agent-id", "content": "message"} -->\`
 5. To broadcast a message to ALL team members, use:
 \`<!-- BROADCAST {"content": "message"} -->\`
-6. To get an updated roster of all agents and their IDs, use:
+6. To send a message to a group you belong to:
+\`<!-- GROUP_MESSAGE {"group": "group-name", "content": "message"} -->\`
+7. To list your groups: \`<!-- LIST_GROUPS -->\`
+8. To get an updated roster of all agents and their IDs, use:
 \`<!-- QUERY_CREW -->\`
-7. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-8. Log important decisions by outputting:
+9. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
+10. Log important decisions by outputting:
 \`<!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->\`
 
 == SKILLS (reusable knowledge for future work) ==

@@ -118,6 +118,14 @@ export function useApi() {
     });
   }, []);
 
+  const fetchGroups = useCallback(async (leadId: string) => {
+    return fetchJSON(`/lead/${leadId}/groups`);
+  }, []);
+
+  const fetchGroupMessages = useCallback(async (leadId: string, groupName: string) => {
+    return fetchJSON(`/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages`);
+  }, []);
+
   return {
     spawnAgent,
     killAgent,
@@ -131,5 +139,7 @@ export function useApi() {
     createRole,
     deleteRole,
     resolvePermission,
+    fetchGroups,
+    fetchGroupMessages,
   };
 }

@@ -98,6 +98,32 @@ CREATE TABLE IF NOT EXISTS agent_memory (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_memory_lead ON agent_memory(lead_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON agent_memory(agent_id);
+
+CREATE TABLE IF NOT EXISTS chat_groups (
+  name TEXT NOT NULL,
+  lead_id TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (name, lead_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_group_members (
+  group_name TEXT NOT NULL,
+  lead_id TEXT NOT NULL,
+  agent_id TEXT NOT NULL,
+  added_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (group_name, lead_id, agent_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_group_messages (
+  id TEXT PRIMARY KEY,
+  group_name TEXT NOT NULL,
+  lead_id TEXT NOT NULL,
+  from_agent_id TEXT NOT NULL,
+  from_role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_group_messages_group ON chat_group_messages(group_name, lead_id);
 `;
 
 export class Database {
