@@ -17,7 +17,7 @@ export function Sidebar() {
           key={to}
           to={to}
           end={to === '/'}
-          className={({ isActive }) =>
+          className={({ isActive }: { isActive: boolean }) =>
             `p-2.5 rounded-lg transition-colors ${
               isActive
                 ? 'bg-accent/20 text-accent'
