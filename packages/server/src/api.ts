@@ -76,6 +76,27 @@ export function apiRouter(
     res.json({ ok: true });
   });
 
+  // Send a message to an agent: mode "queue" (default) waits for idle, "interrupt" cancels current work first
+  router.post('/agents/:id/message', async (req, res) => {
+    const { text, mode = 'queue' } = req.body;
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!text) return res.status(400).json({ error: 'text is required' });
+
+    const prefix = `[USER MESSAGE] The human user says:\n`;
+    const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
+
+    if (mode === 'interrupt') {
+      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+      await agent.interruptWithMessage(formatted);
+      res.json({ ok: true, mode: 'interrupt', status: agent.status });
+    } else {
+      logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+      agent.queueMessage(formatted);
+      res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount, status: agent.status });
+    }
+  });
+
   router.patch('/agents/:id', (req, res) => {
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
@@ -243,13 +264,22 @@ export function apiRouter(
     res.json(agent.toJSON());
   });
 
-  router.post('/lead/:id/message', (req, res) => {
-    const { text } = req.body;
+  router.post('/lead/:id/message', async (req, res) => {
+    const { text, mode = 'interrupt' } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
-    logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
-    agent.sendMessage(`[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`);
-    res.json({ ok: true });
+
+    const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`;
+
+    if (mode === 'queue') {
+      logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
+      agent.queueMessage(formatted);
+      res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount });
+    } else {
+      logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
+      await agent.interruptWithMessage(formatted);
+      res.json({ ok: true, mode: 'interrupt' });
+    }
   });
 
   router.patch('/lead/:id', (req, res) => {

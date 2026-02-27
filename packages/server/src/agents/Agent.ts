@@ -44,6 +44,7 @@ export interface AgentJSON {
   outputTokens: number;
   contextWindowSize: number;
   contextWindowUsed: number;
+  pendingMessages: number;
 }
 
 export class Agent {
@@ -83,6 +84,7 @@ export class Agent {
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
   private statusListeners: Array<(status: AgentStatus) => void> = [];
+  private pendingMessages: string[] = [];
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
   private permissionRequestListeners: Array<(request: any) => void> = [];
@@ -290,6 +292,12 @@ export class Agent {
     // When a prompt finishes, mark delegated agents as idle (task done, awaiting next)
     conn.on('prompt_complete', (_stopReason: string) => {
       if (this.status === 'running' && !this.acpConnection?.isPrompting) {
+        // Drain queued messages before going idle
+        if (this.pendingMessages.length > 0) {
+          const next = this.pendingMessages.shift()!;
+          this.write(next);
+          return;
+        }
         this.status = 'idle';
         for (const listener of this.statusListeners) {
           listener(this.status);
@@ -531,6 +539,32 @@ CREW_UPDATE -->`;
     this.write(message);
   }
 
+  /** Queue a message — delivered after the agent finishes its current prompt */
+  queueMessage(message: string): void {
+    if (this.status === 'idle' || this.status === 'creating') {
+      this.write(message);
+    } else {
+      this.pendingMessages.push(message);
+    }
+  }
+
+  /** Interrupt current work, then send message */
+  async interruptWithMessage(message: string): Promise<void> {
+    if (this.mode === 'acp' && this.acpConnection && this.status === 'running') {
+      // Clear any queued messages — interrupt takes priority
+      this.pendingMessages.length = 0;
+      await this.acpConnection.cancel();
+      // Small delay to let cancellation settle before sending new prompt
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    this.write(message);
+  }
+
+  /** Get the number of pending queued messages */
+  get pendingMessageCount(): number {
+    return this.pendingMessages.length;
+  }
+
   /** Cancel the agent's current work (ACP cancel signal) */
   async interrupt(): Promise<void> {
     if (this.mode === 'acp' && this.acpConnection) {
@@ -642,6 +676,7 @@ CREW_UPDATE -->`;
       outputTokens: this.outputTokens,
       contextWindowSize: this.contextWindowSize,
       contextWindowUsed: this.contextWindowUsed,
+      pendingMessages: this.pendingMessageCount,
     };
   }
 }
