@@ -321,7 +321,7 @@ export class Agent {
 Max concurrent agents: ${budget.maxConcurrent}
 Currently running: ${budget.runningCount} / ${budget.maxConcurrent}
 Available slots: ${budget.maxConcurrent - budget.runningCount}
-${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — kill idle agents to free slots before creating new ones.' : ''}`
+${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — reuse idle agents via DELEGATE, or KILL_AGENT as a last resort to free a slot.' : ''}`
       : '';
 
     const crewSection = isLead
