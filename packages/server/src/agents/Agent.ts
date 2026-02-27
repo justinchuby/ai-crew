@@ -38,6 +38,10 @@ export interface AgentJSON {
   projectName?: string;
   model?: string;
   cwd?: string;
+  inputTokens: number;
+  outputTokens: number;
+  contextWindowSize: number;
+  contextWindowUsed: number;
 }
 
 export class Agent {
@@ -59,6 +63,12 @@ export class Agent {
   public model?: string;
   /** Working directory for this agent's CLI process */
   public cwd?: string;
+  /** Cumulative token usage from ACP PromptResponse */
+  public inputTokens = 0;
+  public outputTokens = 0;
+  /** Context window info from ACP usage_update */
+  public contextWindowSize = 0;
+  public contextWindowUsed = 0;
   private killed = false;
 
   private pty: PtyManager;
@@ -232,6 +242,18 @@ export class Agent {
       for (const listener of this.permissionRequestListeners) {
         listener(request);
       }
+    });
+
+    // Accumulate token usage from each prompt turn
+    conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => {
+      this.inputTokens = usage.inputTokens;
+      this.outputTokens = usage.outputTokens;
+    });
+
+    // Track context window from usage_update events
+    conn.on('usage_update', (info: { size: number; used: number }) => {
+      this.contextWindowSize = info.size;
+      this.contextWindowUsed = info.used;
     });
 
     conn.on('exit', (code: number) => {
@@ -566,6 +588,10 @@ CREW_UPDATE -->`;
       projectName: this.projectName,
       model: this.model || this.role.model,
       cwd: this.cwd,
+      inputTokens: this.inputTokens,
+      outputTokens: this.outputTokens,
+      contextWindowSize: this.contextWindowSize,
+      contextWindowUsed: this.contextWindowUsed,
     };
   }
 }

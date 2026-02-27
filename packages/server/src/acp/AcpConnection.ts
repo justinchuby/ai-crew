@@ -199,6 +199,14 @@ export class AcpConnection extends EventEmitter {
           case 'plan':
             this.emit('plan', update.entries as PlanEntry[]);
             break;
+
+          case 'usage_update':
+            this.emit('usage_update', {
+              size: update.size,
+              used: update.used,
+              cost: update.cost ?? null,
+            });
+            break;
         }
       },
     };
@@ -211,7 +219,7 @@ export class AcpConnection extends EventEmitter {
     });
   }
 
-  async prompt(text: string): Promise<{ stopReason: acp.StopReason }> {
+  async prompt(text: string): Promise<{ stopReason: acp.StopReason; usage?: { inputTokens: number; outputTokens: number } }> {
     if (!this.connection || !this.sessionId) {
       throw new Error('ACP connection not established');
     }
@@ -233,12 +241,19 @@ export class AcpConnection extends EventEmitter {
 
       this._isPrompting = false;
       this.emit('prompting', false);
+
+      // Emit usage if available
+      const usage = result.usage ?? undefined;
+      if (usage) {
+        this.emit('usage', { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+      }
+
       this.emit('prompt_complete', result.stopReason);
 
       // Process queued messages
       this.drainQueue();
 
-      return { stopReason: result.stopReason };
+      return { stopReason: result.stopReason, usage: usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : undefined };
     } catch (err) {
       this._isPrompting = false;
       this.emit('prompting', false);

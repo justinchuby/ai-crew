@@ -1,6 +1,12 @@
 import { Bot, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { AgentInfo, Delegation } from '../../types';
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
 interface Props {
   agents: AgentInfo[];
   delegations: Delegation[];
@@ -71,6 +77,9 @@ export function TeamStatus({ agents, delegations }: Props) {
                     <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded" title={agent.model || agent.role.model}>
                       {shortModel(agent.model || agent.role.model)}
                     </span>
+                  )}
+                  {((agent.inputTokens ?? 0) > 0 || (agent.outputTokens ?? 0) > 0) && (
+                    <span className="text-[10px] font-mono text-purple-400/70">{formatTokens((agent.inputTokens ?? 0) + (agent.outputTokens ?? 0))}</span>
                   )}
                   <span className="text-xs text-gray-600 ml-auto">{agent.id.slice(0, 8)}</span>
                 </div>

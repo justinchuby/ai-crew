@@ -82,6 +82,10 @@ export interface AgentInfo {
   projectName?: string;
   model?: string;
   cwd?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  contextWindowSize?: number;
+  contextWindowUsed?: number;
 }
 
 export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';
@@ -154,11 +158,17 @@ export interface LeadProgress {
   failed: number;
   completionPct: number;
   teamSize: number;
+  leadTokens?: { input: number; output: number };
   teamAgents: Array<{
     id: string;
     role: Role;
     status: AgentStatus;
     taskId?: string;
+    model?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    contextWindowSize?: number;
+    contextWindowUsed?: number;
   }>;
   delegations: Delegation[];
 }
