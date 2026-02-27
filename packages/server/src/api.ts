@@ -279,6 +279,8 @@ export function apiRouter(
     const failed = delegations.filter((d) => d.status === 'failed').length;
     const total = delegations.length;
 
+    const lead = agentManager.get(leadId);
+
     res.json({
       totalDelegations: total,
       active,
@@ -286,11 +288,17 @@ export function apiRouter(
       failed,
       completionPct: total > 0 ? Math.round((completed / total) * 100) : 0,
       teamSize: children.length,
+      leadTokens: lead ? { input: lead.inputTokens, output: lead.outputTokens } : null,
       teamAgents: children.map((a) => ({
         id: a.id,
         role: a.role,
         status: a.status,
         taskId: a.taskId,
+        model: a.model || a.role.model,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
+        contextWindowSize: a.contextWindowSize,
+        contextWindowUsed: a.contextWindowUsed,
       })),
       delegations,
     });
