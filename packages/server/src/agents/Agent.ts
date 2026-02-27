@@ -311,7 +311,7 @@ ${crewSection}
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked (listed above).
-2. If you need to modify a shared file, request a lock first by outputting:
+2. ALWAYS acquire a file lock BEFORE editing any file:
 \`<!-- LOCK_REQUEST {"filePath": "path/to/file", "reason": "why"} -->\`
 3. When you finish editing a file, release the lock:
 \`<!-- LOCK_RELEASE {"filePath": "path/to/file"} -->\`
