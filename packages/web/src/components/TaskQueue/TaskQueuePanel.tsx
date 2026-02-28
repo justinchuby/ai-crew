@@ -104,16 +104,15 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
 }
 
 // ---------------------------------------------------------------------------
-// Sessions tab: per-lead DAG view
+// Main TaskQueuePanel — tabbed by project
 // ---------------------------------------------------------------------------
-function SessionsView({ api }: { api: any }) {
+export function TaskQueuePanel({ api }: Props) {
   const { agents } = useAppStore();
   const { projects } = useLeadStore();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
   const [dagView, setDagView] = useState<'graph' | 'list' | null>(null);
 
-  // Find all leads
   const leads = agents.filter((a: AgentInfo) => a.role?.id === 'lead' && !a.parentId);
 
   // Auto-select first lead
@@ -124,7 +123,7 @@ function SessionsView({ api }: { api: any }) {
     }
   }, [leads, selectedLeadId]);
 
-  // Fetch progress and DAG on lead selection
+  // Fetch progress + DAG
   const fetchData = useCallback(async (leadId: string) => {
     try {
       const [dagData, progressData] = await Promise.all([
@@ -133,14 +132,14 @@ function SessionsView({ api }: { api: any }) {
       ]);
       if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
       setProgress(progressData);
-    } catch { /* ignore fetch errors */ }
+    } catch { /* ignore */ }
   }, [api]);
 
   useEffect(() => {
     if (selectedLeadId) fetchData(selectedLeadId);
   }, [selectedLeadId, fetchData]);
 
-  // Also re-fetch periodically while lead is active
+  // Re-fetch periodically while lead is active
   useEffect(() => {
     if (!selectedLeadId) return;
     const lead = agents.find((a: AgentInfo) => a.id === selectedLeadId);
@@ -152,129 +151,130 @@ function SessionsView({ api }: { api: any }) {
   const project = selectedLeadId ? projects[selectedLeadId] : null;
   const dagStatus: DagStatus | null = project?.dagStatus ?? null;
 
-  if (leads.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-        <Network size={32} className="mb-2 opacity-50" />
-        <p className="text-sm">No lead sessions active</p>
-        <p className="text-xs mt-1">Start a lead agent to see session tasks here</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Lead selector */}
-      {leads.length > 1 && (
-        <div className="flex gap-2 items-center flex-wrap">
-          {leads.map((l: AgentInfo) => {
-            const isSelected = selectedLeadId === l.id;
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ---- Project tabs ---- */}
+      <div className="flex items-center border-b border-gray-700 shrink-0 overflow-x-auto bg-[#1a1a2e]">
+        {leads.length === 0 ? (
+          <div className="flex items-center gap-2 px-4 h-10 text-gray-500 text-sm">
+            <Network size={14} />
+            No projects yet
+          </div>
+        ) : (
+          leads.map((l: AgentInfo) => {
+            const isActive = selectedLeadId === l.id;
             const projState = projects[l.id];
             const dagSummary = projState?.dagStatus?.summary;
             const taskCount = projState?.dagStatus?.tasks.length ?? 0;
+            const doneCount = dagSummary?.done ?? 0;
+
             return (
               <button
                 key={l.id}
                 onClick={() => setSelectedLeadId(l.id)}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                  isSelected
-                    ? 'border-accent bg-accent/10 text-accent'
-                    : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:text-white hover:border-gray-600'
+                className={`flex items-center gap-2 px-4 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
+                  isActive
+                    ? 'border-accent text-accent bg-accent/10'
+                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
                 }`}
               >
-                <span className="font-medium">{l.projectName || l.id.slice(0, 8)}</span>
-                {taskCount > 0 && dagSummary && (
-                  <span className="ml-1.5 text-xs text-gray-500">
-                    ({dagSummary.done}/{taskCount})
+                <span className="font-medium max-w-[160px] truncate">
+                  {l.projectName || l.id.slice(0, 8)}
+                </span>
+                {taskCount > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 rounded-full min-w-[18px] text-center ${
+                    doneCount === taskCount
+                      ? 'bg-green-900/50 text-green-400'
+                      : 'bg-gray-800 text-gray-400'
+                  }`}>
+                    {doneCount}/{taskCount}
                   </span>
                 )}
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  l.status === 'running' ? 'bg-blue-400 animate-pulse' :
+                  l.status === 'idle' ? 'bg-green-400' :
+                  l.status === 'completed' ? 'bg-gray-500' :
+                  'bg-red-400'
+                }`} />
               </button>
             );
-          })}
-        </div>
-      )}
-
-      {/* Progress summary */}
-      <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
-        <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-          <Network size={14} className="text-cyan-400" />
-          Session Progress
-          {selectedLeadId && (
-            <span className="text-xs text-gray-500 font-normal">
-              {leads.find((l: AgentInfo) => l.id === selectedLeadId)?.projectName || selectedLeadId.slice(0, 8)}
-            </span>
-          )}
-        </h3>
-        <SessionProgress progress={progress} dagStatus={dagStatus} />
+          })
+        )}
       </div>
 
-      {/* DAG tasks */}
-      {(() => {
-        // Default to graph when there are tasks with dependencies, list otherwise
-        const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
-        const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
-        return (
-          <div className="bg-gray-800/50 rounded-lg border border-gray-700 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-white flex items-center gap-2">
-                {effectiveView === 'graph' ? (
-                  <Network size={14} className="text-blue-400" />
-                ) : (
-                  <LayoutList size={14} className="text-blue-400" />
-                )}
-                Tasks
-                {dagStatus && (
-                  <span className="text-xs text-gray-500 font-normal">{dagStatus.tasks.length} total</span>
-                )}
-              </h3>
-              {/* View toggle */}
-              <div className="flex bg-gray-900 rounded p-0.5 border border-gray-700">
-                <button
-                  onClick={() => setDagView('list')}
-                  className={`p-1 rounded transition-colors ${
-                    effectiveView === 'list' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                  title="List view"
-                >
-                  <LayoutList size={13} />
-                </button>
-                <button
-                  onClick={() => setDagView('graph')}
-                  className={`p-1 rounded transition-colors ${
-                    effectiveView === 'graph' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                  title="Graph view"
-                >
-                  <Network size={13} />
-                </button>
-              </div>
-            </div>
-            {effectiveView === 'graph' ? (
-              <div className="flex-1" style={{ minHeight: 400 }}>
-                <DagGraph dagStatus={dagStatus} />
-              </div>
-            ) : (
-              <div className="max-h-[500px] overflow-y-auto">
-                <TaskDagPanelContent dagStatus={dagStatus} />
-              </div>
-            )}
+      {/* ---- Content for selected project ---- */}
+      <div className="flex-1 overflow-auto p-4">
+        {!selectedLeadId || leads.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <Network size={32} className="mb-2 opacity-50" />
+            <p className="text-sm">No lead sessions active</p>
+            <p className="text-xs mt-1">Start a lead agent to see project tasks here</p>
           </div>
-        );
-      })()}
-    </div>
-  );
-}
+        ) : (
+          <div className="space-y-4">
+            {/* Progress summary */}
+            <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
+              <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                <Network size={14} className="text-cyan-400" />
+                Progress
+              </h3>
+              <SessionProgress progress={progress} dagStatus={dagStatus} />
+            </div>
 
-// ---------------------------------------------------------------------------
-// Main TaskQueuePanel — shows only the Sessions/DAG view
-// ---------------------------------------------------------------------------
-export function TaskQueuePanel({ api }: Props) {
-  return (
-    <div className="flex-1 overflow-auto p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Sessions</h2>
+            {/* DAG tasks */}
+            {(() => {
+              const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
+              const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+              return (
+                <div className="bg-gray-800/50 rounded-lg border border-gray-700 flex flex-col">
+                  <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                      {effectiveView === 'graph' ? (
+                        <Network size={14} className="text-blue-400" />
+                      ) : (
+                        <LayoutList size={14} className="text-blue-400" />
+                      )}
+                      Tasks
+                      {dagStatus && (
+                        <span className="text-xs text-gray-500 font-normal">{dagStatus.tasks.length} total</span>
+                      )}
+                    </h3>
+                    <div className="flex bg-gray-900 rounded p-0.5 border border-gray-700">
+                      <button
+                        onClick={() => setDagView('list')}
+                        className={`p-1 rounded transition-colors ${
+                          effectiveView === 'list' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                        title="List view"
+                      >
+                        <LayoutList size={13} />
+                      </button>
+                      <button
+                        onClick={() => setDagView('graph')}
+                        className={`p-1 rounded transition-colors ${
+                          effectiveView === 'graph' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                        title="Graph view"
+                      >
+                        <Network size={13} />
+                      </button>
+                    </div>
+                  </div>
+                  {effectiveView === 'graph' ? (
+                    <div className="flex-1" style={{ minHeight: 400 }}>
+                      <DagGraph dagStatus={dagStatus} />
+                    </div>
+                  ) : (
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <TaskDagPanelContent dagStatus={dagStatus} />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
-      <SessionsView api={api} />
     </div>
   );
 }

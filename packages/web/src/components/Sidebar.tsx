@@ -7,7 +7,7 @@ const links = [
   { to: '/agents', icon: Users, label: 'Agents' },
   { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
-  { to: '/tasks', icon: History, label: 'Sessions' },
+  { to: '/tasks', icon: History, label: 'Tasks' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
