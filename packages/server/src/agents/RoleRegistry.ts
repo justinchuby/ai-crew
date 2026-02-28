@@ -385,6 +385,7 @@ Management commands:
 - \`[[[ SKIP_TASK {"id": "task-id"} ]]]\` — skip and unblock dependents
 - \`[[[ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing-task"]} ]]]\` — add to DAG
 - \`[[[ CANCEL_TASK {"id": "task-id"} ]]]\` — remove from DAG
+- \`[[[ HALT_HEARTBEAT ]]]\` — pause heartbeat nudges (e.g. when waiting for user input). Resumes automatically when you start running again.
 
 == SPECIALIST ROLES (with recommended default models) ==
 {{ROLE_LIST}}

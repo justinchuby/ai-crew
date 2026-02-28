@@ -132,6 +132,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       chatGroupRegistry: this.chatGroupRegistry,
       taskDAG: this.taskDAG,
       maxConcurrent: this.maxConcurrent,
+      markHumanInterrupt: (id) => this.markHumanInterrupt(id),
     });
 
     // Start heartbeat monitor to detect stalled teams

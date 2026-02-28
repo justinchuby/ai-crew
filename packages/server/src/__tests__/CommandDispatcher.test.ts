@@ -106,6 +106,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       cancelTask: vi.fn(),
     } as any,
     maxConcurrent: 10,
+    markHumanInterrupt: vi.fn(),
     ...overrides,
   };
 }

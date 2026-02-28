@@ -37,6 +37,7 @@ const RETRY_TASK_REGEX = /\[\[\[\s*RETRY_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const SKIP_TASK_REGEX = /\[\[\[\s*SKIP_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const ADD_TASK_REGEX = /\[\[\[\s*ADD_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const CANCEL_TASK_REGEX = /\[\[\[\s*CANCEL_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const HALT_HEARTBEAT_REGEX = /\[\[\[\s*HALT_HEARTBEAT\s*\]\]\]/s;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export interface CommandContext {
   chatGroupRegistry: ChatGroupRegistry;
   taskDAG: TaskDAG;
   maxConcurrent: number;
+  markHumanInterrupt(agentId: string): void;
 }
 
 // ── CommandDispatcher ────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export class CommandDispatcher {
       { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => this.handleSkipTask(a, d) },
       { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => this.handleAddTask(a, d) },
       { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => this.handleCancelTask(a, d) },
+      { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => this.handleHaltHeartbeat(a) },
     ];
 
     let found = true;
@@ -1032,6 +1035,13 @@ CREW_ROSTER ]]]`;
       const ok = this.ctx.taskDAG.cancelTask(agent.id, req.id);
       agent.sendMessage(ok ? `[System] Task "${req.id}" cancelled.` : `[System] Cannot cancel task "${req.id}" (may be running or done).`);
     } catch { agent.sendMessage('[System] CANCEL_TASK error: invalid payload.'); }
+  }
+
+  private handleHaltHeartbeat(agent: Agent): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can halt heartbeat.'); return; }
+    this.ctx.markHumanInterrupt(agent.id);
+    logger.info('lead', `Heartbeat halted by ${agent.role.name} (${agent.id.slice(0, 8)})`);
+    agent.sendMessage('[System] Heartbeat nudges paused. They will resume automatically when you start running again.');
   }
 
   /** Auto-delegate ready tasks to idle agents or create new ones */
