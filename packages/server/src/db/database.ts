@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS roles (
   system_prompt TEXT DEFAULT '',
   color TEXT DEFAULT '#888',
   icon TEXT DEFAULT '🤖',
-  built_in INTEGER DEFAULT 0
+  built_in INTEGER DEFAULT 0,
+  model TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -151,6 +152,18 @@ export class Database {
     this.db = new BetterSqlite3(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Run lightweight migrations for schema changes on existing DBs */
+  private migrate(): void {
+    // Add model column to roles table if missing
+    try {
+      const cols = this.db.prepare("PRAGMA table_info('roles')").all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === 'model')) {
+        this.db.exec('ALTER TABLE roles ADD COLUMN model TEXT');
+      }
+    } catch { /* ignore */ }
   }
 
   run(sql: string, params?: any[]): BetterSqlite3.RunResult {

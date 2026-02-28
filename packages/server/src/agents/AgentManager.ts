@@ -149,7 +149,14 @@ export class AgentManager extends EventEmitter {
       parentId: a.parentId,
     }));
 
-    const agent = new Agent(role, this.config, task, parentId, peers, mode, autopilot);
+    // For lead agents, inject dynamic role list (including custom roles) before creating
+    let effectiveRole = role;
+    if (role.id === 'lead') {
+      const roleList = this.roleRegistry.generateRoleList();
+      effectiveRole = { ...role, systemPrompt: role.systemPrompt.replace('{{ROLE_LIST}}', roleList) };
+    }
+
+    const agent = new Agent(effectiveRole, this.config, task, parentId, peers, mode, autopilot);
     if (model) agent.model = model;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;

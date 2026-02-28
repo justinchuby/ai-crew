@@ -383,18 +383,7 @@ Management commands:
 - \`[[[ CANCEL_TASK {"id": "task-id"} ]]]\` — remove from DAG
 
 == SPECIALIST ROLES (with recommended default models) ==
-- "developer" — Code implementation, feature building, bug fixes, writes tests (default: claude-opus-4.6)
-- "code-reviewer" — Readability, maintainability, patterns, best practices (default: gemini-3-pro-preview)
-- "critical-reviewer" — Security, performance, edge cases, failure modes (default: gemini-3-pro-preview)
-- "architect" — System design, architecture decisions, problem framing (default: claude-opus-4.6)
-- "product-manager" — Creative product thinking, user needs, quality bar (default: gpt-5.2-codex)
-- "tech-writer" — Documentation, examples, API design review (default: gpt-5.2)
-- "designer" — UX/UI design, human-computer interaction, agent-agent interaction patterns (default: claude-opus-4.6)
-- "generalist" — Cross-disciplinary problem solver for non-software tasks: mechanical eng, 3D modeling, research, hardware (default: claude-opus-4.6)
-- "agent" — Neutral general-purpose agent with no role-specific instructions, just system commands (default: server default model)
-- "radical-thinker" — First-principles challenger, perspective shifter, innovation catalyst (default: gpt-5.3-codex)
-- "secretary" — Plan tracker, progress monitor, status reporter. Create one at the start to track the plan. Consult before marking work done. (default: gpt-4.1)
-- "qa-tester" — Runs actual code, verifies behavior e2e, catches runtime failures. Use after reviews approve code. (default: claude-sonnet-4.6)
+{{ROLE_LIST}}
 
 == MODEL SELECTION ==
 Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. Override the default by setting "model" in CREATE_AGENT.
@@ -458,13 +447,33 @@ When something is unclear or you need information from another agent, message th
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();
+  private db?: import('../db/database.js').Database;
 
-  constructor() {
+  constructor(db?: import('../db/database.js').Database) {
+    this.db = db;
     for (const role of BUILT_IN_ROLES) {
       if (role.id !== 'lead') {
         this.roles.set(role.id, { ...role, systemPrompt: role.systemPrompt + SELF_REPORT_INSTRUCTION });
       } else {
         this.roles.set(role.id, role);
+      }
+    }
+    // Load custom roles from DB
+    if (db) {
+      const rows = db.all<{ id: string; name: string; description: string; system_prompt: string; color: string; icon: string; model: string | null }>(
+        'SELECT id, name, description, system_prompt, color, icon, model FROM roles WHERE built_in = 0'
+      );
+      for (const row of rows) {
+        this.roles.set(row.id, {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          systemPrompt: row.system_prompt + SELF_REPORT_INSTRUCTION,
+          color: row.color,
+          icon: row.icon,
+          builtIn: false,
+          model: row.model ?? undefined,
+        });
       }
     }
   }
@@ -478,14 +487,44 @@ export class RoleRegistry {
   }
 
   register(role: Omit<Role, 'builtIn'>): Role {
-    const full: Role = { ...role, builtIn: false };
+    const full: Role = { ...role, builtIn: false, systemPrompt: role.systemPrompt + SELF_REPORT_INSTRUCTION };
     this.roles.set(full.id, full);
+    // Persist to DB
+    if (this.db) {
+      this.db.run(
+        `INSERT OR REPLACE INTO roles (id, name, description, system_prompt, color, icon, built_in, model)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+        [full.id, full.name, full.description, role.systemPrompt, full.color, full.icon, full.model ?? null]
+      );
+    }
     return full;
   }
 
   remove(id: string): boolean {
     const role = this.roles.get(id);
     if (!role || role.builtIn) return false;
-    return this.roles.delete(id);
+    this.roles.delete(id);
+    if (this.db) {
+      this.db.run('DELETE FROM roles WHERE id = ? AND built_in = 0', [id]);
+    }
+    return true;
+  }
+
+  /** Generate the dynamic role list for the lead prompt, including custom roles */
+  generateRoleList(): string {
+    const lines: string[] = [];
+    for (const role of this.roles.values()) {
+      if (role.id === 'lead') continue; // Don't list lead itself
+      const modelNote = role.model ? `(default: ${role.model})` : '(default: server default model)';
+      lines.push(`- "${role.id}" — ${role.description} ${modelNote}`);
+    }
+    return lines.join('\n');
+  }
+
+  /** Get the lead system prompt with the dynamic role list injected */
+  getLeadPrompt(): string {
+    const lead = this.roles.get('lead');
+    if (!lead) return '';
+    return lead.systemPrompt.replace('{{ROLE_LIST}}', this.generateRoleList());
   }
 }

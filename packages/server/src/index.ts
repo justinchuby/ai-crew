@@ -42,7 +42,7 @@ config = getConfig();
 
 const lockRegistry = new FileLockRegistry(db);
 const activityLedger = new ActivityLedger(db);
-const roleRegistry = new RoleRegistry();
+const roleRegistry = new RoleRegistry(db);
 const messageBus = new MessageBus();
 const decisionLog = new DecisionLog(db);
 const agentMemory = new AgentMemory(db);
