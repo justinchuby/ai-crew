@@ -73,8 +73,9 @@ export function ChatPanel({ agentId, ws, api }: Props) {
     // Record user message in store so it appears in chat
     const state = useAppStore.getState();
     const existing = state.agents.find((a) => a.id === agentId);
+    const isAgentBusy = existing?.status === 'running';
     const msgs = [...(existing?.messages ?? [])];
-    msgs.push({ type: 'text', text: inputText, sender: 'user' });
+    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy ? { queued: true } : {}) });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
     if (broadcast) {

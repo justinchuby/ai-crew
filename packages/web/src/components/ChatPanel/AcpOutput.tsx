@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderOpen, Clock, Loader2 } from 'lucide-react';
 
 interface Props {
   agentId: string;
@@ -127,7 +127,7 @@ export function AcpOutput({ agentId }: Props) {
 
   const timeline: TimelineItem[] = [];
   messages.forEach((msg, i) => {
-    if ((msg.text || msg.contentType)) {
+    if ((msg.text || msg.contentType) && !msg.queued) {
       timeline.push({ kind: 'message', msg, index: i });
     }
   });
@@ -149,6 +149,17 @@ export function AcpOutput({ agentId }: Props) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Promote queued messages when agent responds (new agent message after queued user messages)
+  useEffect(() => {
+    if (!messages.some(m => m.queued)) return;
+    const lastNonQueued = [...messages].reverse().find(m => !m.queued);
+    if (lastNonQueued && lastNonQueued.sender !== 'user') {
+      // Agent has responded — promote all queued messages
+      const updated = messages.map(m => m.queued ? { ...m, queued: false } : m);
+      useAppStore.getState().updateAgent(agentId, { messages: updated });
+    }
+  }, [messages, agentId]);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -267,9 +278,14 @@ export function AcpOutput({ agentId }: Props) {
             }
 
             // Rich content (image, audio, resource)
+            // Agent messages — check if reply to user for blue highlight
+            const prevItem = i > 0 ? timeline[i - 1] : null;
+            const isReplyToUser = prevItem?.kind === 'message' && (prevItem.msg.sender ?? 'agent') === 'user';
+            const replyClass = isReplyToUser ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md' : '';
+
             if (msg.contentType && msg.contentType !== 'text') {
               return (
-                <div key={`msg-${item.index}`} className="py-1">
+                <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       {msg.contentType === 'image' && msg.data && (
@@ -306,7 +322,7 @@ export function AcpOutput({ agentId }: Props) {
             // Agent messages — flowing text, no bubble
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
             return (
-              <div key={`msg-${item.index}`} className="py-1">
+              <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
                 <div className="flex items-start gap-2">
                   <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
                     <AgentTextBlockSimple text={text} />
@@ -317,6 +333,27 @@ export function AcpOutput({ agentId }: Props) {
             );
           })}
           <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      {/* Queued messages — sent but not yet processed by agent */}
+      {messages.some((m) => m.queued) && (
+        <div className="border-t border-dashed border-gray-600 px-3 py-2 bg-gray-800/50">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Queued
+          </div>
+          {messages.filter((m) => m.queued).map((msg, i) => (
+            <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
+              <span className="text-[10px] text-gray-600">
+                {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+              </span>
+              <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+                {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
+              </div>
+              <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+            </div>
+          ))}
         </div>
       )}
     </div>
