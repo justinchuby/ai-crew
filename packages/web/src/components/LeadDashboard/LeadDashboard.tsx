@@ -65,26 +65,24 @@ export function LeadDashboard({ api, ws }: Props) {
   const lastInteractionRef = useRef(Date.now());
   const snapshotRef = useRef<{ tasks: number; decisions: number; comms: number; reports: number }>({ tasks: 0, decisions: 0, comms: 0, reports: 0 });
   const [catchUpSummary, setCatchUpSummary] = useState<{ tasksCompleted: number; pendingDecisions: number; newMessages: number; newReports: number } | null>(null);
-  const catchUpDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track user interactions
   useEffect(() => {
     const markActive = () => {
       lastInteractionRef.current = Date.now();
-      // Auto-dismiss banner after 10s of resumed activity
-      if (catchUpSummary) {
-        if (catchUpDismissTimer.current) clearTimeout(catchUpDismissTimer.current);
-        catchUpDismissTimer.current = setTimeout(() => setCatchUpSummary(null), 10_000);
-      }
+    };
+    const markScroll = () => {
+      lastInteractionRef.current = Date.now();
+      // Auto-dismiss banner on scroll (designer spec)
+      if (catchUpSummary) setCatchUpSummary(null);
     };
     window.addEventListener('click', markActive);
     window.addEventListener('keydown', markActive);
-    window.addEventListener('scroll', markActive, true);
+    window.addEventListener('scroll', markScroll, true);
     return () => {
       window.removeEventListener('click', markActive);
       window.removeEventListener('keydown', markActive);
-      window.removeEventListener('scroll', markActive, true);
-      if (catchUpDismissTimer.current) clearTimeout(catchUpDismissTimer.current);
+      window.removeEventListener('scroll', markScroll, true);
     };
   }, [catchUpSummary]);
 
@@ -99,17 +97,18 @@ export function LeadDashboard({ api, ws }: Props) {
       reports: (project.agentReports ?? []).length,
     };
     const elapsed = Date.now() - lastInteractionRef.current;
-    if (elapsed >= 120_000 && !catchUpSummary) {
+    if (elapsed >= 60_000 && !catchUpSummary) {
       const prev = snapshotRef.current;
       const tasksCompleted = Math.max(0, currentCounts.tasks - prev.tasks);
       const newMessages = Math.max(0, currentCounts.comms - prev.comms);
       const newReports = Math.max(0, currentCounts.reports - prev.reports);
-      if (tasksCompleted > 0 || currentCounts.decisions > 0 || newMessages > 0 || newReports > 0) {
+      const totalNew = tasksCompleted + newMessages + newReports;
+      if (totalNew >= 5 || currentCounts.decisions > 0) {
         setCatchUpSummary({ tasksCompleted, pendingDecisions: currentCounts.decisions, newMessages, newReports });
       }
     }
     // Always update snapshot when user is active
-    if (elapsed < 120_000) {
+    if (elapsed < 60_000) {
       snapshotRef.current = currentCounts;
     }
   }, [agents, projects, selectedLeadId, catchUpSummary]);
@@ -1161,29 +1160,6 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
-            {/* Catch-up summary banner */}
-            {catchUpSummary && (
-              <div
-                role="status"
-                aria-live="polite"
-                tabIndex={0}
-                className="border-b border-blue-500/30 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-blue-900/40 px-4 py-2 flex items-center gap-3 cursor-pointer hover:from-blue-900/50 hover:via-indigo-900/40 hover:to-blue-900/50 transition-all"
-                onClick={() => setCatchUpSummary(null)}
-                onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setCatchUpSummary(null); }}
-                title="Click to dismiss"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-blue-300 shrink-0" />
-                <span className="text-xs font-mono text-blue-100">
-                  While you were away:
-                  {catchUpSummary.tasksCompleted > 0 && <span className="ml-2 text-emerald-300">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
-                  {catchUpSummary.pendingDecisions > 0 && <span className="ml-2 text-amber-300">⚠ {catchUpSummary.pendingDecisions} decision{catchUpSummary.pendingDecisions !== 1 ? 's' : ''} pending</span>}
-                  {catchUpSummary.newMessages > 0 && <span className="ml-2 text-blue-300">{catchUpSummary.newMessages} new message{catchUpSummary.newMessages !== 1 ? 's' : ''}</span>}
-                  {catchUpSummary.newReports > 0 && <span className="ml-2 text-indigo-300">{catchUpSummary.newReports} agent report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
-                </span>
-                <X className="w-3 h-3 text-blue-400/60 ml-auto shrink-0" />
-              </div>
-            )}
-
             {/* Agent Reports — separate from lead output */}
             {agentReports.length > 0 && (
               <div className="border-b border-indigo-700/40 bg-indigo-950/20">
@@ -1354,6 +1330,33 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
               {/* Prompt navigation */}
               <PromptNav containerRef={chatContainerRef} messages={messages} />
+              {/* Catch-up summary — floating overlay at bottom-center */}
+              {catchUpSummary && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 w-[420px] max-w-[calc(100%-2rem)] animate-in slide-in-from-bottom fade-in duration-300">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    tabIndex={0}
+                    className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl px-4 py-3"
+                    onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setCatchUpSummary(null); }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="text-xs font-semibold text-zinc-200">While you were away</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono">
+                      {catchUpSummary.tasksCompleted > 0 && <span className="text-emerald-400">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
+                      {catchUpSummary.pendingDecisions > 0 && <span className="text-amber-400">⚠ {catchUpSummary.pendingDecisions} decision{catchUpSummary.pendingDecisions !== 1 ? 's' : ''} pending</span>}
+                      {catchUpSummary.newMessages > 0 && <span className="text-blue-400">{catchUpSummary.newMessages} new message{catchUpSummary.newMessages !== 1 ? 's' : ''}</span>}
+                      {catchUpSummary.newReports > 0 && <span className="text-indigo-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
+                    </div>
+                    <div className="flex gap-2 mt-2.5">
+                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-zinc-800 border border-zinc-600 text-zinc-300 hover:bg-zinc-700 transition-colors">Dismiss</button>
+                      <button onClick={() => { setCatchUpSummary(null); messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[11px] px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors">Show All</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Queued messages (pending) */}
