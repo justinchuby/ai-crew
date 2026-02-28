@@ -91,6 +91,11 @@ scheduler.register({
   interval: 3_600_000, // every hour
   run: () => activityLedger.prune(50_000),
 });
+scheduler.register({
+  id: 'stale-delegation-cleanup',
+  interval: 300_000, // every 5 minutes
+  run: () => { agentManager.cleanupStaleDelegations(); },
+});
 
 // Health check (no auth required)
 app.get('/health', (_req, res) => {

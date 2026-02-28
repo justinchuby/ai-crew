@@ -47,6 +47,12 @@ export class HeartbeatMonitor {
     this.leadNudgeCount.set(agentId, 0);
   }
 
+  /** Called when a lead agent exits or is killed — clean up all tracking */
+  trackRemoved(agentId: string): void {
+    this.leadIdleSince.delete(agentId);
+    this.leadNudgeCount.delete(agentId);
+  }
+
   /** Periodic heartbeat check: detect stalled teams and nudge the lead */
   private check(): void {
     const leads = this.ctx.getAllAgents().filter((a) => a.role.id === 'lead' && a.status === 'idle');

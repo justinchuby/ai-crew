@@ -96,6 +96,8 @@ export class Agent {
   private permissionRequestListeners: Array<(request: any) => void> = [];
   private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private contextCompactedListeners: Array<(info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void> = [];
+  private static readonly MAX_MESSAGES = 500;
+  private static readonly MAX_TOOL_CALLS = 200;
   private peers: AgentContextInfo[];
 
   /** Resume a previous session by its Copilot session ID */
@@ -169,7 +171,11 @@ export class Agent {
     const conn = this.acpConnection!;
 
     conn.on('text', (text: string) => {
+      if (this.killed) return;
       this.messages.push(text);
+      if (this.messages.length > Agent.MAX_MESSAGES) {
+        this.messages = this.messages.slice(-Agent.MAX_MESSAGES);
+      }
       for (const listener of this.dataListeners) {
         listener(text);
       }
@@ -188,11 +194,15 @@ export class Agent {
     });
 
     conn.on('tool_call', (info: ToolCallInfo) => {
+      if (this.killed) return;
       const idx = this.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
       if (idx >= 0) {
         this.toolCalls[idx] = info;
       } else {
         this.toolCalls.push(info);
+        if (this.toolCalls.length > Agent.MAX_TOOL_CALLS) {
+          this.toolCalls = this.toolCalls.slice(-Agent.MAX_TOOL_CALLS);
+        }
       }
       for (const listener of this.toolCallListeners) {
         listener(info);
@@ -254,6 +264,7 @@ export class Agent {
 
     // When a prompt finishes, mark delegated agents as idle (task done, awaiting next)
     conn.on('prompt_complete', (_stopReason: string) => {
+      if (this.killed) return;
       if (this.status === 'running' && !this.acpConnection?.isPrompting) {
         // Drain queued messages before going idle
         if (this.pendingMessages.length > 0) {
@@ -273,6 +284,7 @@ export class Agent {
 
     // When a prompt starts (including queued/drained prompts), ensure status is 'running'
     conn.on('prompting', (active: boolean) => {
+      if (this.killed) return;
       if (active && this.status !== 'running') {
         this.status = 'running';
         for (const listener of this.statusListeners) {
@@ -464,11 +476,14 @@ ${activityLines}
 CREW_UPDATE ]]]`;
 
     if (this.acpConnection?.isConnected) {
-      this.acpConnection.prompt(update).catch(() => {});
+      this.acpConnection.prompt(update).catch((err) => {
+        logger.warn('agent', `Context update failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message}`);
+      });
     }
   }
 
   write(data: string): void {
+    if (this.killed) return;
     if (this.acpConnection?.isConnected) {
       this.status = 'running';
       for (const listener of this.statusListeners) {
@@ -494,7 +509,7 @@ CREW_UPDATE ]]]`;
 
   /** Queue a message — delivered after the agent finishes its current prompt */
   queueMessage(message: string): void {
-    if (this.status === 'idle' || this.status === 'creating') {
+    if (this.status === 'idle') {
       this.write(message);
     } else {
       this.pendingMessages.push(message);
@@ -534,6 +549,9 @@ CREW_UPDATE ]]]`;
   kill(): void {
     this.killed = true;
     this.status = 'completed';
+    for (const listener of this.statusListeners) {
+      listener(this.status);
+    }
     if (this.acpConnection) {
       this.acpConnection.kill();
       this.acpConnection = null;
@@ -545,11 +563,16 @@ CREW_UPDATE ]]]`;
     this.contentListeners.length = 0;
     this.exitListeners.length = 0;
     this.hungListeners.length = 0;
+    this.statusListeners.length = 0;
+    this.sessionReadyListeners.length = 0;
     this.toolCallListeners.length = 0;
     this.planListeners.length = 0;
     this.permissionRequestListeners.length = 0;
     this.contextCompactedListeners.length = 0;
     this.thinkingListeners.length = 0;
+    this.pendingMessages.length = 0;
+    this.messages.length = 0;
+    this.toolCalls.length = 0;
   }
 
   onData(listener: (data: string) => void): void {
@@ -600,8 +623,16 @@ CREW_UPDATE ]]]`;
     return this.messages.join('');
   }
 
+  /** Get recent output efficiently — avoids joining the entire messages array */
+  getRecentOutput(maxChars = 8000): string {
+    let result = '';
+    for (let i = this.messages.length - 1; i >= 0 && result.length < maxChars; i--) {
+      result = this.messages[i] + result;
+    }
+    return result.length > maxChars ? result.slice(-maxChars) : result;
+  }
+
   toJSON(): AgentJSON {
-    const output = this.messages.join('');
     return {
       id: this.id,
       role: this.role,
@@ -611,9 +642,9 @@ CREW_UPDATE ]]]`;
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
-      outputPreview: output.slice(-500),
+      outputPreview: this.getRecentOutput(500),
       plan: this.plan,
-      toolCalls: this.toolCalls,
+      toolCalls: this.toolCalls.slice(-50),
       sessionId: this.sessionId,
       projectName: this.projectName,
       projectId: this.projectId,

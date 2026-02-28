@@ -424,6 +424,50 @@ describe('CommandDispatcher', () => {
     });
   });
 
+  // ── Delegation cleanup ─────────────────────────────────────────────
+
+  describe('delegation lifecycle', () => {
+    it('completeDelegationsForAgent marks active delegations as failed', () => {
+      const child = makeChildAgent(leadAgent.id);
+      const devRole = makeRole({ id: 'developer', name: 'Developer' });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.spawnAgent as any).mockReturnValue(child);
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+
+      // Create a delegation by spawning via CREATE_AGENT
+      dispatch(dispatcher, leadAgent, `[[[ CREATE_AGENT {"role": "developer", "task": "work"} ]]]`);
+
+      const delegations = dispatcher.getDelegations(leadAgent.id);
+      expect(delegations.length).toBeGreaterThan(0);
+      expect(delegations[0].status).toBe('active');
+
+      // Simulate agent killed — complete its delegations
+      dispatcher.completeDelegationsForAgent(child.id);
+
+      const updated = dispatcher.getDelegations(leadAgent.id);
+      expect(updated[0].status).toBe('failed');
+    });
+
+    it('cleanupStaleDelegations removes old completed delegations', () => {
+      const child = makeChildAgent(leadAgent.id);
+      const devRole = makeRole({ id: 'developer', name: 'Developer' });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.spawnAgent as any).mockReturnValue(child);
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+
+      // Create a delegation
+      dispatch(dispatcher, leadAgent, `[[[ CREATE_AGENT {"role": "developer", "task": "work"} ]]]`);
+
+      // Mark it as completed
+      dispatcher.completeDelegationsForAgent(child.id);
+
+      // With maxAge=0, everything old gets cleaned
+      const removed = dispatcher.cleanupStaleDelegations(0);
+      expect(removed).toBe(1);
+      expect(dispatcher.getDelegations().length).toBe(0);
+    });
+  });
+
   // ── Multiple commands in one text ──────────────────────────────────
 
   describe('multiple commands', () => {

@@ -392,4 +392,27 @@ describe('HeartbeatMonitor', () => {
     // Only one check from the second interval (first was cleared)
     expect(lead.sendMessage).toHaveBeenCalledTimes(1);
   });
+
+  it('trackRemoved cleans up idle and nudge tracking for a lead', () => {
+    const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Lead' }, status: 'idle' });
+    const child = makeAgent({ id: 'child-1', parentId: 'lead-1' });
+
+    ctx.getAllAgents.mockReturnValue([lead, child]);
+    ctx.getDelegationsMap.mockReturnValue(new Map([['d1', makeDelegation()]]));
+
+    monitor.start(100);
+    monitor.trackIdle('lead-1');
+
+    // Need to advance past the 60s idle threshold for nudge to fire
+    vi.advanceTimersByTime(61_000);
+    expect(lead.sendMessage).toHaveBeenCalled();
+
+    // Remove the lead
+    monitor.trackRemoved('lead-1');
+
+    (lead.sendMessage as any).mockClear();
+    vi.advanceTimersByTime(61_000);
+    // No more nudges after removal (idleSince was deleted)
+    expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
 });

@@ -172,11 +172,11 @@ export class CommandDispatcher {
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = 'completed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.getBufferedOutput().slice(-8000);
+        del.result = agent.getRecentOutput(8000);
       }
     }
 
-    const rawOutput = agent.getBufferedOutput().slice(-8000);
+    const rawOutput = agent.getRecentOutput(8000);
     // Strip [[[ ... ]]] command blocks from output
     const cleanPreview = rawOutput.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-6000);
     const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
@@ -230,7 +230,7 @@ export class CommandDispatcher {
         if (del.toAgentId === agent.id && del.status === 'active') {
           del.status = exitCode === 0 ? 'completed' : 'failed';
           del.completedAt = new Date().toISOString();
-          del.result = agent.getBufferedOutput().slice(-8000);
+          del.result = agent.getRecentOutput(8000);
         }
       }
       return;
@@ -241,12 +241,12 @@ export class CommandDispatcher {
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.getBufferedOutput().slice(-8000);
+        del.result = agent.getRecentOutput(8000);
       }
     }
 
     const status = exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
-    const rawOutput2 = agent.getBufferedOutput().slice(-8000);
+    const rawOutput2 = agent.getRecentOutput(8000);
     const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-6000);
     const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
     const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.task || 'none'}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
@@ -291,6 +291,28 @@ export class CommandDispatcher {
   clearCompletionTracking(agentId: string): void {
     this.reportedCompletions.delete(`${agentId}:idle`);
     this.reportedCompletions.delete(`${agentId}:exit`);
+  }
+
+  /** Mark all active delegations involving an agent as failed (used when agent is killed) */
+  completeDelegationsForAgent(agentId: string): void {
+    for (const [, del] of this.delegations) {
+      if (del.status === 'active' && del.toAgentId === agentId) {
+        del.status = 'failed';
+      }
+    }
+  }
+
+  /** Remove completed/failed delegations older than the given age (ms). Returns count removed. */
+  cleanupStaleDelegations(maxAgeMs = 300_000): number {
+    const cutoff = Date.now() - maxAgeMs;
+    let count = 0;
+    for (const [id, del] of this.delegations) {
+      if ((del.status === 'completed' || del.status === 'failed') && new Date(del.createdAt).getTime() <= cutoff) {
+        this.delegations.delete(id);
+        count++;
+      }
+    }
+    return count;
   }
 
   /** Access delegations map for heartbeat checks */

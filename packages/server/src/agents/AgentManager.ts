@@ -209,10 +209,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
     }
 
-    // Track parent-child relationship
+    // Track parent-child relationship (deduplicate for restart with same ID)
     if (parentId) {
       const parent = this.agents.get(parentId);
-      if (parent) {
+      if (parent && !parent.childIds.includes(agent.id)) {
         parent.childIds.push(agent.id);
       }
     }
@@ -322,13 +322,27 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         role: agent.role.id,
         status: agent.status,
       });
-      this.emit('agent:exit', { agentId: agent.id, code });
 
       // Release any file locks held by the exiting agent
       const releasedCount = this.lockRegistry.releaseAll(agent.id);
       if (releasedCount > 0) {
         logger.info('lock', `Auto-released ${releasedCount} lock(s) for exiting agent ${agent.id.slice(0, 8)}`);
       }
+
+      // Clean up parent-child reference
+      if (agent.parentId) {
+        const parent = this.agents.get(agent.parentId);
+        if (parent) {
+          parent.childIds = parent.childIds.filter(cid => cid !== agent.id);
+        }
+      }
+
+      // Clean up heartbeat tracking for leads
+      if (agent.role.id === 'lead') {
+        this.heartbeat.trackRemoved(agent.id);
+      }
+
+      this.emit('agent:exit', { agentId: agent.id, code });
 
       // Notify parent agent of child completion
       this.dispatcher.notifyParentOfCompletion(agent, code);
@@ -345,6 +359,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.dispatcher.clearCompletionTracking(agent.id);
       }, 10000);
 
+      // Schedule removal from Map and dispose after grace period
+      setTimeout(() => {
+        this.agents.delete(agent.id);
+        agent.dispose();
+      }, 30_000);
+
       if (code !== null && code !== 0) {
         const agentRole = agent.role?.id ?? 'unknown';
         const crashKey = `${agentRole}:${agent.task ?? ''}`;
@@ -359,13 +379,29 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         if (this.autoRestart && count < this.maxRestarts) {
           logger.warn('agent', `Auto-restarting ${agent.role.name} (attempt ${count + 1}/${this.maxRestarts})`);
           setTimeout(() => {
-            const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined);
-            this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
+            try {
+              // Verify parent is still alive before restarting
+              if (agent.parentId) {
+                const parent = this.agents.get(agent.parentId);
+                if (!parent || parent.status === 'completed' || parent.status === 'failed') {
+                  logger.warn('agent', `Skipping auto-restart: parent ${agent.parentId.slice(0, 8)} no longer active`);
+                  return;
+                }
+              }
+              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined);
+              this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
+            } catch (err) {
+              logger.error('agent', `Auto-restart failed for ${agent.role.name}: ${(err as Error).message}`);
+            }
           }, 2000);
         } else if (count >= this.maxRestarts) {
           logger.error('agent', `Restart limit reached for ${agent.role.name} (${this.maxRestarts} restarts)`);
           this.emit('agent:restart_limit', { agentId: agent.id });
         }
+      } else {
+        // Clear crash count on successful exit
+        const crashKey = `${agent.role?.id ?? 'unknown'}:${agent.task ?? ''}`;
+        this.crashCounts.delete(crashKey);
       }
     });
 
@@ -399,13 +435,48 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.clearHungTimer(id);
+    this.dispatcher.clearBuffer(id);
+
     // Release any file locks held by the killed agent
     const releasedCount = this.lockRegistry.releaseAll(id);
     if (releasedCount > 0) {
       logger.info('lock', `Auto-released ${releasedCount} lock(s) for killed agent ${id.slice(0, 8)}`);
     }
+
+    // Cascade: kill orphaned children recursively
+    for (const childId of [...agent.childIds]) {
+      const child = this.agents.get(childId);
+      if (child && child.status !== 'completed' && child.status !== 'failed') {
+        logger.info('agent', `Cascade-killing orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
+        this.kill(childId);
+      }
+    }
+
+    // Clean up delegation records for this agent
+    this.dispatcher.completeDelegationsForAgent(id);
+
+    // Notify parent and clean up childIds reference
+    this.dispatcher.notifyParentOfCompletion(agent, -1);
+    if (agent.parentId) {
+      const parent = this.agents.get(agent.parentId);
+      if (parent) {
+        parent.childIds = parent.childIds.filter(cid => cid !== id);
+      }
+    }
+
     agent.kill();
     this.emit('agent:killed', id);
+    this.emit('agent:status', { agentId: id, status: 'completed' });
+
+    // Clean up heartbeat tracking
+    this.heartbeat.trackRemoved(id);
+
+    // Schedule removal from Map after a grace period for event consumers
+    setTimeout(() => {
+      this.agents.delete(id);
+      agent.dispose();
+    }, 30_000);
+
     this.updateLeadBudgets();
     return true;
   }
@@ -418,8 +489,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return Array.from(this.agents.values());
   }
 
+  /** Count agents that are alive (running, idle, or creating) — used for concurrency limit */
   getRunningCount(): number {
-    return this.getAll().filter((a) => a.status === 'running' || a.status === 'creating').length;
+    return this.getAll().filter((a) => a.status === 'running' || a.status === 'creating' || a.status === 'idle').length;
   }
 
   restart(id: string): Agent | null {
@@ -437,6 +509,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   setMaxConcurrent(n: number): void {
     const old = this.maxConcurrent;
     this.maxConcurrent = n;
+    // Keep dispatcher context in sync
+    (this.dispatcher as any).ctx.maxConcurrent = n;
     if (n !== old) {
       // Notify all running leads about the change
       const running = this.getRunningCount();
@@ -485,7 +559,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   shutdownAll(): void {
     this.heartbeat.stop();
     for (const agent of this.agents.values()) {
-      if (agent.status === 'running') {
+      if (agent.status !== 'completed' && agent.status !== 'failed') {
         agent.kill();
       }
     }
@@ -493,6 +567,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getDelegations(parentId?: string): import('./CommandDispatcher.js').Delegation[] {
     return this.dispatcher.getDelegations(parentId);
+  }
+
+  /** Remove completed/failed delegations older than the given age */
+  cleanupStaleDelegations(maxAgeMs?: number): number {
+    return this.dispatcher.cleanupStaleDelegations(maxAgeMs);
   }
 
   getDecisionLog(): DecisionLog {
