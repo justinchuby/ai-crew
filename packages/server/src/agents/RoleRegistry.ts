@@ -11,6 +11,8 @@ export interface Role {
   builtIn: boolean;
   /** Default model to use for agents with this role (e.g. "claude-sonnet-4.6"). Undefined = CLI default. */
   model?: string;
+  /** If true, this role receives periodic health headers in CREW_UPDATE (like the lead). */
+  receivesStatusUpdates?: boolean;
 }
 
 const BUILT_IN_ROLES: Role[] = [
@@ -256,6 +258,7 @@ When you start a task, immediately report what you're tracking:
     icon: '📋',
     builtIn: true,
     model: 'gpt-4.1',
+    receivesStatusUpdates: true,
   },
   {
     id: 'qa-tester',
@@ -451,6 +454,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
     icon: '👑',
     builtIn: true,
     model: 'claude-opus-4.6',
+    receivesStatusUpdates: true,
   },
 ];
 

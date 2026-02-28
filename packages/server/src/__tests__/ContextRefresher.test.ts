@@ -225,7 +225,7 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('start does not set up periodic interval (event-driven only)', () => {
+    it('start sets up periodic timer but only refreshes receivesStatusUpdates roles', () => {
       const a1 = makeAgent({ id: 'a1', status: 'running' });
       mocks.agentManager.getAll.mockReturnValue([a1]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
@@ -233,7 +233,7 @@ describe('ContextRefresher', () => {
 
       refresher.start();
 
-      // No periodic calls — context refresh is event-driven only
+      // Regular agents (no receivesStatusUpdates) are not refreshed by periodic timer
       vi.advanceTimersByTime(60000);
       expect(a1.injectContextUpdate).not.toHaveBeenCalled();
     });
@@ -257,6 +257,130 @@ describe('ContextRefresher', () => {
       refresher.start();
       refresher.start();
       // No error thrown
+    });
+
+    it('stop clears the periodic timer', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+      refresher.stop();
+      vi.advanceTimersByTime(120000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('periodic status updates', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('sends periodic updates to secretary (receivesStatusUpdates) agents', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+      vi.advanceTimersByTime(60000);
+
+      // Secretary gets periodic update
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Dev does NOT get periodic update
+      expect(dev.injectContextUpdate).not.toHaveBeenCalled();
+    });
+
+    it('secretary receives health header in refreshAll', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = secretary.injectContextUpdate.mock.calls[0][2];
+      expect(healthHeader).toBeDefined();
+      expect(healthHeader).toContain('PROJECT HEALTH');
+    });
+
+    it('lead receives health header scoped to children', () => {
+      const lead = makeAgent({
+        id: 'lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
+      });
+      const child = makeAgent({
+        id: 'd1',
+        status: 'running',
+        parentId: 'lead-1',
+      });
+      mocks.agentManager.getAll.mockReturnValue([lead, child]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(lead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = lead.injectContextUpdate.mock.calls[0][2];
+      expect(healthHeader).toContain('PROJECT HEALTH');
+      expect(healthHeader).toContain('1 active');
+    });
+
+    it('regular dev does not receive health header', () => {
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([dev]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+
+      refresher.refreshAll();
+
+      expect(dev.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = dev.injectContextUpdate.mock.calls[0][2];
+      expect(healthHeader).toBeUndefined();
     });
   });
 });

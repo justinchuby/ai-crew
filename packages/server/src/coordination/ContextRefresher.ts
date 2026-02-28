@@ -153,9 +153,12 @@ export class ContextRefresher {
       oldestAge = isNaN(mins) ? 'pending' : mins < 1 ? '<1 min' : `${mins} min`;
     }
 
-    // DAG tasks
+    // DAG tasks — for project-wide, find the lead agent to get DAG scope
     const taskDAG = this.agentManager.getTaskDAG();
-    const dagStatus = taskDAG.getStatus(leadId);
+    const dagLeadId = projectWide
+      ? allAgents.find(a => a.role.id === 'lead' && !a.parentId)?.id ?? agentId
+      : agentId;
+    const dagStatus = taskDAG.getStatus(dagLeadId);
     const dag = dagStatus.summary;
     const dagTotal = dag.pending + dag.ready + dag.running + dag.done + dag.failed + dag.blocked + dag.paused + dag.skipped;
     const completionPct = dagTotal > 0 ? Math.round(((dag.done + dag.skipped) / dagTotal) * 100) : null;
