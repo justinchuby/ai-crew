@@ -12,7 +12,7 @@ export default defineConfig({
   webServer: [
     {
       command: process.env.CI
-        ? 'AUTH=none node ../../packages/server/dist/index.js'
+        ? 'AUTH=none node packages/server/dist/index.js'
         : 'npm run dev --workspace=packages/server',
       port: 3001,
       cwd: '../..',
