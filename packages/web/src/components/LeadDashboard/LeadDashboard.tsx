@@ -114,6 +114,12 @@ export function LeadDashboard({ api, ws }: Props) {
     }
   }, [agents, projects, selectedLeadId, catchUpSummary]);
 
+  // Reset snapshot when switching projects
+  useEffect(() => {
+    snapshotRef.current = { tasks: 0, decisions: 0, comms: 0, reports: 0 };
+    setCatchUpSummary(null);
+  }, [selectedLeadId]);
+
   const leadAgents = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
   // Map active lead projectIds for merging
   const activeProjectIds = new Set(leadAgents.map((a) => a.projectId).filter(Boolean));
@@ -1158,8 +1164,12 @@ export function LeadDashboard({ api, ws }: Props) {
             {/* Catch-up summary banner */}
             {catchUpSummary && (
               <div
+                role="status"
+                aria-live="polite"
+                tabIndex={0}
                 className="border-b border-blue-500/30 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-blue-900/40 px-4 py-2 flex items-center gap-3 cursor-pointer hover:from-blue-900/50 hover:via-indigo-900/40 hover:to-blue-900/50 transition-all"
                 onClick={() => setCatchUpSummary(null)}
+                onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setCatchUpSummary(null); }}
                 title="Click to dismiss"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-blue-300 shrink-0" />
