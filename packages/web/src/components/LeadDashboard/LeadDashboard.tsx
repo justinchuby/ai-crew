@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { MentionText, MarkdownContent } from '../../utils/markdown';
+import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 
@@ -59,6 +60,59 @@ export function LeadDashboard({ api, ws }: Props) {
   const isResizing = useRef(false);
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resumingProjectId, setResumingProjectId] = useState<string | null>(null);
+
+  // ── Catch-up summary banner ──────────────────────────────────────────
+  const lastInteractionRef = useRef(Date.now());
+  const snapshotRef = useRef<{ tasks: number; decisions: number; comms: number; reports: number }>({ tasks: 0, decisions: 0, comms: 0, reports: 0 });
+  const [catchUpSummary, setCatchUpSummary] = useState<{ tasksCompleted: number; pendingDecisions: number; newMessages: number; newReports: number } | null>(null);
+  const catchUpDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track user interactions
+  useEffect(() => {
+    const markActive = () => {
+      lastInteractionRef.current = Date.now();
+      // Auto-dismiss banner after 10s of resumed activity
+      if (catchUpSummary) {
+        if (catchUpDismissTimer.current) clearTimeout(catchUpDismissTimer.current);
+        catchUpDismissTimer.current = setTimeout(() => setCatchUpSummary(null), 10_000);
+      }
+    };
+    window.addEventListener('click', markActive);
+    window.addEventListener('keydown', markActive);
+    window.addEventListener('scroll', markActive, true);
+    return () => {
+      window.removeEventListener('click', markActive);
+      window.removeEventListener('keydown', markActive);
+      window.removeEventListener('scroll', markActive, true);
+      if (catchUpDismissTimer.current) clearTimeout(catchUpDismissTimer.current);
+    };
+  }, [catchUpSummary]);
+
+  // Snapshot current counts on each interaction; check for inactivity on data changes
+  useEffect(() => {
+    const project = selectedLeadId ? projects[selectedLeadId] : null;
+    if (!project) return;
+    const currentCounts = {
+      tasks: agents.filter(a => a.parentId === selectedLeadId && (a.status === 'completed' || a.status === 'failed')).length,
+      decisions: (project.decisions ?? []).filter((d: any) => d.needsConfirmation && d.status === 'recorded').length,
+      comms: (project.comms ?? []).length,
+      reports: (project.agentReports ?? []).length,
+    };
+    const elapsed = Date.now() - lastInteractionRef.current;
+    if (elapsed >= 120_000 && !catchUpSummary) {
+      const prev = snapshotRef.current;
+      const tasksCompleted = Math.max(0, currentCounts.tasks - prev.tasks);
+      const newMessages = Math.max(0, currentCounts.comms - prev.comms);
+      const newReports = Math.max(0, currentCounts.reports - prev.reports);
+      if (tasksCompleted > 0 || currentCounts.decisions > 0 || newMessages > 0 || newReports > 0) {
+        setCatchUpSummary({ tasksCompleted, pendingDecisions: currentCounts.decisions, newMessages, newReports });
+      }
+    }
+    // Always update snapshot when user is active
+    if (elapsed < 120_000) {
+      snapshotRef.current = currentCounts;
+    }
+  }, [agents, projects, selectedLeadId, catchUpSummary]);
 
   const leadAgents = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
   // Map active lead projectIds for merging
@@ -1098,6 +1152,25 @@ export function LeadDashboard({ api, ws }: Props) {
                 >
                   copy
                 </button>
+              </div>
+            )}
+
+            {/* Catch-up summary banner */}
+            {catchUpSummary && (
+              <div
+                className="border-b border-blue-500/30 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-blue-900/40 px-4 py-2 flex items-center gap-3 cursor-pointer hover:from-blue-900/50 hover:via-indigo-900/40 hover:to-blue-900/50 transition-all"
+                onClick={() => setCatchUpSummary(null)}
+                title="Click to dismiss"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-300 shrink-0" />
+                <span className="text-xs font-mono text-blue-100">
+                  While you were away:
+                  {catchUpSummary.tasksCompleted > 0 && <span className="ml-2 text-emerald-300">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
+                  {catchUpSummary.pendingDecisions > 0 && <span className="ml-2 text-amber-300">⚠ {catchUpSummary.pendingDecisions} decision{catchUpSummary.pendingDecisions !== 1 ? 's' : ''} pending</span>}
+                  {catchUpSummary.newMessages > 0 && <span className="ml-2 text-blue-300">{catchUpSummary.newMessages} new message{catchUpSummary.newMessages !== 1 ? 's' : ''}</span>}
+                  {catchUpSummary.newReports > 0 && <span className="ml-2 text-indigo-300">{catchUpSummary.newReports} agent report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
+                </span>
+                <X className="w-3 h-3 text-blue-400/60 ml-auto shrink-0" />
               </div>
             )}
 
@@ -2226,9 +2299,9 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   const [selectedGroupMsg, setSelectedGroupMsg] = useState<GroupMessage | null>(null);
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
 
   // Merge 1:1 comms and group messages into a unified feed sorted by timestamp
-  type FeedItem = { type: '1:1'; item: AgentComm } | { type: 'group'; item: GroupMessage };
   const feed = useMemo(() => {
     const items: FeedItem[] = comms.map(c => ({ type: '1:1' as const, item: c }));
     for (const msgs of Object.values(groupMessages)) {
@@ -2244,11 +2317,33 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
     return items.slice(-50);
   }, [comms, groupMessages]);
 
+  // Classify and filter
+  const classifiedFeed = useMemo(() => {
+    return feed
+      .map(entry => ({ entry, tier: classifyMessage(entry, leadId) }))
+      .filter(({ tier }) => tierPassesFilter(tier, tierFilter));
+  }, [feed, leadId, tierFilter]);
+
+  // Count by tier for filter bar
+  const tierCounts = useMemo(() => {
+    const counts = { critical: 0, notable: 0, routine: 0 };
+    for (const entry of feed) {
+      counts[classifyMessage(entry, leadId)]++;
+    }
+    return counts;
+  }, [feed, leadId]);
+
   useEffect(() => {
     requestAnimationFrame(() => {
       feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
     });
-  }, [feed.length]);
+  }, [classifiedFeed.length]);
+
+  const FILTER_OPTIONS: { value: TierFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'notable', label: `Important (${tierCounts.critical + tierCounts.notable})` },
+    { value: 'critical', label: `Critical (${tierCounts.critical})` },
+  ];
 
   return (
     <>
