@@ -493,6 +493,7 @@ export function apiRouter(
 
   router.post('/decisions/:id/confirm', (req, res) => {
     const decisionId = req.params.id as string;
+    const { reason } = req.body ?? {};
     const decision = decisionLog.confirm(decisionId);
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
 
@@ -508,13 +509,15 @@ export function apiRouter(
     const lead = agentManager.get(leadId);
     if (lead && (lead.status === 'running' || lead.status === 'idle')) {
       const extra = sysAction ? ` The agent limit has been changed to ${sysAction.value}.` : '';
-      lead.sendMessage(`[Decision Approved] "${decision.title}" by ${decision.agentRole} has been approved by the user.${extra}`);
+      const reasonText = reason ? ` User comment: "${reason}"` : '';
+      lead.sendMessage(`[Decision Approved] "${decision.title}" by ${decision.agentRole} has been approved by the user.${extra}${reasonText}`);
     }
     res.json(decision);
   });
 
   router.post('/decisions/:id/reject', (req, res) => {
     const decisionId = req.params.id as string;
+    const { reason } = req.body ?? {};
     const decision = decisionLog.reject(decisionId);
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
 
@@ -525,7 +528,8 @@ export function apiRouter(
     const leadId = decision.leadId || decision.agentId;
     const lead = agentManager.get(leadId);
     if (lead && (lead.status === 'running' || lead.status === 'idle')) {
-      lead.sendMessage(`[Decision Rejected] "${decision.title}" by ${decision.agentRole} has been REJECTED by the user. Please revise your approach.`);
+      const reasonText = reason ? ` User comment: "${reason}"` : '';
+      lead.sendMessage(`[Decision Rejected] "${decision.title}" by ${decision.agentRole} has been REJECTED by the user. Please revise your approach.${reasonText}`);
     }
     res.json(decision);
   });

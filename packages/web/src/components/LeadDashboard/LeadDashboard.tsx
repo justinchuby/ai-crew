@@ -565,18 +565,26 @@ export function LeadDashboard({ api, ws }: Props) {
     });
   }, [input, selectedLeadId]);
 
-  const handleConfirmDecision = useCallback(async (decisionId: string) => {
+  const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
-    const resp = await fetch(`/api/decisions/${decisionId}/confirm`, { method: 'POST' });
+    const resp = await fetch(`/api/decisions/${decisionId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
     if (resp.ok) {
       const decision = await resp.json();
       useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
     }
   }, [selectedLeadId]);
 
-  const handleRejectDecision = useCallback(async (decisionId: string) => {
+  const handleRejectDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
-    const resp = await fetch(`/api/decisions/${decisionId}/reject`, { method: 'POST' });
+    const resp = await fetch(`/api/decisions/${decisionId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
     if (resp.ok) {
       const decision = await resp.json();
       useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
@@ -1152,23 +1160,12 @@ export function LeadDashboard({ api, ws }: Props) {
                               <p className="text-xs font-mono text-gray-400 line-clamp-2">{d.rationale}</p>
                             )}
                           </div>
-                          <div className="flex gap-1.5 shrink-0">
-                            <button
-                              onClick={() => handleConfirmDecision(d.id)}
-                              className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-200 transition-colors"
-                              title="Confirm"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleRejectDecision(d.id)}
-                              className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-200 transition-colors"
-                              title="Reject"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
                         </div>
+                        <BannerDecisionActions
+                          decisionId={d.id}
+                          onConfirm={handleConfirmDecision}
+                          onReject={handleRejectDecision}
+                        />
                       </div>
                     ))}
                   </div>
@@ -1752,9 +1749,45 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
   );
 }
 
-function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: any[]; onConfirm?: (id: string) => void; onReject?: (id: string) => void }) {
+/** Inline comment + action buttons for pending decisions in the banner */
+function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
+  decisionId: string;
+  onConfirm: (id: string, reason?: string) => void;
+  onReject: (id: string, reason?: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') onConfirm(decisionId, reason.trim() || undefined); }}
+        placeholder="Comment (optional)..."
+        className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-yellow-500"
+      />
+      <button
+        onClick={() => onConfirm(decisionId, reason.trim() || undefined)}
+        className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-200 transition-colors"
+        title="Confirm"
+      >
+        <Check className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => onReject(decisionId, reason.trim() || undefined)}
+        className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-200 transition-colors"
+        title="Reject"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: any[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
+  const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
   useEffect(() => {
     requestAnimationFrame(() => {
       feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
@@ -1788,19 +1821,29 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
                   {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
                   <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
                   {d.needsConfirmation && d.status === 'recorded' && (
-                    <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => onConfirm?.(d.id)}
-                        className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center gap-1"
-                      >
-                        <Check className="w-3 h-3" /> Confirm
-                      </button>
-                      <button
-                        onClick={() => onReject?.(d.id)}
-                        className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> Reject
-                      </button>
+                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={decisionReasons[d.id] ?? ''}
+                        onChange={(e) => setDecisionReasons((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); } }}
+                        placeholder="Add a comment (optional)..."
+                        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-yellow-500 mb-2"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
+                          className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center gap-1"
+                        >
+                          <Check className="w-3 h-3" /> Confirm
+                        </button>
+                        <button
+                          onClick={() => { onReject?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
+                          className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" /> Reject
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

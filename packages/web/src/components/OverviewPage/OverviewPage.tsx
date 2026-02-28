@@ -53,12 +53,13 @@ function PendingDecisionCard({
   onRespond,
 }: {
   decision: Decision;
-  onApprove: (id: string) => void;
-  onDeny: (id: string) => void;
+  onApprove: (id: string, reason?: string) => void;
+  onDeny: (id: string, reason?: string) => void;
   onRespond: (id: string, message: string) => void;
 }) {
   const [showReply, setShowReply] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [reason, setReason] = useState('');
   const [acting, setActing] = useState(false);
 
   const handleSendReply = async () => {
@@ -86,9 +87,19 @@ function PendingDecisionCard({
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+      </div>
+      <div className="mt-2">
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { setActing(true); onApprove(decision.id, reason.trim() || undefined); } }}
+          placeholder="Add a comment (optional)..."
+          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-yellow-500 mb-2"
+        />
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => { setActing(true); onApprove(decision.id); }}
+            onClick={() => { setActing(true); onApprove(decision.id, reason.trim() || undefined); }}
             disabled={acting}
             className="px-2 py-1 text-xs rounded bg-green-600/80 hover:bg-green-600 text-white transition-colors disabled:opacity-50"
             title="Approve"
@@ -96,7 +107,7 @@ function PendingDecisionCard({
             <Check className="w-3.5 h-3.5 inline" /> Approve
           </button>
           <button
-            onClick={() => { setActing(true); onDeny(decision.id); }}
+            onClick={() => { setActing(true); onDeny(decision.id, reason.trim() || undefined); }}
             disabled={acting}
             className="px-2 py-1 text-xs rounded bg-red-600/80 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
             title="Deny"
@@ -150,8 +161,8 @@ function DecisionTimelineItem({
 }: {
   decision: Decision;
   projectName?: string;
-  onApprove: (id: string) => void;
-  onDeny: (id: string) => void;
+  onApprove: (id: string, reason?: string) => void;
+  onDeny: (id: string, reason?: string) => void;
   onRespond: (id: string, message: string) => void;
   onClickDetail: (d: Decision) => void;
   onFeedback: (id: string) => void;
@@ -361,27 +372,33 @@ export function OverviewPage({ api, ws }: Props) {
 
   // Actions
   const handleApprove = useCallback(
-    async (id: string) => {
+    async (id: string, reason?: string) => {
       // Optimistic update
       setAllDecisions((prev) =>
         prev.map((d) =>
           d.id === id ? { ...d, status: 'confirmed' as const, confirmedAt: new Date().toISOString() } : d,
         ),
       );
-      await apiFetch(`/decisions/${id}/confirm`, { method: 'POST' });
+      await apiFetch(`/decisions/${id}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
       loadDecisions();
     },
     [loadDecisions],
   );
 
   const handleDeny = useCallback(
-    async (id: string) => {
+    async (id: string, reason?: string) => {
       setAllDecisions((prev) =>
         prev.map((d) =>
           d.id === id ? { ...d, status: 'rejected' as const, confirmedAt: new Date().toISOString() } : d,
         ),
       );
-      await apiFetch(`/decisions/${id}/reject`, { method: 'POST' });
+      await apiFetch(`/decisions/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
       loadDecisions();
     },
     [loadDecisions],
