@@ -14,6 +14,7 @@ import { OrgChart } from './components/OrgChart/OrgChart';
 import { OverviewPage } from './components/OverviewPage/OverviewPage';
 import { GroupChat } from './components/GroupChat/GroupChat';
 import { TimelinePage } from './components/Timeline';
+import { MissionControlPage } from './components/MissionControl';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
@@ -125,6 +126,7 @@ export function App() {
             <Route path="/settings" element={<SettingsPanel api={api} />} />
             <Route path="/data" element={<DataBrowser />} />
             <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
+            <Route path="/mission-control" element={<MissionControlPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

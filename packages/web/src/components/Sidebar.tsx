@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquare, Database, GanttChart } from 'lucide-react';
+import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquare, Database, GanttChart, Activity } from 'lucide-react';
 import { Tooltip } from './Tooltip/Tooltip';
 import { useGroupStore } from '../stores/groupStore';
 import { useEffect, useMemo } from 'react';
@@ -13,6 +13,7 @@ const links = [
   { to: '/org', icon: Network, label: 'Org Chart' },
   { to: '/data', icon: Database, label: 'Database' },
   { to: '/timeline', icon: GanttChart, label: 'Timeline' },
+  { to: '/mission-control', icon: Activity, label: 'Mission Control' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
