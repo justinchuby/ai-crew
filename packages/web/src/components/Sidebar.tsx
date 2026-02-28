@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Users, Settings, Crown, Network } from 'lucide-react';
+import { Users, Settings, Crown, Network, History } from 'lucide-react';
 
 const links = [
   { to: '/', icon: Crown, label: 'Project Lead' },
   { to: '/agents', icon: Users, label: 'Agents' },
   { to: '/org', icon: Network, label: 'Org Chart' },
-  { to: '/tasks', icon: Network, label: 'Sessions' },
+  { to: '/tasks', icon: History, label: 'Sessions' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
