@@ -5,6 +5,7 @@ import type { ProgressSnapshot } from '../../stores/leadStore';
 import type { Decision } from '../../types';
 import { AlertTriangle, Check, X, MessageSquare, Send, Clock } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { MarkdownContent } from '../../utils/markdown';
 
 interface Props {
   api: any;
@@ -20,6 +21,27 @@ function fmtTime(ts: string | number): string {
   if (diffMs < 3600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
   if (diffMs < 86400_000) return `${Math.floor(diffMs / 3600_000)}h ago`;
   return d.toLocaleDateString();
+}
+
+// ── Detail Popup ────────────────────────────────────────────────────────
+
+function DetailPopup({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-100 truncate">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none p-1">×</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 text-sm text-gray-200">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Pending Decision Card ───────────────────────────────────────────────
@@ -123,12 +145,14 @@ function DecisionTimelineItem({
   onApprove,
   onDeny,
   onRespond,
+  onClickDetail,
 }: {
   decision: Decision;
   projectName?: string;
   onApprove: (id: string) => void;
   onDeny: (id: string) => void;
   onRespond: (id: string, message: string) => void;
+  onClickDetail: (d: Decision) => void;
 }) {
   const isPending = decision.needsConfirmation && decision.status === 'recorded';
   const statusColor =
@@ -152,7 +176,10 @@ function DecisionTimelineItem({
     ) : null;
 
   return (
-    <div className={`border rounded-lg p-3 ${statusColor}`}>
+    <div
+      className={`border rounded-lg p-3 cursor-pointer hover:brightness-110 transition-all ${statusColor}`}
+      onClick={() => onClickDetail(decision)}
+    >
       {isPending ? (
         <PendingDecisionCard
           decision={decision}
@@ -197,15 +224,17 @@ function ProjectProgressCard({
   teamSize,
   completionPct,
   latestSnapshot,
+  onClick,
 }: {
   leadId: string;
   projectName: string;
   teamSize: number;
   completionPct: number;
   latestSnapshot: ProgressSnapshot | null;
+  onClick: () => void;
 }) {
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-gray-500 transition-colors" onClick={onClick}>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-100 truncate" title={projectName}>
           {projectName}
@@ -290,6 +319,8 @@ function ProjectProgressCard({
 
 export function OverviewPage({ api, ws }: Props) {
   const [allDecisions, setAllDecisions] = useState<Decision[]>([]);
+  const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
+  const [selectedProject, setSelectedProject] = useState<{ leadId: string; projectName: string; teamSize: number; completionPct: number; latestSnapshot: ProgressSnapshot | null } | null>(null);
   const agents = useAppStore((s) => s.agents);
   const { projects } = useLeadStore();
 
@@ -436,7 +467,7 @@ export function OverviewPage({ api, ws }: Props) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {projectCards.map((card) => (
-              <ProjectProgressCard key={card.leadId} {...card} />
+              <ProjectProgressCard key={card.leadId} {...card} onClick={() => setSelectedProject(card)} />
             ))}
           </div>
         )}
@@ -461,11 +492,94 @@ export function OverviewPage({ api, ws }: Props) {
                 onApprove={handleApprove}
                 onDeny={handleDeny}
                 onRespond={handleRespond}
+                onClickDetail={setSelectedDecision}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Decision detail popup */}
+      {selectedDecision && (
+        <DetailPopup title={selectedDecision.title} onClose={() => setSelectedDecision(null)}>
+          <div className="space-y-3">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Status</span>
+              <p className="text-sm mt-0.5">
+                {selectedDecision.status === 'confirmed' ? '✅ Confirmed' : selectedDecision.status === 'rejected' ? '❌ Rejected' : selectedDecision.needsConfirmation ? '⏳ Pending' : '📋 Recorded'}
+                {selectedDecision.confirmedAt && <span className="text-gray-500 ml-2 text-xs">{fmtTime(selectedDecision.confirmedAt)}</span>}
+              </p>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Rationale</span>
+              <div className="mt-1"><MarkdownContent text={selectedDecision.rationale || 'No rationale provided.'} /></div>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span className="font-mono bg-gray-700/50 px-1.5 rounded">{selectedDecision.agentRole}</span>
+              <span>{fmtTime(selectedDecision.timestamp)}</span>
+              <span className="font-mono text-gray-600">{selectedDecision.agentId?.slice(0, 8)}</span>
+            </div>
+          </div>
+        </DetailPopup>
+      )}
+
+      {/* Project detail popup */}
+      {selectedProject && (
+        <DetailPopup title={selectedProject.projectName} onClose={() => setSelectedProject(null)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-gray-400">{selectedProject.teamSize} agents</span>
+              <span className="text-accent font-semibold">{selectedProject.completionPct}% complete</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-accent h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(selectedProject.completionPct, 100)}%` }}
+              />
+            </div>
+            {selectedProject.latestSnapshot && (
+              <>
+                {selectedProject.latestSnapshot.summary && (
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Summary</span>
+                    <div className="mt-1"><MarkdownContent text={selectedProject.latestSnapshot.summary} /></div>
+                  </div>
+                )}
+                {selectedProject.latestSnapshot.completed.length > 0 && (
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-green-400 font-medium">✅ Completed ({selectedProject.latestSnapshot.completed.length})</span>
+                    <ul className="mt-1 space-y-0.5">
+                      {selectedProject.latestSnapshot.completed.map((item, i) => (
+                        <li key={i} className="text-xs text-gray-300">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedProject.latestSnapshot.inProgress.length > 0 && (
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-blue-400 font-medium">🔄 In Progress ({selectedProject.latestSnapshot.inProgress.length})</span>
+                    <ul className="mt-1 space-y-0.5">
+                      {selectedProject.latestSnapshot.inProgress.map((item, i) => (
+                        <li key={i} className="text-xs text-gray-300">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedProject.latestSnapshot.blocked.length > 0 && (
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-red-400 font-medium">🚫 Blocked ({selectedProject.latestSnapshot.blocked.length})</span>
+                    <ul className="mt-1 space-y-0.5">
+                      {selectedProject.latestSnapshot.blocked.map((item, i) => (
+                        <li key={i} className="text-xs text-gray-300">• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DetailPopup>
+      )}
     </div>
   );
 }

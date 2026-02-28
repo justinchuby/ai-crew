@@ -659,6 +659,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /** Flush all buffered agent messages (e.g. on new client connection) */
+  flushAllMessages(): void {
+    for (const agentId of this.messageBuffers.keys()) {
+      this.flushAgentMessage(agentId);
+    }
+  }
+
   /** Keep all lead agents' budget info in sync with current state */
   private updateLeadBudgets(): void {
     const running = this.getRunningCount();

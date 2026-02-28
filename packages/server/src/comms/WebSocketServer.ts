@@ -64,6 +64,9 @@ export class WebSocketServer {
         this.clients.delete(clientId);
       });
 
+      // Flush any buffered agent messages so the new client gets complete data
+      agentManager.flushAllMessages();
+
       // Send current state on connect
       ws.send(
         JSON.stringify({
