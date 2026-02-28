@@ -65,15 +65,15 @@ export function SettingsPanel({ api }: Props) {
   return (
     <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
-        <Settings className="w-6 h-6 text-gray-400" />
+        <Settings className="w-6 h-6 text-th-text-muted" />
         <h2 className="text-xl font-semibold">Settings</h2>
       </div>
 
       {/* Appearance & Concurrency row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Theme */}
-        <section className="bg-surface-raised border border-gray-700 rounded-lg p-4">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <section className="bg-surface-raised border border-th-border rounded-lg p-4">
+          <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
             <Sun className="w-3.5 h-3.5" /> Appearance
           </h3>
           <div className="flex gap-2">
@@ -82,7 +82,7 @@ export function SettingsPanel({ api }: Props) {
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
                 theme === 'light'
                   ? 'bg-accent text-black font-medium'
-                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                  : 'bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-bg-muted'
               }`}
             >
               <Sun size={14} />
@@ -93,7 +93,7 @@ export function SettingsPanel({ api }: Props) {
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
                 theme === 'dark'
                   ? 'bg-accent text-black font-medium'
-                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                  : 'bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-bg-muted'
               }`}
             >
               <Moon size={14} />
@@ -103,12 +103,12 @@ export function SettingsPanel({ api }: Props) {
         </section>
 
         {/* Concurrency */}
-        <section className="bg-surface-raised border border-gray-700 rounded-lg p-4">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <section className="bg-surface-raised border border-th-border rounded-lg p-4">
+          <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" /> Concurrency
           </h3>
           <label className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-300">Max concurrent agents</span>
+            <span className="text-sm text-th-text-alt">Max concurrent agents</span>
             <span className="text-sm font-mono font-semibold text-accent">{maxAgents}</span>
           </label>
           <input
@@ -120,7 +120,7 @@ export function SettingsPanel({ api }: Props) {
             disabled={!config}
             className="w-full accent-accent"
           />
-          <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+          <div className="flex justify-between text-[10px] text-th-text-muted mt-1">
             <span>1</span>
             <span>5</span>
             <span>10</span>
@@ -131,21 +131,21 @@ export function SettingsPanel({ api }: Props) {
       </div>
 
       {/* Sound Notifications */}
-      <section className="bg-surface-raised border border-gray-700 rounded-lg p-4 mb-6">
-        <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
           <Volume2 className="w-3.5 h-3.5" /> Sound Notifications
         </h3>
         <label className="flex items-center justify-between cursor-pointer">
           <div>
-            <span className="text-sm text-gray-300">Enable sound alerts</span>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <span className="text-sm text-th-text-alt">Enable sound alerts</span>
+            <p className="text-xs text-th-text-muted mt-0.5">
               Play a sound when agents request input or all work is complete
             </p>
           </div>
           <button
             onClick={toggleSound}
             className={`relative w-10 h-5 rounded-full transition-colors ${
-              soundEnabled ? 'bg-accent' : 'bg-gray-600'
+              soundEnabled ? 'bg-accent' : 'bg-th-bg-hover'
             }`}
           >
             <span
@@ -158,40 +158,40 @@ export function SettingsPanel({ api }: Props) {
       </section>
 
       {/* CLI Config */}
-      <section className="bg-surface-raised border border-gray-700 rounded-lg p-4 mb-6">
-        <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
           <Terminal className="w-3.5 h-3.5" /> CLI Configuration
         </h3>
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <label className="text-xs text-gray-500 block mb-1">Command</label>
-            <code className="text-sm text-gray-200 bg-gray-800 px-3 py-1.5 rounded-md block font-mono">
+            <label className="text-xs text-th-text-muted block mb-1">Command</label>
+            <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono">
               {config?.cliCommand || 'copilot'}
             </code>
           </div>
           {config?.cliArgs && config.cliArgs.length > 0 && (
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">Arguments</label>
-              <code className="text-sm text-gray-200 bg-gray-800 px-3 py-1.5 rounded-md block font-mono truncate">
+              <label className="text-xs text-th-text-muted block mb-1">Arguments</label>
+              <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono truncate">
                 {config.cliArgs.join(' ')}
               </code>
             </div>
           )}
         </div>
-        <p className="text-xs text-gray-600 mt-2">
-          Set via <code className="text-gray-400">COPILOT_CLI_PATH</code> environment variable
+        <p className="text-xs text-th-text-muted mt-2">
+          Set via <code className="text-th-text-muted">COPILOT_CLI_PATH</code> environment variable
         </p>
       </section>
 
       {/* Roles */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
             <Users className="w-3.5 h-3.5" /> Agent Roles
           </h3>
           <button
             onClick={() => setShowRoleForm(!showRoleForm)}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-muted transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-muted transition-colors px-2 py-1 rounded hover:bg-th-bg-alt"
           >
             <Plus size={12} />
             Add Custom Role
@@ -207,20 +207,20 @@ export function SettingsPanel({ api }: Props) {
                 placeholder="Role ID (e.g. designer)"
                 value={roleId}
                 onChange={(e) => setRoleId(e.target.value)}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent"
+                className="flex-1 bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent"
               />
               <input
                 type="text"
                 placeholder="🤖"
                 value={roleIcon}
                 onChange={(e) => setRoleIcon(e.target.value)}
-                className="w-14 bg-gray-800 border border-gray-700 rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:border-accent"
+                className="w-14 bg-th-bg-alt border border-th-border rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:border-accent"
               />
               <input
                 type="color"
                 value={roleColor}
                 onChange={(e) => setRoleColor(e.target.value)}
-                className="w-10 h-8 bg-gray-800 border border-gray-700 rounded-md cursor-pointer"
+                className="w-10 h-8 bg-th-bg-alt border border-th-border rounded-md cursor-pointer"
               />
             </div>
             <input
@@ -228,26 +228,26 @@ export function SettingsPanel({ api }: Props) {
               placeholder="Display name"
               value={roleName}
               onChange={(e) => setRoleName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
+              className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
             />
             <input
               type="text"
               placeholder="Short description"
               value={roleDesc}
               onChange={(e) => setRoleDesc(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
+              className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
             />
             <textarea
               placeholder="System prompt — define the agent's behavior..."
               value={rolePrompt}
               onChange={(e) => setRolePrompt(e.target.value)}
               rows={4}
-              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent resize-none"
+              className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent resize-none"
             />
             <div className="flex justify-end gap-2 pt-1">
               <button
                 onClick={() => setShowRoleForm(false)}
-                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
+                className="px-3 py-1.5 text-xs text-th-text-muted hover:text-th-text rounded-md hover:bg-th-bg-muted transition-colors"
               >
                 Cancel
               </button>
@@ -268,7 +268,7 @@ export function SettingsPanel({ api }: Props) {
             return (
               <div
                 key={role.id}
-                className="bg-surface-raised border border-gray-700 rounded-lg overflow-hidden transition-colors hover:border-gray-600"
+                className="bg-surface-raised border border-th-border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover"
               >
                 <div
                   className="flex items-center gap-3 p-3 cursor-pointer"
@@ -277,19 +277,19 @@ export function SettingsPanel({ api }: Props) {
                   <span className="text-lg">{role.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-200">{role.name}</span>
+                      <span className="text-sm font-medium text-th-text-alt">{role.name}</span>
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: role.color }}
                       />
                       {role.builtIn && (
-                        <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">built-in</span>
+                        <span className="text-[10px] text-th-text-muted bg-th-bg-alt px-1.5 py-0.5 rounded">built-in</span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{role.description}</div>
+                    <div className="text-xs text-th-text-muted truncate">{role.description}</div>
                   </div>
                   {role.model && (
-                    <span className="text-[10px] font-mono text-gray-500 bg-gray-800 px-2 py-0.5 rounded shrink-0 flex items-center gap-1">
+                    <span className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt px-2 py-0.5 rounded shrink-0 flex items-center gap-1">
                       <Cpu className="w-2.5 h-2.5" />
                       {role.model}
                     </span>
@@ -297,20 +297,20 @@ export function SettingsPanel({ api }: Props) {
                   {!role.builtIn && (
                     <button
                       onClick={(e) => { e.stopPropagation(); api.deleteRole(role.id); }}
-                      className="p-1.5 text-gray-500 hover:text-red-400 rounded hover:bg-gray-800 transition-colors"
+                      className="p-1.5 text-th-text-muted hover:text-red-400 rounded hover:bg-th-bg-alt transition-colors"
                     >
                       <Trash2 size={13} />
                     </button>
                   )}
                   {isExpanded
-                    ? <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+                    ? <ChevronDown className="w-4 h-4 text-th-text-muted shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-th-text-muted shrink-0" />
                   }
                 </div>
                 {isExpanded && (
-                  <div className="border-t border-gray-700 px-4 py-3 bg-gray-800/30">
-                    <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">System Prompt</label>
-                    <pre className="text-xs font-mono text-gray-300 mt-1.5 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
+                  <div className="border-t border-th-border px-4 py-3 bg-th-bg-alt/30">
+                    <label className="text-[10px] font-medium text-th-text-muted uppercase tracking-wider">System Prompt</label>
+                    <pre className="text-xs font-mono text-th-text-alt mt-1.5 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
                       {role.systemPrompt}
                     </pre>
                   </div>

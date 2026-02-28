@@ -71,19 +71,19 @@ export function HealthSummary({ leadId }: HealthSummaryProps) {
   const completionPct = total > 0 ? Math.round((counts.done / total) * 100) : 0;
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-        <BarChart3 size={14} className="text-zinc-500" />
+    <div className="bg-th-bg rounded-lg border border-th-border-muted p-4 space-y-3">
+      <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2">
+        <BarChart3 size={14} className="text-th-text-muted" />
         Project Health
       </h3>
 
       {/* Progress bar */}
       <div>
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-2xl font-bold text-white">{completionPct}%</span>
-          <span className="text-xs text-zinc-500">Progress</span>
+          <span className="text-2xl font-bold text-th-text">{completionPct}%</span>
+          <span className="text-xs text-th-text-muted">Progress</span>
         </div>
-        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-2 bg-th-bg-alt rounded-full overflow-hidden">
           <div
             className="h-full bg-green-500 rounded-full transition-all duration-500"
             style={{ width: `${completionPct}%` }}
@@ -94,23 +94,23 @@ export function HealthSummary({ leadId }: HealthSummaryProps) {
       {/* Velocity sparkline */}
       {history.length > 2 && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">Velocity:</span>
+          <span className="text-xs text-th-text-muted">Velocity:</span>
           <VelocitySparkline history={history} />
         </div>
       )}
 
       {/* Status counts — 2x2 grid */}
       <div className="grid grid-cols-2 gap-2 text-sm">
-        <span className="text-zinc-400">✅ {counts.done} completed</span>
-        <span className="text-zinc-400">🔄 {counts.running} in progress</span>
-        <span className={counts.blocked > 0 ? 'text-red-400' : 'text-zinc-500'}>
+        <span className="text-th-text-muted">✅ {counts.done} completed</span>
+        <span className="text-th-text-muted">🔄 {counts.running} in progress</span>
+        <span className={counts.blocked > 0 ? 'text-red-400' : 'text-th-text-muted'}>
           🚫 {counts.blocked} blocked
         </span>
-        <span className="text-zinc-500">⏳ {counts.pending} pending</span>
+        <span className="text-th-text-muted">⏳ {counts.pending} pending</span>
       </div>
 
       {/* Team summary line */}
-      <div className="text-xs text-zinc-500 pt-1 border-t border-zinc-800">
+      <div className="text-xs text-th-text-muted pt-1 border-t border-th-border-muted">
         {teamAgents.length} agents · {activeCount} active · {idleCount} idle
       </div>
     </div>

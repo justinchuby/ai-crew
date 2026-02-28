@@ -11,10 +11,10 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  creating: 'text-yellow-400',
+  creating: 'text-yellow-600 dark:text-yellow-400',
   running: 'text-green-400',
   idle: 'text-blue-400',
-  completed: 'text-gray-400',
+  completed: 'text-th-text-muted',
   failed: 'text-red-400',
   terminated: 'text-orange-400',
 };
@@ -42,7 +42,7 @@ export function AgentCard({ agent, api }: Props) {
       className={`rounded-lg border p-3 cursor-pointer transition-colors ${
         isSelected
           ? 'border-accent bg-accent/5'
-          : 'border-gray-700 bg-surface-raised hover:border-gray-600'
+          : 'border-th-border bg-surface-raised hover:border-th-border-hover'
       }`}
       onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
     >
@@ -51,7 +51,7 @@ export function AgentCard({ agent, api }: Props) {
           <span className="text-lg">{agent.role.icon}</span>
           <div>
             <h3 className="text-sm font-medium">{agent.role.name}</h3>
-            <span className={`text-xs ${STATUS_COLORS[agent.status] || 'text-gray-400'}`}>
+            <span className={`text-xs ${STATUS_COLORS[agent.status] || 'text-th-text-muted'}`}>
               {agent.status}
             </span>
           </div>
@@ -62,7 +62,7 @@ export function AgentCard({ agent, api }: Props) {
               e.stopPropagation();
               setSelectedAgent(agent.id);
             }}
-            className="p-1 text-gray-400 hover:text-accent"
+            className="p-1 text-th-text-muted hover:text-accent"
             title="Open terminal"
           >
             <Terminal size={14} />
@@ -73,7 +73,7 @@ export function AgentCard({ agent, api }: Props) {
                 e.stopPropagation();
                 api.restartAgent(agent.id);
               }}
-              className="p-1 text-gray-400 hover:text-yellow-400"
+              className="p-1 text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400"
               title="Restart agent"
             >
               <RefreshCw size={14} />
@@ -85,7 +85,7 @@ export function AgentCard({ agent, api }: Props) {
                 e.stopPropagation();
                 api.interruptAgent(agent.id);
               }}
-              className="p-1 text-gray-400 hover:text-orange-400"
+              className="p-1 text-th-text-muted hover:text-orange-400"
               title="Interrupt — cancel current work"
             >
               <Hand size={14} />
@@ -100,7 +100,7 @@ export function AgentCard({ agent, api }: Props) {
                   setConfirmKill(false);
                 }}
                 onBlur={() => setConfirmKill(false)}
-                className="p-1 text-red-400 hover:text-red-300 animate-pulse"
+                className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300 animate-pulse"
                 title="Confirm stop"
                 autoFocus
               >
@@ -112,7 +112,7 @@ export function AgentCard({ agent, api }: Props) {
                   e.stopPropagation();
                   setConfirmKill(true);
                 }}
-                className="p-1 text-gray-400 hover:text-red-400"
+                className="p-1 text-th-text-muted hover:text-red-400"
                 title="Stop agent"
               >
                 <Square size={14} />
@@ -123,14 +123,14 @@ export function AgentCard({ agent, api }: Props) {
       </div>
 
       {agent.task && (
-        <div className="text-xs text-gray-400 mb-1">
-          Task: <span className="text-gray-300">{agent.task.length > 60 ? agent.task.slice(0, 60) + '...' : agent.task}</span>
+        <div className="text-xs text-th-text-muted mb-1">
+          Task: <span className="text-th-text-alt">{agent.task.length > 60 ? agent.task.slice(0, 60) + '...' : agent.task}</span>
         </div>
       )}
 
       {(agent.status === 'running' || agent.status === 'idle') && (
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[10px] text-gray-500">Model:</span>
+          <span className="text-[10px] text-th-text-muted">Model:</span>
           <select
             value={agent.model || agent.role.model || ''}
             onChange={(e) => {
@@ -138,7 +138,7 @@ export function AgentCard({ agent, api }: Props) {
               api.updateAgent(agent.id, { model: e.target.value });
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[10px] bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+            className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
           >
             {(() => {
               const currentModel = agent.model || agent.role.model || '';
@@ -154,23 +154,23 @@ export function AgentCard({ agent, api }: Props) {
       )}
 
       {!(agent.status === 'running' || agent.status === 'idle') && agent.model && (
-        <div className="text-[10px] text-gray-500 mb-1">
-          Model: <span className="text-gray-400">{agent.model}</span>
+        <div className="text-[10px] text-th-text-muted mb-1">
+          Model: <span className="text-th-text-muted">{agent.model}</span>
         </div>
       )}
 
       {agent.childIds.length > 0 && (
-        <div className="text-xs text-gray-400 mb-1">
-          Sub-agents: <span className="text-gray-300">{agent.childIds.length}</span>
+        <div className="text-xs text-th-text-muted mb-1">
+          Sub-agents: <span className="text-th-text-alt">{agent.childIds.length}</span>
         </div>
       )}
 
       {agent.plan && agent.plan.length > 0 && (
         <div className="mt-1">
-          <div className="flex items-center gap-1 text-[10px] text-gray-400 mb-0.5">
+          <div className="flex items-center gap-1 text-[10px] text-th-text-muted mb-0.5">
             <span>Plan: {agent.plan.filter((e) => e.status === 'completed').length}/{agent.plan.length}</span>
           </div>
-          <div className="w-full bg-gray-700 rounded-full h-1">
+          <div className="w-full bg-th-bg-muted rounded-full h-1">
             <div
               className="bg-green-500 h-1 rounded-full transition-all"
               style={{ width: `${(agent.plan.filter((e) => e.status === 'completed').length / agent.plan.length) * 100}%` }}
@@ -183,14 +183,14 @@ export function AgentCard({ agent, api }: Props) {
         const active = agent.toolCalls.filter((tc) => tc.status === 'in_progress' || tc.status === 'pending');
         const latest = active[active.length - 1] ?? agent.toolCalls[agent.toolCalls.length - 1];
         return (
-          <div className="text-[10px] text-gray-400 mt-1 truncate">
+          <div className="text-[10px] text-th-text-muted mt-1 truncate">
             🔧 {typeof latest.title === 'string' ? latest.title : (latest.title as any)?.text ?? JSON.stringify(latest.title)}
           </div>
         );
       })()}
 
       {agent.outputPreview && (
-        <pre className="text-xs text-gray-500 mt-2 overflow-hidden h-12 font-mono bg-surface/50 rounded p-1">
+        <pre className="text-xs text-th-text-muted mt-2 overflow-hidden h-12 font-mono bg-surface/50 rounded p-1">
           {agent.outputPreview.slice(-200)}
         </pre>
       )}

@@ -80,19 +80,19 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
 }) {
   return (
     <div
-      className={`flex flex-col justify-center px-3 border-b border-zinc-800/50 cursor-pointer hover:bg-zinc-800/50 transition-colors ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-zinc-800/30' : ''}`}
+      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 transition-colors ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
       style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}` }}
       onClick={onClick}
       role="button"
       aria-label={`${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
       aria-expanded={isExpanded}
     >
-      <span className="text-sm font-medium text-zinc-200 truncate">
+      <span className="text-sm font-medium text-th-text-alt truncate">
         {ROLE_ICONS[agent.role] ?? '🤖'} {agent.role}
       </span>
-      <span className="text-xs font-mono text-zinc-500">{agent.shortId}</span>
+      <span className="text-xs font-mono text-th-text-muted">{agent.shortId}</span>
       {isExpanded && (
-        <span className="text-xs text-zinc-600 mt-1">
+        <span className="text-xs text-th-text-muted mt-1">
           {new Date(agent.createdAt).toLocaleTimeString()}
           {agent.endedAt ? ` – ${new Date(agent.endedAt).toLocaleTimeString()}` : ' – active'}
         </span>
@@ -137,7 +137,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
             {/* Task label overlay on running segments */}
             {segWidth > 60 && (seg.taskLabel || seg.status === 'running') && (
               <foreignObject x={x1 + 4} y={y + 6} width={segWidth - 8} height={height - 16} style={{ pointerEvents: 'none' }}>
-                <div className="text-[10px] text-zinc-300 truncate leading-tight pt-0.5">
+                <div className="text-[10px] text-th-text-alt truncate leading-tight pt-0.5">
                   {seg.taskLabel ?? seg.status}
                 </div>
               </foreignObject>
@@ -162,7 +162,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
 
 function TimelineLegend() {
   return (
-    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-zinc-500 border-t border-zinc-800">
+    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted">
       {Object.entries(STATUS_COLORS).map(([status, colors]) => (
         <span key={status} className="flex items-center gap-1">
           {status === 'idle' ? (
@@ -181,7 +181,7 @@ function TimelineLegend() {
           {status}
         </span>
       ))}
-      <span className="border-l border-zinc-700 pl-4 flex items-center gap-1">
+      <span className="border-l border-th-border pl-4 flex items-center gap-1">
         <span className="inline-block w-4 border-t-2" style={{ borderColor: 'rgba(88,166,255,0.6)' }} /> delegation
       </span>
       <span className="flex items-center gap-1">
@@ -430,7 +430,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
   if (data.agents.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-zinc-500 text-sm">
+      <div className="flex items-center justify-center h-64 text-th-text-muted text-sm">
         No agent activity to display.
       </div>
     );
@@ -439,8 +439,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   return (
     <div className="flex flex-col h-full" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to pan, +/- to zoom, Tab to navigate lanes, Enter to expand">
       {/* Zoom controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
-        <span className="text-sm text-zinc-400">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-th-border-muted">
+        <span className="text-sm text-th-text-muted">
           {sortedAgents.length} agents · {data.communications.length} communications
         </span>
         <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             className={`flex items-center gap-1.5 px-2 py-0.5 text-xs rounded transition-colors ${
               liveMode
                 ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50'
-                : 'text-zinc-400 bg-zinc-800 hover:bg-zinc-700'
+                : 'text-th-text-muted bg-th-bg-alt hover:bg-th-bg-muted'
             }`}
             onClick={() => onLiveModeChange?.(!liveMode)}
             aria-label={liveMode ? 'Disable live mode' : 'Enable live mode'}
@@ -457,17 +457,17 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             Live
           </button>
           <button
-            className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={() => zoomBy(ZOOM_FACTOR_IN)}
             aria-label="Zoom in"
           >+</button>
           <button
-            className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={() => zoomBy(ZOOM_FACTOR_OUT)}
             aria-label="Zoom out"
           >−</button>
           <button
-            className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={fitToView}
             aria-label="Fit timeline to view"
           >Fit</button>
@@ -488,12 +488,12 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         {/* Fixed label column */}
         <div
           ref={labelRef}
-          className="flex-shrink-0 border-r border-zinc-700/50 overflow-y-auto overflow-x-hidden"
+          className="flex-shrink-0 border-r border-th-border/50 overflow-y-auto overflow-x-hidden"
           style={{ width: LABEL_WIDTH }}
           onScroll={() => syncScroll('label')}
         >
           {/* Spacer for axis alignment */}
-          <div style={{ height: AXIS_HEIGHT }} className="border-b border-zinc-800/50" />
+          <div style={{ height: AXIS_HEIGHT }} className="border-b border-th-border-muted/50" />
           {laneLayout.map(({ agent, height }, idx) => (
             <AgentLabel
               key={agent.id}
@@ -578,9 +578,9 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 <span className="font-semibold capitalize">{tooltipData.status}</span>
               </div>
               {tooltipData.taskLabel && (
-                <div className="text-zinc-400 mb-1">{tooltipData.taskLabel.length > 80 ? tooltipData.taskLabel.slice(0, 80) + '…' : tooltipData.taskLabel}</div>
+                <div className="text-th-text-muted mb-1">{tooltipData.taskLabel.length > 80 ? tooltipData.taskLabel.slice(0, 80) + '…' : tooltipData.taskLabel}</div>
               )}
-              <div className="text-zinc-500 text-[10px]">
+              <div className="text-th-text-muted text-[10px]">
                 {new Date(tooltipData.startAt).toLocaleTimeString()}
                 {' → '}
                 {tooltipData.endAt ? new Date(tooltipData.endAt).toLocaleTimeString() : 'now'}
@@ -602,7 +602,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
 export function TimelineContainer({ data, liveMode, onLiveModeChange }: TimelineContainerProps) {
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 min-h-[300px] flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
+    <div className="bg-th-bg rounded-lg border border-th-border-muted min-h-[300px] flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
       <ParentSize>
         {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} /> : null}
       </ParentSize>

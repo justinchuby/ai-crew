@@ -260,11 +260,11 @@ export function CommunicationLinks({
               >
                 {getStyle(tooltipData.type).label}
               </span>
-              <span className="text-gray-500 text-[10px]">
+              <span className="text-th-text-muted text-[10px]">
                 {new Date(tooltipData.timestamp).toLocaleTimeString()}
               </span>
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[10px] text-th-text-muted">
               {tooltipData.fromAgentId.slice(0, 8)}
               {tooltipData.toAgentId
                 ? ` → ${tooltipData.toAgentId.slice(0, 8)}`
@@ -273,7 +273,7 @@ export function CommunicationLinks({
                   : ' → ?'}
             </div>
             {tooltipData.summary && (
-              <p className="text-gray-300 text-[11px] line-clamp-3 mt-1">
+              <p className="text-th-text-alt text-[11px] line-clamp-3 mt-1">
                 {tooltipData.summary.length > 80
                   ? tooltipData.summary.slice(0, 80) + '…'
                   : tooltipData.summary}

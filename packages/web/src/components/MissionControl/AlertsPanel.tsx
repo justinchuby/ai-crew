@@ -145,7 +145,7 @@ export function detectAlerts(
 
 const SEVERITY_STYLES: Record<AlertSeverity, { bg: string; border: string; text: string }> = {
   critical: { bg: 'bg-red-500/10',    border: 'border-red-500/30',    text: 'text-red-400' },
-  warning:  { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400' },
+  warning:  { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-600 dark:text-yellow-400' },
   info:     { bg: 'bg-blue-500/10',   border: 'border-blue-500/30',   text: 'text-blue-400' },
 };
 
@@ -182,7 +182,7 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
             <span className="text-sm flex-shrink-0">{alert.icon}</span>
             <div className="min-w-0 flex-1">
               <span className={`text-xs font-medium ${style.text}`}>{alert.title}</span>
-              <p className="text-[11px] text-zinc-500 leading-tight">{alert.detail}</p>
+              <p className="text-[11px] text-th-text-muted leading-tight">{alert.detail}</p>
             </div>
           </div>
         );

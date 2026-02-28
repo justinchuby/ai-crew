@@ -100,22 +100,22 @@ export function ChatPanel({ agentId, ws, api }: Props) {
 
   return (
     <div className={`flex flex-col h-full ${expanded ? 'fixed inset-0 z-50 bg-surface' : ''}`}>
-      <div className="h-10 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
+      <div className="h-10 border-b border-th-border flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
           <span>{agent?.role.icon}</span>
           <span className="text-sm font-medium">{agent?.role.name}</span>
-          <span className="text-xs text-gray-500 font-mono">{agentId.slice(0, 8)}</span>
+          <span className="text-xs text-th-text-muted font-mono">{agentId.slice(0, 8)}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-1 text-gray-400 hover:text-gray-200"
+            className="p-1 text-th-text-muted hover:text-th-text"
           >
             {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           <button
             onClick={() => setSelectedAgent(null)}
-            className="p-1 text-gray-400 hover:text-gray-200"
+            className="p-1 text-th-text-muted hover:text-th-text"
           >
             <X size={14} />
           </button>
@@ -124,14 +124,14 @@ export function ChatPanel({ agentId, ws, api }: Props) {
 
       <AcpOutput agentId={agentId} />
 
-      <div className="border-t border-gray-700 p-2 shrink-0 relative">
+      <div className="border-t border-th-border p-2 shrink-0 relative">
         {mentionSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto z-10">
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-th-bg-alt border border-th-border rounded-lg shadow-lg max-h-40 overflow-y-auto z-10">
             {mentionSuggestions.map((a, i) => (
               <button
                 key={a.id}
                 onClick={() => insertMention(a)}
-                className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-gray-700 ${i === mentionIndex ? 'bg-gray-700' : ''}`}
+                className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-th-bg-muted ${i === mentionIndex ? 'bg-th-bg-muted' : ''}`}
               >
                 <span>{a.role.icon}</span>
                 <span>{a.role.name}</span>
@@ -197,12 +197,12 @@ export function ChatPanel({ agentId, ws, api }: Props) {
             }}
             rows={1}
             placeholder="Type a message... (Enter = send, Shift+Enter = newline, Ctrl+Enter = interrupt, @ to mention)"
-            className={`flex-1 bg-surface border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent resize-none overflow-y-auto ${broadcast ? 'border-accent' : 'border-gray-700'}`}
+            className={`flex-1 bg-surface border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent resize-none overflow-y-auto ${broadcast ? 'border-accent' : 'border-th-border'}`}
             style={{ maxHeight: 150 }}
           />
           <button
             onClick={() => setBroadcast(!broadcast)}
-            className={`p-2 rounded-lg transition-colors ${broadcast ? 'text-accent bg-accent/10' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`p-2 rounded-lg transition-colors ${broadcast ? 'text-accent bg-accent/10' : 'text-th-text-muted hover:text-th-text'}`}
             title="Broadcast to all running agents"
           >
             <Megaphone size={14} />

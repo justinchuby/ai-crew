@@ -21,14 +21,14 @@ interface CommEntry {
 // Status colors shared by the agent node
 // ---------------------------------------------------------------------------
 const statusStyle: Record<string, { border: string; badge: string }> = {
-  running:   { border: 'border-blue-500 bg-blue-500/10',   badge: 'bg-blue-500/20 text-blue-300' },
-  idle:      { border: 'border-green-500 bg-green-500/10', badge: 'bg-green-500/20 text-green-300' },
-  creating:  { border: 'border-yellow-500 bg-yellow-500/10', badge: 'bg-yellow-500/20 text-yellow-300' },
-  completed: { border: 'border-gray-500 bg-gray-500/10',  badge: 'bg-gray-500/20 text-gray-400' },
-  failed:    { border: 'border-red-500 bg-red-500/10',    badge: 'bg-red-500/20 text-red-300' },
+  running:   { border: 'border-blue-500 bg-blue-500/10',   badge: 'bg-blue-500/20 text-blue-600 dark:text-blue-300' },
+  idle:      { border: 'border-green-500 bg-green-500/10', badge: 'bg-green-500/20 text-green-600 dark:text-green-300' },
+  creating:  { border: 'border-yellow-500 bg-yellow-500/10', badge: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-300' },
+  completed: { border: 'border-gray-500 bg-gray-500/10',  badge: 'bg-gray-500/20 text-th-text-muted' },
+  failed:    { border: 'border-red-500 bg-red-500/10',    badge: 'bg-red-500/20 text-red-600 dark:text-red-300' },
 };
 
-const fallbackStatus = { border: 'border-gray-600', badge: 'bg-gray-500/20 text-gray-400' };
+const fallbackStatus = { border: 'border-th-border', badge: 'bg-gray-500/20 text-th-text-muted' };
 
 // ---------------------------------------------------------------------------
 // AgentNode — a single card in the tree
@@ -43,9 +43,9 @@ function AgentNode({ agent }: { agent: AgentInfo }) {
   return (
     <div className={`border-2 rounded-lg px-3 py-2 text-center min-w-[140px] ${s.border}`}>
       {agent.role?.icon && <span className="mr-1">{agent.role.icon}</span>}
-      <span className="text-sm font-medium text-white">{roleName}</span>
+      <span className="text-sm font-medium text-th-text">{roleName}</span>
       <div className="text-xs font-mono" style={{ color: idColor(agent.id) }}>{shortId}</div>
-      {modelLabel && <div className="text-xs text-gray-500 mt-0.5">{modelLabel}</div>}
+      {modelLabel && <div className="text-xs text-th-text-muted mt-0.5">{modelLabel}</div>}
       <div className={`text-[10px] mt-1 px-1.5 py-0.5 rounded-full inline-block ${s.badge}`}>
         {agent.status}
       </div>
@@ -78,17 +78,17 @@ function HierarchyTree({ agents }: { agents: AgentInfo[] }) {
         <AgentNode agent={parent} />
         {children && children.length > 0 && (
           <>
-            <div className="w-px h-4 bg-gray-600" />
+            <div className="w-px h-4 bg-th-bg-hover" />
             {/* horizontal connector when >1 child */}
             {children.length > 1 && (
               <div className="flex items-start">
-                <div className="border-t border-gray-600" style={{ width: `${(children.length - 1) * 160}px` }} />
+                <div className="border-t border-th-border" style={{ width: `${(children.length - 1) * 160}px` }} />
               </div>
             )}
             <div className="flex flex-wrap gap-6 justify-center">
               {children.map((child) => (
                 <div key={child.id} className="flex flex-col items-center gap-2">
-                  <div className="w-px h-4 bg-gray-600" />
+                  <div className="w-px h-4 bg-th-bg-hover" />
                   {renderSubtree(child)}
                 </div>
               ))}
@@ -100,7 +100,7 @@ function HierarchyTree({ agents }: { agents: AgentInfo[] }) {
   };
 
   if (agents.length === 0) {
-    return <div className="text-gray-500 text-sm text-center py-6">No agents running</div>;
+    return <div className="text-th-text-muted text-sm text-center py-6">No agents running</div>;
   }
 
   return (
@@ -114,7 +114,7 @@ function HierarchyTree({ agents }: { agents: AgentInfo[] }) {
 // Role color helper for comms list
 // ---------------------------------------------------------------------------
 const roleColorMap: Record<string, string> = {
-  'Project Lead': 'text-yellow-400',
+  'Project Lead': 'text-yellow-600 dark:text-yellow-400',
   Developer:      'text-blue-400',
   Architect:      'text-purple-400',
   'Code Reviewer': 'text-green-400',
@@ -123,7 +123,7 @@ const roleColorMap: Record<string, string> = {
   Secretary:      'text-teal-400',
 };
 function roleColor(role: string): string {
-  return roleColorMap[role] ?? 'text-gray-300';
+  return roleColorMap[role] ?? 'text-th-text-alt';
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   if (entries.length === 0) {
-    return <div className="text-gray-500 text-sm text-center py-4">No messages yet</div>;
+    return <div className="text-th-text-muted text-sm text-center py-4">No messages yet</div>;
   }
 
   const toggle = (id: string) => {
@@ -163,16 +163,16 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
             <button
               key={c.id}
               onClick={() => toggle(c.id)}
-              className="w-full text-left text-xs px-2 py-1.5 hover:bg-gray-700/30 rounded cursor-pointer transition-colors"
+              className="w-full text-left text-xs px-2 py-1.5 hover:bg-th-bg-muted/30 rounded cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-1">
-                <span className="text-gray-500 shrink-0">[{time}]</span>
+                <span className="text-th-text-muted shrink-0">[{time}]</span>
                 <span className={`shrink-0 ${roleColor(c.fromRole)}`}>
                   {c.fromRole} ({c.fromId?.slice(0, 6)})
                 </span>
                 {c.groupName ? (
                   <>
-                    <span className="text-gray-500"> → </span>
+                    <span className="text-th-text-muted"> → </span>
                     <span className="inline-flex items-center gap-0.5 text-purple-400 shrink-0">
                       <Users className="w-2.5 h-2.5 inline" />
                       {c.groupName}
@@ -180,19 +180,19 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
                   </>
                 ) : (
                   <>
-                    <span className="text-gray-500"> → </span>
+                    <span className="text-th-text-muted"> → </span>
                     <span className={`shrink-0 ${roleColor(c.toRole)}`}>
                       {c.toRole} ({c.toId?.slice(0, 6)})
                     </span>
                   </>
                 )}
                 {isLong && (
-                  <span className="ml-auto text-gray-500 text-[10px] shrink-0">
+                  <span className="ml-auto text-th-text-muted text-[10px] shrink-0">
                     {isExpanded ? '▾' : '▸'} {c.content.length} chars
                   </span>
                 )}
               </div>
-              <div className={`text-gray-400 mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
+              <div className={`text-th-text-muted mt-0.5 ${isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'}`}>
                 {preview}
               </div>
             </button>
@@ -227,7 +227,7 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
   const participants = Array.from(seen.values());
 
   if (participants.length === 0) {
-    return <div className="text-gray-500 text-sm text-center py-4">No communication data</div>;
+    return <div className="text-th-text-muted text-sm text-center py-4">No communication data</div>;
   }
 
   // Count messages per pair
@@ -241,12 +241,12 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
       <table className="text-xs border-collapse">
         <thead>
           <tr>
-            <th className="px-2 py-1 text-gray-400 text-left">From ↓ / To →</th>
+            <th className="px-2 py-1 text-th-text-muted text-left">From ↓ / To →</th>
             {participants.map((a) => (
-              <th key={a.id} className="px-2 py-1 text-gray-400 text-center whitespace-nowrap">
+              <th key={a.id} className="px-2 py-1 text-th-text-muted text-center whitespace-nowrap">
                 {a.role}
                 <br />
-                <span className="font-mono text-gray-500">{a.shortId}</span>
+                <span className="font-mono text-th-text-muted">{a.shortId}</span>
               </th>
             ))}
           </tr>
@@ -254,8 +254,8 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
         <tbody>
           {participants.map((from) => (
             <tr key={from.id}>
-              <td className="px-2 py-1 text-gray-300 whitespace-nowrap">
-                {from.role} <span className="font-mono text-gray-500">{from.shortId}</span>
+              <td className="px-2 py-1 text-th-text-alt whitespace-nowrap">
+                {from.role} <span className="font-mono text-th-text-muted">{from.shortId}</span>
               </td>
               {participants.map((to) => {
                 const isSelf = from.id === to.id;
@@ -264,16 +264,16 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
                 return (
                   <td
                     key={to.id}
-                    className={`px-2 py-1 text-center border border-gray-700/50 ${
-                      isSelf ? 'bg-gray-800' : count > 0 ? `bg-blue-500/${intensity}` : ''
+                    className={`px-2 py-1 text-center border border-th-border/50 ${
+                      isSelf ? 'bg-th-bg-alt' : count > 0 ? `bg-blue-500/${intensity}` : ''
                     }`}
                   >
                     {isSelf ? (
-                      <span className="text-gray-600">—</span>
+                      <span className="text-th-text-muted">—</span>
                     ) : count > 0 ? (
-                      <span className="text-blue-300 font-medium">{count}</span>
+                      <span className="text-blue-600 dark:text-blue-300 font-medium">{count}</span>
                     ) : (
-                      <span className="text-gray-600">0</span>
+                      <span className="text-th-text-muted">0</span>
                     )}
                   </td>
                 );
@@ -366,7 +366,7 @@ export function OrgChart({ api, ws }: Props) {
         <h2 className="text-xl font-semibold">Org Chart</h2>
         {leads.length > 1 && (
           <div className="flex gap-2 items-center">
-            <span className="text-sm text-gray-400">Lead:</span>
+            <span className="text-sm text-th-text-muted">Lead:</span>
             {leads.map((l) => (
               <button
                 key={l.id}
@@ -374,7 +374,7 @@ export function OrgChart({ api, ws }: Props) {
                 className={`px-3 py-1 text-sm rounded transition-colors ${
                   selectedLeadId === l.id
                     ? 'bg-accent/20 text-accent'
-                    : 'bg-gray-700/50 text-gray-400 hover:text-white'
+                    : 'bg-th-bg-muted/50 text-th-text-muted hover:text-th-text'
                 }`}
               >
                 {l.projectName || l.id.slice(0, 8)}
@@ -385,21 +385,21 @@ export function OrgChart({ api, ws }: Props) {
       </div>
 
       {/* Hierarchy section */}
-      <section className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
+      <section className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <Network className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-medium text-white">Agent Hierarchy</h3>
-          <span className="text-xs text-gray-500">{teamAgents.length} agents</span>
+          <h3 className="text-sm font-medium text-th-text">Agent Hierarchy</h3>
+          <span className="text-xs text-th-text-muted">{teamAgents.length} agents</span>
         </div>
         <HierarchyTree agents={teamAgents} />
       </section>
 
       {/* Communication section */}
-      <section className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
+      <section className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <MessageSquare className="w-4 h-4 text-blue-400" />
-          <h3 className="text-sm font-medium text-white">Communication Flow</h3>
-          <span className="text-xs text-gray-500">
+          <h3 className="text-sm font-medium text-th-text">Communication Flow</h3>
+          <span className="text-xs text-th-text-muted">
             {allEntries.length} messages
             {groupMsgCount > 0 && <> ({groupMsgCount} group)</>}
           </span>
@@ -407,7 +407,7 @@ export function OrgChart({ api, ws }: Props) {
             <button
               onClick={() => setCommView('list')}
               className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 transition-colors ${
-                commView === 'list' ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:text-white'
+                commView === 'list' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'text-th-text-muted hover:text-th-text'
               }`}
             >
               <MessageSquare className="w-3 h-3" />
@@ -416,7 +416,7 @@ export function OrgChart({ api, ws }: Props) {
             <button
               onClick={() => setCommView('matrix')}
               className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 transition-colors ${
-                commView === 'matrix' ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:text-white'
+                commView === 'matrix' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'text-th-text-muted hover:text-th-text'
               }`}
             >
               <Grid3X3 className="w-3 h-3" />

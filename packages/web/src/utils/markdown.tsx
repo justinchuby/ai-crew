@@ -14,7 +14,7 @@ export function idColor(id: string): string {
 export function AgentIdBadge({ id, className = '' }: { id: string; className?: string }) {
   return (
     <span
-      className={`font-mono text-[10px] px-1 py-0.5 rounded bg-gray-800/80 ${className}`}
+      className={`font-mono text-[10px] px-1 py-0.5 rounded bg-th-bg-alt/80 ${className}`}
       style={{ color: idColor(id) }}
       title={id}
     >
@@ -44,7 +44,7 @@ export function MentionText({ text, agents, onClickAgent }: {
       parts.push(
         <span
           key={`m-${match.index}`}
-          className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
+          className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
           style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
           title={`${agent.role.name} (${agent.id.slice(0, 8)})`}
           onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
@@ -81,7 +81,7 @@ function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
         }
         if (part.startsWith('`') && part.endsWith('`')) {
           return (
-            <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">
+            <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">
               {part.slice(1, -1)}
             </code>
           );
@@ -109,7 +109,7 @@ export function InlineMarkdown({ text }: { text: string }) {
         }
         if (part.startsWith('`') && part.endsWith('`')) {
           return (
-            <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">
+            <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">
               {part.slice(1, -1)}
             </code>
           );
@@ -135,11 +135,11 @@ function MarkdownTable({ raw }: { raw: string }) {
 
   return (
     <div className="my-2 overflow-x-auto">
-      <table className="text-xs font-mono border-collapse border border-gray-700 w-full">
+      <table className="text-xs font-mono border-collapse border border-th-border w-full">
         <thead>
-          <tr className="bg-gray-800">
+          <tr className="bg-th-bg-alt">
             {headerCells.map((cell, j) => (
-              <th key={j} className="border border-gray-700 px-2 py-1 text-left text-gray-300 font-semibold">
+              <th key={j} className="border border-th-border px-2 py-1 text-left text-th-text-alt font-semibold">
                 <InlineMarkdown text={cell} />
               </th>
             ))}
@@ -147,9 +147,9 @@ function MarkdownTable({ raw }: { raw: string }) {
         </thead>
         <tbody>
           {bodyRows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-800/30'}>
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-th-bg/30' : 'bg-th-bg-alt/30'}>
               {row.map((cell, ci) => (
-                <td key={ci} className="border border-gray-700 px-2 py-1 text-gray-300">
+                <td key={ci} className="border border-th-border px-2 py-1 text-th-text-alt">
                   <InlineMarkdown text={cell} />
                 </td>
               ))}
@@ -187,7 +187,7 @@ export function MarkdownContent({ text, mentionAgents, onMentionClick }: {
               if (seg.startsWith('```') && seg.endsWith('```')) {
                 const content = seg.slice(3, -3).replace(/^[^\n]*\n/, '');
                 return (
-                  <pre key={j} className="bg-gray-900 border border-gray-700 rounded-md px-3 py-2 my-1 overflow-x-auto text-xs font-mono text-gray-300">
+                  <pre key={j} className="bg-th-bg border border-th-border rounded-md px-3 py-2 my-1 overflow-x-auto text-xs font-mono text-th-text-alt">
                     {content}
                   </pre>
                 );

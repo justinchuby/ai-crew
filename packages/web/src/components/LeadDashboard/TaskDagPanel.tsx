@@ -1,14 +1,14 @@
 import type { DagStatus, DagTask } from '../../types';
 
 const STATUS_CONFIG: Record<DagTask['dagStatus'], { icon: string; color: string; label: string; strikethrough?: boolean }> = {
-  pending:  { icon: '⏳', color: 'text-gray-400',    label: 'pending' },
+  pending:  { icon: '⏳', color: 'text-th-text-muted',    label: 'pending' },
   ready:    { icon: '🟢', color: 'text-green-400',   label: 'ready' },
   running:  { icon: '🔵', color: 'text-blue-400',    label: 'running' },
   done:     { icon: '✅', color: 'text-emerald-400',  label: 'done' },
   failed:   { icon: '❌', color: 'text-red-400',      label: 'failed' },
   blocked:  { icon: '🟠', color: 'text-orange-400',   label: 'blocked' },
-  paused:   { icon: '⏸️', color: 'text-yellow-400',   label: 'paused' },
-  skipped:  { icon: '⏭️', color: 'text-gray-500',     label: 'skipped', strikethrough: true },
+  paused:   { icon: '⏸️', color: 'text-yellow-600 dark:text-yellow-400',   label: 'paused' },
+  skipped:  { icon: '⏭️', color: 'text-th-text-muted',     label: 'skipped', strikethrough: true },
 };
 
 /** Badge pill for a task status */
@@ -56,20 +56,20 @@ function TaskCard({ task }: { task: DagTask }) {
   const cfg = STATUS_CONFIG[task.dagStatus];
 
   return (
-    <div className={`px-2 py-1.5 border-b border-gray-700/50 hover:bg-gray-800/30 ${cfg.strikethrough ? 'opacity-50' : ''}`}>
+    <div className={`px-2 py-1.5 border-b border-th-border/50 hover:bg-th-bg-alt/30 ${cfg.strikethrough ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-1.5">
         <StatusBadge status={task.dagStatus} />
-        <span className={`text-xs font-mono text-gray-200 truncate ${cfg.strikethrough ? 'line-through' : ''}`}>
+        <span className={`text-xs font-mono text-th-text-alt truncate ${cfg.strikethrough ? 'line-through' : ''}`}>
           {task.id}
         </span>
-        <span className="text-[10px] text-gray-500 ml-auto shrink-0">({task.role})</span>
+        <span className="text-[10px] text-th-text-muted ml-auto shrink-0">({task.role})</span>
       </div>
       {task.description && (
-        <p className="text-[11px] text-gray-400 mt-0.5 leading-tight line-clamp-2 pl-1">
+        <p className="text-[11px] text-th-text-muted mt-0.5 leading-tight line-clamp-2 pl-1">
           {task.description}
         </p>
       )}
-      <div className="flex flex-wrap gap-x-3 gap-y-0 mt-0.5 pl-1 text-[10px] text-gray-500">
+      <div className="flex flex-wrap gap-x-3 gap-y-0 mt-0.5 pl-1 text-[10px] text-th-text-muted">
         {task.dependsOn.length > 0 && (
           <span>deps: [{task.dependsOn.join(', ')}]</span>
         )}
@@ -90,13 +90,13 @@ function FileLockMap({ fileLockMap }: { fileLockMap: DagStatus['fileLockMap'] })
   if (entries.length === 0) return null;
 
   return (
-    <div className="border-t border-gray-700 px-2 py-1.5">
-      <div className="text-[10px] font-semibold text-gray-500 mb-0.5">File Locks</div>
+    <div className="border-t border-th-border px-2 py-1.5">
+      <div className="text-[10px] font-semibold text-th-text-muted mb-0.5">File Locks</div>
       {entries.map(([file, lock]) => (
-        <div key={file} className="text-[10px] text-gray-400 flex items-center gap-1 leading-relaxed">
+        <div key={file} className="text-[10px] text-th-text-muted flex items-center gap-1 leading-relaxed">
           <span className="text-blue-400">🔒</span>
           <span className="font-mono truncate">{file}</span>
-          <span className="text-gray-600 ml-auto shrink-0">
+          <span className="text-th-text-muted ml-auto shrink-0">
             ← {lock.taskId}{lock.agentId ? ` (${lock.agentId.slice(0, 8)})` : ''}
           </span>
         </div>
@@ -109,7 +109,7 @@ function FileLockMap({ fileLockMap }: { fileLockMap: DagStatus['fileLockMap'] })
 export function TaskDagPanelContent({ dagStatus }: { dagStatus: DagStatus | null }) {
   if (!dagStatus) {
     return (
-      <div className="px-3 py-4 text-xs text-gray-500 text-center">
+      <div className="px-3 py-4 text-xs text-th-text-muted text-center">
         No DAG data available
       </div>
     );

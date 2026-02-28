@@ -23,8 +23,8 @@ function pressureColor(pct: number): string {
 
 function pressureTextColor(pct: number): string {
   if (pct >= 90) return 'text-red-400';
-  if (pct >= 80) return 'text-yellow-400';
-  return 'text-gray-400';
+  if (pct >= 80) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-th-text-muted';
 }
 
 // ── Component ────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export function TokenEconomics() {
 
   if (sorted.length === 0) {
     return (
-      <div className="p-4 text-sm text-gray-500">
+      <div className="p-4 text-sm text-th-text-muted">
         No token usage data yet.
       </div>
     );
@@ -59,23 +59,23 @@ export function TokenEconomics() {
   return (
     <div className="flex flex-col gap-3 p-3 text-sm">
       {/* Summary bar */}
-      <div className="flex items-center justify-between rounded-lg bg-gray-800/60 px-4 py-2.5 border border-gray-700/50">
+      <div className="flex items-center justify-between rounded-lg bg-th-bg-alt/60 px-4 py-2.5 border border-th-border/50">
         <div className="flex items-center gap-2">
           <span className="text-base">📊</span>
-          <span className="font-medium text-gray-200">Token Usage</span>
+          <span className="font-medium text-th-text-alt">Token Usage</span>
         </div>
         <div className="flex items-center gap-4 font-mono text-xs">
-          <span className="text-blue-300">↑ {formatTokens(totalIn)} in</span>
-          <span className="text-emerald-300">↓ {formatTokens(totalOut)} out</span>
-          <span className="text-gray-300 font-semibold">{formatTokens(total)} total</span>
+          <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(totalIn)} in</span>
+          <span className="text-emerald-600 dark:text-emerald-300">↓ {formatTokens(totalOut)} out</span>
+          <span className="text-th-text-alt font-semibold">{formatTokens(total)} total</span>
         </div>
       </div>
 
       {/* Per-agent table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-700/50">
+      <div className="overflow-x-auto rounded-lg border border-th-border/50">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-gray-800/40 text-gray-400">
+            <tr className="bg-th-bg-alt/40 text-th-text-muted">
               <th className="px-3 py-2 text-left font-medium">Agent</th>
               <th className="px-3 py-2 text-left font-medium">Model</th>
               <th className="px-3 py-2 text-right font-medium">Input</th>
@@ -95,33 +95,33 @@ export function TokenEconomics() {
               return (
                 <tr
                   key={agent.id}
-                  className="border-t border-gray-700/30 hover:bg-gray-800/30"
+                  className="border-t border-th-border/30 hover:bg-th-bg-alt/30"
                 >
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
                       <span>{agent.role.icon}</span>
-                      <span className="text-gray-200 font-medium">{agent.role.name}</span>
-                      <span className="text-gray-500 font-mono">({agent.id.slice(0, 8)})</span>
+                      <span className="text-th-text-alt font-medium">{agent.role.name}</span>
+                      <span className="text-th-text-muted font-mono">({agent.id.slice(0, 8)})</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-gray-400 font-mono">
+                  <td className="px-3 py-2 text-th-text-muted font-mono">
                     {agent.model || agent.role.model || '—'}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-blue-300">
+                  <td className="px-3 py-2 text-right font-mono text-blue-600 dark:text-blue-300">
                     {formatTokens(inT)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-emerald-300">
+                  <td className="px-3 py-2 text-right font-mono text-emerald-600 dark:text-emerald-300">
                     {formatTokens(outT)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-gray-200">
+                  <td className="px-3 py-2 text-right font-mono text-th-text-alt">
                     {formatTokens(totalAgent)}
-                    <span className="ml-1 text-gray-500">({shareOfTotal}%)</span>
+                    <span className="ml-1 text-th-text-muted">({shareOfTotal}%)</span>
                   </td>
                   <td className="px-3 py-2">
                     {agent.contextWindowSize ? (
                       <div className="flex items-center gap-2">
                         {/* Pressure bar */}
-                        <div className="flex-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
+                        <div className="flex-1 h-1.5 rounded-full bg-th-bg-muted overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${pressureColor(pct)}`}
                             style={{ width: `${pct}%` }}
@@ -132,7 +132,7 @@ export function TokenEconomics() {
                         </span>
                       </div>
                     ) : (
-                      <span className="text-gray-600">—</span>
+                      <span className="text-th-text-muted">—</span>
                     )}
                   </td>
                 </tr>
@@ -154,7 +154,7 @@ export function TokenEconomics() {
                 <div
                   key={a.id}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded ${
-                    isRed ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'
+                    isRed ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
                   }`}
                 >
                   <span>{isRed ? '🔴' : '🟡'}</span>

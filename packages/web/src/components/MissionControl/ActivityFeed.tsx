@@ -25,8 +25,8 @@ const ACTIVITY_ICONS: Record<string, string> = {
 };
 
 const ACTIVITY_COLORS: Record<string, string> = {
-  tool_call: 'text-zinc-400',
-  delegation: 'text-yellow-400',
+  tool_call: 'text-th-text-muted',
+  delegation: 'text-yellow-600 dark:text-yellow-400',
   completion: 'text-green-400',
   message_sent: 'text-blue-400',
   progress: 'text-purple-400',
@@ -39,7 +39,7 @@ function buildFeedItems(activity: ActivityEvent[], comms: AgentComm[]): FeedItem
     items.push({
       id: `act-${evt.id}`,
       icon: ACTIVITY_ICONS[evt.type] ?? '•',
-      iconColor: ACTIVITY_COLORS[evt.type] ?? 'text-zinc-500',
+      iconColor: ACTIVITY_COLORS[evt.type] ?? 'text-th-text-muted',
       text: evt.summary,
       timestamp: evt.timestamp,
       agentRole: evt.agentRole,
@@ -80,29 +80,29 @@ export function ActivityFeed({ leadId }: ActivityFeedProps) {
   }, [feedItems.length]);
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 flex flex-col h-full">
-      <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+    <div className="bg-th-bg rounded-lg border border-th-border-muted flex flex-col h-full">
+      <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2 px-4 py-3 border-b border-th-border-muted">
         <Radio size={14} className="text-green-400 animate-pulse" />
         Live Activity
-        <span className="text-xs font-normal text-zinc-600 ml-auto">
+        <span className="text-xs font-normal text-th-text-muted ml-auto">
           {feedItems.length} events
         </span>
       </h3>
       <div ref={feedRef} className="flex-1 overflow-y-auto px-2">
         {feedItems.length === 0 && (
-          <p className="text-xs text-zinc-600 px-2 py-4 text-center">No activity yet</p>
+          <p className="text-xs text-th-text-muted px-2 py-4 text-center">No activity yet</p>
         )}
         {feedItems.map((item) => (
           <div
             key={item.id}
-            className="flex items-start gap-2 px-2 py-1.5 border-b border-zinc-800/50 hover:bg-zinc-800/30"
+            className="flex items-start gap-2 px-2 py-1.5 border-b border-th-border-muted/50 hover:bg-th-bg-alt/30"
           >
             <span className={`text-xs mt-0.5 ${item.iconColor}`}>{item.icon}</span>
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-mono text-zinc-500">{item.agentRole}</span>
-              <span className="text-xs text-zinc-400 ml-1 truncate">{item.text}</span>
+              <span className="text-xs font-mono text-th-text-muted">{item.agentRole}</span>
+              <span className="text-xs text-th-text-muted ml-1 truncate">{item.text}</span>
             </div>
-            <span className="text-[10px] font-mono text-zinc-700 flex-shrink-0">
+            <span className="text-[10px] font-mono text-th-text-muted flex-shrink-0">
               {new Date(item.timestamp).toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',

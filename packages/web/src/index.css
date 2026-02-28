@@ -1,12 +1,36 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-:root {
-  color-scheme: dark;
+/* ── Theme custom properties ──────────────────────────────────────────── */
+
+/* Light mode (default) */
+:root, .light {
+  color-scheme: light;
+  --th-bg: 255 255 255;
+  --th-bg-alt: 249 250 251;
+  --th-bg-muted: 243 244 246;
+  --th-bg-hover: 229 231 235;
+  --th-text: 17 24 39;
+  --th-text-alt: 55 65 81;
+  --th-text-muted: 107 114 128;
+  --th-border: 229 231 235;
+  --th-border-hover: 209 213 219;
+  --th-border-muted: 243 244 246;
 }
 
-.light {
-  color-scheme: light;
+/* Dark mode */
+.dark {
+  color-scheme: dark;
+  --th-bg: 13 17 23;
+  --th-bg-alt: 22 27 34;
+  --th-bg-muted: 28 33 40;
+  --th-bg-hover: 55 65 81;
+  --th-text: 249 250 251;
+  --th-text-alt: 209 213 219;
+  --th-text-muted: 156 163 175;
+  --th-border: 55 65 81;
+  --th-border-hover: 75 85 99;
+  --th-border-muted: 31 41 55;
 }
 
 body {
@@ -79,6 +103,20 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+.light .glass-toast {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.70) 100%
+  );
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.10),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  text-shadow: none;
+}
+
 /* ── Tooltip (plain dark style) ───────────────────────────────────────── */
 .tooltip-container {
   max-width: 320px;
@@ -95,4 +133,11 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   white-space: pre-line;
   word-break: break-word;
+}
+
+.light .tooltip-inner {
+  color: rgba(17, 24, 39, 0.92);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }

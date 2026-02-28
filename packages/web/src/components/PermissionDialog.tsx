@@ -113,15 +113,15 @@ export function PermissionDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-surface-raised border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg mx-4">
+      <div className="bg-surface-raised border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-700">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-th-border">
           <Shield size={20} className="text-amber-400" />
-          <h2 className="text-base font-semibold text-gray-100 flex-1">Permission Request</h2>
-          <span className="text-xs text-gray-500 tabular-nums">{countdown}s</span>
+          <h2 className="text-base font-semibold text-th-text flex-1">Permission Request</h2>
+          <span className="text-xs text-th-text-muted tabular-nums">{countdown}s</span>
           <button
             onClick={() => handleResolve(false)}
-            className="text-gray-500 hover:text-gray-300"
+            className="text-th-text-muted hover:text-th-text-alt"
           >
             <X size={16} />
           </button>
@@ -132,7 +132,7 @@ export function PermissionDialog() {
           {/* Agent info */}
           <div className="flex items-center gap-2">
             <span className="text-lg">{agentWithPermission.role.icon}</span>
-            <span className="text-sm font-medium text-gray-200">
+            <span className="text-sm font-medium text-th-text-alt">
               {agentWithPermission.role.name}
             </span>
             <AgentIdBadge id={agentWithPermission.id} />
@@ -141,42 +141,42 @@ export function PermissionDialog() {
           {/* Tool name */}
           <div className="flex items-center gap-2">
             <ToolIcon size={16} className="text-blue-400 shrink-0" />
-            <code className="text-sm text-blue-300 bg-blue-900/20 px-2 py-0.5 rounded">
+            <code className="text-sm text-blue-600 dark:text-blue-300 bg-blue-900/20 px-2 py-0.5 rounded">
               {toolLabel}
             </code>
           </div>
 
           {/* Summary line */}
           {summary && (
-            <div className="text-sm text-gray-300 bg-gray-800 rounded px-3 py-2 font-mono truncate">
+            <div className="text-sm text-th-text-alt bg-th-bg-alt rounded px-3 py-2 font-mono truncate">
               {summary}
             </div>
           )}
 
           {/* Arguments preview */}
           <details className="group">
-            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
+            <summary className="text-xs text-th-text-muted cursor-pointer hover:text-th-text-muted">
               Arguments
             </summary>
-            <pre className="mt-2 text-xs text-gray-400 bg-gray-800 rounded p-3 overflow-auto max-h-48 font-mono">
+            <pre className="mt-2 text-xs text-th-text-muted bg-th-bg-alt rounded p-3 overflow-auto max-h-48 font-mono">
               {formatArgs(argsObj)}
             </pre>
           </details>
 
           {/* Always allow checkbox */}
-          <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-sm text-th-text-muted cursor-pointer select-none">
             <input
               type="checkbox"
               checked={alwaysAllow}
               onChange={(e) => setAlwaysAllow(e.target.checked)}
-              className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/30"
+              className="rounded border-th-border bg-th-bg-alt text-blue-500 focus:ring-blue-500/30"
             />
             Always allow for this agent role
           </label>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-700">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-th-border">
           <button
             onClick={() => handleResolve(false)}
             className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"

@@ -30,7 +30,7 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
   const hasDelegations = delegationTotal > 0;
 
   if (!hasDag && !hasDelegations) {
-    return <div className="text-sm text-gray-500 py-2">No tasks or delegations yet</div>;
+    return <div className="text-sm text-th-text-muted py-2">No tasks or delegations yet</div>;
   }
 
   return (
@@ -39,17 +39,17 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
       {hasDag && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-400 font-medium">DAG Tasks</span>
-            <span className="text-xs text-gray-300">{dagDone}/{dagTotal} done ({dagPct}%)</span>
+            <span className="text-xs text-th-text-muted font-medium">DAG Tasks</span>
+            <span className="text-xs text-th-text-alt">{dagDone}/{dagTotal} done ({dagPct}%)</span>
           </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-th-bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-emerald-500 transition-all duration-300 rounded-full" style={{ width: `${dagPct}%` }} />
           </div>
           <div className="flex gap-3 mt-1 text-[11px]">
             {dagRunning > 0 && <span className="text-blue-400">🔵 {dagRunning} running</span>}
             {dagDone > 0 && <span className="text-emerald-400">✅ {dagDone} done</span>}
             {dagFailed > 0 && <span className="text-red-400">❌ {dagFailed} failed</span>}
-            {(dagStatus?.summary.pending ?? 0) > 0 && <span className="text-gray-400">⏳ {dagStatus!.summary.pending} pending</span>}
+            {(dagStatus?.summary.pending ?? 0) > 0 && <span className="text-th-text-muted">⏳ {dagStatus!.summary.pending} pending</span>}
             {(dagStatus?.summary.ready ?? 0) > 0 && <span className="text-green-400">🟢 {dagStatus!.summary.ready} ready</span>}
           </div>
         </div>
@@ -59,10 +59,10 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
       {hasDelegations && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-400 font-medium">Delegations</span>
-            <span className="text-xs text-gray-300">{delegationCompleted}/{delegationTotal} ({completionPct}%)</span>
+            <span className="text-xs text-th-text-muted font-medium">Delegations</span>
+            <span className="text-xs text-th-text-alt">{delegationCompleted}/{delegationTotal} ({completionPct}%)</span>
           </div>
-          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-th-bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 transition-all duration-300 rounded-full" style={{ width: `${completionPct}%` }} />
           </div>
           <div className="flex gap-3 mt-1 text-[11px]">
@@ -77,24 +77,24 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
       {progress && progress.teamAgents.length > 0 && (
         <div>
           <div className="flex items-center gap-1 mb-1">
-            <Users size={12} className="text-gray-400" />
-            <span className="text-xs text-gray-400 font-medium">Team ({progress.teamSize})</span>
+            <Users size={12} className="text-th-text-muted" />
+            <span className="text-xs text-th-text-muted font-medium">Team ({progress.teamSize})</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {progress.teamAgents.map((a) => (
               <span
                 key={a.id}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border ${
-                  a.status === 'running' ? 'border-blue-500/50 bg-blue-500/10 text-blue-300' :
-                  a.status === 'idle' ? 'border-green-500/50 bg-green-500/10 text-green-300' :
-                  a.status === 'completed' ? 'border-gray-500/50 bg-gray-500/10 text-gray-400' :
-                  a.status === 'failed' ? 'border-red-500/50 bg-red-500/10 text-red-300' :
-                  a.status === 'terminated' ? 'border-orange-500/50 bg-orange-500/10 text-orange-300' :
-                  'border-gray-600 text-gray-400'
+                  a.status === 'running' ? 'border-blue-500/50 bg-blue-500/10 text-blue-600 dark:text-blue-300' :
+                  a.status === 'idle' ? 'border-green-500/50 bg-green-500/10 text-green-600 dark:text-green-300' :
+                  a.status === 'completed' ? 'border-gray-500/50 bg-gray-500/10 text-th-text-muted' :
+                  a.status === 'failed' ? 'border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-300' :
+                  a.status === 'terminated' ? 'border-orange-500/50 bg-orange-500/10 text-orange-600 dark:text-orange-300' :
+                  'border-th-border text-th-text-muted'
                 }`}
               >
                 {a.role?.icon} {a.role?.name ?? 'Unknown'}
-                {a.task && <span className="text-gray-500 max-w-[80px] truncate">— {a.task}</span>}
+                {a.task && <span className="text-th-text-muted max-w-[80px] truncate">— {a.task}</span>}
               </span>
             ))}
           </div>
@@ -222,9 +222,9 @@ export function TaskQueuePanel({ api }: Props) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* ---- Project tabs ---- */}
-      <div className="flex items-center border-b border-gray-700 shrink-0 overflow-x-auto bg-[#1a1a2e]">
+      <div className="flex items-center border-b border-th-border shrink-0 overflow-x-auto bg-th-bg">
         {tabs.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 h-10 text-gray-500 text-sm">
+          <div className="flex items-center gap-2 px-4 h-10 text-th-text-muted text-sm">
             <Network size={14} />
             No projects yet
           </div>
@@ -247,7 +247,7 @@ export function TaskQueuePanel({ api }: Props) {
                   className={`flex items-center gap-2 px-4 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
                     isSelected
                       ? 'border-accent text-accent bg-accent/10'
-                      : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                      : 'border-transparent text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
                   }`}
                 >
                   <span className="font-medium max-w-[160px] truncate">
@@ -257,7 +257,7 @@ export function TaskQueuePanel({ api }: Props) {
                     <span className={`text-[10px] font-bold px-1.5 rounded-full min-w-[18px] text-center ${
                       doneCount === taskCount
                         ? 'bg-green-900/50 text-green-400'
-                        : 'bg-gray-800 text-gray-400'
+                        : 'bg-th-bg-alt text-th-text-muted'
                     }`}>
                       {doneCount}/{taskCount}
                     </span>
@@ -281,13 +281,13 @@ export function TaskQueuePanel({ api }: Props) {
                 onClick={() => setSelectedTab(key)}
                 className={`flex items-center gap-2 px-4 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
                   isSelected
-                    ? 'border-gray-400 text-gray-300 bg-gray-700/30'
-                    : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-700/30'
+                    ? 'border-th-border text-th-text-alt bg-th-bg-muted/30'
+                    : 'border-transparent text-th-text-muted hover:text-th-text-alt hover:bg-th-bg-muted/30'
                 }`}
               >
                 <Archive size={12} className="opacity-50" />
                 <span className="font-medium max-w-[160px] truncate">{p.name}</span>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-gray-600" />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-th-bg-hover" />
               </button>
             );
           })
@@ -297,7 +297,7 @@ export function TaskQueuePanel({ api }: Props) {
       {/* ---- Content for selected tab ---- */}
       <div className="flex-1 overflow-auto p-4">
         {!currentTab ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-12 text-th-text-muted">
             <Network size={32} className="mb-2 opacity-50" />
             <p className="text-sm">No lead sessions active</p>
             <p className="text-xs mt-1">Start a lead agent to see project tasks here</p>
@@ -305,29 +305,29 @@ export function TaskQueuePanel({ api }: Props) {
         ) : currentTab.type === 'persisted' ? (
           /* Inactive project — show summary and resume button */
           <div className="space-y-4 max-w-2xl mx-auto">
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">{currentTab.project.name}</h3>
+            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-6">
+              <h3 className="text-lg font-semibold text-th-text mb-2">{currentTab.project.name}</h3>
               {currentTab.project.description && (
-                <p className="text-sm text-gray-400 mb-4">{currentTab.project.description}</p>
+                <p className="text-sm text-th-text-muted mb-4">{currentTab.project.description}</p>
               )}
-              <div className="flex items-center gap-4 text-xs text-gray-500 mb-6">
+              <div className="flex items-center gap-4 text-xs text-th-text-muted mb-6">
                 <span className="flex items-center gap-1"><Clock size={12} /> Created {new Date(currentTab.project.createdAt).toLocaleDateString()}</span>
                 <span className="flex items-center gap-1"><Clock size={12} /> Updated {new Date(currentTab.project.updatedAt).toLocaleDateString()}</span>
-                {currentTab.project.cwd && <span className="text-gray-600 truncate max-w-[200px]">📂 {currentTab.project.cwd}</span>}
+                {currentTab.project.cwd && <span className="text-th-text-muted truncate max-w-[200px]">📂 {currentTab.project.cwd}</span>}
               </div>
               {currentTab.project.sessions && currentTab.project.sessions.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">Previous Sessions</h4>
+                  <h4 className="text-xs font-medium text-th-text-muted uppercase mb-2">Previous Sessions</h4>
                   <div className="space-y-1">
                     {currentTab.project.sessions.slice(0, 5).map(s => (
-                      <div key={s.id} className="flex items-center gap-2 text-xs text-gray-500">
+                      <div key={s.id} className="flex items-center gap-2 text-xs text-th-text-muted">
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           s.status === 'completed' ? 'bg-green-500' :
                           s.status === 'crashed' ? 'bg-red-500' : 'bg-gray-500'
                         }`} />
                         <span>{s.task?.slice(0, 60) || 'No task'}</span>
-                        <span className="text-gray-600">— {new Date(s.startedAt).toLocaleDateString()}</span>
-                        <span className={s.status === 'crashed' ? 'text-red-400' : 'text-gray-500'}>
+                        <span className="text-th-text-muted">— {new Date(s.startedAt).toLocaleDateString()}</span>
+                        <span className={s.status === 'crashed' ? 'text-red-400' : 'text-th-text-muted'}>
                           ({s.status})
                         </span>
                       </div>
@@ -351,8 +351,8 @@ export function TaskQueuePanel({ api }: Props) {
         ) : (
           /* Active lead — show progress and tasks */
           <div className="space-y-4">
-            <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
-              <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
+              <h3 className="text-sm font-medium text-th-text mb-3 flex items-center gap-2">
                 <Network size={14} className="text-cyan-400" />
                 Progress
               </h3>
@@ -363,9 +363,9 @@ export function TaskQueuePanel({ api }: Props) {
               const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
               const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
               return (
-                <div className="bg-gray-800/50 rounded-lg border border-gray-700 flex flex-col">
-                  <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
+                  <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
                       {effectiveView === 'graph' ? (
                         <Network size={14} className="text-blue-400" />
                       ) : (
@@ -373,14 +373,14 @@ export function TaskQueuePanel({ api }: Props) {
                       )}
                       Tasks
                       {dagStatus && (
-                        <span className="text-xs text-gray-500 font-normal">{dagStatus.tasks.length} total</span>
+                        <span className="text-xs text-th-text-muted font-normal">{dagStatus.tasks.length} total</span>
                       )}
                     </h3>
-                    <div className="flex bg-gray-900 rounded p-0.5 border border-gray-700">
+                    <div className="flex bg-th-bg rounded p-0.5 border border-th-border">
                       <button
                         onClick={() => setDagView('list')}
                         className={`p-1 rounded transition-colors ${
-                          effectiveView === 'list' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                          effectiveView === 'list' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
                         }`}
                         title="List view"
                       >
@@ -389,7 +389,7 @@ export function TaskQueuePanel({ api }: Props) {
                       <button
                         onClick={() => setDagView('graph')}
                         className={`p-1 rounded transition-colors ${
-                          effectiveView === 'graph' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                          effectiveView === 'graph' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
                         }`}
                         title="Graph view"
                       >

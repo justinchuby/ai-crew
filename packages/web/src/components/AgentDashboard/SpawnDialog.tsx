@@ -28,10 +28,10 @@ export function SpawnDialog({ api, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-surface-raised border border-gray-700 rounded-xl p-5 w-[420px] max-h-[80vh] overflow-auto">
+      <div className="bg-surface-raised border border-th-border rounded-xl p-5 w-[420px] max-h-[80vh] overflow-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Spawn Agent</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
+          <button onClick={onClose} className="text-th-text-muted hover:text-th-text">
             <X size={18} />
           </button>
         </div>
@@ -43,7 +43,7 @@ export function SpawnDialog({ api, onClose }: Props) {
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 selectedRole === role.id
                   ? 'border-accent bg-accent/5'
-                  : 'border-gray-700 hover:border-gray-600'
+                  : 'border-th-border hover:border-th-border-hover'
               }`}
             >
               <input
@@ -57,27 +57,27 @@ export function SpawnDialog({ api, onClose }: Props) {
               <span className="text-xl">{role.icon}</span>
               <div>
                 <div className="text-sm font-medium">{role.name}</div>
-                <div className="text-xs text-gray-400">{role.description}</div>
+                <div className="text-xs text-th-text-muted">{role.description}</div>
               </div>
             </label>
           ))}
         </div>
 
-        <label className="flex items-center gap-2 mb-4 px-1 text-sm text-gray-300 cursor-pointer select-none">
+        <label className="flex items-center gap-2 mb-4 px-1 text-sm text-th-text-alt cursor-pointer select-none">
           <input
             type="checkbox"
             checked={autopilot}
             onChange={(e) => setAutopilot(e.target.checked)}
-            className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent/30"
+            className="rounded border-th-border bg-th-bg-alt text-accent focus:ring-accent/30"
           />
           <span>Autopilot</span>
-          <span className="text-xs text-gray-500">— auto-approve all tool calls</span>
+          <span className="text-xs text-th-text-muted">— auto-approve all tool calls</span>
         </label>
 
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm text-th-text-alt hover:text-th-text transition-colors"
           >
             Cancel
           </button>

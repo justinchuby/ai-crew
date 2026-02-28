@@ -6,9 +6,9 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: '#0d1117',
-          raised: '#161b22',
-          overlay: '#1c2128',
+          DEFAULT: 'rgb(var(--th-bg) / <alpha-value>)',
+          raised: 'rgb(var(--th-bg-alt) / <alpha-value>)',
+          overlay: 'rgb(var(--th-bg-muted) / <alpha-value>)',
         },
         accent: {
           DEFAULT: '#58a6ff',
@@ -21,6 +21,18 @@ export default {
           pm: '#d29922',
           advocate: '#f778ba',
           qa: '#79c0ff',
+        },
+        th: {
+          bg: 'rgb(var(--th-bg) / <alpha-value>)',
+          'bg-alt': 'rgb(var(--th-bg-alt) / <alpha-value>)',
+          'bg-muted': 'rgb(var(--th-bg-muted) / <alpha-value>)',
+          'bg-hover': 'rgb(var(--th-bg-hover) / <alpha-value>)',
+          text: 'rgb(var(--th-text) / <alpha-value>)',
+          'text-alt': 'rgb(var(--th-text-alt) / <alpha-value>)',
+          'text-muted': 'rgb(var(--th-text-muted) / <alpha-value>)',
+          border: 'rgb(var(--th-border) / <alpha-value>)',
+          'border-hover': 'rgb(var(--th-border-hover) / <alpha-value>)',
+          'border-muted': 'rgb(var(--th-border-muted) / <alpha-value>)',
         },
       },
     },

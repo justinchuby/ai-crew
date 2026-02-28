@@ -360,10 +360,10 @@ export function GroupChat(_props: { api: any; ws: any }) {
   /* ================================================================ */
 
   return (
-    <div className="flex flex-col h-full bg-[#1a1a2e] text-gray-200">
+    <div className="flex flex-col h-full bg-th-bg text-th-text-alt">
       {/* ---- Project tabs ---- */}
       {leads.length > 1 && (
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-700/50 shrink-0 overflow-x-auto bg-gray-900/50">
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-th-border/50 shrink-0 overflow-x-auto bg-th-bg/50">
           {leads.map((lead) => {
             const isActive = selectedProjectLeadId === lead.id;
             const projectGroups = groups.filter((g) => g.leadId === lead.id);
@@ -374,13 +374,13 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 className={`flex items-center gap-1.5 px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
                   isActive
                     ? 'bg-accent/20 text-accent font-medium'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                    : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
                 }`}
               >
                 <Crown className="w-3 h-3" />
                 <span className="truncate max-w-[120px]">{lead.projectName || lead.id.slice(0, 8)}</span>
                 {projectGroups.length > 0 && (
-                  <span className="text-[10px] text-gray-500 ml-0.5">({projectGroups.length})</span>
+                  <span className="text-[10px] text-th-text-muted ml-0.5">({projectGroups.length})</span>
                 )}
               </button>
             );
@@ -389,9 +389,9 @@ export function GroupChat(_props: { api: any; ws: any }) {
       )}
 
       {/* ---- Tab bar ---- */}
-      <div className="flex items-center border-b border-gray-700 shrink-0 overflow-x-auto bg-[#1a1a2e]">
+      <div className="flex items-center border-b border-th-border shrink-0 overflow-x-auto bg-th-bg">
         {filteredTabs.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 h-10 text-gray-500 text-sm">
+          <div className="flex items-center gap-2 px-4 h-10 text-th-text-muted text-sm">
             <MessageSquare className="w-4 h-4" />
             No group chats{selectedProjectLeadId ? ' in this project' : ' yet'}
           </div>
@@ -411,7 +411,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
               return (
                 <div key={leadId} className="flex items-center shrink-0">
                   {showProjectHeaders && (
-                    <span className="flex items-center gap-1 px-2 h-10 text-[10px] font-mono font-semibold text-purple-300/70 uppercase tracking-wider whitespace-nowrap border-r border-gray-700/40">
+                    <span className="flex items-center gap-1 px-2 h-10 text-[10px] font-mono font-semibold text-purple-600/70 dark:text-purple-300/70 uppercase tracking-wider whitespace-nowrap border-r border-th-border/40">
                       <Crown className="w-3 h-3 text-purple-400/60" />
                       {projectLabel}
                     </span>
@@ -430,7 +430,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         className={`group flex items-center gap-1.5 px-3 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
                           isActive
                             ? 'border-accent text-accent bg-accent/10'
-                            : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                            : 'border-transparent text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
                         }`}
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
@@ -457,7 +457,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
         {leads.length > 0 && (
           <button
             onClick={openCreateDialog}
-            className="flex items-center gap-1 px-2 h-10 text-xs text-gray-400 hover:text-accent hover:bg-gray-700/50 transition-colors shrink-0 border-b-2 border-transparent"
+            className="flex items-center gap-1 px-2 h-10 text-xs text-th-text-muted hover:text-accent hover:bg-th-bg-muted/50 transition-colors shrink-0 border-b-2 border-transparent"
             title="Create group chat"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -468,7 +468,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
         {filteredGroups.length > filteredTabs.length && (
           <div className="relative ml-auto px-2">
             <select
-              className="bg-gray-800 border border-gray-700 rounded text-xs text-gray-400 px-2 py-1 cursor-pointer"
+              className="bg-th-bg-alt border border-th-border rounded text-xs text-th-text-muted px-2 py-1 cursor-pointer"
               value=""
               onChange={(e) => {
                 const [leadId, ...nameParts] = e.target.value.split(':');
@@ -517,9 +517,9 @@ export function GroupChat(_props: { api: any; ws: any }) {
         {selectedGroup && selectedGroupData ? (
           <>
             {/* Group info header */}
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700/50 shrink-0">
-              <Users className="w-4 h-4 text-gray-500" />
-              <div className="flex items-center gap-2 text-xs text-gray-500 truncate flex-wrap">
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-th-border/50 shrink-0">
+              <Users className="w-4 h-4 text-th-text-muted" />
+              <div className="flex items-center gap-2 text-xs text-th-text-muted truncate flex-wrap">
                 <span>{selectedGroupData.memberIds.length} members:</span>
                 {selectedGroupData.memberIds.map((id) => (
                   <span key={id} className="flex items-center gap-1">
@@ -534,7 +534,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {currentMessages.length === 0 && (
-                <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                <div className="flex items-center justify-center h-full text-th-text-muted text-sm">
                   No messages yet — start the conversation!
                 </div>
               )}
@@ -543,7 +543,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 if (isSystem(msg)) {
                   return (
                     <div key={msg.id} className="flex justify-center">
-                      <span className="text-xs text-gray-500 italic">
+                      <span className="text-xs text-th-text-muted italic">
                         <MentionText text={msg.content} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                       </span>
                     </div>
@@ -555,7 +555,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                   <div key={msg.id} className={`flex ${human ? 'justify-end' : 'justify-start'}`}>
                     <div className={`flex gap-2 max-w-[75%] ${human ? 'flex-row-reverse' : 'flex-row'}`}>
                       <div
-                        className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-xs shrink-0 mt-0.5"
+                        className="w-7 h-7 rounded-full bg-th-bg-muted flex items-center justify-center text-xs shrink-0 mt-0.5"
                         style={{ borderColor: human ? undefined : idColor(msg.fromAgentId), borderWidth: human ? 0 : 2 }}
                       >
                         {agentIcon(msg.fromAgentId)}
@@ -567,12 +567,12 @@ export function GroupChat(_props: { api: any; ws: any }) {
                           </span>
                           {!human && <AgentIdBadge id={msg.fromAgentId} />}
                         </div>
-                        <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
+                        <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-th-bg-alt text-th-text-alt'}`}>
                           <div className="whitespace-pre-wrap break-words prose-sm">
                             <MarkdownContent text={msg.content} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </div>
                         </div>
-                        <div className={`text-xs text-gray-500 mt-0.5 ${human ? 'text-right' : ''}`}>
+                        <div className={`text-xs text-th-text-muted mt-0.5 ${human ? 'text-right' : ''}`}>
                           {timeAgo(msg.timestamp)}
                         </div>
                       </div>
@@ -585,21 +585,21 @@ export function GroupChat(_props: { api: any; ws: any }) {
             </div>
 
             {/* Compose bar */}
-            <div className="border-t border-gray-700 p-3 shrink-0 relative">
+            <div className="border-t border-th-border p-3 shrink-0 relative">
               {/* Mention autocomplete dropdown */}
               {mentionSuggestions.length > 0 && (
-                <div className="absolute bottom-full left-3 right-3 mb-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-h-40 overflow-y-auto z-10">
+                <div className="absolute bottom-full left-3 right-3 mb-1 bg-th-bg-alt border border-th-border rounded-lg shadow-xl max-h-40 overflow-y-auto z-10">
                   {mentionSuggestions.map((a, i) => (
                     <button
                       key={a.id}
                       onClick={() => insertMention(a)}
                       className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
-                        i === mentionIndex ? 'bg-accent/20 text-accent' : 'text-gray-300 hover:bg-gray-700'
+                        i === mentionIndex ? 'bg-accent/20 text-accent' : 'text-th-text-alt hover:bg-th-bg-muted'
                       }`}
                     >
                       <AgentIdBadge id={a.id} />
                       <span className="font-mono font-semibold">{a.role.name}</span>
-                      <span className="text-gray-500 text-[10px] ml-auto">{a.status}</span>
+                      <span className="text-th-text-muted text-[10px] ml-auto">{a.status}</span>
                     </button>
                   ))}
                 </div>
@@ -612,7 +612,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                   onKeyDown={handleKeyDown}
                   placeholder="Type a message…"
                   rows={1}
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-accent"
+                  className="flex-1 bg-th-bg-alt border border-th-border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-accent"
                   style={{ maxHeight: 96 }}
                 />
                 <button
@@ -626,7 +626,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-3">
+          <div className="flex-1 flex flex-col items-center justify-center text-th-text-muted gap-3">
             <MessageSquare className="w-10 h-10" />
             <p className="text-sm">Select a group chat tab to view messages</p>
           </div>
@@ -638,25 +638,25 @@ export function GroupChat(_props: { api: any; ws: any }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreate(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <div
-            className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4"
+            className="relative bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Create Group Chat</h3>
-              <button onClick={() => setShowCreate(false)} className="text-gray-500 hover:text-gray-300">
+              <button onClick={() => setShowCreate(false)} className="text-th-text-muted hover:text-th-text-alt">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Group name */}
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Group name</label>
+              <label className="text-xs text-th-text-muted block mb-1">Group name</label>
               <input
                 type="text"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="e.g. frontend-team"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                className="w-full bg-th-bg-alt border border-th-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 autoFocus
               />
             </div>
@@ -664,11 +664,11 @@ export function GroupChat(_props: { api: any; ws: any }) {
             {/* Select lead/project */}
             {leads.length > 1 && (
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Project</label>
+                <label className="text-xs text-th-text-muted block mb-1">Project</label>
                 <select
                   value={newGroupLeadId}
                   onChange={(e) => { setNewGroupLeadId(e.target.value); setNewGroupMembers(new Set()); }}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  className="w-full bg-th-bg-alt border border-th-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 >
                   {leads.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -681,23 +681,23 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
             {/* Select members */}
             <div>
-              <label className="text-xs text-gray-400 block mb-1">
+              <label className="text-xs text-th-text-muted block mb-1">
                 Members ({newGroupMembers.size} selected)
               </label>
-              <div className="max-h-48 overflow-y-auto border border-gray-700 rounded-lg divide-y divide-gray-800">
+              <div className="max-h-48 overflow-y-auto border border-th-border rounded-lg divide-y divide-th-border-muted">
                 {availableAgents.length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-gray-500 text-center">No agents in this project yet</div>
+                  <div className="px-3 py-3 text-xs text-th-text-muted text-center">No agents in this project yet</div>
                 ) : (
                   availableAgents.map((a) => (
                     <label
                       key={a.id}
-                      className="flex items-center gap-3 px-3 py-2 hover:bg-gray-800 cursor-pointer"
+                      className="flex items-center gap-3 px-3 py-2 hover:bg-th-bg-alt cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={newGroupMembers.has(a.id)}
                         onChange={() => toggleMember(a.id)}
-                        className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
+                        className="rounded border-th-border bg-th-bg-alt text-accent focus:ring-accent"
                       />
                       <span className="text-sm">{a.role.icon} {a.role.name}</span>
                       <AgentIdBadge id={a.id} className="ml-auto" />
@@ -705,7 +705,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                   ))
                 )}
               </div>
-              <p className="text-[10px] text-gray-600 mt-1">You are always added automatically.</p>
+              <p className="text-[10px] text-th-text-muted mt-1">You are always added automatically.</p>
             </div>
 
             {/* Create button */}

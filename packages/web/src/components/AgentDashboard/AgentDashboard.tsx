@@ -133,7 +133,7 @@ export function AgentDashboard({ api, ws }: Props) {
           <button
             onClick={() => setGroupByProject((g) => !g)}
             className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-              groupByProject ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:text-white'
+              groupByProject ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'text-th-text-muted hover:text-th-text'
             }`}
             title="Group by project"
           >
@@ -144,7 +144,7 @@ export function AgentDashboard({ api, ws }: Props) {
             <select
               value={selectedAgentFilter ?? ''}
               onChange={(e) => setSelectedAgentFilter(e.target.value || null)}
-              className="bg-surface-raised border border-gray-700 rounded px-2 py-1 text-xs text-gray-300"
+              className="bg-surface-raised border border-th-border rounded px-2 py-1 text-xs text-th-text-alt"
             >
               <option value="">All agents</option>
               {agents.map((a) => (
@@ -154,7 +154,7 @@ export function AgentDashboard({ api, ws }: Props) {
               ))}
             </select>
           )}
-          <kbd className="hidden sm:inline-block text-[10px] text-gray-500 bg-surface border border-gray-700 rounded px-1.5 py-0.5">N</kbd>
+          <kbd className="hidden sm:inline-block text-[10px] text-th-text-muted bg-surface border border-th-border rounded px-1.5 py-0.5">N</kbd>
           <button
             onClick={() => setShowSpawn(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-black rounded-lg text-sm font-medium hover:bg-accent-muted transition-colors"
@@ -172,15 +172,15 @@ export function AgentDashboard({ api, ws }: Props) {
           const label = lead?.projectName || lead?.task?.slice(0, 40) || (leadId === '_unassigned' ? 'Unassigned' : leadId.slice(0, 8));
           const isCollapsed = collapsedGroups.has(leadId);
           return (
-            <div key={leadId} className="border border-gray-700 rounded-lg bg-surface-raised">
+            <div key={leadId} className="border border-th-border rounded-lg bg-surface-raised">
               <button
                 onClick={() => toggleGroup(leadId)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 hover:bg-surface/50 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-th-text-alt hover:bg-surface/50 transition-colors"
               >
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                <FolderOpen size={13} className="text-yellow-400" />
+                <FolderOpen size={13} className="text-yellow-600 dark:text-yellow-400" />
                 <span className="truncate">{label}</span>
-                <span className="text-[10px] text-gray-500 ml-1">({groupAgents.length})</span>
+                <span className="text-[10px] text-th-text-muted ml-1">({groupAgents.length})</span>
               </button>
               {!isCollapsed && (
                 <div className="px-1 pb-1">
@@ -195,15 +195,15 @@ export function AgentDashboard({ api, ws }: Props) {
       )}
 
       {/* Bottom section: Activity Feed + File Locks (collapsible) */}
-      <div className="border border-gray-700 rounded-lg bg-surface-raised">
+      <div className="border border-th-border rounded-lg bg-surface-raised">
         <button
           onClick={() => setBottomOpen((o) => !o)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 uppercase tracking-wider hover:bg-surface/50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-th-text-alt uppercase tracking-wider hover:bg-surface/50 transition-colors"
         >
           {bottomOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           Activity &amp; Locks
           {(filteredActivity.length > 0 || filteredLocks.length > 0) && (
-            <span className="text-[10px] text-gray-500 normal-case tracking-normal">
+            <span className="text-[10px] text-th-text-muted normal-case tracking-normal">
               ({filteredActivity.length} events, {filteredLocks.length} locks)
             </span>
           )}

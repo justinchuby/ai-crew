@@ -97,11 +97,11 @@ export function FleetOverview({ api, ws }: Props) {
         <h2 className="text-xl font-semibold">Fleet Overview</h2>
         {agents.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-400">Filter:</label>
+            <label className="text-xs text-th-text-muted">Filter:</label>
             <select
               value={selectedAgentFilter ?? ''}
               onChange={(e) => setSelectedAgentFilter(e.target.value || null)}
-              className="bg-surface-raised border border-gray-700 rounded px-2 py-1 text-xs text-gray-300"
+              className="bg-surface-raised border border-th-border rounded px-2 py-1 text-xs text-th-text-alt"
             >
               <option value="">All agents</option>
               {agents.map((a) => (

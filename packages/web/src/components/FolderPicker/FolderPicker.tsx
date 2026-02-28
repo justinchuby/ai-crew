@@ -56,21 +56,21 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
       className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[70vh]">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700">
-          <FolderOpen className="w-4 h-4 text-yellow-400" />
-          <span className="text-sm font-semibold text-gray-100">Select Directory</span>
+      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[70vh]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-th-border">
+          <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+          <span className="text-sm font-semibold text-th-text">Select Directory</span>
           <span className="flex-1" />
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none p-1">×</button>
+          <button onClick={onClose} className="text-th-text-muted hover:text-th-text text-lg leading-none p-1">×</button>
         </div>
 
         {/* Current path */}
-        <div className="px-4 py-2 bg-gray-900/50 border-b border-gray-700 flex items-center gap-2">
-          <span className="text-xs font-mono text-gray-300 truncate flex-1" title={current}>{current}</span>
+        <div className="px-4 py-2 bg-th-bg/50 border-b border-th-border flex items-center gap-2">
+          <span className="text-xs font-mono text-th-text-alt truncate flex-1" title={current}>{current}</span>
           {parent && parent !== current && (
             <button
               onClick={() => browse(parent)}
-              className="p-1 text-gray-400 hover:text-gray-200 shrink-0"
+              className="p-1 text-th-text-muted hover:text-th-text shrink-0"
               title="Go up"
             >
               <ChevronUp size={14} />
@@ -82,21 +82,21 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-500" />
+              <Loader2 className="w-5 h-5 animate-spin text-th-text-muted" />
             </div>
           ) : error ? (
             <div className="px-4 py-3 text-xs text-red-400">{error}</div>
           ) : folders.length === 0 ? (
-            <div className="px-4 py-6 text-xs text-gray-500 text-center">No subdirectories</div>
+            <div className="px-4 py-6 text-xs text-th-text-muted text-center">No subdirectories</div>
           ) : (
             <div className="py-1">
               {folders.map((f) => (
                 <button
                   key={f.path}
                   onClick={() => browse(f.path)}
-                  className="w-full text-left flex items-center gap-2 px-4 py-1.5 text-sm text-gray-300 hover:bg-gray-700/60 transition-colors"
+                  className="w-full text-left flex items-center gap-2 px-4 py-1.5 text-sm text-th-text-alt hover:bg-th-bg-muted/60 transition-colors"
                 >
-                  <Folder className="w-4 h-4 text-yellow-400/70 shrink-0" />
+                  <Folder className="w-4 h-4 text-yellow-600/70 dark:text-yellow-400/70 shrink-0" />
                   <span className="truncate">{f.name}</span>
                 </button>
               ))}
@@ -105,10 +105,10 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-th-border">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-700"
+            className="px-3 py-1.5 text-xs text-th-text-muted hover:text-th-text rounded hover:bg-th-bg-muted"
           >
             Cancel
           </button>

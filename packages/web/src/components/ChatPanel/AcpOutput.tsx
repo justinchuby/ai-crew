@@ -16,15 +16,15 @@ const PLAN_ICON: Record<AcpPlanEntry['status'], string> = {
 
 const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   high: 'bg-red-500/20 text-red-400',
-  medium: 'bg-yellow-500/20 text-yellow-400',
-  low: 'bg-gray-500/20 text-gray-400',
+  medium: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
+  low: 'bg-gray-500/20 text-th-text-muted',
 };
 
 const TC_STATUS: Record<AcpToolCall['status'], string> = {
-  pending: 'bg-yellow-500/20 text-yellow-400',
+  pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
   in_progress: 'bg-blue-500/20 text-blue-400',
   completed: 'bg-green-500/20 text-green-400',
-  cancelled: 'bg-gray-500/20 text-gray-400',
+  cancelled: 'bg-gray-500/20 text-th-text-muted',
 };
 
 /** Render inline markdown: **bold**, *italic*, `code` */
@@ -40,14 +40,14 @@ function renderMarkdown(text: string): React.ReactNode[] {
       parts.push(text.slice(lastIndex, match.index));
     }
     if (match[2]) {
-      parts.push(<strong key={key++} className="font-bold text-gray-100">{match[2]}</strong>);
+      parts.push(<strong key={key++} className="font-bold text-th-text">{match[2]}</strong>);
     } else if (match[3]) {
-      parts.push(<em key={key++} className="italic text-gray-200">{match[3]}</em>);
+      parts.push(<em key={key++} className="italic text-th-text-alt">{match[3]}</em>);
     } else if (match[4]) {
-      parts.push(<em key={key++} className="italic text-gray-200">{match[4]}</em>);
+      parts.push(<em key={key++} className="italic text-th-text-alt">{match[4]}</em>);
     } else if (match[5]) {
       parts.push(
-        <code key={key++} className="bg-gray-700/60 text-blue-300 rounded px-1 py-0.5 text-[11px] font-mono">
+        <code key={key++} className="bg-th-bg-muted/60 text-blue-600 dark:text-blue-300 rounded px-1 py-0.5 text-[11px] font-mono">
           {match[5]}
         </code>,
       );
@@ -165,10 +165,10 @@ export function AcpOutput({ agentId }: Props) {
     <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
       {/* Plan Section */}
       {plan.length > 0 && (
-        <div className="border border-gray-700 rounded-lg bg-surface-raised">
+        <div className="border border-th-border rounded-lg bg-surface-raised">
           <button
             onClick={() => setPlanOpen(!planOpen)}
-            className="flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-gray-300"
+            className="flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-th-text-alt"
           >
             {planOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Plan ({plan.filter((e) => e.status === 'completed').length}/{plan.length})
@@ -176,7 +176,7 @@ export function AcpOutput({ agentId }: Props) {
           {planOpen && (
             <ul className="px-3 pb-2 space-y-1">
               {plan.map((entry, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-gray-300">
+                <li key={i} className="flex items-center gap-2 text-xs text-th-text-alt">
                   <span>{PLAN_ICON[entry.status]}</span>
                   <span className="flex-1">{entry.content}</span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${PRIORITY_BADGE[entry.priority]}`}>
@@ -193,18 +193,18 @@ export function AcpOutput({ agentId }: Props) {
       {toolCalls.length > 0 && (
         <div className="space-y-1.5">
           {toolCalls.map((tc) => (
-            <div key={tc.toolCallId} className="border border-gray-700 rounded-lg bg-surface-raised p-2">
+            <div key={tc.toolCallId} className="border border-th-border rounded-lg bg-surface-raised p-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-200">{typeof tc.title === 'string' ? tc.title : JSON.stringify(tc.title)}</span>
-                  <span className="text-[10px] text-gray-500">{typeof tc.kind === 'string' ? tc.kind : JSON.stringify(tc.kind)}</span>
+                  <span className="text-xs font-medium text-th-text-alt">{typeof tc.title === 'string' ? tc.title : JSON.stringify(tc.title)}</span>
+                  <span className="text-[10px] text-th-text-muted">{typeof tc.kind === 'string' ? tc.kind : JSON.stringify(tc.kind)}</span>
                 </div>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] ${TC_STATUS[tc.status]}`}>
                   {tc.status}
                 </span>
               </div>
               {tc.content && tc.status === 'completed' && (
-                <pre className="mt-1 text-[11px] text-gray-400 font-mono overflow-hidden max-h-24 bg-surface/50 rounded p-1">
+                <pre className="mt-1 text-[11px] text-th-text-muted font-mono overflow-hidden max-h-24 bg-surface/50 rounded p-1">
                   {stringifyContent(tc.content)}
                 </pre>
               )}
@@ -222,8 +222,8 @@ export function AcpOutput({ agentId }: Props) {
               const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               return (
                 <div key={`act-${evt.id}`} className="flex items-center gap-2 py-0.5 px-1">
-                  <span className="text-[10px] text-gray-600">{time}</span>
-                  <span className="text-[10px] text-gray-500 italic">
+                  <span className="text-[10px] text-th-text-muted">{time}</span>
+                  <span className="text-[10px] text-th-text-muted italic">
                     {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
                     {' '}{evt.summary}
                   </span>
@@ -239,7 +239,7 @@ export function AcpOutput({ agentId }: Props) {
             if (sender === 'user') {
               return (
                 <div key={`msg-${item.index}`} className="flex justify-end items-start gap-2 py-1">
-                  <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                  <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                   <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
                     {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
                   </div>
@@ -253,10 +253,10 @@ export function AcpOutput({ agentId }: Props) {
               return (
                 <div key={`msg-${item.index}`} className="py-0.5">
                   <div className="flex items-start gap-2">
-                    <div className="flex-1 font-mono text-xs text-gray-500 italic whitespace-pre-wrap min-w-0">
+                    <div className="flex-1 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
                       {text}
                     </div>
-                    <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
                   </div>
                 </div>
               );
@@ -266,11 +266,11 @@ export function AcpOutput({ agentId }: Props) {
             if (sender === 'system') {
               const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
               if (text === '---') {
-                return <hr key={`msg-${item.index}`} className="border-gray-700/50 my-1" />;
+                return <hr key={`msg-${item.index}`} className="border-th-border/50 my-1" />;
               }
               return (
                 <div key={`msg-${item.index}`} className="flex justify-center py-1">
-                  <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 text-xs text-gray-400 whitespace-pre-wrap">
+                  <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-th-bg-alt/60 border border-th-border/50 text-xs text-th-text-muted whitespace-pre-wrap">
                     {text}
                   </div>
                 </div>
@@ -290,8 +290,8 @@ export function AcpOutput({ agentId }: Props) {
                     <div className="flex-1 min-w-0">
                       {msg.contentType === 'image' && msg.data && (
                         <div>
-                          <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-gray-700" />
-                          {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
+                          <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-th-border" />
+                          {msg.uri && <p className="text-[10px] text-th-text-muted mt-1 font-mono">{msg.uri}</p>}
                         </div>
                       )}
                       {msg.contentType === 'audio' && msg.data && (
@@ -308,12 +308,12 @@ export function AcpOutput({ agentId }: Props) {
                             </div>
                           )}
                           {msg.text && (
-                            <pre className="text-xs font-mono text-gray-300 bg-gray-800 border border-gray-700 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
+                            <pre className="text-xs font-mono text-th-text-alt bg-th-bg-alt border border-th-border rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
                           )}
                         </div>
                       )}
                     </div>
-                    <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
                   </div>
                 </div>
               );
@@ -324,10 +324,10 @@ export function AcpOutput({ agentId }: Props) {
             return (
               <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
                 <div className="flex items-start gap-2">
-                  <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
+                  <div className="flex-1 font-mono text-sm text-th-text-alt whitespace-pre-wrap min-w-0">
                     <AgentTextBlockSimple text={text} />
                   </div>
-                  <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                  <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
                 </div>
               </div>
             );
@@ -338,17 +338,17 @@ export function AcpOutput({ agentId }: Props) {
 
       {/* Queued messages — sent but not yet processed by agent */}
       {messages.some((m) => m.queued) && (
-        <div className="border-t border-dashed border-gray-600 px-3 py-2 bg-gray-800/50">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+        <div className="border-t border-dashed border-th-border px-3 py-2 bg-th-bg-alt/50">
+          <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Queued
           </div>
           {messages.filter((m) => m.queued).map((msg, i) => (
             <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
-              <span className="text-[10px] text-gray-600">
+              <span className="text-[10px] text-th-text-muted">
                 {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
               </span>
-              <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+              <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
                 {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
               </div>
               <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
@@ -381,15 +381,15 @@ function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   }
   return (
     <div
-      className="my-1 px-2 py-1 bg-gray-800/80 border border-gray-600 rounded text-[11px] text-gray-300 cursor-pointer hover:border-gray-500 transition-colors"
+      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
       <div className="flex items-center gap-1 min-w-0">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-gray-300 shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-gray-400 truncate ml-1">— {preview}</span>}
+        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
+        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
       </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-gray-400">{text}</pre>}
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
     </div>
   );
 }
@@ -444,7 +444,7 @@ function InlineMarkdownSimple({ text }: { text: string }) {
       {parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
         if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>;
-        if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">{part.slice(1, -1)}</code>;
+        if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">{part.slice(1, -1)}</code>;
         return <span key={i}>{part}</span>;
       })}
     </>
@@ -461,11 +461,11 @@ function SimpleTable({ raw }: { raw: string }) {
   const bodyRows = lines.slice(isSep ? 2 : 1).map(parseRow);
   return (
     <div className="my-2 overflow-x-auto">
-      <table className="text-xs font-mono border-collapse border border-gray-700 w-full">
+      <table className="text-xs font-mono border-collapse border border-th-border w-full">
         <thead>
-          <tr className="bg-gray-800">
+          <tr className="bg-th-bg-alt">
             {headerCells.map((c, j) => (
-              <th key={j} className="border border-gray-700 px-2 py-1 text-left text-gray-300 font-semibold">
+              <th key={j} className="border border-th-border px-2 py-1 text-left text-th-text-alt font-semibold">
                 <InlineMarkdownSimple text={c} />
               </th>
             ))}
@@ -473,9 +473,9 @@ function SimpleTable({ raw }: { raw: string }) {
         </thead>
         <tbody>
           {bodyRows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-800/30'}>
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-th-bg/30' : 'bg-th-bg-alt/30'}>
               {row.map((c, ci) => (
-                <td key={ci} className="border border-gray-700 px-2 py-1 text-gray-300">
+                <td key={ci} className="border border-th-border px-2 py-1 text-th-text-alt">
                   <InlineMarkdownSimple text={c} />
                 </td>
               ))}

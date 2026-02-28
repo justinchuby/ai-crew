@@ -16,9 +16,9 @@ export function MissionControlPage() {
 
   if (!leadId) {
     return (
-      <div className="h-full flex items-center justify-center text-zinc-500">
+      <div className="h-full flex items-center justify-center text-th-text-muted">
         <div className="text-center space-y-2">
-          <Activity size={48} className="mx-auto text-zinc-700" />
+          <Activity size={48} className="mx-auto text-th-text-muted" />
           <p className="text-lg font-medium">Mission Control</p>
           <p className="text-sm">No active project. Start a project from the Lead page.</p>
         </div>
@@ -30,9 +30,9 @@ export function MissionControlPage() {
     <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
       {/* Header */}
       <div className="flex items-center gap-3 shrink-0">
-        <Activity size={20} className="text-zinc-400" />
-        <h1 className="text-lg font-semibold text-zinc-200">Mission Control</h1>
-        <span className="text-xs text-zinc-600 font-mono">Lead: {leadId.slice(0, 8)}</span>
+        <Activity size={20} className="text-th-text-muted" />
+        <h1 className="text-lg font-semibold text-th-text-alt">Mission Control</h1>
+        <span className="text-xs text-th-text-muted font-mono">Lead: {leadId.slice(0, 8)}</span>
       </div>
 
       {/* Top row: Health + Token Economics */}

@@ -7,7 +7,7 @@ interface SkeletonProps {
 export function Skeleton({ width, height, className = '' }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse bg-gray-700/50 rounded ${className}`}
+      className={`animate-pulse bg-th-bg-muted/50 rounded ${className}`}
       style={{ width, height }}
     />
   );
@@ -16,7 +16,7 @@ export function Skeleton({ width, height, className = '' }: SkeletonProps) {
 /** Card-shaped skeleton matching AgentCard dimensions */
 export function SkeletonCard() {
   return (
-    <div className="bg-surface-raised border border-gray-700 rounded-lg p-4 space-y-3">
+    <div className="bg-surface-raised border border-th-border rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-3">
         <Skeleton width="2.5rem" height="2.5rem" className="rounded-full" />
         <div className="flex-1 space-y-2">
@@ -33,7 +33,7 @@ export function SkeletonCard() {
 /** Row-shaped skeleton matching TaskRow dimensions */
 export function SkeletonRow() {
   return (
-    <div className="flex items-center gap-3 bg-surface-raised border border-gray-700 rounded-lg p-3">
+    <div className="flex items-center gap-3 bg-surface-raised border border-th-border rounded-lg p-3">
       <Skeleton width="0.875rem" height="0.875rem" />
       <Skeleton width="0.5rem" height="0.5rem" className="rounded-full" />
       <div className="flex-1 space-y-1.5">

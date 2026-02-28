@@ -433,7 +433,7 @@ interface DagGraphProps {
 export function DagGraph({ dagStatus }: DagGraphProps) {
   if (!dagStatus || dagStatus.tasks.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-full text-th-text-muted text-sm">
         No DAG tasks to visualize
       </div>
     );
@@ -441,7 +441,7 @@ export function DagGraph({ dagStatus }: DagGraphProps) {
 
   return (
     <div
-      className="dag-flow-container relative w-full overflow-hidden bg-gray-900/50 rounded-lg"
+      className="dag-flow-container relative w-full overflow-hidden bg-th-bg/50 rounded-lg"
       style={{ height: 500 }}
     >
       <style>{darkStyles}</style>

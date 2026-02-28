@@ -33,9 +33,9 @@ const ICONS = {
 };
 
 const ICON_COLORS = {
-  success: 'text-green-300',
-  error: 'text-red-300',
-  info: 'text-blue-300',
+  success: 'text-green-600 dark:text-green-300',
+  error: 'text-red-600 dark:text-red-300',
+  info: 'text-blue-600 dark:text-blue-300',
 };
 
 export function ToastContainer() {
@@ -53,8 +53,8 @@ export function ToastContainer() {
             className="glass-toast flex items-center gap-2 px-4 py-3 rounded-xl animate-slide-in"
           >
             <Icon size={16} className={`shrink-0 ${ICON_COLORS[toast.type]}`} />
-            <span className="text-sm flex-1 text-white/90">{toast.message}</span>
-            <button onClick={() => remove(toast.id)} className="shrink-0 opacity-60 hover:opacity-100 text-white/70">
+            <span className="text-sm flex-1 text-th-text/90">{toast.message}</span>
+            <button onClick={() => remove(toast.id)} className="shrink-0 opacity-60 hover:opacity-100 text-th-text/70">
               <X size={14} />
             </button>
           </div>

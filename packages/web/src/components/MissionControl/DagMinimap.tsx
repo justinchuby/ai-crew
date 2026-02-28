@@ -15,7 +15,7 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
     { status: 'blocked', count: summary.blocked, color: 'bg-red-500' },
     { status: 'paused',  count: summary.paused,  color: 'bg-yellow-500' },
     { status: 'pending', count: summary.pending, color: 'bg-zinc-600' },
-    { status: 'skipped', count: summary.skipped, color: 'bg-zinc-700' },
+    { status: 'skipped', count: summary.skipped, color: 'bg-th-bg-muted' },
     { status: 'failed',  count: summary.failed,  color: 'bg-red-600' },
   ].filter((s) => s.count > 0);
 
@@ -29,14 +29,14 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
             style={{ width: `${(seg.count / total) * 100}%` }}
           >
             {seg.count / total > 0.08 && (
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/80">
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-th-text/80">
                 {seg.count}
               </span>
             )}
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500">
+      <div className="flex flex-wrap gap-3 text-[10px] text-th-text-muted">
         {segments.map((seg) => (
           <span key={seg.status} className="flex items-center gap-1">
             <span className={`w-2 h-2 rounded-sm ${seg.color}`} />
@@ -59,7 +59,7 @@ export function DagMinimap({ leadId }: DagMinimapProps) {
 
   if (!dagStatus || dagStatus.tasks.length === 0) {
     return (
-      <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4 flex items-center justify-center h-full text-zinc-600 text-sm">
+      <div className="bg-th-bg rounded-lg border border-th-border-muted p-4 flex items-center justify-center h-full text-th-text-muted text-sm">
         No task DAG defined
       </div>
     );
@@ -73,11 +73,11 @@ export function DagMinimap({ leadId }: DagMinimapProps) {
   const running = dagStatus.tasks.filter((t) => t.dagStatus === 'running');
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4 flex flex-col h-full">
-      <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2 mb-3">
-        <GitBranch size={14} className="text-zinc-500" />
+    <div className="bg-th-bg rounded-lg border border-th-border-muted p-4 flex flex-col h-full">
+      <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2 mb-3">
+        <GitBranch size={14} className="text-th-text-muted" />
         Task Progress
-        <a href="/tasks" className="text-xs text-zinc-600 hover:text-zinc-400 ml-auto">
+        <a href="/tasks" className="text-xs text-th-text-muted hover:text-th-text-muted ml-auto">
           Full DAG →
         </a>
       </h3>
@@ -87,12 +87,12 @@ export function DagMinimap({ leadId }: DagMinimapProps) {
       <div className="grid grid-cols-2 gap-4 mt-3 flex-1 min-h-0 overflow-y-auto">
         {/* Recent completions */}
         <div>
-          <div className="text-xs text-zinc-600 uppercase tracking-wide mb-1">Recent</div>
+          <div className="text-xs text-th-text-muted uppercase tracking-wide mb-1">Recent</div>
           {recentDone.length === 0 && (
-            <div className="text-xs text-zinc-700">None yet</div>
+            <div className="text-xs text-th-text-muted">None yet</div>
           )}
           {recentDone.map((t) => (
-            <div key={t.id} className="text-xs text-zinc-400 py-0.5 truncate">
+            <div key={t.id} className="text-xs text-th-text-muted py-0.5 truncate">
               ✅ {t.description?.slice(0, 40) ?? t.id}
             </div>
           ))}
@@ -100,9 +100,9 @@ export function DagMinimap({ leadId }: DagMinimapProps) {
 
         {/* Currently running */}
         <div>
-          <div className="text-xs text-zinc-600 uppercase tracking-wide mb-1">Running</div>
+          <div className="text-xs text-th-text-muted uppercase tracking-wide mb-1">Running</div>
           {running.length === 0 && (
-            <div className="text-xs text-zinc-700">None</div>
+            <div className="text-xs text-th-text-muted">None</div>
           )}
           {running.map((t) => (
             <div key={t.id} className="text-xs text-blue-400 py-0.5 truncate">

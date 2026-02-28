@@ -9,8 +9,8 @@ export function AgentTimeline() {
   if (roots.length === 0) return null;
 
   return (
-    <div className="p-4 border-t border-gray-700">
-      <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+    <div className="p-4 border-t border-th-border">
+      <h3 className="text-sm font-medium text-th-text-muted uppercase tracking-wide mb-3 flex items-center gap-1.5">
         <GitBranch size={14} />
         Agent Hierarchy
       </h3>
@@ -36,16 +36,16 @@ function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
       <button
         onClick={() => setSelectedAgent(isSelected ? null : agentId)}
         className={`flex items-center gap-2 w-full text-left px-2 py-1 rounded text-sm transition-colors ${
-          isSelected ? 'bg-accent/10 text-accent' : 'hover:bg-gray-700/50 text-gray-300'
+          isSelected ? 'bg-accent/10 text-accent' : 'hover:bg-th-bg-muted/50 text-th-text-alt'
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {children.length > 0 && (
-          <GitBranch size={12} className="text-gray-500 shrink-0" />
+          <GitBranch size={12} className="text-th-text-muted shrink-0" />
         )}
         <span>{agent.role.icon}</span>
         <span className="truncate">{agent.role.name}</span>
-        <span className="text-[10px] text-gray-500 font-mono ml-auto">{agentId.slice(0, 6)}</span>
+        <span className="text-[10px] text-th-text-muted font-mono ml-auto">{agentId.slice(0, 6)}</span>
       </button>
       {children.map((child) => (
         <AgentTreeNode key={child.id} agentId={child.id} depth={depth + 1} />

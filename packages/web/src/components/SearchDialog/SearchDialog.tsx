@@ -40,7 +40,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-yellow-500/30 text-yellow-200 rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      <mark className="bg-yellow-500/30 text-yellow-600 dark:text-yellow-200 rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
   );
@@ -138,38 +138,38 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
       <div
-        className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[60vh] flex flex-col"
+        className="relative bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[60vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-700">
-          <Search className="w-5 h-5 text-gray-400 shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-th-border">
+          <Search className="w-5 h-5 text-th-text-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={handleInput}
             placeholder="Search chat history…"
-            className="flex-1 bg-transparent text-gray-200 text-sm placeholder-gray-500 outline-none"
+            className="flex-1 bg-transparent text-th-text-alt text-sm placeholder-th-text-muted outline-none"
           />
           {query && (
-            <button onClick={() => { setQuery(''); setResults([]); setSearched(false); }} className="text-gray-500 hover:text-gray-300">
+            <button onClick={() => { setQuery(''); setResults([]); setSearched(false); }} className="text-th-text-muted hover:text-th-text-alt">
               <X className="w-4 h-4" />
             </button>
           )}
-          <kbd className="text-[10px] text-gray-600 border border-gray-700 rounded px-1.5 py-0.5">ESC</kbd>
+          <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1.5 py-0.5">ESC</kbd>
         </div>
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
-            <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
+            <div className="flex items-center justify-center py-8 text-th-text-muted text-sm">
               Searching…
             </div>
           )}
 
           {!loading && searched && results.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500 gap-2">
+            <div className="flex flex-col items-center justify-center py-8 text-th-text-muted gap-2">
               <Search className="w-6 h-6" />
               <span className="text-sm">No results for &quot;{query}&quot;</span>
             </div>
@@ -189,12 +189,12 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                   case 'conversation':
                     icon = <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
                     label = agentLabel(r.agentId, r.agentRole);
-                    if (r.sender) badge = <span className="text-xs text-gray-500">({r.sender})</span>;
+                    if (r.sender) badge = <span className="text-xs text-th-text-muted">({r.sender})</span>;
                     break;
                   case 'group':
                     icon = <MessageSquare className="w-3.5 h-3.5 text-green-400 shrink-0" />;
                     label = r.groupName ?? 'Group';
-                    if (r.fromRole) badge = <span className="text-xs text-gray-500">({r.fromRole})</span>;
+                    if (r.fromRole) badge = <span className="text-xs text-th-text-muted">({r.fromRole})</span>;
                     break;
                   case 'task':
                     icon = <ListChecks className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
@@ -204,26 +204,26 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                         r.status === 'done' ? 'bg-green-900/50 text-green-400' :
                         r.status === 'running' ? 'bg-blue-900/50 text-blue-400' :
                         r.status === 'failed' ? 'bg-red-900/50 text-red-400' :
-                        'bg-gray-800 text-gray-400'
+                        'bg-th-bg-alt text-th-text-muted'
                       }`}>{r.status}</span>
                     ) : null;
                     break;
                   case 'decision':
-                    icon = <Scale className="w-3.5 h-3.5 text-yellow-400 shrink-0" />;
+                    icon = <Scale className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />;
                     label = agentLabel(r.agentId, r.agentRole);
                     badge = (
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                         r.status === 'confirmed' ? 'bg-green-900/50 text-green-400' :
                         r.status === 'rejected' ? 'bg-red-900/50 text-red-400' :
-                        r.needsConfirmation ? 'bg-yellow-900/50 text-yellow-400' :
-                        'bg-gray-800 text-gray-400'
+                        r.needsConfirmation ? 'bg-yellow-900/50 text-yellow-600 dark:text-yellow-400' :
+                        'bg-th-bg-alt text-th-text-muted'
                       }`}>{r.needsConfirmation && r.status === 'recorded' ? 'needs review' : r.status}</span>
                     );
                     break;
                   case 'activity':
                     icon = <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
                     label = agentLabel(r.agentId, r.agentRole);
-                    if (r.actionType) badge = <span className="text-xs text-gray-500">{r.actionType}</span>;
+                    if (r.actionType) badge = <span className="text-xs text-th-text-muted">{r.actionType}</span>;
                     break;
                 }
 
@@ -231,21 +231,21 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                   <button
                     key={`${r.source}-${r.id}-${i}`}
                     onClick={() => handleResultClick(r)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
+                    className="w-full text-left px-4 py-2.5 hover:bg-th-bg-alt transition-colors border-b border-th-border-muted/50 last:border-0"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {icon}
                       <span className="text-xs font-medium text-accent">{label}</span>
                       {badge}
-                      <span className="text-xs text-gray-600 ml-auto shrink-0">
+                      <span className="text-xs text-th-text-muted ml-auto shrink-0">
                         {timeAgo(r.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap break-words line-clamp-2">
+                    <p className="text-sm text-th-text-alt whitespace-pre-wrap break-words line-clamp-2">
                       {highlightMatch(preview, query)}
                     </p>
                     {r.source === 'decision' && r.rationale && (
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1 italic">
+                      <p className="text-xs text-th-text-muted mt-0.5 line-clamp-1 italic">
                         {r.rationale}
                       </p>
                     )}
@@ -256,10 +256,10 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           )}
 
           {!loading && !searched && (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500 gap-2">
+            <div className="flex flex-col items-center justify-center py-8 text-th-text-muted gap-2">
               <Search className="w-6 h-6" />
               <span className="text-sm">Search messages, tasks, decisions, and activity</span>
-              <span className="text-xs text-gray-600">Type at least 2 characters</span>
+              <span className="text-xs text-th-text-muted">Type at least 2 characters</span>
             </div>
           )}
         </div>

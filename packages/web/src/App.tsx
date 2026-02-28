@@ -90,28 +90,28 @@ export function App() {
   }, [agents, soundEnabled]);
 
   return (
-    <div className="flex h-screen bg-surface text-gray-200">
+    <div className="flex h-screen bg-surface text-th-text-alt">
       <Sidebar />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="h-12 border-b border-gray-700 flex items-center px-4 justify-between shrink-0">
+          <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
             <h1 className="text-lg font-semibold">AI Crew</h1>
             <div className="flex items-center gap-3">
               <button
                 onClick={openSearch}
-                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-colors text-xs"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
               >
                 <Search className="w-3.5 h-3.5" />
                 <span>Search</span>
-                <kbd className="text-[10px] text-gray-600 border border-gray-700 rounded px-1 py-0.5 ml-1">⌘K</kbd>
+                <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <span
                 className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}
               />
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-th-text-muted">
                 {connected ? 'Connected' : 'Reconnecting...'}
               </span>
-              <span className="text-sm text-gray-500">{agents.length} agents</span>
+              <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
 
@@ -132,7 +132,7 @@ export function App() {
         </div>
 
         {selectedAgentId && (
-          <div className="w-[500px] border-l border-gray-700 flex flex-col">
+          <div className="w-[500px] border-l border-th-border flex flex-col">
             <ChatPanel agentId={selectedAgentId} ws={ws} api={api} />
           </div>
         )}

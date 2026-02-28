@@ -40,7 +40,7 @@ function ToggleChips<T extends string>({ label, items, selected, labels, onChang
 
   return (
     <div className="space-y-1">
-      <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">{label}</span>
+      <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         {items.map(item => (
           <button
@@ -48,8 +48,8 @@ function ToggleChips<T extends string>({ label, items, selected, labels, onChang
             onClick={() => toggle(item)}
             className={`px-2 py-0.5 text-[11px] rounded border transition-colors ${
               selected.has(item)
-                ? 'bg-zinc-700 border-zinc-500 text-zinc-200'
-                : 'bg-transparent border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                ? 'bg-th-bg-muted border-th-border text-th-text-alt'
+                : 'bg-transparent border-th-border text-th-text-muted hover:border-th-border-hover'
             }`}
           >
             {labels[item] ?? item}
@@ -113,14 +113,14 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
   return (
     <div className="p-6 space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Team Collaboration Timeline</h1>
+        <h1 className="text-2xl font-bold text-th-text">Team Collaboration Timeline</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(f => !f)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
               showFilters || activeFilterCount > 0
                 ? 'bg-indigo-900/40 border border-indigo-500/50 text-indigo-300'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+                : 'bg-th-bg-alt text-th-text-alt hover:bg-th-bg-muted hover:text-th-text'
             }`}
           >
             <Filter size={14} />
@@ -131,7 +131,7 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors ${
               liveMode
                 ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-900/60'
-                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                : 'bg-th-bg-alt text-th-text-muted hover:bg-th-bg-muted hover:text-th-text-alt'
             }`}
           >
             <span className={`inline-block w-2 h-2 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
@@ -140,7 +140,7 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
           <button
             onClick={refetch}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-th-bg-alt text-th-text-alt hover:bg-th-bg-muted hover:text-th-text transition-colors disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
@@ -150,11 +150,11 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
 
       {/* Filter toolbar */}
       {showFilters && (
-        <div className="bg-zinc-900 rounded-lg border border-zinc-800 px-4 py-3 flex flex-wrap gap-6 items-start">
+        <div className="bg-th-bg rounded-lg border border-th-border-muted px-4 py-3 flex flex-wrap gap-6 items-start">
           <ToggleChips label="Roles" items={ALL_ROLES} selected={roleFilter} labels={ROLE_LABELS} onChange={setRoleFilter} />
           <ToggleChips label="Communication" items={ALL_COMM_TYPES} selected={commFilter} labels={COMM_LABELS} onChange={setCommFilter} />
           <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Hide agents</span>
+            <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium">Hide agents</span>
             <div className="flex flex-wrap gap-1.5">
               {HIDDEN_STATUSES.map(status => (
                 <button
@@ -166,8 +166,8 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
                   }}
                   className={`px-2 py-0.5 text-[11px] rounded border transition-colors ${
                     hiddenStatuses.has(status)
-                      ? 'bg-zinc-700 border-zinc-500 text-zinc-200'
-                      : 'bg-transparent border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                      ? 'bg-th-bg-muted border-th-border text-th-text-alt'
+                      : 'bg-transparent border-th-border text-th-text-muted hover:border-th-border-hover'
                   }`}
                 >
                   {status}
@@ -182,7 +182,7 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
                 setCommFilter(new Set(ALL_COMM_TYPES));
                 setHiddenStatuses(new Set());
               }}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 self-end pb-0.5"
+              className="text-[11px] text-th-text-muted hover:text-th-text-alt self-end pb-0.5"
             >
               Reset all
             </button>
@@ -191,8 +191,8 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
       )}
 
       {loading && !data && (
-        <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-8 min-h-[400px] flex items-center justify-center">
-          <RefreshCw size={24} className="animate-spin text-zinc-500" />
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center">
+          <RefreshCw size={24} className="animate-spin text-th-text-muted" />
         </div>
       )}
 

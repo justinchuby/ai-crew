@@ -103,7 +103,7 @@ export function BrushTimeSelector({
   if (innerWidth <= 0) return null;
 
   return (
-    <div className="border-b border-zinc-800 bg-zinc-900/50" style={{ height: BRUSH_HEIGHT }}>
+    <div className="border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }}>
       <svg width={width} height={BRUSH_HEIGHT}>
         <Group top={PADDING.top} left={PADDING.left}>
           {/* Mini agent lanes background */}

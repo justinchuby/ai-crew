@@ -135,17 +135,17 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
 
   if (agents.length === 0) {
     return (
-      <div className="border border-gray-700 rounded-lg bg-surface-raised p-8 text-center text-gray-500">
+      <div className="border border-th-border rounded-lg bg-surface-raised p-8 text-center text-th-text-muted">
         <p>No agents to display</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-700 rounded-lg bg-surface-raised overflow-hidden">
+    <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wider">
+          <tr className="border-b border-th-border text-th-text-muted text-xs uppercase tracking-wider">
             <th className="text-left px-3 py-2">Agent</th>
             <th className="text-left px-3 py-2">Status</th>
             <th className="text-left px-3 py-2 hidden md:table-cell">Model</th>
@@ -169,13 +169,13 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
             return (
               <tr
                 key={agent.id}
-                className="border-b border-gray-700/50 hover:bg-surface/50 transition-colors"
+                className="border-b border-th-border/50 hover:bg-surface/50 transition-colors"
               >
                 {/* Agent identity — clickable name to open chat panel */}
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
                     {depth > 0 && (
-                      <span className="text-gray-600 text-xs font-mono select-none shrink-0">
+                      <span className="text-th-text-muted text-xs font-mono select-none shrink-0">
                         {isLastChild ? '└─' : '├─'}
                       </span>
                     )}
@@ -183,12 +183,12 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     <div className="min-w-0">
                       <button
                         onClick={() => handleSelect(agent.id)}
-                        className="font-medium text-gray-200 text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
+                        className="font-medium text-th-text-alt text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
                         title={`${agent.role.name} — click to open chat`}
                       >
                         {agent.role.name}
                       </button>
-                      <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1 flex-wrap">
+                      <div className="text-[10px] text-th-text-muted font-mono flex items-center gap-1 flex-wrap">
                         {agent.id.slice(0, 8)}
                         {agent.childIds.length > 0 && (
                           <span className="text-[10px] px-1 py-px rounded bg-blue-500/15 text-blue-400 font-sans">
@@ -204,7 +204,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_DOT[agent.status] ?? 'bg-gray-400'}`} />
-                    <span className="text-xs text-gray-300 capitalize">{agent.status}</span>
+                    <span className="text-xs text-th-text-alt capitalize">{agent.status}</span>
                   </div>
                 </td>
 
@@ -218,7 +218,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         api.updateAgent(agent.id, { model: e.target.value });
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[10px] bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer max-w-[120px]"
+                      className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer max-w-[120px]"
                     >
                       {(() => {
                         const options = AVAILABLE_MODELS.includes(currentModel)
@@ -230,7 +230,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                       })()}
                     </select>
                   ) : (
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-th-text-muted">
                       {currentModel ? shortModelName(currentModel) : '—'}
                     </span>
                   )}
@@ -240,23 +240,23 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                 <td className="px-3 py-2.5 hidden md:table-cell">
                   {agent.task ? (
                     <div className="max-w-[180px]">
-                      <div className="text-xs text-gray-300 truncate" title={agent.task}>
+                      <div className="text-xs text-th-text-alt truncate" title={agent.task}>
                         {agent.task}
                       </div>
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-500">—</span>
+                    <span className="text-xs text-th-text-muted">—</span>
                   )}
                 </td>
 
                 {/* Current Activity */}
                 <td className="px-3 py-2.5">
                   <div className="max-w-[250px]">
-                    <div className="text-xs text-gray-300 truncate" title={activity.text}>
+                    <div className="text-xs text-th-text-alt truncate" title={activity.text}>
                       {activity.text}
                     </div>
                     {activity.detail && (
-                      <div className="text-[10px] text-gray-500">{activity.detail}</div>
+                      <div className="text-[10px] text-th-text-muted">{activity.detail}</div>
                     )}
                   </div>
                 </td>
@@ -265,18 +265,18 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                 <td className="px-3 py-2.5 hidden lg:table-cell">
                   {planTotal > 0 ? (
                     <div className="flex items-center gap-2 min-w-[100px]">
-                      <div className="flex-1 bg-gray-700 rounded-full h-1.5">
+                      <div className="flex-1 bg-th-bg-muted rounded-full h-1.5">
                         <div
                           className="bg-green-500 h-1.5 rounded-full transition-all"
                           style={{ width: `${(planDone / planTotal) * 100}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                      <span className="text-[10px] text-th-text-muted whitespace-nowrap">
                         {planDone}/{planTotal}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-500">—</span>
+                    <span className="text-xs text-th-text-muted">—</span>
                   )}
                 </td>
 
@@ -286,7 +286,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-purple-400">🔒 {agentLocks.length}</span>
                       <span
-                        className="text-[10px] text-gray-500 truncate max-w-[100px]"
+                        className="text-[10px] text-th-text-muted truncate max-w-[100px]"
                         title={agentLocks.map((l) => l.filePath).join(', ')}
                       >
                         {agentLocks[0].filePath.split('/').pop()}
@@ -294,13 +294,13 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-500">—</span>
+                    <span className="text-xs text-th-text-muted">—</span>
                   )}
                 </td>
 
                 {/* Uptime */}
                 <td className="px-3 py-2.5 hidden sm:table-cell">
-                  <span className="text-xs text-gray-400 font-mono">{elapsed(agent.createdAt)}</span>
+                  <span className="text-xs text-th-text-muted font-mono">{elapsed(agent.createdAt)}</span>
                 </td>
 
                 {/* Actions */}
@@ -311,7 +311,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         e.stopPropagation();
                         handleSelect(agent.id);
                       }}
-                      className="p-1 text-gray-400 hover:text-accent"
+                      className="p-1 text-th-text-muted hover:text-accent"
                       title="Open terminal"
                     >
                       <Terminal size={14} />
@@ -322,7 +322,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                           e.stopPropagation();
                           api.restartAgent(agent.id);
                         }}
-                        className="p-1 text-gray-400 hover:text-yellow-400"
+                        className="p-1 text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400"
                         title="Restart agent"
                       >
                         <RefreshCw size={14} />
@@ -334,7 +334,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                           e.stopPropagation();
                           api.interruptAgent(agent.id);
                         }}
-                        className="p-1 text-gray-400 hover:text-orange-400"
+                        className="p-1 text-th-text-muted hover:text-orange-400"
                         title="Interrupt — cancel current work"
                       >
                         <Hand size={14} />
@@ -349,7 +349,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                             setConfirmTerminateIds((s) => { const n = new Set(s); n.delete(agent.id); return n; });
                           }}
                           onBlur={() => setConfirmTerminateIds((s) => { const n = new Set(s); n.delete(agent.id); return n; })}
-                          className="p-1 text-red-400 hover:text-red-300 animate-pulse"
+                          className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300 animate-pulse"
                           title="Confirm stop"
                           autoFocus
                         >
@@ -361,7 +361,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                             e.stopPropagation();
                             setConfirmTerminateIds((s) => new Set(s).add(agent.id));
                           }}
-                          className="p-1 text-gray-400 hover:text-red-400"
+                          className="p-1 text-th-text-muted hover:text-red-400"
                           title="Stop agent"
                         >
                           <Square size={14} />

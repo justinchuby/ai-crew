@@ -39,7 +39,7 @@ export function Sidebar() {
   }, [messages, lastSeen]);
 
   return (
-    <nav className="w-14 border-r border-gray-700 flex flex-col items-center py-3 gap-1 shrink-0">
+    <nav className="w-14 border-r border-th-border flex flex-col items-center py-3 gap-1 shrink-0">
       {links.map(({ to, icon: Icon, label }) => (
         <Tooltip key={to} content={label} placement="right">
           <NavLink
@@ -49,7 +49,7 @@ export function Sidebar() {
               `relative p-2.5 rounded-lg transition-colors ${
                 isActive
                   ? 'bg-accent/20 text-accent'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                  : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
               }`
             }
           >

@@ -677,15 +677,15 @@ export function LeadDashboard({ api, ws }: Props) {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Project list sidebar */}
-      <div className="w-56 border-r border-gray-700 flex flex-col shrink-0">
-        <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
+      <div className="w-56 border-r border-th-border flex flex-col shrink-0">
+        <div className="px-3 py-2 border-b border-th-border flex items-center justify-between">
           <span className="text-sm font-semibold flex items-center gap-1.5">
-            <Crown className="w-4 h-4 text-yellow-400" />
+            <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
             Projects
           </span>
           <button
             onClick={() => setShowNewProject(true)}
-            className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+            className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
             title="New Project"
           >
             <Plus className="w-4 h-4" />
@@ -695,8 +695,8 @@ export function LeadDashboard({ api, ws }: Props) {
         <div className="flex-1 overflow-y-auto">
           {leadAgents.length === 0 && inactiveProjects.length === 0 && !showNewProject && (
             <div className="p-4 text-center">
-              <Crown className="w-10 h-10 text-yellow-400/50 mx-auto mb-2" />
-              <p className="text-xs text-gray-500 font-mono mb-3">No projects yet</p>
+              <Crown className="w-10 h-10 text-yellow-600/50 dark:text-yellow-400/50 mx-auto mb-2" />
+              <p className="text-xs text-th-text-muted font-mono mb-3">No projects yet</p>
               <button
                 onClick={() => setShowNewProject(true)}
                 className="text-xs bg-yellow-600 hover:bg-yellow-500 text-black px-3 py-1.5 rounded font-semibold"
@@ -716,10 +716,10 @@ export function LeadDashboard({ api, ws }: Props) {
                   useLeadStore.getState().addProject(lead.id);
                   useLeadStore.getState().selectLead(lead.id);
                 }}
-                className={`w-full text-left px-3 py-2.5 border-b border-gray-700/50 transition-colors group ${
+                className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group ${
                   isSelected
                     ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
-                    : 'hover:bg-gray-800 border-l-2 border-l-transparent'
+                    : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -727,7 +727,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   {renamingLeadId === lead.id ? (
                     <input
                       autoFocus
-                      className="text-sm font-mono truncate flex-1 bg-gray-700 border border-gray-500 rounded px-1 py-0 text-white focus:outline-none focus:border-accent"
+                      className="text-sm font-mono truncate flex-1 bg-th-bg-muted border border-th-border rounded px-1 py-0 text-th-text focus:outline-none focus:border-accent"
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
                       onKeyDown={(e) => {
@@ -777,14 +777,14 @@ export function LeadDashboard({ api, ws }: Props) {
                   <span
                     role="button"
                     title="Rename project"
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-700 rounded transition-opacity shrink-0"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-th-bg-muted rounded transition-opacity shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       setRenamingLeadId(lead.id);
                       setRenameValue(lead.projectName || lead.task?.slice(0, 40) || '');
                     }}
                   >
-                    <Pencil className="w-3 h-3 text-gray-500 hover:text-gray-300" />
+                    <Pencil className="w-3 h-3 text-th-text-muted hover:text-th-text-alt" />
                   </span>
                   <span
                     role="button"
@@ -799,10 +799,10 @@ export function LeadDashboard({ api, ws }: Props) {
                       useLeadStore.getState().removeProject(lead.id);
                     }}
                   >
-                    <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                    <X className="w-3.5 h-3.5 text-th-text-muted hover:text-red-400" />
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5 pl-4 font-mono">
+                <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
                   {lead.status} · {agents.filter((a: any) => a.parentId === lead.id).length} agents
                   {(() => {
                     const allIds = [lead.id, ...(lead.childIds || [])];
@@ -821,7 +821,7 @@ export function LeadDashboard({ api, ws }: Props) {
           {inactiveProjects.length > 0 && (
             <>
               {leadAgents.length > 0 && (
-                <div className="px-3 py-1.5 text-[10px] font-medium text-gray-600 uppercase tracking-wider border-t border-gray-700/50">
+                <div className="px-3 py-1.5 text-[10px] font-medium text-th-text-muted uppercase tracking-wider border-t border-th-border/50">
                   Past Projects
                 </div>
               )}
@@ -835,15 +835,15 @@ export function LeadDashboard({ api, ws }: Props) {
                       useLeadStore.getState().addProject(key);
                       useLeadStore.getState().selectLead(key);
                     }}
-                    className={`w-full text-left px-3 py-2.5 border-b border-gray-700/50 transition-colors group ${
+                    className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group ${
                       isSelected
                         ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
-                        : 'hover:bg-gray-800 border-l-2 border-l-transparent'
+                        : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full shrink-0 bg-gray-600" />
-                      <span className="text-sm font-mono truncate flex-1 text-gray-400">{proj.name}</span>
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-th-bg-hover" />
+                      <span className="text-sm font-mono truncate flex-1 text-th-text-muted">{proj.name}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -866,7 +866,7 @@ export function LeadDashboard({ api, ws }: Props) {
                             .catch(() => {})
                             .finally(() => setResumingProjectId(null));
                         }}
-                        className="text-[10px] text-yellow-500 hover:text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                        className="text-[10px] text-yellow-500 hover:text-yellow-600 dark:hover:text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
                         title="Resume project"
                       >
                         {resumingProjectId === proj.id ? <Loader2 size={10} className="animate-spin" /> : 'Resume'}
@@ -885,10 +885,10 @@ export function LeadDashboard({ api, ws }: Props) {
                         className="p-0.5 hover:bg-red-900/40 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                         title="Delete project"
                       >
-                        <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                        <X className="w-3.5 h-3.5 text-th-text-muted hover:text-red-400" />
                       </button>
                     </div>
-                    <div className="text-xs text-gray-600 mt-0.5 pl-4 font-mono">
+                    <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
                       {proj.status} · {proj.updatedAt?.slice(0, 10)}
                     </div>
                   </button>
@@ -900,10 +900,10 @@ export function LeadDashboard({ api, ws }: Props) {
 
         {/* New project button at bottom of sidebar */}
         {showNewProject ? null : (
-          <div className="border-t border-gray-700 p-2">
+          <div className="border-t border-th-border p-2">
             <button
               onClick={() => setShowNewProject(true)}
-              className="w-full flex items-center justify-center gap-1.5 text-sm text-yellow-400 hover:text-yellow-300 py-1.5 rounded hover:bg-gray-800 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-600 dark:hover:text-yellow-300 py-1.5 rounded hover:bg-th-bg-alt transition-colors"
             >
               <Plus className="w-4 h-4" />
               New Project
@@ -919,41 +919,41 @@ export function LeadDashboard({ api, ws }: Props) {
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowNewProject(false); }}
         >
           <div
-            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
+            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
           >
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-700">
-              <Crown className="w-5 h-5 text-yellow-400" />
-              <h2 className="text-base font-semibold text-gray-100">New Project</h2>
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-th-border">
+              <Crown className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              <h2 className="text-base font-semibold text-th-text">New Project</h2>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div>
-                <label className="block text-xs text-gray-400 mb-1 font-medium">Project Name</label>
+                <label className="block text-xs text-th-text-muted mb-1 font-medium">Project Name</label>
                 <input
                   type="text"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   placeholder="My Feature"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1 font-medium">Task / Prompt</label>
+                <label className="block text-xs text-th-text-muted mb-1 font-medium">Task / Prompt</label>
                 <textarea
                   value={newProjectTask}
                   onChange={(e) => setNewProjectTask(e.target.value)}
                   placeholder="Describe what you want the team to work on..."
                   rows={6}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 resize-y"
+                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 resize-y"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1 font-medium">Model</label>
+                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Model</label>
                   <select
                     value={newProjectModel}
                     onChange={(e) => setNewProjectModel(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                    className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
                   >
                     <option value="">Default</option>
                     <option value="claude-opus-4.6">Claude Opus 4.6</option>
@@ -968,19 +968,19 @@ export function LeadDashboard({ api, ws }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1 font-medium">Working Directory</label>
+                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Working Directory</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       value={newProjectCwd}
                       onChange={(e) => setNewProjectCwd(e.target.value)}
                       placeholder="/path/to/project"
-                      className="flex-1 bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                      className="flex-1 bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowFolderPicker(true)}
-                      className="px-2 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md text-xs shrink-0 transition-colors"
+                      className="px-2 py-2 bg-th-bg-muted hover:bg-th-bg-hover text-th-text-alt rounded-md text-xs shrink-0 transition-colors"
                       title="Browse folders"
                     >
                       <FolderOpen className="w-4 h-4" />
@@ -988,20 +988,20 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1 font-medium">Resume Session <span className="text-gray-600">(optional — paste a session ID to continue previous work)</span></label>
+                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Resume Session <span className="text-th-text-muted">(optional — paste a session ID to continue previous work)</span></label>
                   <input
                     type="text"
                     value={resumeSessionId}
                     onChange={(e) => setResumeSessionId(e.target.value)}
                     placeholder="session-id-from-previous-lead"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
               {/* Initial Team Selection */}
               {availableRoles.length > 0 && (
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1.5 font-medium">Initial Team <span className="text-gray-600">(optional — pre-select roles to auto-create)</span></label>
+                  <label className="block text-xs text-th-text-muted mb-1.5 font-medium">Initial Team <span className="text-th-text-muted">(optional — pre-select roles to auto-create)</span></label>
                   <div className="flex flex-wrap gap-1.5">
                     {availableRoles.map((role) => {
                       const isSelected = selectedRoles.has(role.id);
@@ -1016,8 +1016,8 @@ export function LeadDashboard({ api, ws }: Props) {
                           })}
                           className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors border ${
                             isSelected
-                              ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-200'
-                              : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-500'
+                              ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-600 dark:text-yellow-200'
+                              : 'bg-th-bg border-th-border text-th-text-muted hover:border-th-border-hover'
                           }`}
                           title={role.description}
                         >
@@ -1031,10 +1031,10 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
               <button
                 onClick={() => setShowNewProject(false)}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 rounded-md hover:bg-gray-700 transition-colors"
+                className="px-4 py-2 text-sm text-th-text-muted hover:text-th-text rounded-md hover:bg-th-bg-muted transition-colors"
               >
                 Cancel
               </button>
@@ -1048,7 +1048,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
                 )}
                 disabled={starting}
-                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
+                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
               >
                 {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
                 {starting ? 'Starting...' : resumeSessionId.trim() ? 'Resume Project' : 'Create Project'}
@@ -1071,8 +1071,8 @@ export function LeadDashboard({ api, ws }: Props) {
       {!selectedLeadId ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Crown className="w-16 h-16 text-yellow-400/30 mx-auto mb-4" />
-            <p className="text-gray-500 font-mono text-sm">Select a project or create a new one</p>
+            <Crown className="w-16 h-16 text-yellow-600/30 dark:text-yellow-400/30 mx-auto mb-4" />
+            <p className="text-th-text-muted font-mono text-sm">Select a project or create a new one</p>
           </div>
         </div>
       ) : (
@@ -1082,7 +1082,7 @@ export function LeadDashboard({ api, ws }: Props) {
             {/* Progress banner — clickable to open detail */}
             {progress && progress.totalDelegations > 0 && (
               <div
-                className="border-b border-gray-700 px-4 py-2 flex items-center gap-4 text-sm font-mono bg-gray-800/50 cursor-pointer hover:bg-gray-800/80 transition-colors"
+                className="border-b border-th-border px-4 py-2 flex items-center gap-4 text-sm font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
@@ -1091,7 +1091,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <span>{progress.teamSize} agents</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-yellow-400" />
+                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                   <span>{progress.active} active</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1111,26 +1111,26 @@ export function LeadDashboard({ api, ws }: Props) {
                   const teamOut = (progress.teamAgents || []).reduce((s: number, a: any) => s + (a.outputTokens || 0), 0);
                   const total = leadIn + leadOut + teamIn + teamOut;
                   return total > 0 ? (
-                    <div className="flex items-center gap-1.5 text-gray-400" title={`Input: ${formatTokens(leadIn + teamIn)} · Output: ${formatTokens(leadOut + teamOut)}`}>
+                    <div className="flex items-center gap-1.5 text-th-text-muted" title={`Input: ${formatTokens(leadIn + teamIn)} · Output: ${formatTokens(leadOut + teamOut)}`}>
                       <BarChart3 className="w-4 h-4 text-purple-400" />
                       <span>{formatTokens(total)} tokens</span>
                     </div>
                   ) : null;
                 })()}
                 <div className="ml-auto">
-                  <div className="w-32 bg-gray-700 rounded-full h-2">
+                  <div className="w-32 bg-th-bg-muted rounded-full h-2">
                     <div
                       className="bg-green-500 h-2 rounded-full transition-all"
                       style={{ width: `${progress.completionPct}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-gray-400">{progress.completionPct}%</span>
+                <span className="text-th-text-muted">{progress.completionPct}%</span>
               </div>
             )}
             {progressSummary && (
               <div
-                className="border-b border-gray-700 px-4 py-1.5 text-xs text-gray-400 bg-gray-800/30 font-mono truncate cursor-pointer hover:bg-gray-800/50 transition-colors"
+                className="border-b border-th-border px-4 py-1.5 text-xs text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
@@ -1143,10 +1143,10 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Session ID bar — copyable for resume */}
             {leadAgent?.sessionId && (
-              <div className="border-b border-gray-700 px-4 py-1 flex items-center gap-2 text-xs font-mono bg-gray-800/20">
-                <GitBranch className="w-3 h-3 text-gray-500 shrink-0" />
-                <span className="text-gray-500">Session:</span>
-                <span className="text-gray-400 truncate" title={leadAgent.sessionId}>{leadAgent.sessionId}</span>
+              <div className="border-b border-th-border px-4 py-1 flex items-center gap-2 text-xs font-mono bg-th-bg-alt/20">
+                <GitBranch className="w-3 h-3 text-th-text-muted shrink-0" />
+                <span className="text-th-text-muted">Session:</span>
+                <span className="text-th-text-muted truncate" title={leadAgent.sessionId}>{leadAgent.sessionId}</span>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(leadAgent.sessionId!);
@@ -1154,7 +1154,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     btn.textContent = 'copied!';
                     setTimeout(() => { btn.textContent = 'copy'; }, 1500);
                   }}
-                  className="text-gray-500 hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
+                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
                 >
                   copy
                 </button>
@@ -1186,7 +1186,7 @@ export function LeadDashboard({ api, ws }: Props) {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="text-xs font-mono font-semibold text-indigo-400">{r.fromRole}</span>
-                              <span className="text-[10px] text-gray-600 ml-auto">{time}</span>
+                              <span className="text-[10px] text-th-text-muted ml-auto">{time}</span>
                             </div>
                             <AgentReportBlock content={r.content} compact />
                           </div>
@@ -1202,7 +1202,7 @@ export function LeadDashboard({ api, ws }: Props) {
             {pendingConfirmations.length > 0 && (
               <div className="border-b border-amber-700/50 bg-amber-900/30">
                 <button
-                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-200 hover:bg-amber-900/40 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-600 dark:text-amber-200 hover:bg-amber-900/40 transition-colors"
                   onClick={() => setPendingBannerExpanded(!pendingBannerExpanded)}
                 >
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -1212,17 +1212,17 @@ export function LeadDashboard({ api, ws }: Props) {
                 {pendingBannerExpanded && (
                   <div className="px-4 pb-3 space-y-2">
                     {pendingConfirmations.map((d: any) => (
-                      <div key={d.id} className="bg-gray-800/80 border border-amber-700/40 rounded-lg p-3">
+                      <div key={d.id} className="bg-th-bg-alt/80 border border-amber-700/40 rounded-lg p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-mono font-semibold text-gray-200">{d.title}</span>
+                              <span className="text-sm font-mono font-semibold text-th-text-alt">{d.title}</span>
                               {d.agentRole && (
                                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
                               )}
                             </div>
                             {d.rationale && (
-                              <p className="text-xs font-mono text-gray-400 line-clamp-2">{d.rationale}</p>
+                              <p className="text-xs font-mono text-th-text-muted line-clamp-2">{d.rationale}</p>
                             )}
                           </div>
                         </div>
@@ -1248,7 +1248,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 if (msg.sender === 'user') {
                   return (
                     <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
-                      <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                      <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                       <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
                         {msg.text}
                       </div>
@@ -1259,14 +1259,14 @@ export function LeadDashboard({ api, ws }: Props) {
                 if (msg.sender === 'external') {
                   return (
                     <div key={i} className="flex items-start gap-2 py-1 bg-blue-500/[0.06] rounded-md border-l-2 border-blue-400/30 pl-2">
-                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-indigo-900/40 border border-indigo-700/50 font-mono text-sm whitespace-pre-wrap text-gray-300">
+                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-indigo-900/40 border border-indigo-700/50 font-mono text-sm whitespace-pre-wrap text-th-text-alt">
                         <div className="flex items-center gap-1.5 mb-1 text-indigo-400 text-xs font-medium">
                           <MessageSquare className="w-3 h-3" />
                           {msg.fromRole || 'Agent'}
                         </div>
                         <InlineMarkdown text={msg.text} />
                       </div>
-                      <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                      <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                     </div>
                   );
                 }
@@ -1274,10 +1274,10 @@ export function LeadDashboard({ api, ws }: Props) {
                 if (msg.sender === 'system') {
                   return (
                     <div key={i} className="flex justify-center py-1">
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50 text-xs font-mono text-gray-400">
-                        <RefreshCw className="w-3 h-3 text-gray-500" />
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-th-bg-alt/60 border border-th-border/50 text-xs font-mono text-th-text-muted">
+                        <RefreshCw className="w-3 h-3 text-th-text-muted" />
                         {msg.text}
-                        {ts && <span className="text-[10px] text-gray-600 ml-1">{ts}</span>}
+                        {ts && <span className="text-[10px] text-th-text-muted ml-1">{ts}</span>}
                       </div>
                     </div>
                   );
@@ -1303,7 +1303,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <div className="flex-1 min-w-0">
                           <RichContentBlock msg={msg} />
                         </div>
-                        {agentTs && <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{agentTs}</span>}
+                        {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                       </div>
                     </div>
                   );
@@ -1311,18 +1311,18 @@ export function LeadDashboard({ api, ws }: Props) {
                 return (
                   <div key={i} className={`py-0.5 ${replyHighlight}`}>
                     <div className="flex items-start gap-2">
-                      <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
+                      <div className="flex-1 font-mono text-sm text-th-text-alt whitespace-pre-wrap min-w-0">
                         <AgentTextBlock text={msg.text} />
                       </div>
-                      {agentTs && <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{agentTs}</span>}
+                      {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                     </div>
                   </div>
                 );
               })}
               {isActive && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && !messages[messages.length - 1]?.queued && (
                 <div className="flex justify-start py-1">
-                  <div className="text-gray-400 font-mono text-sm flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />
+                  <div className="text-th-text-muted font-mono text-sm flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin text-yellow-600 dark:text-yellow-400" />
                     <span>Working...</span>
                   </div>
                 </div>
@@ -1338,12 +1338,12 @@ export function LeadDashboard({ api, ws }: Props) {
                     role="status"
                     aria-live="polite"
                     tabIndex={0}
-                    className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl px-4 py-3"
+                    className="bg-th-bg/95 backdrop-blur-md border border-th-border rounded-xl shadow-2xl px-4 py-3"
                     onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setCatchUpSummary(null); }}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <RefreshCw className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="text-xs font-semibold text-zinc-200">While you were away</span>
+                      <span className="text-xs font-semibold text-th-text-alt">While you were away</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono">
                       {catchUpSummary.tasksCompleted > 0 && <span className="text-emerald-400">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
@@ -1352,7 +1352,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       {catchUpSummary.newReports > 0 && <span className="text-indigo-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
                     </div>
                     <div className="flex gap-2 mt-2.5">
-                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-zinc-800 border border-zinc-600 text-zinc-300 hover:bg-zinc-700 transition-colors">Dismiss</button>
+                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-th-bg-alt border border-th-border text-th-text-alt hover:bg-th-bg-muted transition-colors">Dismiss</button>
                       <button onClick={() => { setCatchUpSummary(null); messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[11px] px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors">Show All</button>
                     </div>
                   </div>
@@ -1362,17 +1362,17 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Queued messages (pending) */}
             {messages.some((m) => m.queued) && (
-              <div className="border-t border-dashed border-gray-600 px-4 py-2 bg-gray-800/50">
-                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <div className="border-t border-dashed border-th-border px-4 py-2 bg-th-bg-alt/50">
+                <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Queued
                 </div>
                 {messages.filter((m) => m.queued).map((msg, i) => (
                   <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
-                    <span className="text-[10px] text-gray-600">
+                    <span className="text-[10px] text-th-text-muted">
                       {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
-                    <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+                    <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
                       {msg.text}
                     </div>
                     <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
@@ -1382,7 +1382,7 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Input */}
-            <div className="border-t border-gray-700 p-3">
+            <div className="border-t border-th-border p-3">
               <div className="flex gap-2 items-end">
                 <textarea
                   value={input}
@@ -1405,7 +1405,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     el.style.height = 'auto';
                     el.style.height = Math.min(el.scrollHeight, 150) + 'px';
                   }}
-                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
+                  className="flex-1 bg-th-bg-alt border border-th-border rounded px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
                   style={{ maxHeight: 150 }}
                 />
                 <div className="flex flex-col gap-1 shrink-0">
@@ -1414,7 +1414,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     onClick={() => sendMessage('queue')}
                     disabled={!isActive || !input.trim()}
                     title="Send (queued) — Enter"
-                    className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
+                    className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
                   >
                     <Send className="w-3.5 h-3.5" />
                     Queue
@@ -1424,7 +1424,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     onClick={() => sendMessage('interrupt')}
                     disabled={!isActive || !input.trim()}
                     title="Interrupt current work (Ctrl+Enter)"
-                    className="bg-red-700 hover:bg-red-600 disabled:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
+                    className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
                   >
                     <AlertCircle className="w-3.5 h-3.5" />
                     Interrupt
@@ -1436,10 +1436,10 @@ export function LeadDashboard({ api, ws }: Props) {
 
           {/* Right sidebar: decisions + comms + activity + team */}
           {sidebarCollapsed ? (
-            <div className="border-l border-gray-700 flex flex-col items-center py-2 w-10 shrink-0">
+            <div className="border-l border-th-border flex flex-col items-center py-2 w-10 shrink-0">
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200 relative"
+                className="p-1.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text relative"
                 title="Expand sidebar"
               >
                 <PanelRightOpen className="w-4 h-4" />
@@ -1457,11 +1457,11 @@ export function LeadDashboard({ api, ws }: Props) {
                 onMouseDown={startResize}
                 className="w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
               />
-              <div className="flex-1 border-l border-gray-700 flex flex-col overflow-hidden min-w-0">
-                <div className="px-2 py-1 border-b border-gray-700 flex items-center justify-end shrink-0">
+              <div className="flex-1 border-l border-th-border flex flex-col overflow-hidden min-w-0">
+                <div className="px-2 py-1 border-b border-th-border flex items-center justify-end shrink-0">
                   <button
                     onClick={() => setSidebarCollapsed(true)}
-                    className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                    className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
                     title="Collapse sidebar"
                   >
                     <PanelRightClose className="w-3.5 h-3.5" />
@@ -1469,13 +1469,13 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
                 {/* Decisions — always visible at top */}
                 <div className="shrink-0 flex flex-col relative" style={{ height: decisionsPanelHeight, maxHeight: '30%' }}>
-                  <div className="px-3 py-1.5 flex items-center gap-2 border-b border-gray-700 shrink-0">
-                    <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />
+                  <div className="px-3 py-1.5 flex items-center gap-2 border-b border-th-border shrink-0">
+                    <Lightbulb className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
                     <span className="text-xs font-semibold">Decisions</span>
                     {pendingConfirmations.length > 0 && (
                       <span className="w-2 h-2 bg-yellow-500 rounded-full" title={`${pendingConfirmations.length} pending`} />
                     )}
-                    <span className="text-[10px] text-gray-500 ml-auto">{decisions.length}</span>
+                    <span className="text-[10px] text-th-text-muted ml-auto">{decisions.length}</span>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto">
                     <DecisionPanelContent decisions={decisions} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} />
@@ -1489,8 +1489,8 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
 
                 {/* Tabbed bottom panels */}
-                <div className="flex-1 min-h-0 border-t border-gray-700 flex flex-col relative">
-                  <div className="flex border-b border-gray-700 shrink-0 overflow-x-auto">
+                <div className="flex-1 min-h-0 border-t border-th-border flex flex-col relative">
+                  <div className="flex border-b border-th-border shrink-0 overflow-x-auto">
                     {(() => {
                       const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
                         team: { icon: <Bot className="w-3 h-3" />, label: 'Team', badge: teamAgents.length },
@@ -1518,16 +1518,16 @@ export function LeadDashboard({ api, ws }: Props) {
                             onClick={() => setSidebarTab(tabId)}
                             className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
                               dragOverTab === tabId
-                                ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                                ? 'border-blue-400 bg-blue-500/10 text-blue-600 dark:text-blue-300'
                                 : sidebarTab === tabId
-                                  ? 'border-yellow-500 text-yellow-400'
-                                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                                  ? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
+                                  : 'border-transparent text-th-text-muted hover:text-th-text-alt'
                             }`}
                           >
                             {tab.icon}
                             {tab.label}
                             {tab.badge !== undefined && tab.badge > 0 && (
-                              <span className="text-[9px] bg-gray-700 text-gray-400 px-1 rounded-full ml-0.5">{tab.badge}</span>
+                              <span className="text-[9px] bg-th-bg-muted text-th-text-muted px-1 rounded-full ml-0.5">{tab.badge}</span>
                             )}
                           </button>
                         );
@@ -1560,13 +1560,13 @@ export function LeadDashboard({ api, ws }: Props) {
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowProgressDetail(false); }}
         >
-          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-purple-400" />
-                <span className="text-sm font-semibold text-gray-100">Progress Detail</span>
+                <span className="text-sm font-semibold text-th-text">Progress Detail</span>
               </div>
-              <button onClick={() => setShowProgressDetail(false)} className="text-gray-400 hover:text-gray-200">
+              <button onClick={() => setShowProgressDetail(false)} className="text-th-text-muted hover:text-th-text">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1574,34 +1574,34 @@ export function LeadDashboard({ api, ws }: Props) {
               {/* Delegation stats */}
               {progress && progress.totalDelegations > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-2">Delegation Overview</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-2">Delegation Overview</p>
                   <div className="flex items-center gap-4 text-sm font-mono mb-2">
                     <span className="text-blue-400">{progress.teamSize} agents</span>
-                    <span className="text-yellow-400">{progress.active} active</span>
+                    <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
                     <span className="text-green-400">{progress.completed} done</span>
                     {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
                   </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2.5 mb-1">
+                  <div className="w-full bg-th-bg-muted rounded-full h-2.5 mb-1">
                     <div
                       className="bg-green-500 h-2.5 rounded-full transition-all"
                       style={{ width: `${progress.completionPct}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 font-mono text-right">{progress.completionPct}% complete</p>
+                  <p className="text-xs text-th-text-muted font-mono text-right">{progress.completionPct}% complete</p>
                 </div>
               )}
 
               {/* Agent team roster */}
               {progress && progress.teamAgents && progress.teamAgents.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-2">Team Roster</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-2">Team Roster</p>
                   <div className="space-y-1">
                     {progress.teamAgents.map((ta) => (
-                      <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-700/50 text-xs font-mono">
+                      <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-th-bg-muted/50 text-xs font-mono">
                         <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse motion-reduce:animate-none' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
-                        <span className="text-gray-200">{ta.role?.name || 'Agent'}</span>
-                        <span className="text-gray-500">{ta.id.slice(0, 8)}</span>
-                        <span className="ml-auto text-gray-400">{ta.status}</span>
+                        <span className="text-th-text-alt">{ta.role?.name || 'Agent'}</span>
+                        <span className="text-th-text-muted">{ta.id.slice(0, 8)}</span>
+                        <span className="ml-auto text-th-text-muted">{ta.status}</span>
                       </div>
                     ))}
                   </div>
@@ -1613,14 +1613,14 @@ export function LeadDashboard({ api, ws }: Props) {
                 const latest = progressHistory[progressHistory.length - 1];
                 return (
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 mb-2">Latest Lead Report</p>
-                    <p className="text-sm font-mono text-gray-200 mb-3">{latest.summary}</p>
+                    <p className="text-xs font-semibold text-th-text-muted mb-2">Latest Lead Report</p>
+                    <p className="text-sm font-mono text-th-text-alt mb-3">{latest.summary}</p>
                     {latest.completed.length > 0 && (
                       <div className="mb-2">
                         <p className="text-xs text-green-400 font-semibold mb-1">✓ Completed</p>
                         <ul className="space-y-0.5">
                           {latest.completed.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
                               <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
                               {item}
                             </li>
@@ -1633,7 +1633,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <p className="text-xs text-blue-400 font-semibold mb-1">⟳ In Progress</p>
                         <ul className="space-y-0.5">
                           {latest.inProgress.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
                               <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />
                               {item}
                             </li>
@@ -1646,7 +1646,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <p className="text-xs text-red-400 font-semibold mb-1">⚠ Blocked</p>
                         <ul className="space-y-0.5">
                           {latest.blocked.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
                               <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
                               {item}
                             </li>
@@ -1654,7 +1654,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         </ul>
                       </div>
                     )}
-                    <p className="text-[10px] text-gray-600 font-mono mt-2">
+                    <p className="text-[10px] text-th-text-muted font-mono mt-2">
                       {new Date(latest.timestamp).toLocaleString()}
                     </p>
                   </div>
@@ -1664,13 +1664,13 @@ export function LeadDashboard({ api, ws }: Props) {
               {/* Progress history timeline */}
               {progressHistory.length > 1 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-2">Progress Timeline</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-2">Progress Timeline</p>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {[...progressHistory].reverse().slice(1).map((snap, i) => (
-                      <div key={i} className="flex items-start gap-2 border-l-2 border-gray-600 pl-3 py-1">
+                      <div key={i} className="flex items-start gap-2 border-l-2 border-th-border pl-3 py-1">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-mono text-gray-300">{snap.summary}</p>
-                          <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-gray-500">
+                          <p className="text-xs font-mono text-th-text-alt">{snap.summary}</p>
+                          <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-th-text-muted">
                             {snap.completed.length > 0 && <span className="text-green-500">✓{snap.completed.length}</span>}
                             {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
                             {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
@@ -1686,19 +1686,19 @@ export function LeadDashboard({ api, ws }: Props) {
               {/* Delegation details */}
               {progress && progress.delegations && progress.delegations.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-2">Delegations</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-2">Delegations</p>
                   <div className="space-y-1">
                     {progress.delegations.map((d: any, i: number) => (
-                      <div key={d.id || i} className="px-2 py-1.5 rounded bg-gray-700/50 text-xs font-mono">
+                      <div key={d.id || i} className="px-2 py-1.5 rounded bg-th-bg-muted/50 text-xs font-mono">
                         <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-green-500/20 text-green-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-green-500/20 text-green-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
                             {d.status}
                           </span>
-                          <span className="text-gray-300">{d.toRole}</span>
-                          <span className="text-gray-500 ml-auto">{d.childId?.slice(0, 8)}</span>
+                          <span className="text-th-text-alt">{d.toRole}</span>
+                          <span className="text-th-text-muted ml-auto">{d.childId?.slice(0, 8)}</span>
                         </div>
                         {d.task && (
-                          <p className="text-gray-400 mt-1 break-words">{d.task.length > 120 ? d.task.slice(0, 120) + '…' : d.task}</p>
+                          <p className="text-th-text-muted mt-1 break-words">{d.task.length > 120 ? d.task.slice(0, 120) + '…' : d.task}</p>
                         )}
                       </div>
                     ))}
@@ -1716,18 +1716,18 @@ export function LeadDashboard({ api, ws }: Props) {
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setExpandedReport(null); }}
         >
-          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-semibold text-indigo-400">{expandedReport.fromRole}</span>
-                <span className="text-xs text-gray-500">→ Project Lead</span>
+                <span className="text-xs text-th-text-muted">→ Project Lead</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-th-text-muted">
                   {new Date(expandedReport.timestamp).toLocaleTimeString()}
                 </span>
-                <button onClick={() => setExpandedReport(null)} className="text-gray-400 hover:text-gray-200">
+                <button onClick={() => setExpandedReport(null)} className="text-th-text-muted hover:text-th-text">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -1793,7 +1793,7 @@ function parseAgentReport(content: string): { header: string; task: string; outp
 function AgentReportBlock({ content, compact }: { content: string; compact?: boolean }) {
   const parsed = parseAgentReport(content);
   if (!parsed.isReport) {
-    return <span className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words">{content}</span>;
+    return <span className="text-xs font-mono text-th-text-alt whitespace-pre-wrap break-words">{content}</span>;
   }
 
   // ACK messages: compact inline rendering
@@ -1801,8 +1801,8 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
     return (
       <div className="text-xs font-mono flex items-center gap-1.5">
         <Check className="w-3 h-3 text-blue-400 shrink-0" />
-        <span className="text-blue-300">{parsed.header}</span>
-        {parsed.task && <span className="text-gray-500"> — {compact && parsed.task.length > 60 ? parsed.task.slice(0, 60) + '…' : parsed.task}</span>}
+        <span className="text-blue-600 dark:text-blue-300">{parsed.header}</span>
+        {parsed.task && <span className="text-th-text-muted"> — {compact && parsed.task.length > 60 ? parsed.task.slice(0, 60) + '…' : parsed.task}</span>}
       </div>
     );
   }
@@ -1810,8 +1810,8 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
   if (compact) {
     return (
       <div className="text-xs font-mono">
-        <span className="text-gray-200">{parsed.header}</span>
-        {parsed.task && <span className="text-gray-500"> — {parsed.task.length > 80 ? parsed.task.slice(0, 80) + '…' : parsed.task}</span>}
+        <span className="text-th-text-alt">{parsed.header}</span>
+        {parsed.task && <span className="text-th-text-muted"> — {parsed.task.length > 80 ? parsed.task.slice(0, 80) + '…' : parsed.task}</span>}
       </div>
     );
   }
@@ -1820,27 +1820,27 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
     <div className="space-y-2 text-sm font-mono">
       <div className="flex items-center gap-2">
         <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-        <span className="text-gray-200 font-semibold">{parsed.header}</span>
+        <span className="text-th-text-alt font-semibold">{parsed.header}</span>
       </div>
       {parsed.task && (
         <div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Task</span>
-          <p className="text-gray-300 whitespace-pre-wrap break-words mt-0.5">{parsed.task}</p>
+          <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Task</span>
+          <p className="text-th-text-alt whitespace-pre-wrap break-words mt-0.5">{parsed.task}</p>
         </div>
       )}
       {parsed.output && (
         <div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Output</span>
-          <pre className="text-gray-300 whitespace-pre-wrap break-words mt-0.5 bg-gray-900/50 rounded p-2 text-xs max-h-60 overflow-y-auto">{parsed.output}</pre>
+          <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Output</span>
+          <pre className="text-th-text-alt whitespace-pre-wrap break-words mt-0.5 bg-th-bg/50 rounded p-2 text-xs max-h-60 overflow-y-auto">{parsed.output}</pre>
         </div>
       )}
       {parsed.sessionId && (
         <div className="flex items-center gap-2 text-[10px]">
-          <span className="text-gray-500 uppercase tracking-wider">Session</span>
-          <code className="text-gray-400 bg-gray-900/50 px-1.5 py-0.5 rounded">{parsed.sessionId}</code>
+          <span className="text-th-text-muted uppercase tracking-wider">Session</span>
+          <code className="text-th-text-muted bg-th-bg/50 px-1.5 py-0.5 rounded">{parsed.sessionId}</code>
           <button
             onClick={() => navigator.clipboard.writeText(parsed.sessionId)}
-            className="text-gray-500 hover:text-yellow-400"
+            className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400"
           >
             copy
           </button>
@@ -1865,18 +1865,18 @@ function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
         onChange={(e) => setReason(e.target.value)}
         onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') onConfirm(decisionId, reason.trim() || undefined); }}
         placeholder="Comment (optional)..."
-        className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-yellow-500"
+        className="flex-1 bg-th-bg border border-th-border rounded px-2 py-1 text-xs text-th-text-alt focus:outline-none focus:border-yellow-500"
       />
       <button
         onClick={() => onConfirm(decisionId, reason.trim() || undefined)}
-        className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-200 transition-colors"
+        className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-600 dark:text-green-200 transition-colors"
         title="Confirm"
       >
         <Check className="w-3.5 h-3.5" />
       </button>
       <button
         onClick={() => onReject(decisionId, reason.trim() || undefined)}
-        className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-200 transition-colors"
+        className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-600 dark:text-red-200 transition-colors"
         title="Reject"
       >
         <X className="w-3.5 h-3.5" />
@@ -1899,28 +1899,28 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
     <>
       <div ref={feedRef} className="h-full overflow-y-auto p-2 space-y-2">
         {decisions.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">No decisions yet</p>
+          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No decisions yet</p>
         ) : (
           decisions.map((d: any, i: number) => (
             <div
               key={d.id || `dec-${i}`}
-              className={`bg-gray-800 border rounded p-2 cursor-pointer hover:bg-gray-700/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-gray-700'}`}
+              className={`bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
               onClick={() => setSelectedDecision(d)}
             >
               <div className="flex items-start gap-2">
-                <Lightbulb className="w-3.5 h-3.5 text-yellow-400 mt-0.5 shrink-0" />
+                <Lightbulb className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-mono font-semibold text-gray-200 truncate">{d.title}</p>
+                    <p className="text-sm font-mono font-semibold text-th-text-alt truncate">{d.title}</p>
                     {d.agentRole && (
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
                     )}
                     {d.status && d.status !== 'recorded' && (
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{d.status}</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-600 dark:text-green-300' : 'bg-red-500/20 text-red-600 dark:text-red-300'}`}>{d.status}</span>
                     )}
                   </div>
-                  {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
-                  <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+                  {d.rationale && <p className="text-xs font-mono text-th-text-muted mt-1 line-clamp-2">{d.rationale}</p>}
+                  <p className="text-xs text-th-text-muted mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
                   {d.needsConfirmation && d.status === 'recorded' && (
                     <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -1929,18 +1929,18 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
                         onChange={(e) => setDecisionReasons((prev) => ({ ...prev, [d.id]: e.target.value }))}
                         onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); } }}
                         placeholder="Add a comment (optional)..."
-                        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-yellow-500 mb-2"
+                        className="w-full bg-th-bg border border-th-border rounded px-2 py-1 text-xs text-th-text-alt focus:outline-none focus:border-yellow-500 mb-2"
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
-                          className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center gap-1"
+                          className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-600 dark:text-green-200 flex items-center gap-1"
                         >
                           <Check className="w-3 h-3" /> Confirm
                         </button>
                         <button
                           onClick={() => { onReject?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
-                          className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 flex items-center gap-1"
+                          className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-600 dark:text-red-200 flex items-center gap-1"
                         >
                           <X className="w-3 h-3" /> Reject
                         </button>
@@ -1960,36 +1960,36 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedDecision(null); }}
         >
-          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm font-semibold text-gray-100">Decision</span>
+                <Lightbulb className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-sm font-semibold text-th-text">Decision</span>
                 {selectedDecision.agentRole && (
                   <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">by {selectedDecision.agentRole}</span>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedDecision.timestamp).toLocaleString()}
                 </span>
-                <button onClick={() => setSelectedDecision(null)} className="text-gray-400 hover:text-gray-200">
+                <button onClick={() => setSelectedDecision(null)} className="text-th-text-muted hover:text-th-text">
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
             <div className="p-4 overflow-y-auto">
-              <h3 className="text-base font-mono font-semibold text-gray-100 mb-3">{selectedDecision.title}</h3>
+              <h3 className="text-base font-mono font-semibold text-th-text mb-3">{selectedDecision.title}</h3>
               {selectedDecision.rationale && (
                 <div className="mb-3">
-                  <p className="text-xs font-semibold text-gray-400 mb-1">Rationale</p>
-                  <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap">{selectedDecision.rationale}</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-1">Rationale</p>
+                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDecision.rationale}</p>
                 </div>
               )}
               {selectedDecision.alternatives && selectedDecision.alternatives.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-semibold text-gray-400 mb-1">Alternatives considered</p>
-                  <ul className="list-disc list-inside text-sm font-mono text-gray-400 space-y-1">
+                  <p className="text-xs font-semibold text-th-text-muted mb-1">Alternatives considered</p>
+                  <ul className="list-disc list-inside text-sm font-mono text-th-text-muted space-y-1">
                     {selectedDecision.alternatives.map((alt: string, i: number) => (
                       <li key={i}>{alt}</li>
                     ))}
@@ -1998,8 +1998,8 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
               )}
               {selectedDecision.impact && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-1">Impact</p>
-                  <p className="text-sm font-mono text-gray-300 whitespace-pre-wrap">{selectedDecision.impact}</p>
+                  <p className="text-xs font-semibold text-th-text-muted mb-1">Impact</p>
+                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDecision.impact}</p>
                 </div>
               )}
             </div>
@@ -2012,7 +2012,7 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
 
 function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
   const STATUS_COLOR: Record<string, string> = {
-    creating: 'text-gray-400', running: 'text-blue-400', idle: 'text-yellow-400',
+    creating: 'text-th-text-muted', running: 'text-blue-400', idle: 'text-yellow-600 dark:text-yellow-400',
     completed: 'text-green-400', failed: 'text-red-400',
   };
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
@@ -2026,37 +2026,37 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
     <>
       <div className="h-full overflow-y-auto p-1.5 space-y-1">
         {agents.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
+          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No team members yet</p>
         ) : (
           agents.map((agent: any) => {
             const delegation = [...delegations].reverse().find((d: any) => d.toAgentId === agent.id);
-            const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
+            const colorClass = STATUS_COLOR[agent.status] || 'text-th-text-muted';
             return (
               <div
                 key={agent.id}
-                className="bg-gray-800 border border-gray-700 rounded p-1.5 cursor-pointer hover:border-gray-500 transition-colors"
+                className="bg-th-bg-alt border border-th-border rounded p-1.5 cursor-pointer hover:border-th-border-hover transition-colors"
                 onClick={() => setSelectedAgent(agent)}
               >
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm leading-none">{agent.role.icon}</span>
-                  <span className="text-xs font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
+                  <span className="text-xs font-mono font-semibold text-th-text-alt truncate">{agent.role.name}</span>
                   <span className={`text-[10px] font-mono ${colorClass} ml-auto shrink-0`}>{agent.status}</span>
                   {onOpenChat && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onOpenChat(agent.id); }}
-                      className="text-xs leading-none text-blue-400 hover:text-blue-300 shrink-0 px-0.5"
+                      className="text-xs leading-none text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 shrink-0 px-0.5"
                       title="Open agent chat panel"
                     >
                       💬
                     </button>
                   )}
-                  <span className="text-[10px] font-mono text-gray-500 shrink-0">{agent.id.slice(0, 8)}</span>
+                  <span className="text-[10px] font-mono text-th-text-muted shrink-0">{agent.id.slice(0, 8)}</span>
                 </div>
                 {delegation && (
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-[10px] font-mono text-gray-400 truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
+                    <p className="text-[10px] font-mono text-th-text-muted truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
                     {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}
                     {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
                       <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
@@ -2066,7 +2066,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}
                     {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
                       <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
@@ -2079,8 +2079,8 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   const actTime = new Date(latestAct.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   return (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-[9px] text-gray-500">{actTime}</span>
-                      <span className="text-[10px] text-gray-400 truncate">{latestAct.summary}</span>
+                      <span className="text-[9px] text-th-text-muted">{actTime}</span>
+                      <span className="text-[10px] text-th-text-muted truncate">{latestAct.summary}</span>
                     </div>
                   );
                 })()}
@@ -2097,22 +2097,22 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedAgent(null); }}
         >
           <div
-            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-700">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-th-border">
               <span className="text-2xl">{selectedAgent.role.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-semibold text-gray-100">{selectedAgent.role.name}</span>
-                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${STATUS_COLOR[selectedAgent.status] || 'text-gray-400'} bg-gray-700`}>
+                  <span className="text-base font-semibold text-th-text">{selectedAgent.role.name}</span>
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${STATUS_COLOR[selectedAgent.status] || 'text-th-text-muted'} bg-th-bg-muted`}>
                     {selectedAgent.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 font-mono">
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-th-text-muted font-mono">
                   <span>{selectedAgent.id.slice(0, 8)}</span>
                   {(selectedAgent.model || selectedAgent.role.model) && (
-                    <span className="bg-gray-700/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
+                    <span className="bg-th-bg-muted/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
                   )}
                 </div>
               </div>
@@ -2141,7 +2141,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               )}
               <button
                 onClick={() => setSelectedAgent(null)}
-                className="text-gray-400 hover:text-white text-lg leading-none p-1"
+                className="text-th-text-muted hover:text-th-text text-lg leading-none p-1"
               >
                 ×
               </button>
@@ -2151,9 +2151,9 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
             <div className="flex-1 overflow-y-auto">
               {/* Assigned Task */}
               {selectedDelegation && (
-                <div className="px-5 py-3 border-b border-gray-700">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">Assigned Task</h4>
-                  <p className="text-sm font-mono text-gray-200 whitespace-pre-wrap">{selectedDelegation.task}</p>
+                <div className="px-5 py-3 border-b border-th-border">
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Assigned Task</h4>
+                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDelegation.task}</p>
                   {selectedDelegation.status && (
                     <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${
                       selectedDelegation.status === 'completed' ? 'text-green-400 bg-green-900/30' :
@@ -2166,20 +2166,20 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
 
               {/* Token Usage */}
               {(selectedAgent.inputTokens > 0 || selectedAgent.outputTokens > 0) && (
-                <div className="px-5 py-3 border-b border-gray-700">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">Token Usage</h4>
+                <div className="px-5 py-3 border-b border-th-border">
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Token Usage</h4>
                   <div className="flex gap-4 text-xs font-mono">
-                    <span className="text-blue-300">↑ {formatTokens(selectedAgent.inputTokens)} in</span>
-                    <span className="text-green-300">↓ {formatTokens(selectedAgent.outputTokens)} out</span>
-                    <span className="text-gray-400">Σ {formatTokens(selectedAgent.inputTokens + selectedAgent.outputTokens)}</span>
+                    <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(selectedAgent.inputTokens)} in</span>
+                    <span className="text-green-600 dark:text-green-300">↓ {formatTokens(selectedAgent.outputTokens)} out</span>
+                    <span className="text-th-text-muted">Σ {formatTokens(selectedAgent.inputTokens + selectedAgent.outputTokens)}</span>
                   </div>
                   {selectedAgent.contextWindowSize > 0 && (
                     <div className="mt-1.5">
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-gray-500">
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
                         <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
                         <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-1 mt-1">
+                      <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
                         <div
                           className={`h-1 rounded-full transition-all ${
                             selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
@@ -2196,9 +2196,9 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
 
               {/* Agent Output Preview */}
               {selectedAgent.outputPreview && (
-                <div className="px-5 py-3 border-b border-gray-700">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">Latest Output</h4>
-                  <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-40 overflow-y-auto bg-gray-900/50 rounded p-2">
+                <div className="px-5 py-3 border-b border-th-border">
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Latest Output</h4>
+                  <pre className="text-xs font-mono text-th-text-alt whitespace-pre-wrap max-h-40 overflow-y-auto bg-th-bg/50 rounded p-2">
                     {selectedAgent.outputPreview}
                   </pre>
                 </div>
@@ -2206,8 +2206,8 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
 
               {/* Communications */}
               {agentComms.length > 0 && (
-                <div className="px-5 py-3 border-b border-gray-700">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-2">
+                <div className="px-5 py-3 border-b border-th-border">
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
                     Communications ({agentComms.length})
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -2217,16 +2217,16 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                       return (
                         <div
                           key={c.id}
-                          className="text-xs font-mono cursor-pointer hover:bg-gray-700/40 rounded px-1 py-0.5 transition-colors"
+                          className="text-xs font-mono cursor-pointer hover:bg-th-bg-muted/40 rounded px-1 py-0.5 transition-colors"
                           onClick={() => setSelectedComm(c)}
                         >
                           <div className="flex items-center gap-1">
                             <span className={isSender ? 'text-cyan-400' : 'text-green-400'}>{isSender ? c.fromRole : c.toRole}</span>
-                            <span className="text-gray-600">{isSender ? '→' : '←'}</span>
+                            <span className="text-th-text-muted">{isSender ? '→' : '←'}</span>
                             <span className={isSender ? 'text-green-400' : 'text-cyan-400'}>{isSender ? c.toRole : c.fromRole}</span>
-                            <span className="text-gray-600 ml-auto">{time}</span>
+                            <span className="text-th-text-muted ml-auto">{time}</span>
                           </div>
-                          <p className="text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
+                          <p className="text-th-text-alt mt-0.5 break-words whitespace-pre-wrap">
                             {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
                           </p>
                         </div>
@@ -2239,7 +2239,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               {/* Activity */}
               {agentActivity.length > 0 && (
                 <div className="px-5 py-3">
-                  <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-2">
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
                     Activity ({agentActivity.length})
                   </h4>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -2247,12 +2247,12 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                       const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                       return (
                         <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
-                          <span className="text-gray-500">{time}</span>
-                          <span className="text-gray-300 truncate">{evt.summary}</span>
+                          <span className="text-th-text-muted">{time}</span>
+                          <span className="text-th-text-alt truncate">{evt.summary}</span>
                           {evt.status && (
                             <span className={`ml-auto shrink-0 text-[10px] ${
                               evt.status === 'completed' ? 'text-green-400' :
-                              evt.status === 'in_progress' ? 'text-blue-400' : 'text-gray-500'
+                              evt.status === 'in_progress' ? 'text-blue-400' : 'text-th-text-muted'
                             }`}>{evt.status}</span>
                           )}
                         </div>
@@ -2264,7 +2264,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
 
               {/* Empty state */}
               {!selectedDelegation && !selectedAgent.outputPreview && agentComms.length === 0 && agentActivity.length === 0 && (
-                <div className="px-5 py-8 text-center text-gray-500 text-xs font-mono">
+                <div className="px-5 py-8 text-center text-th-text-muted text-xs font-mono">
                   No activity yet for this agent
                 </div>
               )}
@@ -2279,26 +2279,26 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
           className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
         >
-          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2 text-sm">
                 <MessageSquare className="w-4 h-4 text-blue-400" />
                 <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
-                <span className="text-gray-500">→</span>
+                <span className="text-th-text-muted">→</span>
                 <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedComm.timestamp).toLocaleTimeString()}
                 </span>
-                <button onClick={() => setSelectedComm(null)} className="text-gray-400 hover:text-white text-lg leading-none">×</button>
+                <button onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
               {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
-                  <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                  <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
                     <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
                   </pre>
                 )
@@ -2364,12 +2364,12 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
   return (
     <>
       {/* Tier filter bar */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-700/50 bg-gray-900/50">
-        <Filter className="w-3 h-3 text-gray-500 shrink-0" />
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-th-border/50 bg-th-bg/50">
+        <Filter className="w-3 h-3 text-th-text-muted shrink-0" />
         {FILTER_OPTIONS.map(opt => (
           <button
             key={opt.value}
-            className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${tierFilter === opt.value ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}`}
+            className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${tierFilter === opt.value ? 'bg-th-bg-muted text-th-text-alt' : 'text-th-text-muted hover:text-th-text-alt hover:bg-th-bg-alt'}`}
             onClick={() => setTierFilter(opt.value)}
           >
             {opt.label}
@@ -2379,7 +2379,7 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
 
       <div ref={feedRef} className="h-full overflow-y-auto">
         {classifiedFeed.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">
+          <p className="text-xs text-th-text-muted text-center py-4 font-mono">
             {feed.length === 0 ? 'No messages yet' : 'No messages match this filter'}
           </p>
         ) : (
@@ -2398,12 +2398,12 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
                   <div className="flex items-center gap-1 text-xs">
                     <Users className="w-3 h-3 text-emerald-400 shrink-0" />
                     <span className="font-mono font-semibold text-emerald-400 truncate">{gm.groupName}</span>
-                    <span className="text-gray-500">·</span>
+                    <span className="text-th-text-muted">·</span>
                     <span className="font-mono text-cyan-400">{gm.fromRole}</span>
                     {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
-                    <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+                    <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
                   </div>
-                  <div className="text-xs font-mono text-gray-300 mt-0.5">
+                  <div className="text-xs font-mono text-th-text-alt mt-0.5">
                     <p className="truncate">
                       <MentionText text={gm.content.length > 120 ? gm.content.slice(0, 120) + '…' : gm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                     </p>
@@ -2417,17 +2417,17 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
             return (
               <div
                 key={c.id}
-                className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'notable' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-blue-500/[0.08]` : `${isToUser ? 'bg-blue-500/[0.04] border-b-blue-400/15 border-l-blue-400/20' : 'border-b-gray-700/30 border-l-transparent'} opacity-60 hover:opacity-100 hover:bg-gray-700/30`}`}
+                className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'notable' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-blue-500/[0.08]` : `${isToUser ? 'bg-blue-500/[0.04] border-b-blue-400/15 border-l-blue-400/20' : 'border-b-gray-700/30 border-l-transparent'} opacity-60 hover:opacity-100 hover:bg-th-bg-muted/30`}`}
                 onClick={() => setSelectedComm(c)}
               >
                 <div className="flex items-center gap-1 text-xs">
                   <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
-                  <span className="text-gray-500">→</span>
+                  <span className="text-th-text-muted">→</span>
                   <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
                   {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
-                  <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+                  <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
                 </div>
-                <div className="text-xs font-mono text-gray-300 mt-0.5">
+                <div className="text-xs font-mono text-th-text-alt mt-0.5">
                   {c.content.startsWith('[Agent Report]') || c.content.startsWith('[Agent ACK]')
                     ? <AgentReportBlock content={c.content} compact />
                     : <p className="truncate">
@@ -2448,21 +2448,21 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
         >
           <div
-            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
-                <span className="text-gray-500">→</span>
+                <span className="text-th-text-muted">→</span>
                 <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedComm.timestamp).toLocaleTimeString()}
                 </span>
                 <button
                   onClick={() => setSelectedComm(null)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
+                  className="text-th-text-muted hover:text-th-text text-lg leading-none"
                 >
                   ×
                 </button>
@@ -2472,7 +2472,7 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
               {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
-                  <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                  <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
                     <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
                   </pre>
                 )
@@ -2488,28 +2488,28 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedGroupMsg(null); }}
         >
-          <div className="bg-gray-800 border border-emerald-600/40 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+          <div className="bg-th-bg-alt border border-emerald-600/40 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-700/40">
               <div className="flex items-center gap-2 text-sm">
                 <Users className="w-4 h-4 text-emerald-400" />
                 <span className="font-mono font-semibold text-emerald-400">{selectedGroupMsg.groupName}</span>
-                <span className="text-gray-500">·</span>
+                <span className="text-th-text-muted">·</span>
                 <span className="font-mono text-cyan-400">{selectedGroupMsg.fromRole}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedGroupMsg.timestamp).toLocaleTimeString()}
                 </span>
                 <button
                   onClick={() => setSelectedGroupMsg(null)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
+                  className="text-th-text-muted hover:text-th-text text-lg leading-none"
                 >
                   ×
                 </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+              <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
                 <MentionText text={selectedGroupMsg.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedGroupMsg(null); }} />
               </pre>
             </div>
@@ -2578,42 +2578,42 @@ function GroupsPanelContent({
   return (
     <div ref={feedRef} className="h-full overflow-y-auto">
       {groups.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4 font-mono">No groups yet</p>
+        <p className="text-xs text-th-text-muted text-center py-4 font-mono">No groups yet</p>
       ) : (
         groups.map((g) => {
           const isExpanded = expandedGroup === g.name;
           const msgs = groupMessages[g.name] ?? [];
           return (
-            <div key={g.name} className="border-b border-gray-700/30">
+            <div key={g.name} className="border-b border-th-border/30">
               <button
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-700/30 transition-colors flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 hover:bg-th-bg-muted/30 transition-colors flex items-center gap-2"
                 onClick={() => setExpandedGroup(isExpanded ? null : g.name)}
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-3 h-3 text-gray-500 shrink-0" />
+                  <ChevronDown className="w-3 h-3 text-th-text-muted shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3 h-3 text-gray-500 shrink-0" />
+                  <ChevronRight className="w-3 h-3 text-th-text-muted shrink-0" />
                 )}
                 <span className="text-xs font-mono font-semibold text-teal-400 truncate flex-1">{g.name}</span>
-                <span className="text-[10px] font-mono text-gray-500 shrink-0">{g.memberIds.length} members</span>
+                <span className="text-[10px] font-mono text-th-text-muted shrink-0">{g.memberIds.length} members</span>
               </button>
               {isExpanded && (
                 <div className="px-2 pb-2 space-y-0.5 max-h-60 overflow-y-auto">
                   {msgs.length === 0 ? (
-                    <p className="text-[10px] text-gray-600 text-center py-2 font-mono">No messages</p>
+                    <p className="text-[10px] text-th-text-muted text-center py-2 font-mono">No messages</p>
                   ) : (
                     msgs.map((m) => {
                       const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                       const shortId = m.fromAgentId?.slice(0, 6) ?? '';
                       return (
-                        <div key={m.id} className="px-2 py-1 rounded bg-gray-800/50 text-xs font-mono">
+                        <div key={m.id} className="px-2 py-1 rounded bg-th-bg-alt/50 text-xs font-mono">
                           <div className="flex items-center gap-1">
-                            <span className="text-gray-600 text-[10px] shrink-0">{time}</span>
+                            <span className="text-th-text-muted text-[10px] shrink-0">{time}</span>
                             <span style={{ color: roleColor(m.fromRole) }} className="font-semibold truncate">
                               {m.fromRole}{shortId ? ` (${shortId})` : ''}:
                             </span>
                           </div>
-                          <p className="text-gray-300 break-words mt-0.5 whitespace-pre-wrap">
+                          <p className="text-th-text-alt break-words mt-0.5 whitespace-pre-wrap">
                             <MentionText text={m.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </p>
                         </div>
@@ -2641,34 +2641,34 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
   const recent = activity.slice(-30);
 
   const getIcon = (type: string, status?: string) => {
-    if (type === 'delegation') return <GitBranch className="w-3 h-3 text-yellow-400 shrink-0" />;
+    if (type === 'delegation') return <GitBranch className="w-3 h-3 text-yellow-600 dark:text-yellow-400 shrink-0" />;
     if (type === 'completion') return <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />;
     if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
     if (type === 'progress') return <BarChart3 className="w-3 h-3 text-purple-400 shrink-0" />;
     if (status === 'in_progress') return <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />;
     if (status === 'completed') return <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />;
-    return <Wrench className="w-3 h-3 text-gray-400 shrink-0" />;
+    return <Wrench className="w-3 h-3 text-th-text-muted shrink-0" />;
   };
 
   return (
     <div ref={feedRef} className="h-full overflow-y-auto">
       {recent.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4 font-mono">No activity yet</p>
+        <p className="text-xs text-th-text-muted text-center py-4 font-mono">No activity yet</p>
       ) : (
         recent.map((evt) => {
           const agent = agents.find((a: any) => a.id === evt.agentId);
           const label = agent?.role?.name ?? evt.agentRole;
           const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (
-            <div key={evt.id} className="px-3 py-1.5 border-b border-gray-700/30 flex items-start gap-2">
+            <div key={evt.id} className="px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
               {getIcon(evt.type, evt.status)}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono text-gray-400">{label}</span>
-                  <span className="text-[10px] font-mono text-gray-500">{evt.agentId?.slice(0, 8)}</span>
-                  <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+                  <span className="text-xs font-mono text-th-text-muted">{label}</span>
+                  <span className="text-[10px] font-mono text-th-text-muted">{evt.agentId?.slice(0, 8)}</span>
+                  <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
                 </div>
-                <span className="text-xs font-mono text-gray-300 break-words">{typeof evt.summary === 'string' ? evt.summary : JSON.stringify(evt.summary)}</span>
+                <span className="text-xs font-mono text-th-text-alt break-words">{typeof evt.summary === 'string' ? evt.summary : JSON.stringify(evt.summary)}</span>
               </div>
             </div>
           );
@@ -2726,15 +2726,15 @@ function CollapsibleSection({
   }, [height, minHeight, maxHeight]);
 
   return (
-    <div className="border-t border-gray-700 flex flex-col shrink-0" style={collapsed ? undefined : { height }}>
+    <div className="border-t border-th-border flex flex-col shrink-0" style={collapsed ? undefined : { height }}>
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="px-3 py-1.5 flex items-center gap-2 shrink-0 hover:bg-gray-800/50 transition-colors w-full text-left"
+        className="px-3 py-1.5 flex items-center gap-2 shrink-0 hover:bg-th-bg-alt/50 transition-colors w-full text-left"
       >
-        {collapsed ? <ChevronRight className="w-3 h-3 text-gray-500" /> : <ChevronDown className="w-3 h-3 text-gray-500" />}
+        {collapsed ? <ChevronRight className="w-3 h-3 text-th-text-muted" /> : <ChevronDown className="w-3 h-3 text-th-text-muted" />}
         {icon}
         <span className="text-xs font-semibold">{title}</span>
-        {badge !== undefined && <span className="text-[10px] text-gray-500 ml-auto">{badge}</span>}
+        {badge !== undefined && <span className="text-[10px] text-th-text-muted ml-auto">{badge}</span>}
       </button>
       {!collapsed && (
         <>
@@ -2768,8 +2768,8 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
   };
 
   return (
-    <div className="border-b border-gray-700 px-4 py-1.5 flex items-center gap-2 text-xs font-mono bg-gray-800/30">
-      <FolderOpen className="w-3 h-3 text-gray-500 shrink-0" />
+    <div className="border-b border-th-border px-4 py-1.5 flex items-center gap-2 text-xs font-mono bg-th-bg-alt/30">
+      <FolderOpen className="w-3 h-3 text-th-text-muted shrink-0" />
       {editing ? (
         <>
           <input
@@ -2778,18 +2778,18 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
             placeholder="/path/to/project"
-            className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+            className="flex-1 bg-th-bg-alt border border-th-border rounded px-2 py-0.5 text-xs font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
             autoFocus
           />
-          <button onClick={save} className="text-green-400 hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
-          <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-200 p-0.5"><X className="w-3 h-3" /></button>
+          <button onClick={save} className="text-green-400 hover:text-green-600 dark:hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
+          <button onClick={() => setEditing(false)} className="text-th-text-muted hover:text-th-text p-0.5"><X className="w-3 h-3" /></button>
         </>
       ) : (
         <>
-          <span className="text-gray-400 truncate flex-1" title={cwd}>{cwd || '(server default)'}</span>
+          <span className="text-th-text-muted truncate flex-1" title={cwd}>{cwd || '(server default)'}</span>
           <button
             onClick={() => setEditing(true)}
-            className="text-gray-500 hover:text-yellow-400 text-[10px] shrink-0"
+            className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
           >
             edit
           </button>
@@ -2845,17 +2845,17 @@ function PromptNav({ containerRef, messages }: { containerRef: React.RefObject<H
     <div className="absolute right-3 top-3 flex flex-col items-center gap-0.5 z-10">
       <button
         onClick={goUp}
-        className="p-1 rounded bg-gray-800/80 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        className="p-1 rounded bg-th-bg-alt/80 border border-th-border text-th-text-muted hover:text-th-text hover:bg-th-bg-muted transition-colors"
         title="Previous prompt"
       >
         <ChevronUp className="w-3.5 h-3.5" />
       </button>
-      <span className="text-[10px] font-mono text-gray-500 select-none leading-none py-0.5">
+      <span className="text-[10px] font-mono text-th-text-muted select-none leading-none py-0.5">
         {currentIdx >= 0 ? currentIdx + 1 : '·'}/{total}
       </span>
       <button
         onClick={goDown}
-        className="p-1 rounded bg-gray-800/80 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        className="p-1 rounded bg-th-bg-alt/80 border border-th-border text-th-text-muted hover:text-th-text hover:bg-th-bg-muted transition-colors"
         title="Next prompt"
       >
         <ChevronDown className="w-3.5 h-3.5" />
@@ -2877,7 +2877,7 @@ function InlineMarkdown({ text }: { text: string }) {
         }
         if (part.startsWith('`') && part.endsWith('`')) {
           return (
-            <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">
+            <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">
               {part.slice(1, -1)}
             </code>
           );
@@ -2896,9 +2896,9 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
         <img
           src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`}
           alt="Agent image"
-          className="max-w-full max-h-96 rounded-lg border border-gray-700"
+          className="max-w-full max-h-96 rounded-lg border border-th-border"
         />
-        {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
+        {msg.uri && <p className="text-[10px] text-th-text-muted mt-1 font-mono">{msg.uri}</p>}
       </div>
     );
   }
@@ -2921,7 +2921,7 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
           </div>
         )}
         {msg.text && (
-          <pre className="text-xs font-mono text-gray-300 bg-gray-800 border border-gray-700 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+          <pre className="text-xs font-mono text-th-text-alt bg-th-bg-alt border border-th-border rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
             {msg.text}
           </pre>
         )}
@@ -2953,15 +2953,15 @@ function CollapsibleCommandBlock({ text }: { text: string }) {
   }
   return (
     <div
-      className="my-1 px-2 py-1 bg-gray-800/80 border border-gray-600 rounded text-[11px] text-gray-300 cursor-pointer hover:border-gray-500 transition-colors"
+      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
       <div className="flex items-center gap-1 min-w-0">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-gray-300 shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-gray-400 truncate ml-1">— {preview}</span>}
+        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
+        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
       </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-gray-400">{text}</pre>}
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
     </div>
   );
 }
@@ -3043,11 +3043,11 @@ function MarkdownTable({ raw }: { raw: string }) {
 
   return (
     <div className="my-2 overflow-x-auto">
-      <table className="text-xs font-mono border-collapse border border-gray-700 w-full">
+      <table className="text-xs font-mono border-collapse border border-th-border w-full">
         <thead>
-          <tr className="bg-gray-800">
+          <tr className="bg-th-bg-alt">
             {headerCells.map((cell, j) => (
-              <th key={j} className="border border-gray-700 px-2 py-1 text-left text-gray-300 font-semibold">
+              <th key={j} className="border border-th-border px-2 py-1 text-left text-th-text-alt font-semibold">
                 <InlineMarkdown text={cell} />
               </th>
             ))}
@@ -3055,9 +3055,9 @@ function MarkdownTable({ raw }: { raw: string }) {
         </thead>
         <tbody>
           {bodyRows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-800/30'}>
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-th-bg/30' : 'bg-th-bg-alt/30'}>
               {row.map((cell, ci) => (
-                <td key={ci} className="border border-gray-700 px-2 py-1 text-gray-300">
+                <td key={ci} className="border border-th-border px-2 py-1 text-th-text-alt">
                   <InlineMarkdown text={cell} />
                 </td>
               ))}
