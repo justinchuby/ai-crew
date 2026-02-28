@@ -1342,6 +1342,9 @@ CREW_ROSTER ]]]`;
 
       agent.sendMessage(`[System] Message delivered to ${delivered} group member(s) in "${req.group}".`);
       this.ctx.emit('group:message', { message, groupName: req.group, leadId });
+      this.ctx.activityLedger.log(agent.id, agent.role.id, 'group_message', `Group "${req.group}": ${req.content.slice(0, 120)}`, {
+        groupName: req.group, recipientCount: delivered,
+      });
       logger.info('groups', `Group message in "${req.group}": ${agent.role.name} (${agent.id.slice(0, 8)}) → ${delivered} recipients`);
     } catch (err) { logger.debug('command', 'Failed to parse GROUP_MESSAGE command', { error: (err as Error).message }); }
   }

@@ -314,7 +314,7 @@ export function apiRouter(
     }
 
     // Build communication links from delegated, message_sent, and broadcast events
-    const communications: { type: string; fromAgentId: string; toAgentId: string; summary: string; timestamp: string }[] = [];
+    const communications: { type: string; fromAgentId: string; toAgentId: string | null; summary: string; timestamp: string; groupName?: string }[] = [];
     for (const ev of events) {
       if (ev.actionType === 'delegated' && ev.details?.childId) {
         communications.push({
@@ -331,6 +331,15 @@ export function apiRouter(
           type: isBroadcast ? 'broadcast' : 'message',
           fromAgentId: ev.agentId,
           toAgentId: ev.details.toAgentId,
+          summary: ev.summary.slice(0, 120),
+          timestamp: ev.timestamp,
+        });
+      } else if (ev.actionType === 'group_message' && ev.details?.groupName) {
+        communications.push({
+          type: 'group_message',
+          fromAgentId: ev.agentId,
+          toAgentId: null as any,
+          groupName: ev.details.groupName,
           summary: ev.summary.slice(0, 120),
           timestamp: ev.timestamp,
         });
@@ -389,8 +398,9 @@ export function apiRouter(
       end: allTimestamps[allTimestamps.length - 1] ?? new Date().toISOString(),
     };
 
-    // Find project context from the lead agent
-    const leadAgent = agentManager.getAll().find(a => a.role.id === 'lead' && !a.parentId);
+    // Find project context from the lead agent (prefer leadId from query)
+    const resolvedLeadId = leadId || agentManager.getAll().find(a => a.role.id === 'lead' && !a.parentId)?.id;
+    const leadAgent = resolvedLeadId ? agentManager.get(resolvedLeadId) : undefined;
     const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
 
     res.json({ agents, communications, locks, timeRange, project });

@@ -1116,7 +1116,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       return (
                         <div
                           key={r.id}
-                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-indigo-900/20 border border-indigo-700/30 cursor-pointer hover:bg-indigo-900/30 transition-colors"
+                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-blue-500/[0.06] border border-blue-400/20 border-l-2 border-l-blue-400/30 cursor-pointer hover:bg-blue-500/[0.10] transition-colors"
                           onClick={() => setExpandedReport(r)}
                         >
                           <div className="min-w-0 flex-1">
@@ -1194,7 +1194,7 @@ export function LeadDashboard({ api, ws }: Props) {
 
                 if (msg.sender === 'external') {
                   return (
-                    <div key={i} className="flex items-start gap-2 py-1">
+                    <div key={i} className="flex items-start gap-2 py-1 bg-blue-500/[0.06] rounded-md border-l-2 border-blue-400/30 pl-2">
                       <div className="max-w-[85%] rounded-lg px-3 py-2 bg-indigo-900/40 border border-indigo-700/50 font-mono text-sm whitespace-pre-wrap text-gray-300">
                         <div className="flex items-center gap-1.5 mb-1 text-indigo-400 text-xs font-medium">
                           <MessageSquare className="w-3 h-3" />
@@ -1225,9 +1225,16 @@ export function LeadDashboard({ api, ws }: Props) {
                 const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued;
                 const agentTs = isFirstInRun ? ts : '';
 
+                // Highlight agent messages that are responses to user input
+                const isReplyToUser = (prevMsg?.sender === 'user' && isFirstInRun)
+                  || msg.text.includes('[USER MESSAGE');
+                const replyHighlight = isReplyToUser
+                  ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
+                  : '';
+
                 if (msg.contentType && msg.contentType !== 'text') {
                   return (
-                    <div key={i} className="py-1">
+                    <div key={i} className={`py-1 ${replyHighlight}`}>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <RichContentBlock msg={msg} />
@@ -1238,7 +1245,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   );
                 }
                 return (
-                  <div key={i} className="py-0.5">
+                  <div key={i} className={`py-0.5 ${replyHighlight}`}>
                     <div className="flex items-start gap-2">
                       <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
                         <AgentTextBlock text={msg.text} />
@@ -1437,7 +1444,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
-                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} />}
+                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} leadId={selectedLeadId} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
                   </div>
@@ -2211,7 +2218,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
   );
 }
 
-function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
+function CommsPanelContent({ comms, leadId }: { comms: AgentComm[]; leadId?: string }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   useEffect(() => {
@@ -2230,10 +2237,11 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
         ) : (
           recent.map((c) => {
             const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const isToUser = leadId && c.toId === leadId;
             return (
               <div
                 key={c.id}
-                className="px-3 py-1.5 border-b border-gray-700/30 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                className={`px-3 py-1.5 border-b cursor-pointer transition-colors ${isToUser ? 'bg-blue-500/[0.06] border-b-blue-400/20 border-l-2 border-l-blue-400/30 hover:bg-blue-500/[0.10]' : 'border-b-gray-700/30 hover:bg-gray-700/30'}`}
                 onClick={() => setSelectedComm(c)}
               >
                 <div className="flex items-center gap-1 text-xs">

@@ -23,6 +23,7 @@ export type ActionType =
   | 'heartbeat_halted'
   | 'limit_change_requested'
   | 'deferred_issue'
+  | 'group_message'
   | 'error';
 
 export interface ActivityEntry {

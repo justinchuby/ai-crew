@@ -4,6 +4,7 @@ import { scaleTime } from '@visx/scale';
 import { AxisTop } from '@visx/axis';
 import { Group } from '@visx/group';
 import { CommunicationLinks } from './CommunicationLinks';
+import { BrushTimeSelector } from './BrushTimeSelector';
 import type {
   TimelineAgent,
   TimelineLock,
@@ -17,6 +18,10 @@ const LANE_HEIGHT = 56;
 const LANE_HEIGHT_EXPANDED = 160;
 const LANE_GAP = 2;
 const AXIS_HEIGHT = 32;
+const BRUSH_HEIGHT = 48;
+const ZOOM_FACTOR_IN = 0.6;
+const ZOOM_FACTOR_OUT = 1.5;
+const MIN_VISIBLE_MS = 5_000; // 5 seconds minimum visible range
 const MIN_ZOOM = 0.002;   // px per ms (very zoomed out)
 const MAX_ZOOM = 2;        // px per ms (very zoomed in)
 const DEFAULT_ZOOM = 0.05; // px per ms
@@ -52,22 +57,19 @@ const ROLE_COLORS: Record<string, string> = {
   designer: '#f778ba', secretary: '#79c0ff', qa: '#79c0ff',
 };
 
-const LEGEND_COMM_COLORS = {
-  delegation: 'rgba(88,166,255,0.6)',
-  message: 'rgba(163,113,247,0.5)',
-  broadcast: 'rgba(247,120,186,0.4)',
-};
-
 // ── Sub-components ───────────────────────────────────────────────────
 
-function AgentLabel({ agent, height, isExpanded, onClick }: {
-  agent: TimelineAgent; height: number; isExpanded: boolean; onClick: () => void;
+function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
+  agent: TimelineAgent; height: number; isExpanded: boolean; isFocused: boolean; onClick: () => void;
 }) {
   return (
     <div
-      className="flex flex-col justify-center px-3 border-b border-zinc-800/50 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+      className={`flex flex-col justify-center px-3 border-b border-zinc-800/50 cursor-pointer hover:bg-zinc-800/50 transition-colors ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-zinc-800/30' : ''}`}
       style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}` }}
       onClick={onClick}
+      role="button"
+      aria-label={`${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
+      aria-expanded={isExpanded}
     >
       <span className="text-sm font-medium text-zinc-200 truncate">
         {ROLE_ICONS[agent.role] ?? '🤖'} {agent.role}
@@ -91,7 +93,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks }: {
   const agentLocks = locks.filter(l => l.agentId === agent.id);
 
   return (
-    <g>
+    <g role="row" aria-label={`${agent.role} agent ${agent.shortId} timeline`}>
       {/* Lane background */}
       <rect x={0} y={y} width={width} height={height} fill="transparent" stroke="#27272a" strokeWidth={0.5} />
 
@@ -160,13 +162,42 @@ function TimelineLegend() {
 
 interface TimelineContainerProps {
   data: TimelineData;
+  liveMode?: boolean;
+  onLiveModeChange?: (live: boolean) => void;
 }
 
-function TimelineContent({ data, width: containerWidth }: TimelineContainerProps & { width: number }) {
+function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange }: TimelineContainerProps & { width: number }) {
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [focusedLaneIdx, setFocusedLaneIdx] = useState(-1);
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isAutoScrolling = useRef(false);
+
+  const fullRange = useMemo(() => ({
+    start: new Date(data.timeRange.start),
+    end: new Date(data.timeRange.end),
+  }), [data.timeRange]);
+
+  const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date }>(fullRange);
+
+  // Reset visible range when full range changes (new data)
+  useEffect(() => { setVisibleRange(fullRange); }, [fullRange]);
+
+  // Zoom helpers that adjust visibleRange instead of a zoom scalar
+  const zoomBy = useCallback((factor: number) => {
+    setVisibleRange(prev => {
+      const mid = (prev.start.getTime() + prev.end.getTime()) / 2;
+      const halfSpan = (prev.end.getTime() - prev.start.getTime()) / 2 * factor;
+      const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
+      const clampedHalf = Math.max(MIN_VISIBLE_MS / 2, Math.min(fullMs / 2, halfSpan));
+      const newStart = Math.max(fullRange.start.getTime(), mid - clampedHalf);
+      const newEnd = Math.min(fullRange.end.getTime(), mid + clampedHalf);
+      return { start: new Date(newStart), end: new Date(newEnd) };
+    });
+  }, [fullRange]);
+
+  const fitToView = useCallback(() => { setVisibleRange(fullRange); }, [fullRange]);
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
@@ -178,13 +209,7 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
     });
   }, [data.agents]);
 
-  const timeRange = useMemo(() => ({
-    start: new Date(data.timeRange.start),
-    end: new Date(data.timeRange.end),
-  }), [data.timeRange]);
-
-  const durationMs = timeRange.end.getTime() - timeRange.start.getTime();
-  const chartWidth = Math.max(durationMs * zoom, containerWidth - LABEL_WIDTH);
+  const chartWidth = Math.max(containerWidth - LABEL_WIDTH, 400);
 
   // Lane heights and Y positions
   const laneLayout = useMemo(() => {
@@ -203,8 +228,8 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
     : 0;
 
   const timeScale = useMemo(
-    () => scaleTime({ domain: [timeRange.start, timeRange.end], range: [0, chartWidth] }),
-    [timeRange, chartWidth],
+    () => scaleTime({ domain: [visibleRange.start, visibleRange.end], range: [0, chartWidth] }),
+    [visibleRange, chartWidth],
   );
 
   const agentPositions = useMemo(() => {
@@ -243,13 +268,112 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
     const handler = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const factor = e.deltaY > 0 ? 0.85 : 1.18;
-        setZoom(prev => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * factor)));
+        const factor = e.deltaY > 0 ? ZOOM_FACTOR_OUT : ZOOM_FACTOR_IN;
+        zoomBy(factor);
       }
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  }, []);
+  }, [zoomBy]);
+
+  // Live mode: auto-scroll to right edge when data updates
+  useEffect(() => {
+    if (!liveMode) return;
+    const el = timelineRef.current;
+    if (!el) return;
+    isAutoScrolling.current = true;
+    el.scrollTo({ left: el.scrollWidth - el.clientWidth, behavior: 'smooth' });
+    // Reset flag after scroll animation completes
+    const timer = setTimeout(() => { isAutoScrolling.current = false; }, 500);
+    return () => clearTimeout(timer);
+  }, [liveMode, data]);
+
+  // Disable live mode on manual horizontal scroll
+  useEffect(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+    const handler = () => {
+      if (isAutoScrolling.current) return;
+      // User scrolled manually — check if NOT at right edge
+      const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 20;
+      if (!atRightEdge && liveMode) {
+        onLiveModeChange?.(false);
+      }
+    };
+    el.addEventListener('scroll', handler, { passive: true });
+    return () => el.removeEventListener('scroll', handler);
+  }, [liveMode, onLiveModeChange]);
+
+  // Keyboard navigation
+  const PAN_STEP = 120;
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const el = timelineRef.current;
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (el) el.scrollLeft = Math.max(0, el.scrollLeft - PAN_STEP);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (el) el.scrollLeft += PAN_STEP;
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedLaneIdx(prev => Math.min(prev + 1, sortedAgents.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedLaneIdx(prev => Math.max(prev - 1, 0));
+        break;
+      case '+':
+      case '=':
+        if (e.ctrlKey || e.metaKey || e.key === '+') {
+          e.preventDefault();
+          zoomBy(ZOOM_FACTOR_IN);
+        }
+        break;
+      case '-':
+        if (e.ctrlKey || e.metaKey || e.key === '-') {
+          e.preventDefault();
+          zoomBy(ZOOM_FACTOR_OUT);
+        }
+        break;
+      case 'Home':
+        e.preventDefault();
+        if (el) el.scrollLeft = 0;
+        break;
+      case 'End':
+        e.preventDefault();
+        if (el) el.scrollLeft = el.scrollWidth;
+        break;
+      case 'Enter':
+      case ' ':
+        if (focusedLaneIdx >= 0 && focusedLaneIdx < sortedAgents.length) {
+          e.preventDefault();
+          toggleExpand(sortedAgents[focusedLaneIdx].id);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setFocusedLaneIdx(-1);
+        containerRef.current?.focus();
+        break;
+      case 'Tab':
+        // Allow natural tab to move between lanes
+        if (!e.shiftKey) {
+          if (focusedLaneIdx < sortedAgents.length - 1) {
+            e.preventDefault();
+            setFocusedLaneIdx(prev => prev + 1);
+          }
+        } else {
+          if (focusedLaneIdx > 0) {
+            e.preventDefault();
+            setFocusedLaneIdx(prev => prev - 1);
+          }
+        }
+        break;
+    }
+  }, [focusedLaneIdx, sortedAgents, toggleExpand]);
 
   if (data.agents.length === 0) {
     return (
@@ -260,7 +384,7 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to pan, +/- to zoom, Tab to navigate lanes, Enter to expand">
       {/* Zoom controls */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
         <span className="text-sm text-zinc-400">
@@ -269,21 +393,30 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
         <div className="flex items-center gap-2">
           <button
             className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
-            onClick={() => setZoom(prev => Math.min(MAX_ZOOM, prev * 1.5))}
+            onClick={() => zoomBy(ZOOM_FACTOR_IN)}
+            aria-label="Zoom in"
           >+</button>
           <button
             className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
-            onClick={() => setZoom(prev => Math.max(MIN_ZOOM, prev * 0.67))}
+            onClick={() => zoomBy(ZOOM_FACTOR_OUT)}
+            aria-label="Zoom out"
           >−</button>
           <button
             className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
-            onClick={() => {
-              const fitZoom = (containerWidth - LABEL_WIDTH - 32) / Math.max(durationMs, 1);
-              setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitZoom)));
-            }}
+            onClick={fitToView}
+            aria-label="Fit timeline to view"
           >Fit</button>
         </div>
       </div>
+
+      {/* Brush time range selector */}
+      <BrushTimeSelector
+        fullRange={fullRange}
+        visibleRange={visibleRange}
+        onRangeChange={setVisibleRange}
+        agents={sortedAgents}
+        width={containerWidth}
+      />
 
       {/* Main area: fixed labels + scrollable timeline */}
       <div className="flex flex-1 overflow-hidden">
@@ -296,12 +429,13 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
         >
           {/* Spacer for axis alignment */}
           <div style={{ height: AXIS_HEIGHT }} className="border-b border-zinc-800/50" />
-          {laneLayout.map(({ agent, height }) => (
+          {laneLayout.map(({ agent, height }, idx) => (
             <AgentLabel
               key={agent.id}
               agent={agent}
               height={height + LANE_GAP}
               isExpanded={expandedAgents.has(agent.id)}
+              isFocused={idx === focusedLaneIdx}
               onClick={() => toggleExpand(agent.id)}
             />
           ))}
@@ -313,7 +447,7 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
           className="flex-1 overflow-auto"
           onScroll={() => syncScroll('timeline')}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label="Team collaboration timeline showing agent activity over time">
             {/* Time axis (sticky behavior via SVG position) */}
             <Group top={AXIS_HEIGHT - 4}>
               <AxisTop
@@ -362,11 +496,11 @@ function TimelineContent({ data, width: containerWidth }: TimelineContainerProps
   );
 }
 
-export function TimelineContainer({ data }: TimelineContainerProps) {
+export function TimelineContainer({ data, liveMode, onLiveModeChange }: TimelineContainerProps) {
   return (
     <div className="bg-zinc-900 rounded-lg border border-zinc-800 min-h-[300px] flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
       <ParentSize>
-        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} /> : null}
+        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} /> : null}
       </ParentSize>
     </div>
   );
