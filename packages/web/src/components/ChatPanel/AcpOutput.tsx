@@ -127,7 +127,7 @@ export function AcpOutput({ agentId }: Props) {
 
   const timeline: TimelineItem[] = [];
   messages.forEach((msg, i) => {
-    if (msg.sender !== 'system' && (msg.text || msg.contentType)) {
+    if ((msg.text || msg.contentType)) {
       timeline.push({ kind: 'message', msg, index: i });
     }
   });
@@ -246,6 +246,21 @@ export function AcpOutput({ agentId }: Props) {
                       {text}
                     </div>
                     <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // System messages — centered, muted, smaller
+            if (sender === 'system') {
+              const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+              if (text === '---') {
+                return <hr key={`msg-${item.index}`} className="border-gray-700/50 my-1" />;
+              }
+              return (
+                <div key={`msg-${item.index}`} className="flex justify-center py-1">
+                  <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 text-xs text-gray-400 whitespace-pre-wrap">
+                    {text}
                   </div>
                 </div>
               );

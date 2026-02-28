@@ -171,12 +171,13 @@ export function useWebSocket() {
             const recipient = state.agents.find((a) => a.id === toId);
             if (recipient) {
               const msgs = [...(recipient.messages ?? [])];
+              const isFromSystem = msg.from === 'system';
               const senderLabel = msg.fromRole || msg.from?.slice(0, 8) || 'System';
               const preview = (msg.content ?? '').slice(0, 500);
               msgs.push({
                 type: 'text',
-                text: `[From ${senderLabel}] ${preview}`,
-                sender: 'user' as any,
+                text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
+                sender: isFromSystem ? 'system' as any : 'user' as any,
                 timestamp: Date.now(),
               });
               updateAgent(toId, { messages: msgs });
