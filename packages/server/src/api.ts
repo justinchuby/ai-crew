@@ -60,6 +60,11 @@ export function apiRouter(
   searchEngine?: SearchEngine,
   performanceTracker?: import('./coordination/PerformanceScorecard.js').PerformanceTracker,
   decisionRecordStore?: DecisionRecordStore,
+  coverageTracker?: import('./coordination/CoverageTracker.js').CoverageTracker,
+  complexityMonitor?: import('./coordination/ComplexityMonitor.js').ComplexityMonitor,
+  dependencyScanner?: import('./coordination/DependencyScanner.js').DependencyScanner,
+  notificationManager?: import('./coordination/NotificationManager.js').NotificationManager,
+  escalationManager?: import('./coordination/EscalationManager.js').EscalationManager,
 ): Router {
   const router = Router();
 
@@ -1294,6 +1299,91 @@ export function apiRouter(
     const record = decisionRecordStore.get(req.params.id);
     if (!record) { res.status(404).json({ error: 'not found' }); return; }
     res.json(record);
+  });
+
+  // ── Code Quality endpoints ──────────────────────────────────────────
+
+  router.get('/coordination/coverage', (_req, res) => {
+    if (!coverageTracker) { res.json({ history: [], latest: null, trend: { tests: [], durations: [] } }); return; }
+    res.json({
+      history: coverageTracker.getHistory(),
+      latest: coverageTracker.getLatest() ?? null,
+      trend: coverageTracker.getTrend(),
+    });
+  });
+
+  router.get('/coordination/complexity', (_req, res) => {
+    if (!complexityMonitor) { res.json({ alerts: [], files: [], highComplexity: [] }); return; }
+    res.json({
+      alerts: complexityMonitor.getAlerts(),
+      files: complexityMonitor.getFiles(),
+      highComplexity: complexityMonitor.getHighComplexity(),
+    });
+  });
+
+  router.get('/coordination/dependencies', (_req, res) => {
+    if (!dependencyScanner) { res.json({ workspaces: {}, counts: { production: 0, dev: 0, total: 0 } }); return; }
+    res.json({
+      workspaces: dependencyScanner.scanWorkspaces(),
+      counts: dependencyScanner.getDependencyCount(),
+    });
+  });
+
+  // ── Notifications ───────────────────────────────────────────────
+
+  router.get('/notifications', (req, res) => {
+    if (!notificationManager) { res.json({ notifications: [], unreadCount: 0 }); return; }
+    const unreadOnly = req.query.unreadOnly === 'true';
+    const category = req.query.category as import('./coordination/NotificationManager.js').NotificationCategory | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    res.json({
+      notifications: notificationManager.getNotifications({ unreadOnly, category, limit }),
+      unreadCount: notificationManager.getUnreadCount(),
+    });
+  });
+
+  router.put('/notifications/read-all', (_req, res) => {
+    if (!notificationManager) { res.json({ ok: true }); return; }
+    notificationManager.markAllRead();
+    res.json({ ok: true });
+  });
+
+  router.put('/notifications/:id/read', (req, res) => {
+    if (!notificationManager) { res.status(404).json({ error: 'Notification manager not available' }); return; }
+    const ok = notificationManager.markRead(req.params.id);
+    if (!ok) { res.status(404).json({ error: 'Notification not found' }); return; }
+    res.json({ ok: true });
+  });
+
+  router.get('/notifications/preferences', (req, res) => {
+    if (!notificationManager) { res.json(null); return; }
+    const userId = (req.query.userId as string) || 'default';
+    res.json(notificationManager.getPreferences(userId) ?? null);
+  });
+
+  router.put('/notifications/preferences', (req, res) => {
+    if (!notificationManager) { res.status(503).json({ error: 'Notification manager not available' }); return; }
+    const userId = (req.body.userId as string) || 'default';
+    const prefs = notificationManager.setPreferences(userId, req.body);
+    res.json(prefs);
+  });
+
+  // ── Escalations ─────────────────────────────────────────────────
+
+  router.get('/coordination/escalations', (req, res) => {
+    if (!escalationManager) { res.json({ active: [], all: [], rules: [] }); return; }
+    const all = req.query.all === 'true';
+    res.json({
+      escalations: all ? escalationManager.getAll() : escalationManager.getActive(),
+      rules: escalationManager.getRules(),
+    });
+  });
+
+  router.put('/coordination/escalations/:id/resolve', (req, res) => {
+    if (!escalationManager) { res.status(404).json({ error: 'Escalation manager not available' }); return; }
+    const ok = escalationManager.resolve(req.params.id);
+    if (!ok) { res.status(404).json({ error: 'Escalation not found' }); return; }
+    res.json({ ok: true });
   });
 
   return router;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Trash2, Plus, Sun, Moon, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
+import { DashboardCustomizer } from './DashboardCustomizer';
 
 interface Props {
   api: any;
@@ -182,6 +183,9 @@ export function SettingsPanel({ api }: Props) {
           Set via <code className="text-th-text-muted">COPILOT_CLI_PATH</code> environment variable
         </p>
       </section>
+
+      {/* Dashboard Layout */}
+      <DashboardCustomizer />
 
       {/* Roles */}
       <section className="mb-8">

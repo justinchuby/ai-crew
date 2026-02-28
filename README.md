@@ -7,6 +7,8 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 **Why AI Crew?** Instead of one AI agent doing everything sequentially, AI Crew runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
 
+> **Status**: Waves 1–17 complete. See [branch `team-work-2`](https://github.com/github/ai-crew/tree/team-work-2) and [PR #35](https://github.com/github/ai-crew/pull/35) for recent changes.
+
 ## Features
 
 ### 🎯 Team Orchestration
@@ -51,14 +53,15 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Persistent Projects** — Projects survive lead sessions; resume with full context briefing
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
 
-## Getting Started
+## Quick Start
 
 ```bash
 npm install
-npx ai-crew
+npm run build
+npm start
 ```
 
-This builds the project, starts the server, and opens the web UI. Options: `--port=4000`, `--no-browser`.
+This starts the server and opens the web UI. Options: `--port=4000`, `--no-browser`.
 
 For development with hot reload:
 
@@ -66,8 +69,8 @@ For development with hot reload:
 npm run dev
 ```
 
-- **Server**: http://localhost:3001
-- **Web UI**: http://localhost:5173 (dev) or http://localhost:3001 (production)
+- **Server**: `http://localhost:3001`
+- **Web UI**: `http://localhost:5173` (dev) or `http://localhost:3001` (production)
 
 ### Creating a Project
 
@@ -76,6 +79,15 @@ npm run dev
 3. The lead analyzes the task, creates agents, and starts delegating
 
 ## Architecture
+
+**Monorepo** (`npm workspaces`):
+
+| Package | Description |
+|---------|-------------|
+| `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
+| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
+
+**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · ReactFlow · WebSocket (ws)
 
 ```
 React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
@@ -90,13 +102,6 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
                    DeferredIssueRegistry  EventPipeline
                    AlertEngine  TimerRegistry
 ```
-
-**Monorepo structure** (`npm workspaces`):
-
-| Package | Description |
-|---------|-------------|
-| `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
-| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
 
 ### Key Components
 
@@ -116,6 +121,11 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
 | **HeartbeatMonitor** | DAG-aware stall detection — nudges idle leads with remaining work |
+| **EventPipeline** | Reactive event handlers: run CI after commits, log summaries on task completion, trigger webhooks |
+| **CapabilityRegistry** | Tracks acquired agent expertise (files, technologies, domains) for smart matching |
+| **EagerScheduler** | Pre-assigns upcoming tasks to idle agents before they become active |
+
+> See [docs/architecture-decisions.md](docs/architecture-decisions.md) for the rationale behind key design choices.
 
 ## Agent Roles
 
@@ -209,6 +219,17 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
 - **Testing**: Vitest with v8 coverage, Codecov integration (1000+ tests including 30 Task DAG E2E + 40 Timeline E2E)
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/api-reference.md](docs/api-reference.md) | Full REST API reference for all endpoints |
+| [docs/architecture-decisions.md](docs/architecture-decisions.md) | Key architecture decision records (ADRs) |
+| [docs/agent-communication.md](docs/agent-communication.md) | ACP agent communication protocol details |
+| [docs/coordination.md](docs/coordination.md) | File locking, delegation, and coordination primitives |
+| [docs/database-design.md](docs/database-design.md) | SQLite schema and Drizzle ORM setup |
+| [docs/ui-design.md](docs/ui-design.md) | Frontend component architecture and design tokens |
 
 ## Screenshots
 

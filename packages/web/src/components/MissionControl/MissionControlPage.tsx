@@ -4,15 +4,20 @@ import { HealthSummary } from './HealthSummary';
 import { AgentFleet } from './AgentFleet';
 import { DagMinimap } from './DagMinimap';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
+import { AlertsPanel } from './AlertsPanel';
+import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 
 // ── MissionControlPage ───────────────────────────────────────────────
 
 export function MissionControlPage() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const projectKeys = useLeadStore((s) => Object.keys(s.projects));
+  const { panels } = useDashboardLayout();
 
   // Auto-select first lead if none selected
   const leadId = selectedLeadId ?? projectKeys[0] ?? null;
+
+  const isVisible = (id: string) => panels.some((p) => p.id === id);
 
   if (!leadId) {
     return (
@@ -35,17 +40,28 @@ export function MissionControlPage() {
         <span className="text-xs text-th-text-muted font-mono">Lead: {leadId.slice(0, 8)}</span>
       </div>
 
+      {/* Alerts (full-width when visible) */}
+      {isVisible('alerts') && (
+        <div className="shrink-0">
+          <AlertsPanel leadId={leadId} />
+        </div>
+      )}
+
       {/* Top row: Health + Token Economics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 shrink-0">
-        <HealthSummary leadId={leadId} />
-        <TokenEconomics />
-      </div>
+      {(isVisible('health') || isVisible('tokens')) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 shrink-0">
+          {isVisible('health') && <HealthSummary leadId={leadId} />}
+          {isVisible('tokens') && <TokenEconomics />}
+        </div>
+      )}
 
       {/* Middle row: Agent Fleet + DAG Minimap */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0" style={{ minHeight: '280px' }}>
-        <AgentFleet leadId={leadId} />
-        <DagMinimap leadId={leadId} />
-      </div>
+      {(isVisible('fleet') || isVisible('dag')) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0" style={{ minHeight: '280px' }}>
+          {isVisible('fleet') && <AgentFleet leadId={leadId} />}
+          {isVisible('dag') && <DagMinimap leadId={leadId} />}
+        </div>
+      )}
     </div>
   );
 }

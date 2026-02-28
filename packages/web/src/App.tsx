@@ -24,6 +24,7 @@ import { PermissionDialog } from './components/PermissionDialog';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search } from 'lucide-react';
+import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
@@ -39,6 +40,10 @@ export function App() {
 
   // Command palette — Cmd/Ctrl+K is handled by the hook
   const { isOpen: cmdOpen, open: openCmd, close: closeCmd } = useCommandPalette();
+
+  // Onboarding wizard — show on first visit
+  const { shouldShow } = useOnboarding();
+  const [showOnboarding, setShowOnboarding] = useState(shouldShow);
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
   useEffect(() => {
@@ -136,6 +141,7 @@ export function App() {
       <PermissionDialog />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
+      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
     </div>
   );
 }

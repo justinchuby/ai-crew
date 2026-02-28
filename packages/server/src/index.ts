@@ -25,6 +25,8 @@ import { EagerScheduler } from './tasks/EagerScheduler.js';
 import { FileDependencyGraph } from './coordination/FileDependencyGraph.js';
 import { RetryManager } from './agents/RetryManager.js';
 import { CrashForensics } from './agents/CrashForensics.js';
+import { NotificationManager } from './coordination/NotificationManager.js';
+import { EscalationManager } from './coordination/EscalationManager.js';
 
 // Initialize auth (auto-generates token if not set)
 const authToken = initAuth();
@@ -120,6 +122,12 @@ retryManager.start();
 
 // Crash forensics — captures diagnostic snapshots when agents crash
 const crashForensics = new CrashForensics();
+
+// Notification manager — manages in-app notification preferences and delivery
+const notificationManager = new NotificationManager();
+
+// Escalation manager — auto-escalates stuck decisions and blocked tasks
+const escalationManager = new EscalationManager(decisionLog, taskDAG);
 
 // Eager Scheduler — pre-assigns tasks that are 1 dep away from ready
 const eagerScheduler = new EagerScheduler(taskDAG);
@@ -251,8 +259,16 @@ decisionLog.on('decision', (decision: import('./coordination/DecisionLog.js').De
 import { PerformanceTracker } from './coordination/PerformanceScorecard.js';
 const performanceTracker = new PerformanceTracker(activityLedger, agentManager);
 
+// Code quality automation
+import { CoverageTracker } from './coordination/CoverageTracker.js';
+import { ComplexityMonitor } from './coordination/ComplexityMonitor.js';
+import { DependencyScanner } from './coordination/DependencyScanner.js';
+const coverageTracker = new CoverageTracker();
+const complexityMonitor = new ComplexityMonitor(process.cwd());
+const dependencyScanner = new DependencyScanner(process.cwd());
+
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore, coverageTracker, complexityMonitor, dependencyScanner, notificationManager, escalationManager));
 
 // Serve built web frontend in production
 import path from 'path';
@@ -293,6 +309,7 @@ httpServer.listen(config.port, config.host, () => {
     console.warn('⚠️  WARNING: Server is binding to all interfaces (0.0.0.0). Set HOST=127.0.0.1 for local-only access.');
   }
   contextRefresher.start();
+  escalationManager.start();
 });
 
 // Graceful shutdown
@@ -302,6 +319,7 @@ function gracefulShutdown(signal: string) {
   scheduler.stop();
   eagerScheduler.stop();
   retryManager.stop();
+  escalationManager.stop();
   agentManager.shutdownAll();
   activityLedger.stop();
   timerRegistry.stop();
