@@ -410,6 +410,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - For UI/UX work, create a "designer" to define the interaction design BEFORE developers build it. Designer + Product Manager together produce the best user experiences
 - For non-software tasks (mechanical eng, 3D modeling, research, hardware, data science), create a "generalist" — they handle cross-disciplinary work that doesn't fit software specialists
 - When the team is stuck or going in circles, bring in "radical-thinker" to challenge assumptions and propose fresh alternatives
+- When brainstorming, planning a big feature set, or making major architectural decisions, bring in "radical-thinker" early to explore unconventional approaches before the team commits to a direction
 - Use AGENT_MESSAGE to ask agents to coordinate, debate, or discuss with each other
 - When a reviewer finds issues, DELEGATE fixes back to a developer with the reviewer's feedback as context
 - For documentation needs, create a "tech-writer" — their feedback on API clarity can improve the design itself
