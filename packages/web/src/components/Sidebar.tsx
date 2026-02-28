@@ -4,10 +4,10 @@ import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquar
 const links = [
   { to: '/', icon: Crown, label: 'Project Lead' },
   { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
+  { to: '/tasks', icon: History, label: 'Tasks' },
   { to: '/agents', icon: Users, label: 'Agents' },
   { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
-  { to: '/tasks', icon: History, label: 'Tasks' },
   { to: '/data', icon: Database, label: 'Database' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
