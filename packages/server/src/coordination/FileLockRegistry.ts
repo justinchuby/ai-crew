@@ -162,15 +162,28 @@ export class FileLockRegistry extends EventEmitter {
     return rows.map(rowToFileLock);
   }
 
-  cleanExpired(): number {
+  cleanExpired(): FileLock[] {
     return this._cleanExpired();
   }
 
-  private _cleanExpired(): number {
-    const result = this.db.drizzle
+  private _cleanExpired(): FileLock[] {
+    // Find expired locks before deleting so we can notify agents
+    const expired = this.db.drizzle
+      .select()
+      .from(fileLocks)
+      .where(expiredFilter)
+      .all();
+    if (expired.length === 0) return [];
+
+    this.db.drizzle
       .delete(fileLocks)
       .where(expiredFilter)
       .run();
-    return result.changes;
+
+    const result = expired.map(rowToFileLock);
+    for (const lock of result) {
+      this.emit('lock:expired', { filePath: lock.filePath, agentId: lock.agentId, agentRole: lock.agentRole });
+    }
+    return result;
   }
 }

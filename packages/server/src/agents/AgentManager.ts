@@ -135,6 +135,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
     this.heartbeat.start();
 
+    // Notify agents when their file locks expire
+    this.lockRegistry.on('lock:expired', ({ filePath, agentId }: { filePath: string; agentId: string }) => {
+      const agent = this.agents.get(agentId);
+      if (agent && (agent.status === 'running' || agent.status === 'idle')) {
+        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired and was released. Re-acquire it if you still need it.`);
+      }
+    });
+
     // Write .agent.md files for all roles so Copilot CLI can load them
     writeAgentFiles(this.roleRegistry.getAll());
 
