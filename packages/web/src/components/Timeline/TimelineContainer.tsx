@@ -383,6 +383,18 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         </span>
         <div className="flex items-center gap-2">
           <button
+            className={`flex items-center gap-1.5 px-2 py-0.5 text-xs rounded transition-colors ${
+              liveMode
+                ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50'
+                : 'text-zinc-400 bg-zinc-800 hover:bg-zinc-700'
+            }`}
+            onClick={() => onLiveModeChange?.(!liveMode)}
+            aria-label={liveMode ? 'Disable live mode' : 'Enable live mode'}
+          >
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+            Live
+          </button>
+          <button
             className="px-2 py-0.5 text-xs text-zinc-400 bg-zinc-800 rounded hover:bg-zinc-700"
             onClick={() => zoomBy(ZOOM_FACTOR_IN)}
             aria-label="Zoom in"
@@ -404,7 +416,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       <BrushTimeSelector
         fullRange={fullRange}
         visibleRange={visibleRange}
-        onRangeChange={setVisibleRange}
+        onRangeChange={(range) => { onLiveModeChange?.(false); setVisibleRange(range); }}
         agents={sortedAgents}
         width={containerWidth}
       />

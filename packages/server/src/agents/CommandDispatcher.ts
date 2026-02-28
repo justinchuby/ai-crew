@@ -762,19 +762,21 @@ export class CommandDispatcher {
       const manual = JSON.parse(match[1]);
       const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
 
-      // When a DAG exists, auto-derive computed fields from it
-      let progress = manual;
+      // When a DAG exists, attach a computed snapshot as a separate field
+      let progress: Record<string, unknown> = { ...manual };
       if (leadId) {
         const dagStatus = this.ctx.taskDAG.getStatus(leadId);
         if (dagStatus.tasks.length > 0) {
           const { summary } = dagStatus;
-          progress = {
-            summary: manual.summary || `${summary.done}/${dagStatus.tasks.length} tasks complete`,
+          progress.dag = {
+            summary: `${summary.done}/${dagStatus.tasks.length} tasks complete`,
             completed: dagStatus.tasks.filter(t => t.dagStatus === 'done').map(t => t.id),
             in_progress: dagStatus.tasks.filter(t => t.dagStatus === 'running').map(t => t.id),
             blocked: dagStatus.tasks.filter(t => t.dagStatus === 'blocked' || t.dagStatus === 'failed').map(t => t.id),
-            note: manual.summary,
           };
+          if (!progress.summary) {
+            progress.summary = (progress.dag as any).summary;
+          }
         }
       }
 
