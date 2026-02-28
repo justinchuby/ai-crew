@@ -162,6 +162,27 @@ export function useWebSocket() {
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
+        case 'agent:message_sent': {
+          // Show incoming messages in the recipient agent's chat panel
+          const toId = msg.to;
+          if (toId && toId !== 'system') {
+            const state = useAppStore.getState();
+            const recipient = state.agents.find((a) => a.id === toId);
+            if (recipient) {
+              const msgs = [...(recipient.messages ?? [])];
+              const senderLabel = msg.fromRole || msg.from?.slice(0, 8) || 'System';
+              const preview = (msg.content ?? '').slice(0, 500);
+              msgs.push({
+                type: 'text',
+                text: `[From ${senderLabel}] ${preview}`,
+                sender: 'user' as any,
+                timestamp: Date.now(),
+              });
+              updateAgent(toId, { messages: msgs });
+            }
+          }
+          break;
+        }
       }
     };
   }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
