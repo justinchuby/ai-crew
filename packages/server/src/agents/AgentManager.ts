@@ -12,6 +12,7 @@ import type { Database } from '../db/database.js';
 import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
+import type { TimerRegistry } from '../coordination/TimerRegistry.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -73,6 +74,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private chatGroupRegistry: ChatGroupRegistry;
   private taskDAG: TaskDAG;
   private deferredIssueRegistry: DeferredIssueRegistry;
+  private timerRegistry: TimerRegistry;
   private db?: Database;
   private conversationStore?: ConversationStore;
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
@@ -98,7 +100,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry } = {},
   ) {
     super();
     this.config = config;
@@ -111,6 +113,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.chatGroupRegistry = chatGroupRegistry;
     this.taskDAG = taskDAG;
     this.deferredIssueRegistry = deferredIssueRegistry ?? (null as any);
+    this.timerRegistry = timerRegistry ?? (null as any);
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -135,6 +138,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       chatGroupRegistry: this.chatGroupRegistry,
       taskDAG: this.taskDAG,
       deferredIssueRegistry: this.deferredIssueRegistry,
+      timerRegistry: this.timerRegistry,
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
     });
@@ -509,6 +513,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.terminate();
     this.emit('agent:terminated', id);
+
+    // Clean up agent timers
+    if (this.timerRegistry) this.timerRegistry.clearAgent(id);
 
     // Auto-archive groups where all members are now in terminal status
     this.archiveOrphanedGroups(id);

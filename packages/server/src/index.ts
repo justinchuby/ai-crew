@@ -85,7 +85,13 @@ const chatGroupRegistry = new ChatGroupRegistry(db);
 const taskDAG = new TaskDAG(db);
 const deferredIssueRegistry = new DeferredIssueRegistry(db);
 const projectRegistry = new ProjectRegistry(db);
-const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry });
+
+// Timer system — agents can set named timers with custom messages
+import { TimerRegistry } from './coordination/TimerRegistry.js';
+const timerRegistry = new TimerRegistry();
+timerRegistry.start();
+
+const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry });
 agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
@@ -96,6 +102,23 @@ const alertEngine = new AlertEngine(agentManager, lockRegistry, decisionLog, act
 alertEngine.start();
 alertEngine.on('alert:new', (alert) => {
   wsServer.broadcastEvent({ type: 'alert:new', alert });
+});
+
+// Capability registry — tracks which agents have expertise on which files/technologies
+import { CapabilityRegistry } from './coordination/CapabilityRegistry.js';
+const capabilityRegistry = new CapabilityRegistry(db, lockRegistry, () => agentManager.getAll());
+lockRegistry.on('lock:acquired', ({ agentId, agentRole, filePath }: { agentId: string; agentRole: string; filePath: string }) => {
+  const agent = agentManager.get(agentId);
+  const leadId = agent?.parentId ?? agentId;
+  capabilityRegistry.recordFileTouch(agentId, agentRole, leadId, filePath);
+});
+
+// Wire timer:fired events — inject reminder messages into agents
+timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
+  const agent = agentManager.get(timer.agentId);
+  if (agent && agent.status === 'running') {
+    agent.sendMessage(`[Timer "${timer.label}"] ${timer.message}`);
+  }
 });
 
 // Register scheduled background tasks
@@ -128,7 +151,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', authMiddleware);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry));
 
 // Serve built web frontend in production
 import path from 'path';
@@ -178,6 +201,7 @@ function gracefulShutdown(signal: string) {
   scheduler.stop();
   agentManager.shutdownAll();
   activityLedger.stop();
+  timerRegistry.stop();
   lockRegistry.cleanExpired();
   db.close();
   httpServer.close(() => {

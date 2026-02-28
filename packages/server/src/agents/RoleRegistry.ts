@@ -468,7 +468,12 @@ When something is unclear or you need information from another agent, send them 
 When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), use QUERY_GROUPS to check for existing groups first, then create one with CREATE_GROUP if needed. Groups are auto-created when you delegate the same feature to 3+ agents — check QUERY_GROUPS before creating duplicates. Group chats keep everyone in sync and reduce duplicated conversations.
 
 When committing changes, NEVER use \`git add -A\` — it picks up other agents' uncommitted work. Instead, use \`git add <your-specific-files>\` or use the COMMIT command which auto-scopes to your locked files:
-\`[[[ COMMIT {"message": "description of changes"} ]]]\``;
+\`[[[ COMMIT {"message": "description of changes"} ]]]\`
+
+You can set reminders using timers:
+\`[[[ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ]]]\`
+\`[[[ CANCEL_TIMER {"name": "check-build"} ]]]\`
+\`[[[ LIST_TIMERS {} ]]]\``;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();

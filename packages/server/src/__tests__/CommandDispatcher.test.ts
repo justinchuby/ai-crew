@@ -112,6 +112,13 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       resolve: vi.fn().mockReturnValue(true),
       dismiss: vi.fn().mockReturnValue(true),
     } as any,
+    timerRegistry: {
+      create: vi.fn().mockReturnValue({ id: 'tmr-1', label: 'test', repeat: false }),
+      cancel: vi.fn().mockReturnValue(true),
+      getAgentTimers: vi.fn().mockReturnValue([]),
+      getAllTimers: vi.fn().mockReturnValue([]),
+      clearAgent: vi.fn(),
+    } as any,
     maxConcurrent: 10,
     markHumanInterrupt: vi.fn(),
     ...overrides,
