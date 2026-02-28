@@ -2347,18 +2347,36 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
 
   return (
     <>
+      {/* Tier filter bar */}
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-700/50 bg-gray-900/50">
+        <Filter className="w-3 h-3 text-gray-500 shrink-0" />
+        {FILTER_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${tierFilter === opt.value ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'}`}
+            onClick={() => setTierFilter(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       <div ref={feedRef} className="h-full overflow-y-auto">
-        {feed.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
+        {classifiedFeed.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-4 font-mono">
+            {feed.length === 0 ? 'No messages yet' : 'No messages match this filter'}
+          </p>
         ) : (
-          feed.map((entry, i) => {
+          classifiedFeed.map(({ entry, tier }, i) => {
+            const tierStyle = TIER_CONFIG[tier];
+
             if (entry.type === 'group') {
               const gm = entry.item;
               const time = new Date(gm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
               return (
                 <div
                   key={gm.id || `gm-${i}`}
-                  className="px-3 py-1.5 border-b border-b-emerald-400/20 bg-emerald-500/[0.04] border-l-2 border-l-emerald-400/30 cursor-pointer hover:bg-emerald-500/[0.08] transition-colors"
+                  className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'routine' ? 'border-b-emerald-400/10 border-l-emerald-400/15 opacity-60 hover:opacity-100 hover:bg-emerald-500/[0.06]' : 'border-b-emerald-400/20 bg-emerald-500/[0.04] border-l-emerald-400/30 hover:bg-emerald-500/[0.08]'}`}
                   onClick={() => setSelectedGroupMsg(gm)}
                 >
                   <div className="flex items-center gap-1 text-xs">
@@ -2366,6 +2384,7 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
                     <span className="font-mono font-semibold text-emerald-400 truncate">{gm.groupName}</span>
                     <span className="text-gray-500">·</span>
                     <span className="font-mono text-cyan-400">{gm.fromRole}</span>
+                    {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse text-[10px]">●</span>}
                     <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                   </div>
                   <div className="text-xs font-mono text-gray-300 mt-0.5">
@@ -2382,13 +2401,14 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
             return (
               <div
                 key={c.id}
-                className={`px-3 py-1.5 border-b cursor-pointer transition-colors ${isToUser ? 'bg-blue-500/[0.06] border-b-blue-400/20 border-l-2 border-l-blue-400/30 hover:bg-blue-500/[0.10]' : 'border-b-gray-700/30 hover:bg-gray-700/30'}`}
+                className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'notable' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-blue-500/[0.08]` : `${isToUser ? 'bg-blue-500/[0.04] border-b-blue-400/15 border-l-blue-400/20' : 'border-b-gray-700/30 border-l-transparent'} opacity-60 hover:opacity-100 hover:bg-gray-700/30`}`}
                 onClick={() => setSelectedComm(c)}
               >
                 <div className="flex items-center gap-1 text-xs">
                   <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
                   <span className="text-gray-500">→</span>
                   <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
+                  {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse text-[10px]">●</span>}
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
                 <div className="text-xs font-mono text-gray-300 mt-0.5">
