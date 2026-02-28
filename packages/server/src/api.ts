@@ -42,6 +42,7 @@ export function apiRouter(
   capabilityRegistry?: import('./coordination/CapabilityRegistry.js').CapabilityRegistry,
   sessionRetro?: import('./coordination/SessionRetro.js').SessionRetro,
   sessionExporter?: import('./coordination/SessionExporter.js').SessionExporter,
+  eagerScheduler?: import('./tasks/EagerScheduler.js').EagerScheduler,
 ): Router {
   const router = Router();
 
@@ -1067,6 +1068,15 @@ export function apiRouter(
       return;
     }
     res.json(alertEngine.getAlerts());
+  });
+
+  // --- Eager Scheduler ---
+  router.get('/coordination/eager-schedule', (_req, res) => {
+    if (!eagerScheduler) {
+      res.json([]);
+      return;
+    }
+    res.json(eagerScheduler.getPreAssignments());
   });
 
   // --- Capability Registry ---

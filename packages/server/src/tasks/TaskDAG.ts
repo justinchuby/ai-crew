@@ -417,6 +417,16 @@ export class TaskDAG extends EventEmitter {
       .map(rowToTask);
   }
 
+  /** Get all tasks across all leads (used by EagerScheduler and global queries) */
+  getAll(): DagTask[] {
+    return this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .orderBy(desc(dagTasks.priority), asc(dagTasks.createdAt))
+      .all()
+      .map(rowToTask);
+  }
+
   /** Get full DAG status (for TASK_STATUS command) */
   getStatus(leadId: string): {
     tasks: DagTask[];

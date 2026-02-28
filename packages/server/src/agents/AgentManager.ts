@@ -14,6 +14,7 @@ import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../coordination/TimerRegistry.js';
 import type { SessionExporter } from '../coordination/SessionExporter.js';
+import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -76,6 +77,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private taskDAG: TaskDAG;
   private deferredIssueRegistry: DeferredIssueRegistry;
   private timerRegistry: TimerRegistry;
+  private capabilityInjector?: CapabilityInjector;
   private sessionExporter?: SessionExporter;
 
   private db?: Database;
@@ -103,7 +105,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector } = {},
   ) {
     super();
     this.config = config;
@@ -117,6 +119,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.taskDAG = taskDAG;
     this.deferredIssueRegistry = deferredIssueRegistry ?? (null as any);
     this.timerRegistry = timerRegistry ?? (null as any);
+    this.capabilityInjector = capabilityInjector;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -143,6 +146,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       taskDAG: this.taskDAG,
       deferredIssueRegistry: this.deferredIssueRegistry,
       timerRegistry: this.timerRegistry,
+      capabilityInjector: this.capabilityInjector,
       get sessionExporter() { return self.sessionExporter; },
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
@@ -525,6 +529,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Clean up agent timers
     if (this.timerRegistry) this.timerRegistry.clearAgent(id);
+
+    // Clean up acquired capabilities
+    if (this.capabilityInjector) this.capabilityInjector.clearAgent(id);
 
     // Auto-archive groups where all members are now in terminal status
     this.archiveOrphanedGroups(id);

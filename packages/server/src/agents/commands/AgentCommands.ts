@@ -205,8 +205,9 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
   try {
     const req = JSON.parse(match[1]);
 
-    // Lead and architect agents can create agents
-    const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect';
+    // Lead, architect, and agents with delegation capability can create agents
+    const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect'
+      || ctx.capabilityInjector?.hasCommand(agent.id, 'CREATE_AGENT');
     if (!canCreate) {
       logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — only leads and architects can create agents.`);
       agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
@@ -320,8 +321,9 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const req = JSON.parse(match[1]);
     if (!req.to || !req.task) return;
 
-    // Lead and architect agents can delegate; others get a warning
-    const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect';
+    // Lead, architect, and agents with delegation capability can delegate
+    const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect'
+      || ctx.capabilityInjector?.hasCommand(agent.id, 'DELEGATE');
     if (!canDelegate) {
       logger.warn('delegation', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — only leads and architects can delegate.`);
       agent.sendMessage(`[System] Only the Project Lead and Architects can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);

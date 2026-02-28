@@ -19,6 +19,7 @@ import { ChatGroupRegistry } from './comms/ChatGroupRegistry.js';
 import { ContextRefresher } from './coordination/ContextRefresher.js';
 import { Scheduler } from './utils/Scheduler.js';
 import { ProjectRegistry } from './projects/ProjectRegistry.js';
+import { EagerScheduler } from './tasks/EagerScheduler.js';
 
 // Initialize auth (auto-generates token if not set)
 const authToken = initAuth();
@@ -87,12 +88,20 @@ const taskDAG = new TaskDAG(db);
 const deferredIssueRegistry = new DeferredIssueRegistry(db);
 const projectRegistry = new ProjectRegistry(db);
 
+// Eager Scheduler — pre-assigns tasks that are 1 dep away from ready
+const eagerScheduler = new EagerScheduler(taskDAG);
+eagerScheduler.start();
+
 // Timer system — agents can set named timers with custom messages
 import { TimerRegistry } from './coordination/TimerRegistry.js';
 const timerRegistry = new TimerRegistry();
 timerRegistry.start();
 
-const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry });
+// Dynamic Role Morphing — agents acquire capabilities on demand
+import { CapabilityInjector } from './agents/capabilities/CapabilityInjector.js';
+const capabilityInjector = new CapabilityInjector();
+
+const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry, capabilityInjector });
 agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
@@ -138,6 +147,19 @@ timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; messag
   }
 });
 
+// Wire dag:updated → eager scheduler re-evaluates immediately on any DAG change
+taskDAG.on('dag:updated', () => eagerScheduler.evaluate());
+
+// Wire eager scheduler task:ready → notify the running lead agent
+eagerScheduler.on('task:ready', ({ taskId }: { taskId: string }) => {
+  const lead = agentManager.getAll().find(a => a.role?.id === 'lead' && a.status === 'running');
+  if (lead) {
+    lead.sendMessage(
+      `[System] ⚡ Eager Scheduler: task now ready: ${taskId.slice(0, 8)}`,
+    );
+  }
+});
+
 // Register scheduled background tasks
 const scheduler = new Scheduler();
 scheduler.register({
@@ -177,7 +199,7 @@ const sessionExporter = new SessionExporter(agentManager, activityLedger, decisi
 agentManager.setSessionExporter(sessionExporter);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler));
 
 // Serve built web frontend in production
 import path from 'path';
@@ -225,6 +247,7 @@ function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
   contextRefresher.stop();
   scheduler.stop();
+  eagerScheduler.stop();
   agentManager.shutdownAll();
   activityLedger.stop();
   timerRegistry.stop();

@@ -26,6 +26,8 @@ import { getDeferredCommands } from './commands/DeferredCommands.js';
 import { getSystemCommands } from './commands/SystemCommands.js';
 import { getTimerCommands } from './commands/TimerCommands.js';
 import { getExportCommands } from './commands/ExportCommands.js';
+import { getCapabilityCommands } from './commands/CapabilityCommands.js';
+import { getDirectMessageCommands } from './commands/DirectMessageCommands.js';
 
 // Re-export types for backward compatibility (AgentManager, HeartbeatMonitor import from here)
 export type { Delegation, CommandContext } from './commands/types.js';
@@ -65,6 +67,8 @@ export class CommandDispatcher {
       ...getSystemCommands(this.handlerCtx),
       ...getTimerCommands(this.handlerCtx),
       ...getExportCommands(this.handlerCtx),
+      ...getCapabilityCommands(this.handlerCtx),
+      ...getDirectMessageCommands(this.handlerCtx),
     ];
   }
 

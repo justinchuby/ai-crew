@@ -473,7 +473,20 @@ When committing changes, NEVER use \`git add -A\` — it picks up other agents' 
 You can set reminders using timers:
 \`[[[ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ]]]\`
 \`[[[ CANCEL_TIMER {"name": "check-build"} ]]]\`
-\`[[[ LIST_TIMERS {} ]]]\``;
+\`[[[ LIST_TIMERS {} ]]]\`
+
+== Capability System ==
+You can acquire additional capabilities beyond your role:
+  \`[[[ ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "found bug during development"} ]]]\`
+  \`[[[ LIST_CAPABILITIES ]]]\`
+Available: code-review, architecture, delegation, testing, devops
+
+== Direct Messaging ==
+You can message other agents directly without going through the lead:
+  \`[[[ DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "your message"} ]]]\`
+  \`[[[ QUERY_PEERS ]]]\`
+Use this for peer coordination — asking questions, sharing findings, requesting help.
+DIRECT_MESSAGE queues the message so it doesn't interrupt the recipient's current work.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();
