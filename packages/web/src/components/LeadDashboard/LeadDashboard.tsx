@@ -1691,7 +1691,7 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
                   {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
                   <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
                   {d.needsConfirmation && d.status === 'recorded' && (
-                    <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="cursor-pointer flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => onConfirm?.(d.id)}
                         className="cursor-pointer text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center gap-1"
