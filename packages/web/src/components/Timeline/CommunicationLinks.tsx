@@ -8,6 +8,7 @@ export interface Communication {
   type: string;
   fromAgentId: string;
   toAgentId?: string;
+  groupName?: string;
   summary: string;
   timestamp: string;
 }
@@ -267,7 +268,9 @@ export function CommunicationLinks({
               {tooltipData.fromAgentId.slice(0, 8)}
               {tooltipData.toAgentId
                 ? ` → ${tooltipData.toAgentId.slice(0, 8)}`
-                : ' → ?'}
+                : tooltipData.groupName
+                  ? ` → 👥 ${tooltipData.groupName}`
+                  : ' → ?'}
             </div>
             {tooltipData.summary && (
               <p className="text-gray-300 text-[11px] line-clamp-3 mt-1">
