@@ -131,3 +131,14 @@ Agents communicate via HTML comment commands detected in their output stream:
 
 <img width="3164" height="1598" alt="image" src="https://github.com/user-attachments/assets/bcf9bb15-be17-4f53-9347-d044dbc0871c" />
 
+<img width="1411" height="782" alt="Image" src="https://github.com/user-attachments/assets/2d9762c1-a546-4494-8545-6fd3cc41cbc0" />
+
+<img width="1404" height="796" alt="Image" src="https://github.com/user-attachments/assets/47b8b71b-ae85-485a-94fc-881c8d616369" />
+
+<img width="1404" height="796" alt="Image" src="https://github.com/user-attachments/assets/9596336c-27f0-43e8-a82f-0cf20af7a149" />
+
+<img width="1413" height="825" alt="Image" src="https://github.com/user-attachments/assets/83243b55-33fb-46f5-aa63-2f8a68b75118" />
+
+<img width="1412" height="826" alt="Image" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
+
+<img width="1406" height="817" alt="Image" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
