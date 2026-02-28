@@ -51,8 +51,12 @@ export class TimerRegistry extends EventEmitter {
     }
   }
 
-  /** Create a timer for an agent. Returns the timer or null if limit reached. */
+  /** Create a timer for an agent. Returns the timer or null if limit reached or invalid input. */
   create(agentId: string, input: TimerInput): Timer | null {
+    if (!Number.isFinite(input.delaySeconds) || input.delaySeconds < 0 || input.delaySeconds > 86400) {
+      return null;
+    }
+
     const agentTimers = this.getAgentTimers(agentId);
     if (agentTimers.length >= MAX_TIMERS_PER_AGENT) {
       return null;

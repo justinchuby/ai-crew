@@ -114,10 +114,12 @@ lockRegistry.on('lock:acquired', ({ agentId, agentRole, filePath }: { agentId: s
 });
 
 // Wire timer:fired events — inject reminder messages into agents
+// Wrap in [System Timer] prefix to prevent ACP command injection
 timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
   const agent = agentManager.get(timer.agentId);
   if (agent && agent.status === 'running') {
-    agent.sendMessage(`[Timer "${timer.label}"] ${timer.message}`);
+    const safeMsg = timer.message.replace(/\[\[\[/g, '(((').replace(/\]\]\]/g, ')))');
+    agent.sendMessage(`[System Timer "${timer.label}"] ${safeMsg}`);
   }
 });
 
