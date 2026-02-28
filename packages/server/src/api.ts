@@ -339,6 +339,22 @@ export function apiRouter(
     res.json(chatGroups.getMessages(req.params.name, req.params.id, limit));
   });
 
+  router.post('/lead/:id/groups/:name/messages', (req, res) => {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: 'content required' });
+    const chatGroups = agentManager.getChatGroupRegistry();
+    const leadId = req.params.id;
+    const groupName = req.params.name;
+    if (!chatGroups.exists(groupName, leadId)) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    // Add human as member if not already (human can join any group)
+    chatGroups.addMembers(leadId, groupName, ['human']);
+    const message = chatGroups.sendMessage(groupName, leadId, 'human', 'Human User', content);
+    if (!message) return res.status(500).json({ error: 'Failed to send message' });
+    res.status(201).json(message);
+  });
+
   router.get('/lead/:id/delegations', (req, res) => {
     res.json(agentManager.getDelegations(req.params.id));
   });

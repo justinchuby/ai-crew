@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Users, Settings, Crown, Network, History, LayoutDashboard } from 'lucide-react';
+import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquare } from 'lucide-react';
 
 const links = [
   { to: '/', icon: Crown, label: 'Project Lead' },
   { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
   { to: '/agents', icon: Users, label: 'Agents' },
+  { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
   { to: '/tasks', icon: History, label: 'Sessions' },
   { to: '/settings', icon: Settings, label: 'Settings' },

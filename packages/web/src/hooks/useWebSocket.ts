@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
@@ -180,6 +181,38 @@ export function useWebSocket() {
               });
               updateAgent(toId, { messages: msgs });
             }
+          }
+          break;
+        }
+        case 'group:created': {
+          const gs = useGroupStore.getState();
+          gs.addGroup({
+            name: msg.name,
+            leadId: msg.leadId,
+            memberIds: msg.memberIds ?? [],
+            createdAt: msg.createdAt ?? new Date().toISOString(),
+          });
+          break;
+        }
+        case 'group:message': {
+          const gs = useGroupStore.getState();
+          if (msg.message) {
+            const key = groupKey(msg.message.leadId, msg.message.groupName);
+            gs.addMessage(key, msg.message);
+          }
+          break;
+        }
+        case 'group:member_added': {
+          const gs = useGroupStore.getState();
+          if (msg.group && msg.agentId) {
+            gs.addMember(msg.leadId, msg.group, msg.agentId);
+          }
+          break;
+        }
+        case 'group:member_removed': {
+          const gs = useGroupStore.getState();
+          if (msg.group && msg.agentId) {
+            gs.removeMember(msg.leadId, msg.group, msg.agentId);
           }
           break;
         }
