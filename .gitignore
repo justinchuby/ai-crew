@@ -1,10 +1,37 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+*.tsbuildinfo
+
+# Environment & secrets
 .env
+.env.*
+!.env.example
+
+# Database files
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Test output
 test-results/
 playwright-report/
+coverage/
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Runtime / workspace
+.ai-crew
+
+# Logs
+*.log
+npm-debug.log*

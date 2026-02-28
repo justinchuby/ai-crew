@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Hand, Check } from 'lucide-react';
+import { AgentIdBadge } from '../../utils/markdown';
 
 interface Props {
   agent: AgentInfo;
@@ -16,6 +17,19 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'text-gray-400',
   failed: 'text-red-400',
 };
+
+const AVAILABLE_MODELS = [
+  'claude-opus-4.6',
+  'claude-sonnet-4.6',
+  'claude-sonnet-4.5',
+  'claude-haiku-4.5',
+  'gpt-5.3-codex',
+  'gpt-5.2-codex',
+  'gpt-5.2',
+  'gpt-5.1-codex',
+  'gemini-3-pro-preview',
+  'gpt-4.1',
+];
 
 export function AgentCard({ agent, api }: Props) {
   const { setSelectedAgent, selectedAgentId } = useAppStore();
@@ -107,9 +121,40 @@ export function AgentCard({ agent, api }: Props) {
         </div>
       </div>
 
-      {agent.taskId && (
+      {agent.task && (
         <div className="text-xs text-gray-400 mb-1">
-          Task: <span className="text-gray-300">{agent.taskId.slice(0, 8)}...</span>
+          Task: <span className="text-gray-300">{agent.task.length > 60 ? agent.task.slice(0, 60) + '...' : agent.task}</span>
+        </div>
+      )}
+
+      {(agent.status === 'running' || agent.status === 'idle') && (
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-[10px] text-gray-500">Model:</span>
+          <select
+            value={agent.model || agent.role.model || ''}
+            onChange={(e) => {
+              e.stopPropagation();
+              api.updateAgent(agent.id, { model: e.target.value });
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[10px] bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+          >
+            {(() => {
+              const currentModel = agent.model || agent.role.model || '';
+              const options = AVAILABLE_MODELS.includes(currentModel)
+                ? AVAILABLE_MODELS
+                : [currentModel, ...AVAILABLE_MODELS];
+              return options.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ));
+            })()}
+          </select>
+        </div>
+      )}
+
+      {!(agent.status === 'running' || agent.status === 'idle') && agent.model && (
+        <div className="text-[10px] text-gray-500 mb-1">
+          Model: <span className="text-gray-400">{agent.model}</span>
         </div>
       )}
 
@@ -155,16 +200,13 @@ export function AgentCard({ agent, api }: Props) {
             className="inline-block w-2.5 h-2.5 rounded-full"
             style={{ backgroundColor: agent.role.color }}
           />
-          <span className={`text-[10px] px-1 py-0.5 rounded ${agent.mode === 'acp' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'}`}>
-            {agent.mode === 'acp' ? 'ACP' : 'PTY'}
-          </span>
           {agent.autopilot && (
             <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">
               autopilot
             </span>
           )}
         </div>
-        <span className="text-[10px] text-gray-500 font-mono">{agent.id.slice(0, 8)}</span>
+        <AgentIdBadge id={agent.id} />
       </div>
     </div>
   );

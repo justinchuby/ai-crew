@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall } from '../types';
+import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
 
 export interface ActivityEvent {
   id: string;
@@ -48,6 +48,9 @@ interface ProjectState {
   toolCalls: AcpToolCall[];
   activity: ActivityEvent[];
   comms: AgentComm[];
+  groups: ChatGroup[];
+  groupMessages: Record<string, GroupMessage[]>;
+  dagStatus: DagStatus | null;
   /** Timestamp of last text received — used to show "working" indicator */
   lastTextAt: number;
   /** When true, the next appended text should start on a new line */
@@ -69,21 +72,26 @@ interface LeadState {
 
   setDecisions: (leadId: string, decisions: Decision[]) => void;
   addDecision: (leadId: string, decision: Decision) => void;
+  updateDecision: (leadId: string, decisionId: string, updates: Partial<Decision>) => void;
   setProgress: (leadId: string, progress: LeadProgress) => void;
   setProgressSummary: (leadId: string, summary: string) => void;
   addProgressSnapshot: (leadId: string, snapshot: ProgressSnapshot) => void;
   addMessage: (leadId: string, msg: AcpTextChunk) => void;
+  setMessages: (leadId: string, messages: AcpTextChunk[]) => void;
   appendToLastAgentMessage: (leadId: string, text: string) => void;
   promoteQueuedMessages: (leadId: string) => void;
   updateToolCall: (leadId: string, toolCall: AcpToolCall) => void;
   addActivity: (leadId: string, event: ActivityEvent) => void;
   addComm: (leadId: string, comm: AgentComm) => void;
   addAgentReport: (leadId: string, report: AgentReport) => void;
+  setGroups: (leadId: string, groups: ChatGroup[]) => void;
+  addGroupMessage: (leadId: string, groupName: string, message: GroupMessage) => void;
+  setDagStatus: (leadId: string, status: DagStatus) => void;
   reset: () => void;
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
+  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, dagStatus: null, lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -125,6 +133,15 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, decisions: [...proj.decisions, decision] } } };
     }),
 
+  updateDecision: (leadId, decisionId, updates) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      const decisions = proj.decisions.map((d) =>
+        d.id === decisionId ? { ...d, ...updates } : d,
+      );
+      return { projects: { ...s.projects, [leadId]: { ...proj, decisions } } };
+    }),
+
   setProgress: (leadId, progress) =>
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
@@ -150,14 +167,20 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, messages: [...proj.messages, withTs] } } };
     }),
 
+  setMessages: (leadId, messages) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages } } };
+    }),
+
   appendToLastAgentMessage: (leadId, text) =>
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       const msgs = [...proj.messages];
       const lastIdx = msgs.length - 1;
-      // If the last message has an unclosed <!-- block, always append to keep the command intact
+      // If the last message has an unclosed [[[ block, always append to keep the command intact
       const lastText = lastIdx >= 0 ? msgs[lastIdx].text : '';
-      const hasUnclosedCommand = lastText.lastIndexOf('<!--') > lastText.lastIndexOf('-->');
+      const hasUnclosedCommand = lastText.lastIndexOf('[[[') > lastText.lastIndexOf(']]]');
       if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent' && (!proj.pendingNewline || hasUnclosedCommand)) {
         msgs[lastIdx] = { ...msgs[lastIdx], text: lastText + text, timestamp: msgs[lastIdx].timestamp || Date.now() };
       } else {
@@ -212,6 +235,37 @@ export const useLeadStore = create<LeadState>((set) => ({
       let reports = [...proj.agentReports, report];
       if (reports.length > 100) reports = reports.slice(-100);
       return { projects: { ...s.projects, [leadId]: { ...proj, agentReports: reports } } };
+    }),
+
+  setGroups: (leadId, groups) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, groups } } };
+    }),
+
+  addGroupMessage: (leadId, groupName, message) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      const existing = proj.groupMessages[groupName] ?? [];
+      // Deduplicate by message id
+      if (existing.some((m) => m.id === message.id)) return s;
+      let msgs = [...existing, message];
+      if (msgs.length > 500) msgs = msgs.slice(-500);
+      return {
+        projects: {
+          ...s.projects,
+          [leadId]: {
+            ...proj,
+            groupMessages: { ...proj.groupMessages, [groupName]: msgs },
+          },
+        },
+      };
+    }),
+
+  setDagStatus: (leadId, status) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, dagStatus: status } } };
     }),
 
   reset: () => set({ projects: {}, selectedLeadId: null }),

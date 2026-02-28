@@ -25,6 +25,11 @@ export class ContextRefresher {
     this.agentManager.on('agent:exit', debouncedRefresh);
     this.lockRegistry.on('lock:acquired', debouncedRefresh);
     this.lockRegistry.on('lock:released', debouncedRefresh);
+
+    // Re-inject crew context immediately after Copilot CLI compacts an agent's context
+    this.agentManager.on('agent:context_compacted', (data: { agentId: string }) => {
+      this.refreshOne(data.agentId);
+    });
   }
 
   start(): void {
@@ -69,7 +74,7 @@ export class ContextRefresher {
       role: agent.role.id,
       roleName: agent.role.name,
       status: agent.status,
-      taskId: agent.taskId,
+      task: agent.task,
       lockedFiles: allLocks
         .filter((lock) => lock.agentId === agent.id)
         .map((lock) => lock.filePath),

@@ -32,10 +32,10 @@ const ICONS = {
   info: Info,
 };
 
-const COLORS = {
-  success: 'border-green-500/30 bg-green-900/20 text-green-300',
-  error: 'border-red-500/30 bg-red-900/20 text-red-300',
-  info: 'border-blue-500/30 bg-blue-900/20 text-blue-300',
+const ICON_COLORS = {
+  success: 'text-green-300',
+  error: 'text-red-300',
+  info: 'text-blue-300',
 };
 
 export function ToastContainer() {
@@ -50,11 +50,11 @@ export function ToastContainer() {
         return (
           <div
             key={toast.id}
-            className={`flex items-center gap-2 px-4 py-3 rounded-lg border shadow-lg animate-slide-in ${COLORS[toast.type]}`}
+            className="glass-toast flex items-center gap-2 px-4 py-3 rounded-xl animate-slide-in"
           >
-            <Icon size={16} className="shrink-0" />
-            <span className="text-sm flex-1">{toast.message}</span>
-            <button onClick={() => remove(toast.id)} className="shrink-0 opacity-60 hover:opacity-100">
+            <Icon size={16} className={`shrink-0 ${ICON_COLORS[toast.type]}`} />
+            <span className="text-sm flex-1 text-white/90">{toast.message}</span>
+            <button onClick={() => remove(toast.id)} className="shrink-0 opacity-60 hover:opacity-100 text-white/70">
               <X size={14} />
             </button>
           </div>

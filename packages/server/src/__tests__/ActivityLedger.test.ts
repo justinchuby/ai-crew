@@ -12,6 +12,7 @@ describe('ActivityLedger', () => {
   });
 
   afterEach(() => {
+    ledger.stop();
     db.close();
   });
 

@@ -1,5 +1,8 @@
 import { EventEmitter } from 'events';
+import { eq, desc, asc, gt, sql, inArray } from 'drizzle-orm';
 import { Database } from '../db/database.js';
+import { activityLog } from '../db/schema.js';
+import { logger } from '../utils/logger.js';
 
 export type ActionType =
   | 'file_edit'
@@ -9,11 +12,14 @@ export type ActionType =
   | 'task_completed'
   | 'sub_agent_spawned'
   | 'agent_killed'
+  | 'agent_terminated'
   | 'lock_acquired'
   | 'lock_released'
   | 'lock_denied'
   | 'message_sent'
   | 'delegated'
+  | 'heartbeat_halted'
+  | 'limit_change_requested'
   | 'error';
 
 export interface ActivityEntry {
@@ -28,10 +34,15 @@ export interface ActivityEntry {
 
 export class ActivityLedger extends EventEmitter {
   private db: Database;
+  private buffer: Array<{ agentId: string; agentRole: string; actionType: string; summary: string; details: string }> = [];
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly FLUSH_INTERVAL_MS = 250;
+  private readonly FLUSH_BATCH_SIZE = 64;
 
   constructor(db: Database) {
     super();
     this.db = db;
+    this.flushTimer = setInterval(() => this.flush(), this.FLUSH_INTERVAL_MS);
   }
 
   log(
@@ -42,48 +53,89 @@ export class ActivityLedger extends EventEmitter {
     details: Record<string, any> = {},
   ): ActivityEntry {
     const detailsJson = JSON.stringify(details);
-    const result = this.db.run(
-      'INSERT INTO activity_log (agent_id, agent_role, action_type, summary, details) VALUES (?, ?, ?, ?, ?)',
-      [agentId, agentRole, actionType, summary, detailsJson],
-    );
-    const row = this.db.get(
-      'SELECT * FROM activity_log WHERE id = ?',
-      [result.lastInsertRowid],
-    );
-    const entry = this._mapRow(row);
+    this.buffer.push({ agentId, agentRole, actionType, summary, details: detailsJson });
+    if (this.buffer.length >= this.FLUSH_BATCH_SIZE) {
+      this.flush();
+    }
+
+    // Construct a synthetic entry for the event (no DB id yet)
+    const entry: ActivityEntry = {
+      id: 0,
+      agentId,
+      agentRole,
+      actionType,
+      summary,
+      details,
+      timestamp: new Date().toISOString(),
+    };
     this.emit('activity', entry);
     return entry;
   }
 
+  /** Flush buffered entries to the database */
+  flush(): void {
+    if (this.buffer.length === 0) return;
+    const batch = this.buffer.splice(0);
+    for (const entry of batch) {
+      this.db.drizzle
+        .insert(activityLog)
+        .values(entry)
+        .run();
+    }
+  }
+
+  /** Stop the flush timer (for graceful shutdown) */
+  stop(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.flush();
+  }
+
   getRecent(limit: number = 50): ActivityEntry[] {
-    const rows = this.db.all(
-      'SELECT * FROM activity_log ORDER BY id DESC LIMIT ?',
-      [limit],
-    );
+    this.flush();
+    const rows = this.db.drizzle
+      .select()
+      .from(activityLog)
+      .orderBy(desc(activityLog.id))
+      .limit(limit)
+      .all();
     return rows.map((row) => this._mapRow(row));
   }
 
   getByAgent(agentId: string, limit: number = 50): ActivityEntry[] {
-    const rows = this.db.all(
-      'SELECT * FROM activity_log WHERE agent_id = ? ORDER BY id DESC LIMIT ?',
-      [agentId, limit],
-    );
+    this.flush();
+    const rows = this.db.drizzle
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.agentId, agentId))
+      .orderBy(desc(activityLog.id))
+      .limit(limit)
+      .all();
     return rows.map((row) => this._mapRow(row));
   }
 
   getByType(actionType: ActionType, limit: number = 50): ActivityEntry[] {
-    const rows = this.db.all(
-      'SELECT * FROM activity_log WHERE action_type = ? ORDER BY id DESC LIMIT ?',
-      [actionType, limit],
-    );
+    this.flush();
+    const rows = this.db.drizzle
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.actionType, actionType))
+      .orderBy(desc(activityLog.id))
+      .limit(limit)
+      .all();
     return rows.map((row) => this._mapRow(row));
   }
 
   getSince(timestamp: string): ActivityEntry[] {
-    const rows = this.db.all(
-      'SELECT * FROM activity_log WHERE timestamp > ? ORDER BY id ASC',
-      [timestamp],
-    );
+    this.flush();
+    const rows = this.db.drizzle
+      .select()
+      .from(activityLog)
+      .where(gt(activityLog.timestamp, timestamp))
+      .orderBy(asc(activityLog.id))
+      .all();
     return rows.map((row) => this._mapRow(row));
   }
 
@@ -93,42 +145,52 @@ export class ActivityLedger extends EventEmitter {
     byType: Record<string, number>;
     recentFiles: string[];
   } {
-    const totalRow = this.db.get<{ count: number }>(
-      'SELECT COUNT(*) as count FROM activity_log',
-    );
+    this.flush();
+    const totalRow = this.db.drizzle
+      .select({ count: sql<number>`count(*)` })
+      .from(activityLog)
+      .get();
     const totalActions = totalRow?.count ?? 0;
 
-    const agentRows = this.db.all<{ agent_id: string; count: number }>(
-      'SELECT agent_id, COUNT(*) as count FROM activity_log GROUP BY agent_id',
-    );
+    const agentRows = this.db.drizzle
+      .select({ agentId: activityLog.agentId, count: sql<number>`count(*)` })
+      .from(activityLog)
+      .groupBy(activityLog.agentId)
+      .all();
     const byAgent: Record<string, number> = {};
     for (const row of agentRows) {
-      byAgent[row.agent_id] = row.count;
+      byAgent[row.agentId] = row.count;
     }
 
-    const typeRows = this.db.all<{ action_type: string; count: number }>(
-      'SELECT action_type, COUNT(*) as count FROM activity_log GROUP BY action_type',
-    );
+    const typeRows = this.db.drizzle
+      .select({ actionType: activityLog.actionType, count: sql<number>`count(*)` })
+      .from(activityLog)
+      .groupBy(activityLog.actionType)
+      .all();
     const byType: Record<string, number> = {};
     for (const row of typeRows) {
-      byType[row.action_type] = row.count;
+      byType[row.actionType] = row.count;
     }
 
-    const fileRows = this.db.all<{ details: string }>(
-      "SELECT details FROM activity_log WHERE action_type IN ('file_edit', 'file_read') ORDER BY id DESC LIMIT 50",
-    );
+    const fileRows = this.db.drizzle
+      .select({ details: activityLog.details })
+      .from(activityLog)
+      .where(inArray(activityLog.actionType, ['file_edit', 'file_read']))
+      .orderBy(desc(activityLog.id))
+      .limit(50)
+      .all();
     const recentFiles: string[] = [];
     const seen = new Set<string>();
     for (const row of fileRows) {
       try {
-        const parsed = JSON.parse(row.details);
+        const parsed = JSON.parse(row.details ?? '{}');
         const file = parsed.file ?? parsed.path;
         if (file && !seen.has(file)) {
           seen.add(file);
           recentFiles.push(file);
         }
-      } catch {
-        // skip malformed JSON
+      } catch (err) {
+        logger.debug('activity', 'Failed to parse activity details JSON', { error: (err as Error).message });
       }
     }
 
@@ -136,6 +198,7 @@ export class ActivityLedger extends EventEmitter {
   }
 
   prune(keepCount: number = 10000): void {
+    this.flush();
     this.db.run(
       'DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT ?)',
       [keepCount],
@@ -146,14 +209,15 @@ export class ActivityLedger extends EventEmitter {
     let details: Record<string, any> = {};
     try {
       details = JSON.parse(row.details ?? '{}');
-    } catch {
+    } catch (err) {
+      logger.debug('activity', 'Failed to parse activity row details', { error: (err as Error).message });
       details = {};
     }
     return {
       id: row.id,
-      agentId: row.agent_id,
-      agentRole: row.agent_role,
-      actionType: row.action_type as ActionType,
+      agentId: row.agentId,
+      agentRole: row.agentRole,
+      actionType: row.actionType as ActionType,
       summary: row.summary,
       details,
       timestamp: row.timestamp,

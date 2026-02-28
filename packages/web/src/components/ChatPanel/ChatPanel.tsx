@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
+import { useRef, useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
-import '@xterm/xterm/css/xterm.css';
+import { AgentIdBadge } from '../../utils/markdown';
 
 interface Props {
   agentId: string;
@@ -19,16 +17,13 @@ interface Props {
   api: any;
 }
 
-export function ChatPanel({ agentId, ws }: Props) {
-  const termRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+export function ChatPanel({ agentId, ws, api }: Props) {
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { agents, setSelectedAgent } = useAppStore();
   const agent = agents.find((a) => a.id === agentId);
 
@@ -69,67 +64,6 @@ export function ChatPanel({ agentId, ws }: Props) {
     setMentionQuery(null);
     inputRef.current?.focus();
   };
-
-  const isPty = agent?.mode !== 'acp';
-
-  useEffect(() => {
-    if (!isPty || !termRef.current) return;
-
-    const terminal = new Terminal({
-      theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-        cursor: '#58a6ff',
-        selectionBackground: '#388bfd44',
-      },
-      fontSize: 13,
-      fontFamily: 'Menlo, Monaco, Consolas, monospace',
-      cursorBlink: true,
-      scrollback: 5000,
-    });
-
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(termRef.current);
-    fitAddon.fit();
-
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
-    // Subscribe to agent output
-    ws.subscribe(agentId);
-
-    // Handle terminal input
-    terminal.onData((data) => {
-      ws.sendInput(agentId, data);
-    });
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      ws.resizeAgent(agentId, terminal.cols, terminal.rows);
-    });
-    resizeObserver.observe(termRef.current);
-
-    // Listen for WebSocket messages forwarded via custom window events
-    const handleWsMessage = (event: Event) => {
-      const msg = JSON.parse((event as MessageEvent).data);
-      if (msg.type === 'agent:data' && msg.agentId === agentId) {
-        terminal.write(msg.data);
-      } else if (msg.type === 'agent:buffer' && msg.agentId === agentId) {
-        terminal.write(msg.data);
-      }
-    };
-
-    window.addEventListener('ws-message', handleWsMessage);
-
-    return () => {
-      ws.unsubscribe(agentId);
-      resizeObserver.disconnect();
-      terminal.dispose();
-      window.removeEventListener('ws-message', handleWsMessage);
-    };
-  }, [agentId, ws, isPty]);
 
   const runningAgents = agents.filter((a) => a.status === 'running');
 
@@ -187,11 +121,7 @@ export function ChatPanel({ agentId, ws }: Props) {
         </div>
       </div>
 
-      {agent?.mode === 'acp' ? (
-        <AcpOutput agentId={agentId} />
-      ) : (
-        <div ref={termRef} className="flex-1 overflow-hidden" />
-      )}
+      <AcpOutput agentId={agentId} />
 
       <div className="border-t border-gray-700 p-2 shrink-0 relative">
         {mentionSuggestions.length > 0 && (
@@ -204,7 +134,7 @@ export function ChatPanel({ agentId, ws }: Props) {
               >
                 <span>{a.role.icon}</span>
                 <span>{a.role.name}</span>
-                <span className="text-xs text-gray-500 font-mono">{a.id.slice(0, 8)}</span>
+                <AgentIdBadge id={a.id} />
               </button>
             ))}
           </div>
@@ -214,10 +144,9 @@ export function ChatPanel({ agentId, ws }: Props) {
             Broadcasting to {runningAgents.length} agents
           </div>
         )}
-        <div className="flex gap-2">
-          <input
+        <div className="flex gap-2 items-end">
+          <textarea
             ref={inputRef}
-            type="text"
             value={inputText}
             onChange={(e) => {
               setInputText(e.target.value);
@@ -248,10 +177,26 @@ export function ChatPanel({ agentId, ws }: Props) {
                   return;
                 }
               }
-              if (e.key === 'Enter') handleSend();
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                handleSend();
+              } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                if (inputText.trim()) {
+                  handleSend();
+                }
+                api.interruptAgent(agentId);
+              }
             }}
-            placeholder="Type a message... (@ to mention)"
-            className={`flex-1 bg-surface border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent ${broadcast ? 'border-accent' : 'border-gray-700'}`}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = 'auto';
+              el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+            }}
+            rows={1}
+            placeholder="Type a message... (Enter = send, Shift+Enter = newline, Ctrl+Enter = interrupt, @ to mention)"
+            className={`flex-1 bg-surface border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent resize-none overflow-y-auto ${broadcast ? 'border-accent' : 'border-gray-700'}`}
+            style={{ maxHeight: 150 }}
           />
           <button
             onClick={() => setBroadcast(!broadcast)}

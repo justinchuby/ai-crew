@@ -1,7 +1,9 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
+import { getAuthToken } from './useApi';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -9,7 +11,7 @@ export function useWebSocket() {
   const shouldReconnectRef = useRef(true);
   // Track agents that had a tool call since their last text — next append needs a newline separator
   const pendingNewlineRef = useRef<Set<string>>(new Set());
-  const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask } =
+  const { setConnected, setAgents, addAgent, updateAgent, removeAgent } =
     useAppStore();
 
   const connect = useCallback(() => {
@@ -21,7 +23,11 @@ export function useWebSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const token = getAuthToken();
+    const wsUrl = token
+      ? `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`
+      : `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => setConnected(true);
@@ -40,7 +46,6 @@ export function useWebSocket() {
       switch (msg.type) {
         case 'init':
           setAgents(msg.agents);
-          setTasks(msg.tasks);
           useAppStore.getState().setLoading(false);
           break;
         case 'agent:spawned':
@@ -90,9 +95,9 @@ export function useWebSocket() {
           const last = msgs[msgs.length - 1];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-          // If the last message has an unclosed <!-- block, always append to keep commands intact
+          // If the last message has an unclosed [[[ block, always append to keep commands intact
           const lastText = last?.text ?? '';
-          const hasUnclosedCommand = lastText.lastIndexOf('<!--') > lastText.lastIndexOf('-->');
+          const hasUnclosedCommand = lastText.lastIndexOf('[[[') > lastText.lastIndexOf(']]]');
           if (last && (last.sender ?? 'agent') === 'agent' && (!needsNewline || hasUnclosedCommand)) {
             msgs[msgs.length - 1] = { ...last, text: lastText + rawText, timestamp: last.timestamp || Date.now() };
           } else {
@@ -130,6 +135,20 @@ export function useWebSocket() {
           updateAgent(msg.agentId, { messages: msgs });
           break;
         }
+        case 'agent:thinking': {
+          const state = useAppStore.getState();
+          const existing = state.agents.find((a) => a.id === msg.agentId);
+          const msgs = [...(existing?.messages ?? [])];
+          const last = msgs[msgs.length - 1];
+          // Append to existing thinking message or create new one
+          if (last && last.sender === 'thinking') {
+            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + msg.text, timestamp: last.timestamp || Date.now() };
+          } else {
+            msgs.push({ type: 'text', text: msg.text, sender: 'thinking', timestamp: Date.now() });
+          }
+          updateAgent(msg.agentId, { messages: msgs });
+          break;
+        }
         case 'agent:plan':
           updateAgent(msg.agentId, { plan: msg.plan });
           break;
@@ -141,18 +160,66 @@ export function useWebSocket() {
             useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
           }
           break;
-        case 'task:updated':
-          updateTask(msg.task);
-          break;
-        case 'task:removed':
-          removeTask(msg.taskId);
-          break;
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
+        case 'agent:message_sent': {
+          // Show incoming messages in the recipient agent's chat panel
+          const toId = msg.to;
+          if (toId && toId !== 'system') {
+            const state = useAppStore.getState();
+            const recipient = state.agents.find((a) => a.id === toId);
+            if (recipient) {
+              const msgs = [...(recipient.messages ?? [])];
+              const isFromSystem = msg.from === 'system';
+              const senderLabel = msg.fromRole || msg.from?.slice(0, 8) || 'System';
+              const preview = (msg.content ?? '').slice(0, 500);
+              msgs.push({
+                type: 'text',
+                text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
+                sender: isFromSystem ? 'system' as any : 'user' as any,
+                timestamp: Date.now(),
+              });
+              updateAgent(toId, { messages: msgs });
+            }
+          }
+          break;
+        }
+        case 'group:created': {
+          const gs = useGroupStore.getState();
+          gs.addGroup({
+            name: msg.name,
+            leadId: msg.leadId,
+            memberIds: msg.memberIds ?? [],
+            createdAt: msg.createdAt ?? new Date().toISOString(),
+          });
+          break;
+        }
+        case 'group:message': {
+          const gs = useGroupStore.getState();
+          if (msg.message) {
+            const key = groupKey(msg.message.leadId, msg.message.groupName);
+            gs.addMessage(key, msg.message);
+          }
+          break;
+        }
+        case 'group:member_added': {
+          const gs = useGroupStore.getState();
+          if (msg.group && msg.agentId) {
+            gs.addMember(msg.leadId, msg.group, msg.agentId);
+          }
+          break;
+        }
+        case 'group:member_removed': {
+          const gs = useGroupStore.getState();
+          if (msg.group && msg.agentId) {
+            gs.removeMember(msg.leadId, msg.group, msg.agentId);
+          }
+          break;
+        }
       }
     };
-  }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask]);
+  }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

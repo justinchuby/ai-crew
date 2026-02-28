@@ -3,6 +3,7 @@ import { Shield, FileText, Terminal, X } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useApi } from '../hooks/useApi';
 import type { AgentInfo, AcpPermissionRequest } from '../types';
+import { AgentIdBadge } from '../utils/markdown';
 
 const AUTO_DENY_SECONDS = 60;
 
@@ -134,9 +135,7 @@ export function PermissionDialog() {
             <span className="text-sm font-medium text-gray-200">
               {agentWithPermission.role.name}
             </span>
-            <span className="text-xs text-gray-500 font-mono">
-              {agentWithPermission.id.slice(0, 8)}
-            </span>
+            <AgentIdBadge id={agentWithPermission.id} />
           </div>
 
           {/* Tool name */}

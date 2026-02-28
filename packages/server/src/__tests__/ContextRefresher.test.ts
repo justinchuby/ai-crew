@@ -7,7 +7,7 @@ function makeAgent(overrides: Record<string, any> = {}) {
     id: overrides.id ?? 'agent-1',
     role: overrides.role ?? { id: 'dev', name: 'Developer' },
     status: overrides.status ?? 'running',
-    taskId: overrides.taskId ?? 'task-1',
+    task: overrides.task ?? 'task-1',
     injectContextUpdate: vi.fn(),
     ...overrides,
   };
@@ -59,8 +59,8 @@ describe('ContextRefresher', () => {
   describe('buildPeerList', () => {
     it('returns correct AgentContextInfo array from agents', () => {
       const agents = [
-        makeAgent({ id: 'a1', role: { id: 'dev', name: 'Developer' }, status: 'running', taskId: 't1' }),
-        makeAgent({ id: 'a2', role: { id: 'qa', name: 'QA Engineer' }, status: 'completed', taskId: 't2' }),
+        makeAgent({ id: 'a1', role: { id: 'dev', name: 'Developer' }, status: 'running', task: 't1' }),
+        makeAgent({ id: 'a2', role: { id: 'qa', name: 'QA Engineer' }, status: 'completed', task: 't2' }),
       ];
       mocks.agentManager.getAll.mockReturnValue(agents);
       mocks.lockRegistry.getAll.mockReturnValue([]);
@@ -73,7 +73,7 @@ describe('ContextRefresher', () => {
         role: 'dev',
         roleName: 'Developer',
         status: 'running',
-        taskId: 't1',
+        task: 't1',
         lockedFiles: [],
       });
       expect(peers[1]).toEqual({
@@ -81,7 +81,7 @@ describe('ContextRefresher', () => {
         role: 'qa',
         roleName: 'QA Engineer',
         status: 'completed',
-        taskId: 't2',
+        task: 't2',
         lockedFiles: [],
       });
     });

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Agent Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/agents');
     await expect(page.locator('h2')).toHaveText('Agents');
   });
 
@@ -14,8 +14,8 @@ test.describe('Agent Dashboard', () => {
     await page.getByRole('button', { name: /Spawn Agent/i }).click();
     await expect(page.getByText('Spawn Agent').first()).toBeVisible(); // dialog title
 
-    // All 10 built-in roles should be visible
-    for (const role of ['Architect', 'Code Reviewer', 'Critical Reviewer', 'Developer', 'Product Manager', 'Technical Writer', 'Designer', 'Generalist', 'Radical Thinker', 'Project Lead']) {
+    // Built-in roles should be visible
+    for (const role of ['Architect', 'Code Reviewer', 'Critical Reviewer', 'Developer', 'Product Manager', 'Technical Writer', 'Designer', 'Generalist', 'Radical Thinker', 'Project Lead', 'Secretary', 'QA Tester']) {
       await expect(page.getByText(role).first()).toBeVisible();
     }
   });

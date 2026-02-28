@@ -11,11 +11,14 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run dev --workspace=packages/server',
+      command: process.env.CI
+        ? 'AUTH=none node packages/server/dist/index.js'
+        : 'npm run dev --workspace=packages/server',
       port: 3001,
       cwd: '../..',
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
+      env: { AUTH: 'none' },
     },
     {
       command: 'npm run dev --workspace=packages/web',

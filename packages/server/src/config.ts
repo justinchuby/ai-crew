@@ -5,17 +5,15 @@ export interface ServerConfig {
   cliArgs: string[];
   maxConcurrentAgents: number;
   dbPath: string;
-  defaultAgentMode: 'pty' | 'acp';
 }
 
 const defaults: ServerConfig = {
-  port: 3001,
-  host: '0.0.0.0',
+  port: parseInt(process.env.PORT || '3001', 10),
+  host: process.env.HOST || '127.0.0.1',
   cliCommand: process.env.COPILOT_CLI_PATH || 'copilot',
   cliArgs: [],
-  maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '5', 10),
+  maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '10', 10),
   dbPath: process.env.DB_PATH || './ai-crew.db',
-  defaultAgentMode: (process.env.AGENT_MODE as 'pty' | 'acp') || 'acp',
 };
 
 let config: ServerConfig = { ...defaults };

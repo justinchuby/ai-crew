@@ -1,5 +1,6 @@
 import { Bot, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { AgentInfo, Delegation } from '../../types';
+import { AgentIdBadge } from '../../utils/markdown';
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -81,7 +82,7 @@ export function TeamStatus({ agents, delegations }: Props) {
                   {((agent.inputTokens ?? 0) > 0 || (agent.outputTokens ?? 0) > 0) && (
                     <span className="text-[10px] font-mono text-purple-400/70">{formatTokens((agent.inputTokens ?? 0) + (agent.outputTokens ?? 0))}</span>
                   )}
-                  <span className="text-xs text-gray-600 ml-auto">{agent.id.slice(0, 8)}</span>
+                  <AgentIdBadge id={agent.id} className="ml-auto" />
                 </div>
               </div>
             );

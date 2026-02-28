@@ -1,9 +1,11 @@
 import { Server as HttpServer } from 'http';
 import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
-import type { TaskQueue } from '../tasks/TaskQueue.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
+import type { DecisionLog } from '../coordination/DecisionLog.js';
+import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
+import { getAuthSecret } from '../middleware/auth.js';
 import { v4 as uuid } from 'uuid';
 
 interface ClientConnection {
@@ -19,13 +21,27 @@ export class WebSocketServer {
   constructor(
     server: HttpServer,
     agentManager: AgentManager,
-    taskQueue: TaskQueue,
     lockRegistry: FileLockRegistry,
     activityLedger: ActivityLedger,
+    decisionLog: DecisionLog,
+    chatGroupRegistry: ChatGroupRegistry,
   ) {
     this.wss = new WsServer({ server, path: '/ws' });
 
-    this.wss.on('connection', (ws) => {
+    this.wss.on('connection', (ws, req) => {
+      // Check auth if secret is configured (allow localhost without token)
+      const secret = getAuthSecret();
+      if (secret) {
+        const ip = req.socket.remoteAddress || '';
+        const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+        const url = new URL(req.url || '', `http://${req.headers.host}`);
+        const token = url.searchParams.get('token');
+        if (!isLocalhost && token !== secret) {
+          ws.close(4401, 'Authentication required');
+          return;
+        }
+      }
+
       const clientId = uuid();
       const client: ClientConnection = { id: clientId, ws, subscribedAgents: new Set() };
       this.clients.set(clientId, client);
@@ -33,9 +49,9 @@ export class WebSocketServer {
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
-          this.handleMessage(client, msg, agentManager, taskQueue);
+          this.handleMessage(client, msg, agentManager);
         } catch {
-          ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' }));
+          try { ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' })); } catch { /* broken */ }
         }
       });
 
@@ -43,21 +59,35 @@ export class WebSocketServer {
         this.clients.delete(clientId);
       });
 
+      ws.on('error', () => {
+        // Silently handle broken pipe / connection reset — client already gone
+        this.clients.delete(clientId);
+      });
+
+      // Flush any buffered agent messages so the new client gets complete data
+      agentManager.flushAllMessages();
+
       // Send current state on connect
       ws.send(
         JSON.stringify({
           type: 'init',
           agents: agentManager.getAll().map((a) => a.toJSON()),
-          tasks: taskQueue.getAll(),
           locks: lockRegistry.getAll(),
         }),
       );
     });
 
-    // Forward agent events to subscribed clients
-    agentManager.on('agent:data', (agentId: string, data: string) => {
+    // Wire events by domain
+    this.wireAgentEvents(agentManager);
+    this.wireCoordinationEvents(lockRegistry, activityLedger);
+    this.wireDecisionEvents(decisionLog);
+    this.wireGroupEvents(chatGroupRegistry);
+  }
+
+  private wireAgentEvents(agentManager: AgentManager): void {
+    agentManager.on('agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       this.broadcast(
-        { type: 'agent:data', agentId, data },
+        { type: 'agent:data', agentId, data: text },
         (c) => c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*'),
       );
     });
@@ -70,7 +100,7 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:killed', agentId });
     });
 
-    agentManager.on('agent:exit', (agentId: string, code: number) => {
+    agentManager.on('agent:exit', ({ agentId, code }: { agentId: string; code: number }) => {
       this.broadcastAll({ type: 'agent:exit', agentId, code });
     });
 
@@ -90,20 +120,24 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:restart_limit', ...data });
     });
 
-    agentManager.on('agent:sub_spawned', (parentId: string, childJson: any) => {
-      this.broadcastAll({ type: 'agent:sub_spawned', parentId, child: childJson });
+    agentManager.on('agent:sub_spawned', (data: any) => {
+      this.broadcastAll({ type: 'agent:sub_spawned', parentId: data.parentId, child: data.child });
     });
 
     agentManager.on('agent:tool_call', (data: any) => {
       this.broadcastAll({ type: 'agent:tool_call', ...data });
     });
 
-    agentManager.on('agent:text', (agentId: string, text: string) => {
+    agentManager.on('agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       this.broadcastAll({ type: 'agent:text', agentId, text });
     });
 
     agentManager.on('agent:content', (data: any) => {
       this.broadcastAll({ type: 'agent:content', ...data });
+    });
+
+    agentManager.on('agent:thinking', (data: any) => {
+      this.broadcastAll({ type: 'agent:thinking', ...data });
     });
 
     agentManager.on('agent:plan', (data: any) => {
@@ -114,28 +148,6 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:permission_request', ...data });
     });
 
-    taskQueue.on('task:updated', (task: any) => {
-      this.broadcastAll({ type: 'task:updated', task });
-    });
-
-    taskQueue.on('task:removed', (taskId: string) => {
-      this.broadcastAll({ type: 'task:removed', taskId });
-    });
-
-    // Forward coordination events
-    lockRegistry.on('lock:acquired', (data: any) => {
-      this.broadcastAll({ type: 'lock:acquired', ...data });
-    });
-
-    lockRegistry.on('lock:released', (data: any) => {
-      this.broadcastAll({ type: 'lock:released', ...data });
-    });
-
-    activityLedger.on('activity', (entry: any) => {
-      this.broadcastAll({ type: 'activity', entry });
-    });
-
-    // Forward lead events
     agentManager.on('lead:decision', (data: any) => {
       this.broadcastAll({ type: 'lead:decision', ...data });
     });
@@ -159,13 +171,59 @@ export class WebSocketServer {
     agentManager.on('agent:session_ready', (data: any) => {
       this.broadcastAll({ type: 'agent:session_ready', ...data });
     });
+
+    agentManager.on('agent:context_compacted', (data: any) => {
+      this.broadcastAll({ type: 'agent:context_compacted', ...data });
+    });
+
+    agentManager.on('dag:updated', (data: any) => {
+      this.broadcastAll({ type: 'dag:updated', ...data });
+    });
+  }
+
+  private wireCoordinationEvents(lockRegistry: FileLockRegistry, activityLedger: ActivityLedger): void {
+    lockRegistry.on('lock:acquired', (data: any) => {
+      this.broadcastAll({ type: 'lock:acquired', ...data });
+    });
+
+    lockRegistry.on('lock:released', (data: any) => {
+      this.broadcastAll({ type: 'lock:released', ...data });
+    });
+
+    activityLedger.on('activity', (entry: any) => {
+      this.broadcastAll({ type: 'activity', entry });
+    });
+  }
+
+  private wireDecisionEvents(decisionLog: DecisionLog): void {
+    decisionLog.on('decision:confirmed', (decision: any) => {
+      this.broadcastAll({ type: 'decision:confirmed', decision });
+    });
+
+    decisionLog.on('decision:rejected', (decision: any) => {
+      this.broadcastAll({ type: 'decision:rejected', decision });
+    });
+  }
+
+  private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
+    chatGroupRegistry.on('group:created', (data: any) => {
+      this.broadcastAll({ type: 'group:created', ...data });
+    });
+    chatGroupRegistry.on('group:message', (data: any) => {
+      this.broadcastAll({ type: 'group:message', ...data });
+    });
+    chatGroupRegistry.on('group:member_added', (data: any) => {
+      this.broadcastAll({ type: 'group:member_added', ...data });
+    });
+    chatGroupRegistry.on('group:member_removed', (data: any) => {
+      this.broadcastAll({ type: 'group:member_removed', ...data });
+    });
   }
 
   private handleMessage(
     client: ClientConnection,
     msg: any,
     agentManager: AgentManager,
-    _taskQueue: TaskQueue,
   ): void {
     switch (msg.type) {
       case 'subscribe':
@@ -201,12 +259,7 @@ export class WebSocketServer {
         break;
 
       case 'resize':
-        if (msg.agentId) {
-          const agent = agentManager.get(msg.agentId);
-          if (agent) {
-            agent.resize(msg.cols, msg.rows);
-          }
-        }
+        // resize is no longer supported (PTY mode removed)
         break;
 
       case 'permission_response':
@@ -221,7 +274,11 @@ export class WebSocketServer {
     const payload = JSON.stringify(msg);
     for (const client of this.clients.values()) {
       if (client.ws.readyState === WebSocket.OPEN && filter(client)) {
-        client.ws.send(payload);
+        try {
+          client.ws.send(payload);
+        } catch {
+          // Connection broken — will be cleaned up on 'close'/'error' event
+        }
       }
     }
   }

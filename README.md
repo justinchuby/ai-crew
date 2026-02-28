@@ -7,125 +7,127 @@ A web UI that orchestrates multiple Copilot CLI agents with specialized roles to
 
 ## Features
 
-- **🎯 Project Lead** — An AI coordinator that breaks down tasks, delegates to specialists, synthesizes results, and reports progress
-- **👥 Specialized Roles** — Purpose-built agents with natural creative tension:
+- **🎯 Project Lead** — Breaks down tasks, assembles a team, delegates work, and synthesizes results
+- **👥 Specialized Roles** — 12 purpose-built agents with model diversity:
   | Role | Focus | Default Model |
   |------|-------|---------------|
-  | 💻 Developer | Code + tests, full ownership | Claude Opus 4.6 |
-  | 🏗️ Architect | System design, challenges problem framing | Claude Opus 4.6 |
-  | 📖 Code Reviewer | Readability, maintainability, patterns | Gemini 3 Pro |
-  | 🛡️ Critical Reviewer | Security, performance, edge cases | Claude Sonnet 4.6 |
-  | 🎯 Product Manager | User needs, product quality, UX | GPT-5.2 Codex |
-  | 📝 Technical Writer | Docs, API design review | GPT-5.2 |
-  | 🎨 Designer | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
-  | 🔧 Generalist | Cross-disciplinary problem solving (mechanical eng, 3D, etc.) | Claude Opus 4.6 |
-  | 🚀 Radical Thinker | Challenge assumptions, propose unconventional approaches | GPT-5.3 Codex |
-- **🔄 Explicit Agent Control** — The lead creates agents with specific roles and models via `CREATE_AGENT`, then assigns tasks via `DELEGATE` by agent ID
-- **💬 Inter-Agent Communication** — Agents message each other, debate approaches, and challenge ideas collaboratively
-- **🧠 Model Diversity** — Each role uses a different AI model by default; the lead can override per agent
-- **📡 Real-Time Dashboard** — Live activity feed, agent comms panel, team status, decision log, and progress tracking
-- **🙋 Human-in-the-Loop** — Send messages to the Project Lead or any agent at any time
-- **📚 Skills & Learnings** — Agents record discoveries in `.github/skills/` using SKILL.md format
-- **🔒 File Locking** — Coordination to prevent conflicts when multiple agents edit files
-- **⏸️ Agent Controls** — Interrupt (cancel current work) and stop agents from the UI
-- **🗑️ Project Removal** — Remove projects from the sidebar; stops the lead and all child agents
-- **📊 Progress Tracking** — Detailed progress popup with team roster, timeline, delegation details, and lead progress reports
-- **🧭 Chat Navigation** — Jump between user prompts in the chat with floating nav buttons
-- **📨 Agent Reports** — Incoming agent messages displayed in a dedicated section, not interleaved with lead output
-- **📋 Rich Content** — Markdown tables, images, audio, and resource rendering in chat
-- **🔄 Session Resume** — Resume from a previous Copilot session by providing a session ID
-- **💾 Persistent Agent Roles** — `.agent.md` files ensure role instructions survive context compression
+  | 💻 Developer | Code + tests | Claude Opus 4.6 |
+  | 🏗️ Architect | System design | GPT-5.3 Codex |
+  | 📖 Code Reviewer | Readability, patterns | Gemini 3 Pro |
+  | 🛡️ Critical Reviewer | Security, performance | Gemini 3 Pro |
+  | 🎯 Product Manager | User needs, UX | GPT-5.2 Codex |
+  | 📝 Technical Writer | Docs, API design | GPT-5.2 |
+  | 🎨 Designer | UI/UX, accessibility | Claude Opus 4.6 |
+  | 🔧 Generalist | Cross-disciplinary | Claude Opus 4.6 |
+  | 🚀 Radical Thinker | Challenge assumptions | Gemini 3 Pro |
+  | 📋 Secretary | Plan tracking | GPT-4.1 |
+  | 🧪 QA Tester | Test strategy, quality | Claude Sonnet 4.6 |
+- **💬 Inter-Agent Communication** — Direct messages, broadcasts, and group chats between agents
+- **📊 Task DAG** — Visualize task dependencies as a directed acyclic graph (ReactFlow)
+- **✅ Decision Log** — Track architectural decisions with async user confirmation
+- **🔒 File Locking** — Prevents conflicts when multiple agents edit the same files
+- **📡 Real-Time Dashboard** — Live activity feed, team status, progress tracking via WebSocket
+- **🙋 Human-in-the-Loop** — Message any agent or the lead; queue or interrupt with dedicated buttons
+- **⏸️ Agent Controls** — Interrupt, stop, restart agents; change models on the fly
+- **🔄 Session Resume** — Resume from a previous Copilot session ID
+- **💾 Persistent Projects** — Projects survive lead sessions; resume with full context briefing
+- **🔐 Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path validation
+- **🔍 Global Search** — Search across messages, tasks, decisions, and activity
+- **💬 Group Chat** — Tabbed group chat UI with human participation
+- **📡 Context Re-injection** — Automatic crew context recovery after context window compaction
 
 ## Getting Started
 
 ```bash
 npm install
+npx ai-crew
+```
+
+This builds the project, starts the server, and opens the web UI. Options: `--port=4000`, `--no-browser`.
+
+For development with hot reload:
+
+```bash
 npm run dev
 ```
 
-- Server: `http://localhost:3001`
-- Web UI: `http://localhost:5173`
+- **Server**: http://localhost:3001
+- **Web UI**: http://localhost:5173 (dev) or http://localhost:3001 (production)
 
 ### Creating a Project
 
-1. Open the web UI and navigate to the **Lead** tab
-2. Click **Create Project**, give it a name and initial task
-3. Optionally select a model and working directory for the Project Lead
-4. The lead will analyze the task, assemble a team, and start delegating
-
-### Agent Controls
-
-All running/idle agents have two control buttons:
-- **✋ Interrupt** — Sends an ACP cancel signal to abort the agent's current work immediately
-- **■ Stop** — Kills the agent process entirely
-- **↻ Restart** — Available for completed/failed agents
-
-These controls appear in both the Fleet Overview and the Agent Management views.
+1. Open the web UI — the **Lead** page is the default view
+2. Click **Create Project**, provide a name, task, and optionally a working directory
+3. The lead analyzes the task, creates agents, and starts delegating
 
 ## Architecture
 
 ```
-React UI ←→ WebSocket ←→ Node.js Server ←→ ACP/PTY ←→ Copilot CLI ×N
+React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
                               │
-                         AgentManager
-                        ┌─────┴─────┐
-                   MessageBus    ActivityLedger
+                         AgentManager (TypedEmitter)
+                        ┌─────┴──────┐
+                   MessageBus    ActivityLedger (batched writes)
                    DecisionLog   FileLockRegistry
+                   Scheduler     ContextRefresher
+                   ProjectRegistry  ChatGroupRegistry
 ```
 
 ### Key Components
 
-- **AgentManager** — Spawns agents, buffers ACP text for command detection, routes messages, manages delegations. Only the lead can create agents (`CREATE_AGENT`) and delegate tasks (`DELEGATE` by agent ID).
-- **Agent** — Wraps a Copilot CLI process (ACP or PTY mode) with lifecycle management (creating → running → idle → completed)
-- **RoleRegistry** — Defines specialist roles with system prompts, icons, colors, and default models
-- **MessageBus** — Routes inter-agent messages with short ID resolution
-- **ActivityLedger** — Tracks all agent actions for the real-time activity feed
+| Component | Responsibility |
+|-----------|---------------|
+| **AgentManager** | Spawns agents, detects commands in output stream, routes messages, manages delegations. Cascade cleanup on termination. |
+| **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
+| **CommandDispatcher** | Parses triple-bracket commands from agent output, enforces ownership rules |
+| **RoleRegistry** | Role definitions with system prompts, icons, colors, default models |
+| **MessageBus** | Routes inter-agent messages and group chats |
+| **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
+| **ContextRefresher** | Re-injects crew context after agent compaction events |
+| **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
+| **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
+| **HeartbeatMonitor** | DAG-aware stall detection — nudges idle leads with remaining work |
 
-### Inter-Agent Communication
+### Agent Commands
 
-Agents communicate via HTML comment commands detected in their output stream:
+Agents communicate via structured commands detected in their output:
 
 ```
-<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "...", "context": "..."} -->
-<!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
-<!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->
-<!-- BROADCAST {"content": "..."} -->
-<!-- DECISION {"title": "...", "rationale": "...", "alternatives": [...], "impact": "..."} -->
-<!-- PROGRESS {"summary": "...", "completed": [...], "in_progress": [...], "blocked": [...]} -->
-<!-- QUERY_CREW -->
+[[[ CREATE_AGENT {"role": "developer", "model": "...", "task": "..."} ]]]
+[[[ DELEGATE {"to": "agent-id", "task": "...", "context": "..."} ]]]
+[[[ TERMINATE_AGENT {"id": "agent-id", "reason": "..."} ]]]
+[[[ AGENT_MESSAGE {"to": "agent-id", "content": "..."} ]]]
+[[[ CREATE_GROUP {"name": "...", "members": ["id1", "id2"]} ]]]
+[[[ BROADCAST {"content": "..."} ]]]
+[[[ DECISION {"title": "...", "rationale": "...", "alternatives": [...]} ]]]
+[[[ DECLARE_TASKS {"tasks": [{"id": "...", "title": "...", "depends_on": [...]}]} ]]]
+[[[ PROGRESS {"summary": "...", "completed": [...], "in_progress": [...]} ]]]
+[[[ COMPLETE_TASK {"summary": "..."} ]]]
+[[[ LOCK_FILE {"filePath": "...", "reason": "..."} ]]]
+[[[ QUERY_CREW ]]]
 ```
 
 ### UI Views
 
 | View | Description |
 |------|-------------|
-| **Lead Dashboard** | Chat with the Project Lead, progress bar, agent reports, decisions, comms, activity feed, team status |
-| **Fleet Overview** | All agents at a glance with status, tool calls, plan steps, and clickable live activity feed |
-| **Agent Management** | Per-agent cards with terminal access, interrupt/stop/restart controls |
-| **Task Queue** | Create, assign, and track tasks with status lifecycle |
+| **Lead Dashboard** | Chat with the lead, decisions panel (always visible), team/comms/groups/DAG/activity tabs |
+| **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls |
+| **Tasks** | Per-project task tabs with DAG status, progress badges, and persistent project archive |
+| **Group Chat** | Tabbed group chat interface with human participation and real-time messaging |
+| **Overview** | Progress tracking, decision management, and global search |
 | **Settings** | Concurrency limits, model defaults, custom roles |
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/agents` | List all agents |
-| `POST` | `/api/agents` | Spawn a new agent |
-| `DELETE` | `/api/agents/:id` | Kill (stop) an agent |
-| `POST` | `/api/agents/:id/interrupt` | Cancel agent's current work (ACP cancel) |
-| `POST` | `/api/agents/:id/restart` | Restart a completed/failed agent |
-| `POST` | `/api/agents/:id/input` | Send text input to an agent |
-| `POST` | `/api/lead/start` | Create a new project with a Project Lead |
-| `POST` | `/api/lead/:id/message` | Send a user message to a lead |
-| `GET` | `/api/lead/:id/progress` | Get delegation progress stats |
-| `GET` | `/api/lead/:id/decisions` | Get lead's decision log |
 
 ## Tech Stack
 
-- **Frontend**: React, Vite, TypeScript, Tailwind CSS, Zustand, Lucide Icons
-- **Backend**: Node.js, Express, ws, node-pty
-- **Agent Protocol**: ACP (Agent Communication Protocol) with text buffering for streaming command detection
-- **Database**: SQLite with WAL mode
+- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS 4, Zustand, ReactFlow, Lucide
+- **Backend**: Node.js, Express 5, ws
+- **Database**: SQLite (WAL mode, Drizzle ORM) with optimized pragmas (`busy_timeout`, `foreign_keys`, `synchronous=NORMAL`)
+- **Security**: Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
+- **Validation**: Zod schemas on all API routes
+- **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
+- **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
+- **Testing**: Vitest with v8 coverage, Codecov integration (864+ tests)
 
 ## Screenshots
 

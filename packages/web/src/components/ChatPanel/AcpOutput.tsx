@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
 
@@ -110,6 +111,36 @@ export function AcpOutput({ agentId }: Props) {
   const toolCalls = agent?.toolCalls ?? [];
   const messages = agent?.messages ?? [];
 
+  // Get activity events for this agent from leadStore
+  const allProjects = useLeadStore((s) => s.projects);
+  const agentActivity: ActivityEvent[] = [];
+  for (const proj of Object.values(allProjects)) {
+    for (const evt of proj.activity) {
+      if (evt.agentId === agentId) agentActivity.push(evt);
+    }
+  }
+
+  // Build merged timeline of messages + activity
+  type TimelineItem =
+    | { kind: 'message'; msg: (typeof messages)[0]; index: number }
+    | { kind: 'activity'; evt: ActivityEvent };
+
+  const timeline: TimelineItem[] = [];
+  messages.forEach((msg, i) => {
+    if ((msg.text || msg.contentType)) {
+      timeline.push({ kind: 'message', msg, index: i });
+    }
+  });
+  agentActivity.forEach((evt) => {
+    timeline.push({ kind: 'activity', evt });
+  });
+  // Sort by timestamp
+  timeline.sort((a, b) => {
+    const tA = a.kind === 'message' ? (a.msg.timestamp || 0) : a.evt.timestamp;
+    const tB = b.kind === 'message' ? (b.msg.timestamp || 0) : b.evt.timestamp;
+    return tA - tB;
+  });
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -171,17 +202,32 @@ export function AcpOutput({ agentId }: Props) {
         </div>
       )}
 
-      {/* Messages Section */}
-      {messages.length > 0 && (
+      {/* Messages + Activity Timeline */}
+      {timeline.length > 0 && (
         <div className="space-y-1">
-          {messages.filter((msg) => msg.sender !== 'system' && (msg.text || msg.contentType)).map((msg, i) => {
+          {timeline.map((item, i) => {
+            if (item.kind === 'activity') {
+              const evt = item.evt;
+              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={`act-${evt.id}`} className="flex items-center gap-2 py-0.5 px-1">
+                  <span className="text-[10px] text-gray-600">{time}</span>
+                  <span className="text-[10px] text-gray-500 italic">
+                    {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
+                    {' '}{evt.summary}
+                  </span>
+                </div>
+              );
+            }
+            // Message rendering
+            const msg = item.msg;
             const sender = msg.sender ?? 'agent';
             const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
             // User messages — right-aligned blue bubble
             if (sender === 'user') {
               return (
-                <div key={i} className="flex justify-end items-start gap-2 py-1">
+                <div key={`msg-${item.index}`} className="flex justify-end items-start gap-2 py-1">
                   <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
                   <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
                     {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
@@ -190,10 +236,40 @@ export function AcpOutput({ agentId }: Props) {
               );
             }
 
+            // Thinking/reasoning — italic, lighter color
+            if (sender === 'thinking') {
+              const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+              return (
+                <div key={`msg-${item.index}`} className="py-0.5">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 font-mono text-xs text-gray-500 italic whitespace-pre-wrap min-w-0">
+                      {text}
+                    </div>
+                    <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // System messages — centered, muted, smaller
+            if (sender === 'system') {
+              const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+              if (text === '---') {
+                return <hr key={`msg-${item.index}`} className="border-gray-700/50 my-1" />;
+              }
+              return (
+                <div key={`msg-${item.index}`} className="flex justify-center py-1">
+                  <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-gray-800/60 border border-gray-700/50 text-xs text-gray-400 whitespace-pre-wrap">
+                    {text}
+                  </div>
+                </div>
+              );
+            }
+
             // Rich content (image, audio, resource)
             if (msg.contentType && msg.contentType !== 'text') {
               return (
-                <div key={i} className="py-1">
+                <div key={`msg-${item.index}`} className="py-1">
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       {msg.contentType === 'image' && msg.data && (
@@ -230,7 +306,7 @@ export function AcpOutput({ agentId }: Props) {
             // Agent messages — flowing text, no bubble
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
             return (
-              <div key={i} className="py-1">
+              <div key={`msg-${item.index}`} className="py-1">
                 <div className="flex items-start gap-2">
                   <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
                     <AgentTextBlockSimple text={text} />
@@ -247,10 +323,10 @@ export function AcpOutput({ agentId }: Props) {
   );
 }
 
-/** Collapsed-by-default <!-- command --> block with click to expand */
+/** Collapsed-by-default [[[ command ]]] block with click to expand */
 function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/<!--\s*(\w+)/);
+  const nameMatch = text.match(/\[\[\[\s*(\w+)/);
   const label = nameMatch ? nameMatch[1] : 'command';
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   let preview = '';
@@ -281,18 +357,18 @@ function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   );
 }
 
-/** Render agent text with <!-- --> blocks separated and inline markdown + tables */
+/** Render agent text with [[[ ]]] blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
-  const segments = text.split(/(<!--[\s\S]*?-->)/g);
+  const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
   return (
     <>
       {segments.map((seg, i) => {
-        if (seg.startsWith('<!--') && seg.endsWith('-->')) {
+        if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
           return <CollapsibleCommandBlockSimple key={i} text={seg} />;
         }
-        // Unclosed <!-- block
-        if (seg.includes('<!--') && !seg.includes('-->')) {
-          const idx = seg.indexOf('<!--');
+        // Unclosed [[[ block
+        if (seg.includes('[[[') && !seg.includes(']]]')) {
+          const idx = seg.indexOf('[[[');
           const before = seg.slice(0, idx);
           const cmdBlock = seg.slice(idx);
           return (

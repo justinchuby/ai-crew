@@ -1,0 +1,1 @@
+ALTER TABLE `decisions` ADD `auto_approved` integer DEFAULT 0;

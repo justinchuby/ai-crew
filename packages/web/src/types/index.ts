@@ -1,13 +1,73 @@
+export interface DagTask {
+  id: string;
+  leadId: string;
+  role: string;
+  description: string;
+  files: string[];
+  dependsOn: string[];
+  dagStatus: 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
+  priority: number;
+  model?: string;
+  assignedAgentId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+// Persistent project (survives lead sessions)
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  cwd: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  sessions?: ProjectSession[];
+  activeLeadId?: string;
+}
+
+export interface ProjectSession {
+  id: number;
+  projectId: string;
+  leadId: string;
+  sessionId: string | null;
+  task: string | null;
+  status: string;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface DagStatus {
+  tasks: DagTask[];
+  fileLockMap: Record<string, { taskId: string; agentId?: string }>;
+  summary: { pending: number; ready: number; running: number; done: number; failed: number; blocked: number; paused: number; skipped: number };
+}
+
+export interface ChatGroup {
+  name: string;
+  leadId: string;
+  memberIds: string[];
+  createdAt: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  groupName: string;
+  leadId: string;
+  fromAgentId: string;
+  fromRole: string;
+  content: string;
+  timestamp: string;
+}
+
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
 
 // ACP Protocol Types
 
-export type AgentMode = 'pty' | 'acp';
-
 export interface AcpTextChunk {
   type: 'text';
   text: string;
-  sender?: 'agent' | 'user' | 'system' | 'external';
+  sender?: 'agent' | 'user' | 'system' | 'external' | 'thinking';
   /** Role name of external sender (e.g. "Developer", "Architect") */
   fromRole?: string;
   timestamp?: number;
@@ -47,7 +107,6 @@ export interface AcpPermissionRequest {
 
 export interface AcpSessionInfo {
   sessionId: string;
-  mode: AgentMode;
   isPrompting: boolean;
 }
 
@@ -66,12 +125,11 @@ export interface AgentInfo {
   id: string;
   role: Role;
   status: AgentStatus;
-  taskId?: string;
+  task?: string;
   parentId?: string;
   childIds: string[];
   createdAt: string;
   outputPreview: string;
-  mode: AgentMode;
   autopilot: boolean;
   session?: AcpSessionInfo;
   sessionId?: string | null;
@@ -80,27 +138,13 @@ export interface AgentInfo {
   messages?: AcpTextChunk[];
   pendingPermission?: AcpPermissionRequest;
   projectName?: string;
+  projectId?: string;
   model?: string;
   cwd?: string;
   inputTokens?: number;
   outputTokens?: number;
   contextWindowSize?: number;
   contextWindowUsed?: number;
-}
-
-export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: number;
-  assignedRole?: string;
-  assignedAgentId?: string;
-  parentTaskId?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface ServerConfig {
@@ -123,6 +167,7 @@ export interface WsMessage {
     | 'agent:permission_response'
     | 'agent:delegated'
     | 'agent:completion_reported'
+    | 'agent:thinking'
     | 'lead:decision'
     | 'lead:progress'
     | string;
@@ -135,6 +180,10 @@ export interface Decision {
   agentRole: string;
   title: string;
   rationale: string;
+  needsConfirmation?: boolean;
+  status?: 'recorded' | 'confirmed' | 'rejected';
+  autoApproved?: boolean;
+  confirmedAt?: string | null;
   timestamp: string;
 }
 
@@ -163,7 +212,7 @@ export interface LeadProgress {
     id: string;
     role: Role;
     status: AgentStatus;
-    taskId?: string;
+    task?: string;
     model?: string;
     inputTokens?: number;
     outputTokens?: number;

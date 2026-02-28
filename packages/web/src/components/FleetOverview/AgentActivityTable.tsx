@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import type { AgentInfo, Task } from '../../types';
+import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal, Hand, Check } from 'lucide-react';
 
@@ -15,12 +15,50 @@ function shortModelName(model?: string): string {
   return model;
 }
 
+const AVAILABLE_MODELS = [
+  'claude-opus-4.6',
+  'claude-sonnet-4.6',
+  'claude-sonnet-4.5',
+  'claude-haiku-4.5',
+  'gpt-5.3-codex',
+  'gpt-5.2-codex',
+  'gpt-5.2',
+  'gpt-5.1-codex',
+  'gemini-3-pro-preview',
+  'gpt-4.1',
+];
+
+/** Flatten agents into a depth-first hierarchy. Parents first, children indented below. */
+function flattenHierarchy(agents: AgentInfo[]): { agent: AgentInfo; depth: number; isLastChild: boolean }[] {
+  const byId = new Map(agents.map((a) => [a.id, a]));
+  const childrenOf = new Map<string | undefined, AgentInfo[]>();
+  for (const a of agents) {
+    const parentKey = a.parentId && byId.has(a.parentId) ? a.parentId : undefined;
+    const siblings = childrenOf.get(parentKey) ?? [];
+    siblings.push(a);
+    childrenOf.set(parentKey, siblings);
+  }
+
+  const result: { agent: AgentInfo; depth: number; isLastChild: boolean }[] = [];
+
+  function walk(parentId: string | undefined, depth: number) {
+    const children = childrenOf.get(parentId) ?? [];
+    children.forEach((child, idx) => {
+      result.push({ agent: child, depth, isLastChild: idx === children.length - 1 });
+      walk(child.id, depth + 1);
+    });
+  }
+
+  walk(undefined, 0);
+  return result;
+}
+
 interface Props {
   agents: AgentInfo[];
-  tasks: Task[];
   locks: FileLock[];
   api: any;
   ws: any;
+  onSelectAgent?: (id: string) => void;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -82,9 +120,16 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   return { text: 'Idle' };
 }
 
-export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
+export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
   const { setSelectedAgent } = useAppStore();
   const [confirmKillIds, setConfirmKillIds] = useState<Set<string>>(new Set());
+
+  const handleSelect = (id: string) => {
+    if (onSelectAgent) onSelectAgent(id);
+    else setSelectedAgent(id);
+  };
+
+  const hierarchicalAgents = useMemo(() => flattenHierarchy(agents), [agents]);
 
   if (agents.length === 0) {
     return (
@@ -101,6 +146,7 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
           <tr className="border-b border-gray-700 text-gray-400 text-xs uppercase tracking-wider">
             <th className="text-left px-3 py-2">Agent</th>
             <th className="text-left px-3 py-2">Status</th>
+            <th className="text-left px-3 py-2 hidden md:table-cell">Model</th>
             <th className="text-left px-3 py-2 hidden md:table-cell">Task</th>
             <th className="text-left px-3 py-2">Current Activity</th>
             <th className="text-left px-3 py-2 hidden lg:table-cell">Progress</th>
@@ -110,31 +156,42 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
           </tr>
         </thead>
         <tbody>
-          {agents.map((agent) => {
+          {hierarchicalAgents.map(({ agent, depth, isLastChild }) => {
             const activity = getCurrentActivity(agent);
             const agentLocks = locks.filter((l) => l.agentId === agent.id);
-            const agentTask = agent.taskId
-              ? tasks.find((t) => t.id === agent.taskId)
-              : undefined;
             const planTotal = agent.plan?.length ?? 0;
             const planDone = agent.plan?.filter((p) => p.status === 'completed').length ?? 0;
+            const isActive = agent.status === 'running' || agent.status === 'idle';
+            const currentModel = agent.model || agent.role.model || '';
 
             return (
               <tr
                 key={agent.id}
-                className="border-b border-gray-700/50 hover:bg-surface/50 cursor-pointer transition-colors"
-                onClick={() => setSelectedAgent(agent.id)}
+                className="border-b border-gray-700/50 hover:bg-surface/50 transition-colors"
               >
-                {/* Agent identity */}
+                {/* Agent identity — clickable name to open chat panel */}
                 <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{agent.role.icon}</span>
-                    <div>
-                      <div className="font-medium text-gray-200 text-xs">{agent.role.name}</div>
-                      <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1">
+                  <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
+                    {depth > 0 && (
+                      <span className="text-gray-600 text-xs font-mono select-none shrink-0">
+                        {isLastChild ? '└─' : '├─'}
+                      </span>
+                    )}
+                    <span className="text-base shrink-0">{agent.role.icon}</span>
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => handleSelect(agent.id)}
+                        className="font-medium text-gray-200 text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
+                        title={`${agent.role.name} — click to open chat`}
+                      >
+                        {agent.role.name}
+                      </button>
+                      <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1 flex-wrap">
                         {agent.id.slice(0, 8)}
-                        {(agent.model || agent.role.model) && (
-                          <span className="text-gray-600">· {shortModelName(agent.model || agent.role.model)}</span>
+                        {agent.childIds.length > 0 && (
+                          <span className="text-[10px] px-1 py-px rounded bg-blue-500/15 text-blue-400 font-sans">
+                            {agent.childIds.length} sub-agent{agent.childIds.length > 1 ? 's' : ''}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -146,26 +203,44 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_DOT[agent.status] ?? 'bg-gray-400'}`} />
                     <span className="text-xs text-gray-300 capitalize">{agent.status}</span>
-                    <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${
-                        agent.mode === 'acp'
-                          ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}
-                    >
-                      {agent.mode === 'acp' ? 'ACP' : 'PTY'}
-                    </span>
                   </div>
+                </td>
+
+                {/* Model */}
+                <td className="px-3 py-2.5 hidden md:table-cell">
+                  {isActive ? (
+                    <select
+                      value={currentModel}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        api.updateAgent(agent.id, { model: e.target.value });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[10px] bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer max-w-[120px]"
+                    >
+                      {(() => {
+                        const options = AVAILABLE_MODELS.includes(currentModel)
+                          ? AVAILABLE_MODELS
+                          : [currentModel, ...AVAILABLE_MODELS];
+                        return options.map((m) => (
+                          <option key={m} value={m}>{shortModelName(m) || m}</option>
+                        ));
+                      })()}
+                    </select>
+                  ) : (
+                    <span className="text-[10px] text-gray-500">
+                      {currentModel ? shortModelName(currentModel) : '—'}
+                    </span>
+                  )}
                 </td>
 
                 {/* Task */}
                 <td className="px-3 py-2.5 hidden md:table-cell">
-                  {agentTask ? (
+                  {agent.task ? (
                     <div className="max-w-[180px]">
-                      <div className="text-xs text-gray-300 truncate" title={agentTask.title}>
-                        {agentTask.title}
+                      <div className="text-xs text-gray-300 truncate" title={agent.task}>
+                        {agent.task}
                       </div>
-                      <div className="text-[10px] text-gray-500 capitalize">{agentTask.status}</div>
                     </div>
                   ) : (
                     <span className="text-xs text-gray-500">—</span>
@@ -232,7 +307,7 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedAgent(agent.id);
+                        handleSelect(agent.id);
                       }}
                       className="p-1 text-gray-400 hover:text-accent"
                       title="Open terminal"
@@ -251,7 +326,7 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                         <RefreshCw size={14} />
                       </button>
                     )}
-                    {(agent.status === 'running' || agent.status === 'idle') && (
+                    {isActive && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -263,7 +338,7 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                         <Hand size={14} />
                       </button>
                     )}
-                    {(agent.status === 'running' || agent.status === 'idle') && (
+                    {isActive && (
                       confirmKillIds.has(agent.id) ? (
                         <button
                           onClick={(e) => {

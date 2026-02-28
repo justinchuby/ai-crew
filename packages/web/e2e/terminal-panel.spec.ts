@@ -14,7 +14,7 @@ test.describe('Terminal Panel', () => {
     const res = await page.request.post('/api/agents', { data: { roleId: 'developer' } });
     const agent = await res.json();
 
-    await page.goto('/');
+    await page.goto('/agents');
     await page.waitForTimeout(1000);
 
     // If agent card is visible, click it
@@ -29,10 +29,10 @@ test.describe('Terminal Panel', () => {
   });
 
   test('terminal panel has input field and send button', async ({ page }) => {
-    const res = await page.request.post('/api/agents', { data: { roleId: 'reviewer' } });
+    const res = await page.request.post('/api/agents', { data: { roleId: 'code-reviewer' } });
     const agent = await res.json();
 
-    await page.goto('/');
+    await page.goto('/agents');
     await page.waitForTimeout(1000);
 
     const card = page.getByText('Code Reviewer').first();
@@ -51,7 +51,7 @@ test.describe('Terminal Panel', () => {
   test('close button dismisses terminal panel', async ({ page }) => {
     const res = await page.request.post('/api/agents', { data: { roleId: 'developer' } });
 
-    await page.goto('/');
+    await page.goto('/agents');
     await page.waitForTimeout(1000);
 
     const card = page.getByText('Developer').first();
@@ -75,7 +75,7 @@ test.describe('Terminal Panel', () => {
   test('input field sends on Enter key', async ({ page }) => {
     const res = await page.request.post('/api/agents', { data: { roleId: 'developer' } });
 
-    await page.goto('/');
+    await page.goto('/agents');
     await page.waitForTimeout(1000);
 
     const card = page.getByText('Developer').first();

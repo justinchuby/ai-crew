@@ -39,7 +39,7 @@ test.describe('Settings', () => {
   test('built-in roles show built-in label and no delete button', async ({ page }) => {
     const builtInLabels = page.getByText('built-in', { exact: true });
     await expect(builtInLabels.first()).toBeVisible();
-    await expect(builtInLabels).toHaveCount(10);
+    await expect(builtInLabels).toHaveCount(13);
   });
 
   test('custom role button toggles form', async ({ page }) => {

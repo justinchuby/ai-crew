@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
-import type { AcpTextChunk } from '../../types';
+import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
+import { TaskDagPanelContent } from './TaskDagPanel';
+import { FolderPicker } from '../FolderPicker/FolderPicker';
+
+interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
 interface Props {
   api: any;
@@ -24,26 +28,77 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectModel, setNewProjectModel] = useState('');
   const [newProjectCwd, setNewProjectCwd] = useState('');
   const [resumeSessionId, setResumeSessionId] = useState('');
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<string>('team');
+  const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
+  const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
+  const [tabOrder, setTabOrder] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('ai-crew-sidebar-tabs');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length >= 4) return parsed.filter((id: string) => id !== 'activity');
+      }
+    } catch {}
+    return ['team', 'comms', 'groups', 'dag'];
+  });
+  const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
   const [expandedReport, setExpandedReport] = useState<AgentReport | null>(null);
   const [reportsExpanded, setReportsExpanded] = useState(true);
+  const [pendingBannerExpanded, setPendingBannerExpanded] = useState(false);
+  const [renamingLeadId, setRenamingLeadId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const isResizing = useRef(false);
+  const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
+  const [resumingProjectId, setResumingProjectId] = useState<string | null>(null);
 
-  const leadAgents = agents.filter((a) => a.role.id === 'lead');
+  const leadAgents = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
+  // Map active lead projectIds for merging
+  const activeProjectIds = new Set(leadAgents.map((a) => a.projectId).filter(Boolean));
+  // Inactive persisted projects (no active lead)
+  const inactiveProjects = persistedProjects.filter((p) => !activeProjectIds.has(p.id) && p.status !== 'archived');
   const currentProject = selectedLeadId ? projects[selectedLeadId] : null;
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
-  // On mount, load existing leads from server
+  // On mount, load existing leads and persisted projects from server
   useEffect(() => {
+    // Load persisted projects
+    fetch('/api/projects')
+      .then((r) => r.json())
+      .then((data: Project[]) => { if (Array.isArray(data)) setPersistedProjects(data); })
+      .catch(() => {});
+
+    // Load active leads
     fetch('/api/lead').then((r) => r.json()).then((leads: any[]) => {
       if (Array.isArray(leads)) {
         leads.forEach((l) => {
           useLeadStore.getState().addProject(l.id);
+          // Pre-load message history for each lead
+          fetch(`/api/agents/${l.id}/messages?limit=200`)
+            .then((r) => r.json())
+            .then((data: any) => {
+              if (Array.isArray(data.messages) && data.messages.length > 0) {
+                const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+                  type: 'text' as const,
+                  text: m.content,
+                  sender: m.sender as 'agent' | 'user' | 'system',
+                  timestamp: new Date(m.timestamp).getTime(),
+                }));
+                const current = useLeadStore.getState().projects[l.id];
+                if (!current || current.messages.length === 0) {
+                  useLeadStore.getState().setMessages(l.id, msgs);
+                }
+              }
+            })
+            .catch(() => {});
         });
         // Auto-select first running lead if none selected
         if (!useLeadStore.getState().selectedLeadId) {
@@ -54,11 +109,41 @@ export function LeadDashboard({ api, ws }: Props) {
     }).catch(() => {});
   }, []);
 
-  // Subscribe to selected lead agent WS stream
+  // Fetch available roles when new project modal opens
+  useEffect(() => {
+    if (!showNewProject) return;
+    fetch('/api/roles').then((r) => r.json()).then((roles: RoleInfo[]) => {
+      setAvailableRoles(roles.filter((r) => r.id !== 'lead'));
+    }).catch(() => {});
+  }, [showNewProject]);
+
+  // Subscribe to selected lead agent WS stream and load message history
   useEffect(() => {
     if (!selectedLeadId) return;
     chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
     ws.subscribe(selectedLeadId);
+    // Load persisted message history if we don't have any messages yet
+    const proj = useLeadStore.getState().projects[selectedLeadId];
+    if (!proj || proj.messages.length === 0) {
+      fetch(`/api/agents/${selectedLeadId}/messages?limit=200`)
+        .then((r) => r.json())
+        .then((data: any) => {
+          if (Array.isArray(data.messages) && data.messages.length > 0) {
+            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+              type: 'text' as const,
+              text: m.content,
+              sender: m.sender as 'agent' | 'user' | 'system',
+              timestamp: new Date(m.timestamp).getTime(),
+            }));
+            // Only set if still no messages (avoid overwriting live data)
+            const current = useLeadStore.getState().projects[selectedLeadId];
+            if (!current || current.messages.length === 0) {
+              useLeadStore.getState().setMessages(selectedLeadId, msgs);
+            }
+          }
+        })
+        .catch(() => {});
+    }
     return () => ws.unsubscribe(selectedLeadId);
   }, [selectedLeadId, ws]);
 
@@ -102,6 +187,27 @@ export function LeadDashboard({ api, ws }: Props) {
     };
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
+    return () => clearInterval(interval);
+  }, [selectedLeadId]);
+
+  // Fetch groups for selected lead
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
+    }).catch(() => {});
+  }, [selectedLeadId]);
+
+  // Fetch DAG status for selected lead
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    const fetchDag = () => {
+      fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
+        if (data && data.tasks) useLeadStore.getState().setDagStatus(selectedLeadId, data as DagStatus);
+      }).catch(() => {});
+    };
+    fetchDag();
+    const interval = setInterval(fetchDag, 10000);
     return () => clearInterval(interval);
   }, [selectedLeadId]);
 
@@ -250,6 +356,47 @@ export function LeadDashboard({ api, ws }: Props) {
           }
         }
       }
+
+      // Group chat events
+      if (msg.type === 'group:created' && msg.leadId === selectedLeadId) {
+        fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
+          if (Array.isArray(data)) store.setGroups(selectedLeadId!, data);
+        }).catch(() => {});
+      }
+      if (msg.type === 'group:message' && msg.leadId === selectedLeadId) {
+        store.addGroupMessage(selectedLeadId!, msg.groupName, msg.message);
+      }
+
+      // DAG status updates
+      if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
+        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
+          if (data && data.tasks) store.setDagStatus(selectedLeadId!, data as DagStatus);
+        }).catch(() => {});
+      }
+
+      // Context compaction — add system message to relevant lead's chat
+      if (msg.type === 'agent:context_compacted' && msg.agentId) {
+        const compactedId = msg.agentId;
+        // Find the lead project this agent belongs to (could be the lead itself or a child)
+        let targetLeadId: string | null = null;
+        if (store.projects[compactedId]) {
+          targetLeadId = compactedId;
+        } else {
+          const parentAgent = agents.find((a) => a.id === compactedId);
+          if (parentAgent?.parentId && store.projects[parentAgent.parentId]) {
+            targetLeadId = parentAgent.parentId;
+          }
+        }
+        if (targetLeadId) {
+          const pct = msg.percentDrop != null ? `${msg.percentDrop}%` : '?%';
+          store.addMessage(targetLeadId, {
+            type: 'text',
+            text: `🔄 Context compacted for agent ${compactedId.slice(0, 8)}: ${pct} reduction`,
+            sender: 'system',
+            timestamp: Date.now(),
+          });
+        }
+      }
     };
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
@@ -283,13 +430,106 @@ export function LeadDashboard({ api, ws }: Props) {
     document.addEventListener('mouseup', onMouseUp);
   }, [sidebarWidth]);
 
-  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string) => {
+  const isTabResizing = useRef(false);
+  const startTabResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isTabResizing.current = true;
+    const startY = e.clientY;
+    const startHeight = sidebarTabHeight;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isTabResizing.current) return;
+      const delta = startY - ev.clientY;
+      const newHeight = Math.min(600, Math.max(120, startHeight + delta));
+      setSidebarTabHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      isTabResizing.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [sidebarTabHeight]);
+
+  const isDecisionsResizing = useRef(false);
+  const startDecisionsResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDecisionsResizing.current = true;
+    const startY = e.clientY;
+    const startHeight = decisionsPanelHeight;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDecisionsResizing.current) return;
+      const delta = ev.clientY - startY;
+      const newHeight = Math.min(400, Math.max(80, startHeight + delta));
+      setDecisionsPanelHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      isDecisionsResizing.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [decisionsPanelHeight]);
+
+  const handleTabDragStart = useCallback((e: React.DragEvent, tabId: string) => {
+    e.dataTransfer.setData('text/plain', tabId);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleTabDragOver = useCallback((e: React.DragEvent, tabId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverTab(tabId);
+  }, []);
+
+  const handleTabDrop = useCallback((e: React.DragEvent, targetTabId: string) => {
+    e.preventDefault();
+    setDragOverTab(null);
+    const sourceTabId = e.dataTransfer.getData('text/plain');
+    if (!sourceTabId || sourceTabId === targetTabId) return;
+    setTabOrder((prev) => {
+      const newOrder = [...prev];
+      const srcIdx = newOrder.indexOf(sourceTabId);
+      const tgtIdx = newOrder.indexOf(targetTabId);
+      if (srcIdx === -1 || tgtIdx === -1) return prev;
+      [newOrder[srcIdx], newOrder[tgtIdx]] = [newOrder[tgtIdx], newOrder[srcIdx]];
+      localStorage.setItem('ai-crew-sidebar-tabs', JSON.stringify(newOrder));
+      return newOrder;
+    });
+  }, []);
+
+  const handleTabDragEnd = useCallback(() => {
+    setDragOverTab(null);
+  }, []);
+
+  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string, initialTeam?: string[]) => {
     setStarting(true);
     try {
+      // If initial team is selected, prepend to the task so the lead knows to create them
+      let fullTask = task;
+      if (initialTeam && initialTeam.length > 0) {
+        const teamHint = `\n\n[Initial Team] The user has pre-selected these roles for the initial team: ${initialTeam.join(', ')}. Please create these agents as your first action.`;
+        fullTask = (task || '') + teamHint;
+      }
       const resp = await fetch('/api/lead/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, task, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
+        body: JSON.stringify({ name, task: fullTask, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
       });
       const data = await resp.json();
       if (data.id) {
@@ -304,6 +544,7 @@ export function LeadDashboard({ api, ws }: Props) {
         setNewProjectModel('');
         setNewProjectCwd('');
         setResumeSessionId('');
+        setSelectedRoles(new Set());
       }
     } catch {
       // ignore
@@ -312,26 +553,52 @@ export function LeadDashboard({ api, ws }: Props) {
     }
   }, []);
 
-  const sendMessage = useCallback(async () => {
+  const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
-    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: true, timestamp: Date.now() });
+    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, mode }),
     });
   }, [input, selectedLeadId]);
 
+  const handleConfirmDecision = useCallback(async (decisionId: string) => {
+    if (!selectedLeadId) return;
+    const resp = await fetch(`/api/decisions/${decisionId}/confirm`, { method: 'POST' });
+    if (resp.ok) {
+      const decision = await resp.json();
+      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
+    }
+  }, [selectedLeadId]);
+
+  const handleRejectDecision = useCallback(async (decisionId: string) => {
+    if (!selectedLeadId) return;
+    const resp = await fetch(`/api/decisions/${decisionId}/reject`, { method: 'POST' });
+    if (resp.ok) {
+      const decision = await resp.json();
+      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
+    }
+  }, [selectedLeadId]);
+
+  const handleOpenAgentChat = useCallback((agentId: string) => {
+    useAppStore.getState().setSelectedAgent(agentId);
+  }, []);
+
   const messages = currentProject?.messages ?? [];
   const decisions = currentProject?.decisions ?? [];
+  const pendingConfirmations = decisions.filter((d: any) => d.needsConfirmation && d.status === 'recorded');
   const progress = currentProject?.progress ?? null;
   const progressSummary = currentProject?.progressSummary ?? null;
   const progressHistory = currentProject?.progressHistory ?? [];
   const activity = currentProject?.activity ?? [];
   const comms = currentProject?.comms ?? [];
   const agentReports = currentProject?.agentReports ?? [];
+  const groups = currentProject?.groups ?? [];
+  const groupMessages = currentProject?.groupMessages ?? {};
+  const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
 
   return (
@@ -353,7 +620,7 @@ export function LeadDashboard({ api, ws }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {leadAgents.length === 0 && !showNewProject && (
+          {leadAgents.length === 0 && inactiveProjects.length === 0 && !showNewProject && (
             <div className="p-4 text-center">
               <Crown className="w-10 h-10 text-yellow-400/50 mx-auto mb-2" />
               <p className="text-xs text-gray-500 font-mono mb-3">No projects yet</p>
@@ -384,8 +651,66 @@ export function LeadDashboard({ api, ws }: Props) {
               >
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${isRunning ? 'bg-green-400' : 'bg-gray-500'}`} />
-                  <span className="text-sm font-mono truncate flex-1">
-                    {lead.projectName || lead.taskId?.slice(0, 40) || lead.id.slice(0, 8)}
+                  {renamingLeadId === lead.id ? (
+                    <input
+                      autoFocus
+                      className="text-sm font-mono truncate flex-1 bg-gray-700 border border-gray-500 rounded px-1 py-0 text-white focus:outline-none focus:border-accent"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const trimmed = renameValue.trim();
+                          if (trimmed) {
+                            fetch(`/api/lead/${lead.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ projectName: trimmed }),
+                            }).catch(() => {});
+                            useAppStore.getState().updateAgent(lead.id, { projectName: trimmed });
+                          }
+                          setRenamingLeadId(null);
+                        }
+                        if (e.key === 'Escape') setRenamingLeadId(null);
+                      }}
+                      onBlur={() => {
+                        const trimmed = renameValue.trim();
+                        if (trimmed && trimmed !== (lead.projectName || '')) {
+                          fetch(`/api/lead/${lead.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ projectName: trimmed }),
+                          }).catch(() => {});
+                          useAppStore.getState().updateAgent(lead.id, { projectName: trimmed });
+                        }
+                        setRenamingLeadId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      className="text-sm font-mono truncate flex-1"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setRenamingLeadId(lead.id);
+                        setRenameValue(lead.projectName || lead.task?.slice(0, 40) || '');
+                      }}
+                      title="Double-click to rename"
+                    >
+                      {lead.projectName || lead.task?.slice(0, 40) || lead.id.slice(0, 8)}
+                    </span>
+                  )}
+                  <span
+                    role="button"
+                    title="Rename project"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-700 rounded transition-opacity shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenamingLeadId(lead.id);
+                      setRenameValue(lead.projectName || lead.task?.slice(0, 40) || '');
+                    }}
+                  >
+                    <Pencil className="w-3 h-3 text-gray-500 hover:text-gray-300" />
                   </span>
                   <span
                     role="button"
@@ -417,6 +742,86 @@ export function LeadDashboard({ api, ws }: Props) {
               </button>
             );
           })}
+
+          {/* Inactive persisted projects */}
+          {inactiveProjects.length > 0 && (
+            <>
+              {leadAgents.length > 0 && (
+                <div className="px-3 py-1.5 text-[10px] font-medium text-gray-600 uppercase tracking-wider border-t border-gray-700/50">
+                  Past Projects
+                </div>
+              )}
+              {inactiveProjects.map((proj) => {
+                const isSelected = selectedLeadId === `project:${proj.id}`;
+                return (
+                  <button
+                    key={proj.id}
+                    onClick={() => {
+                      const key = `project:${proj.id}`;
+                      useLeadStore.getState().addProject(key);
+                      useLeadStore.getState().selectLead(key);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 border-b border-gray-700/50 transition-colors group ${
+                      isSelected
+                        ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
+                        : 'hover:bg-gray-800 border-l-2 border-l-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-gray-600" />
+                      <span className="text-sm font-mono truncate flex-1 text-gray-400">{proj.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResumingProjectId(proj.id);
+                          fetch(`/api/projects/${proj.id}/resume`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({}),
+                          })
+                            .then((r) => r.json())
+                            .then((data) => {
+                              if (data.id) {
+                                useLeadStore.getState().addProject(data.id);
+                                useLeadStore.getState().selectLead(data.id);
+                                fetch('/api/projects').then((r) => r.json()).then((ps: Project[]) => {
+                                  if (Array.isArray(ps)) setPersistedProjects(ps);
+                                }).catch(() => {});
+                              }
+                            })
+                            .catch(() => {})
+                            .finally(() => setResumingProjectId(null));
+                        }}
+                        className="text-[10px] text-yellow-500 hover:text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                        title="Resume project"
+                      >
+                        {resumingProjectId === proj.id ? <Loader2 size={10} className="animate-spin" /> : 'Resume'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!confirm(`Delete project "${proj.name}"? This cannot be undone.`)) return;
+                          fetch(`/api/projects/${proj.id}`, { method: 'DELETE' })
+                            .then(() => {
+                              setPersistedProjects((prev) => prev.filter((p) => p.id !== proj.id));
+                              useLeadStore.getState().removeProject(`project:${proj.id}`);
+                            })
+                            .catch(() => {});
+                        }}
+                        className="p-0.5 hover:bg-red-900/40 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        title="Delete project"
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5 pl-4 font-mono">
+                      {proj.status} · {proj.updatedAt?.slice(0, 10)}
+                    </div>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
 
         {/* New project button at bottom of sidebar */}
@@ -490,13 +895,23 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1 font-medium">Working Directory</label>
-                  <input
-                    type="text"
-                    value={newProjectCwd}
-                    onChange={(e) => setNewProjectCwd(e.target.value)}
-                    placeholder="/path/to/project"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={newProjectCwd}
+                      onChange={(e) => setNewProjectCwd(e.target.value)}
+                      placeholder="/path/to/project"
+                      className="flex-1 bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowFolderPicker(true)}
+                      className="px-2 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md text-xs shrink-0 transition-colors"
+                      title="Browse folders"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1 font-medium">Resume Session <span className="text-gray-600">(optional — paste a session ID to continue previous work)</span></label>
@@ -509,6 +924,38 @@ export function LeadDashboard({ api, ws }: Props) {
                   />
                 </div>
               </div>
+              {/* Initial Team Selection */}
+              {availableRoles.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium">Initial Team <span className="text-gray-600">(optional — pre-select roles to auto-create)</span></label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableRoles.map((role) => {
+                      const isSelected = selectedRoles.has(role.id);
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => setSelectedRoles((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(role.id)) next.delete(role.id); else next.add(role.id);
+                            return next;
+                          })}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors border ${
+                            isSelected
+                              ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-200'
+                              : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-500'
+                          }`}
+                          title={role.description}
+                        >
+                          <span>{role.icon}</span>
+                          <span>{role.name}</span>
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
               <button
@@ -518,7 +965,14 @@ export function LeadDashboard({ api, ws }: Props) {
                 Cancel
               </button>
               <button
-                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined, resumeSessionId.trim() || undefined)}
+                onClick={() => startLead(
+                  newProjectName || 'Untitled',
+                  newProjectTask.trim() || undefined,
+                  newProjectModel || undefined,
+                  newProjectCwd.trim() || undefined,
+                  resumeSessionId.trim() || undefined,
+                  selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
+                )}
                 disabled={starting}
                 className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
               >
@@ -528,6 +982,15 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Folder picker modal */}
+      {showFolderPicker && (
+        <FolderPicker
+          value={newProjectCwd}
+          onChange={(path) => setNewProjectCwd(path)}
+          onClose={() => setShowFolderPicker(false)}
+        />
       )}
 
       {/* Main content */}
@@ -661,10 +1124,61 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
+            {/* Pending decisions banner */}
+            {pendingConfirmations.length > 0 && (
+              <div className="border-b border-amber-700/50 bg-amber-900/30">
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-200 hover:bg-amber-900/40 transition-colors"
+                  onClick={() => setPendingBannerExpanded(!pendingBannerExpanded)}
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="font-mono font-medium">⚠ {pendingConfirmations.length} decision{pendingConfirmations.length !== 1 ? 's' : ''} need{pendingConfirmations.length === 1 ? 's' : ''} your confirmation</span>
+                  {pendingBannerExpanded ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-amber-400" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-amber-400" />}
+                </button>
+                {pendingBannerExpanded && (
+                  <div className="px-4 pb-3 space-y-2">
+                    {pendingConfirmations.map((d: any) => (
+                      <div key={d.id} className="bg-gray-800/80 border border-amber-700/40 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-mono font-semibold text-gray-200">{d.title}</span>
+                              {d.agentRole && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
+                              )}
+                            </div>
+                            {d.rationale && (
+                              <p className="text-xs font-mono text-gray-400 line-clamp-2">{d.rationale}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <button
+                              onClick={() => handleConfirmDecision(d.id)}
+                              className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-200 transition-colors"
+                              title="Confirm"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleRejectDecision(d.id)}
+                              className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-200 transition-colors"
+                              title="Reject"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Messages with prompt navigation */}
             <div className="flex-1 relative min-h-0">
               <div ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-1">
-              {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i, filtered) => {
+              {messages.filter((msg) => msg.text).map((msg, i, filtered) => {
                 if (msg.queued) return null; // queued messages rendered below
                 const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
@@ -690,6 +1204,18 @@ export function LeadDashboard({ api, ws }: Props) {
                         <InlineMarkdown text={msg.text} />
                       </div>
                       <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                    </div>
+                  );
+                }
+
+                if (msg.sender === 'system') {
+                  return (
+                    <div key={i} className="flex justify-center py-1">
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700/50 text-xs font-mono text-gray-400">
+                        <RefreshCw className="w-3 h-3 text-gray-500" />
+                        {msg.text}
+                        {ts && <span className="text-[10px] text-gray-600 ml-1">{ts}</span>}
+                      </div>
                     </div>
                   );
                 }
@@ -765,12 +1291,15 @@ export function LeadDashboard({ api, ws }: Props) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                       e.preventDefault();
-                      sendMessage();
+                      sendMessage('queue');
+                    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      sendMessage('interrupt');
                     }
                   }}
-                  placeholder={isActive ? 'Message the Project Lead... (Shift+Enter for new line)' : 'Project Lead is not active'}
+                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt)' : 'Project Lead is not active'}
                   disabled={!isActive}
                   rows={1}
                   onInput={(e) => {
@@ -781,14 +1310,28 @@ export function LeadDashboard({ api, ws }: Props) {
                   className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
                   style={{ maxHeight: 150 }}
                 />
-                <button
-                  type="button"
-                  onClick={sendMessage}
-                  disabled={!isActive || !input.trim()}
-                  className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black px-3 py-2 rounded shrink-0"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => sendMessage('queue')}
+                    disabled={!isActive || !input.trim()}
+                    title="Send (queued) — Enter"
+                    className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Queue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendMessage('interrupt')}
+                    disabled={!isActive || !input.trim()}
+                    title="Interrupt current work (Ctrl+Enter)"
+                    className="bg-red-700 hover:bg-red-600 disabled:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Interrupt
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -798,10 +1341,15 @@ export function LeadDashboard({ api, ws }: Props) {
             <div className="border-l border-gray-700 flex flex-col items-center py-2 w-10 shrink-0">
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200 relative"
                 title="Expand sidebar"
               >
                 <PanelRightOpen className="w-4 h-4" />
+                {pendingConfirmations.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-yellow-500 rounded-full text-[8px] font-bold text-black flex items-center justify-center" title={`${pendingConfirmations.length} decision(s) need confirmation`}>
+                    {pendingConfirmations.length}
+                  </span>
+                )}
               </button>
             </div>
           ) : (
@@ -821,18 +1369,85 @@ export function LeadDashboard({ api, ws }: Props) {
                     <PanelRightClose className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <CollapsibleSection title="Decisions" icon={<Lightbulb className="w-3.5 h-3.5 text-yellow-400" />} badge={decisions.length} defaultHeight={150}>
-                  <DecisionPanelContent decisions={decisions} />
-                </CollapsibleSection>
-                <CollapsibleSection title="Agent Comms" icon={<MessageSquare className="w-3.5 h-3.5 text-purple-400" />} badge={comms.length} defaultHeight={200}>
-                  <CommsPanelContent comms={comms} />
-                </CollapsibleSection>
-                <CollapsibleSection title="Activity" icon={<Wrench className="w-3.5 h-3.5 text-gray-400" />} badge={activity.length} defaultHeight={180}>
-                  <ActivityFeedContent activity={activity} agents={agents} />
-                </CollapsibleSection>
-                <CollapsibleSection title="Team" icon={<Bot className="w-3.5 h-3.5 text-blue-400" />} badge={teamAgents.length} defaultHeight={180}>
-                  <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} />
-                </CollapsibleSection>
+                {/* Decisions — always visible at top */}
+                <div className="shrink-0 flex flex-col relative" style={{ height: decisionsPanelHeight, maxHeight: '30%' }}>
+                  <div className="px-3 py-1.5 flex items-center gap-2 border-b border-gray-700 shrink-0">
+                    <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />
+                    <span className="text-xs font-semibold">Decisions</span>
+                    {pendingConfirmations.length > 0 && (
+                      <span className="w-2 h-2 bg-yellow-500 rounded-full" title={`${pendingConfirmations.length} pending`} />
+                    )}
+                    <span className="text-[10px] text-gray-500 ml-auto">{decisions.length}</span>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <DecisionPanelContent decisions={decisions} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} />
+                  </div>
+                  {/* Resize handle for decisions panel */}
+                  <div
+                    onMouseDown={startDecisionsResize}
+                    className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute bottom-0 left-0 right-0"
+                    style={{ transform: 'translateY(2px)', zIndex: 10 }}
+                  />
+                </div>
+
+                {/* Tabbed bottom panels */}
+                <div className="flex-1 min-h-0 border-t border-gray-700 flex flex-col relative">
+                  <div className="flex border-b border-gray-700 shrink-0 overflow-x-auto">
+                    {(() => {
+                      const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
+                        team: { icon: <Bot className="w-3 h-3" />, label: 'Team', badge: teamAgents.length },
+                        comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
+                        groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
+                        dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
+                      };
+                      const orderedIds = tabOrder.filter((id) => id in allTabs);
+                      // Append any missing tabs (safety net)
+                      for (const id of Object.keys(allTabs)) {
+                        if (!orderedIds.includes(id)) orderedIds.push(id);
+                      }
+                      return orderedIds.map((tabId) => {
+                        const tab = allTabs[tabId];
+                        return (
+                          <button
+                            key={tabId}
+                            draggable
+                            onDragStart={(e) => handleTabDragStart(e, tabId)}
+                            onDragOver={(e) => handleTabDragOver(e, tabId)}
+                            onDrop={(e) => handleTabDrop(e, tabId)}
+                            onDragEnd={handleTabDragEnd}
+                            onDragLeave={() => setDragOverTab(null)}
+                            onClick={() => setSidebarTab(tabId)}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
+                              dragOverTab === tabId
+                                ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                                : sidebarTab === tabId
+                                  ? 'border-yellow-500 text-yellow-400'
+                                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            {tab.icon}
+                            {tab.label}
+                            {tab.badge !== undefined && tab.badge > 0 && (
+                              <span className="text-[9px] bg-gray-700 text-gray-400 px-1 rounded-full ml-0.5">{tab.badge}</span>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
+                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} />}
+                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
+                    {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
+                  </div>
+                  {/* Resize handle for tabbed section */}
+                  <div
+                    onMouseDown={startTabResize}
+                    className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute top-0 left-0 right-0"
+                    style={{ transform: 'translateY(-2px)' }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1059,9 +1674,9 @@ function parseAgentReport(content: string): { header: string; task: string; outp
   const sessionMatch = content.match(/\nSession ID:\s*(.*?)(?:\n|$)/);
   const outputMatch = content.match(/\nOutput summary:\s*([\s\S]*)$/);
 
-  // Clean output: strip <!-- ... --> fragments and normalize whitespace
+  // Clean output: strip [[[ ... ]]] fragments and normalize whitespace
   let output = outputMatch ? outputMatch[1].trim() : '';
-  output = output.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').replace(/^[\s\S]*?-->/g, '').trim();
+  output = output.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').replace(/^[\s\S]*?\]\]\]/g, '').trim();
   output = output.replace(/\n\s(?=\S)/g, ' ');
 
   return {
@@ -1135,7 +1750,7 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
   );
 }
 
-function DecisionPanelContent({ decisions }: { decisions: any[] }) {
+function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: any[]; onConfirm?: (id: string) => void; onReject?: (id: string) => void }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
   useEffect(() => {
@@ -1153,7 +1768,7 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
           decisions.map((d: any, i: number) => (
             <div
               key={d.id || `dec-${i}`}
-              className="bg-gray-800 border border-gray-700 rounded p-2 cursor-pointer hover:bg-gray-700/50 transition-colors"
+              className={`bg-gray-800 border rounded p-2 cursor-pointer hover:bg-gray-700/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-gray-700'}`}
               onClick={() => setSelectedDecision(d)}
             >
               <div className="flex items-start gap-2">
@@ -1164,9 +1779,28 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
                     {d.agentRole && (
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
                     )}
+                    {d.status && d.status !== 'recorded' && (
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{d.status}</span>
+                    )}
                   </div>
                   {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1 line-clamp-2">{d.rationale}</p>}
                   <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+                  {d.needsConfirmation && d.status === 'recorded' && (
+                    <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => onConfirm?.(d.id)}
+                        className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" /> Confirm
+                      </button>
+                      <button
+                        onClick={() => onReject?.(d.id)}
+                        className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" /> Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1230,7 +1864,7 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   );
 }
 
-function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[] }) {
+function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
   const STATUS_COLOR: Record<string, string> = {
     creating: 'text-gray-400', running: 'text-blue-400', idle: 'text-yellow-400',
     completed: 'text-green-400', failed: 'text-red-400',
@@ -1244,7 +1878,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
 
   return (
     <>
-      <div className="h-full overflow-y-auto p-2 space-y-2">
+      <div className="h-full overflow-y-auto p-1.5 space-y-1">
         {agents.length === 0 ? (
           <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
         ) : (
@@ -1254,26 +1888,56 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
             return (
               <div
                 key={agent.id}
-                className="bg-gray-800 border border-gray-700 rounded p-2 cursor-pointer hover:border-gray-500 transition-colors"
+                className="bg-gray-800 border border-gray-700 rounded p-1.5 cursor-pointer hover:border-gray-500 transition-colors"
                 onClick={() => setSelectedAgent(agent)}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{agent.role.icon}</span>
-                  <span className="text-sm font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
-                  <span className={`text-xs font-mono ${colorClass} ml-auto`}>{agent.status}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm leading-none">{agent.role.icon}</span>
+                  <span className="text-xs font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
+                  <span className={`text-[10px] font-mono ${colorClass} ml-auto shrink-0`}>{agent.status}</span>
+                  {onOpenChat && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpenChat(agent.id); }}
+                      className="text-xs leading-none text-blue-400 hover:text-blue-300 shrink-0 px-0.5"
+                      title="Open agent chat panel"
+                    >
+                      💬
+                    </button>
+                  )}
+                  <span className="text-[10px] font-mono text-gray-500 shrink-0">{agent.id.slice(0, 8)}</span>
                 </div>
                 {delegation && (
-                  <p className="text-xs font-mono text-gray-400 mt-1 truncate" title={delegation.task}>{delegation.task}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-[10px] font-mono text-gray-400 truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
+                    {(agent.model || agent.role.model) && (
+                      <span className="text-[9px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                    )}
+                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
+                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
+                    )}
+                  </div>
                 )}
-                <div className="flex items-center gap-2 mt-1">
-                  {(agent.model || agent.role.model) && (
-                    <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded">{agent.model || agent.role.model}</span>
-                  )}
-                  {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                    <span className="text-[10px] font-mono text-purple-400/70">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
-                  )}
-                  <span className="text-xs font-mono text-gray-400 ml-auto">{agent.id.slice(0, 8)}</span>
-                </div>
+                {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {(agent.model || agent.role.model) && (
+                      <span className="text-[9px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                    )}
+                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
+                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
+                    )}
+                  </div>
+                )}
+                {(() => {
+                  const latestAct = (activity ?? []).filter((e) => e.agentId === agent.id).slice(-1)[0];
+                  if (!latestAct) return null;
+                  const actTime = new Date(latestAct.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[9px] text-gray-500">{actTime}</span>
+                      <span className="text-[10px] text-gray-400 truncate">{latestAct.summary}</span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })
@@ -1306,6 +1970,29 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
                   )}
                 </div>
               </div>
+              {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
+                <div className="flex items-center gap-1 mr-2">
+                  <button
+                    onClick={() => fetch(`/api/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
+                    title="Interrupt — cancel current work"
+                  >
+                    <Hand size={12} /> Interrupt
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Stop this agent?')) {
+                        fetch(`/api/agents/${selectedAgent.id}`, { method: 'DELETE' });
+                        setSelectedAgent(null);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors"
+                    title="Stop agent"
+                  >
+                    <Square size={12} /> Stop
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => setSelectedAgent(null)}
                 className="text-gray-400 hover:text-white text-lg leading-none p-1"
@@ -1562,6 +2249,116 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Simple hash to pick a color for a role name */
+function roleColor(role: string): string {
+  const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#60a5fa', '#e879f9', '#fb923c'];
+  let hash = 0;
+  for (let i = 0; i < role.length; i++) hash = (hash * 31 + role.charCodeAt(i)) | 0;
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function GroupsPanelContent({
+  groups,
+  groupMessages,
+  leadId,
+}: {
+  groups: ChatGroup[];
+  groupMessages: Record<string, GroupMessage[]>;
+  leadId: string | null;
+}) {
+  const feedRef = useRef<HTMLDivElement>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [fetchedGroups, setFetchedGroups] = useState<Set<string>>(new Set());
+
+  // Reset expanded state when lead changes
+  useEffect(() => {
+    setExpandedGroup(null);
+    setFetchedGroups(new Set());
+  }, [leadId]);
+
+  // Fetch messages when a group is first expanded
+  useEffect(() => {
+    if (!expandedGroup || !leadId || fetchedGroups.has(expandedGroup)) return;
+    setFetchedGroups((prev) => new Set(prev).add(expandedGroup));
+    fetch(`/api/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const store = useLeadStore.getState();
+          // Bulk-set messages for this group
+          const proj = store.projects[leadId];
+          if (proj) {
+            data.forEach((msg: GroupMessage) => {
+              store.addGroupMessage(leadId, expandedGroup, msg);
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [expandedGroup, leadId, fetchedGroups]);
+
+  // Auto-scroll when messages change for expanded group
+  useEffect(() => {
+    if (expandedGroup) {
+      requestAnimationFrame(() => {
+        feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+      });
+    }
+  }, [expandedGroup, groupMessages[expandedGroup ?? '']?.length]);
+
+  return (
+    <div ref={feedRef} className="h-full overflow-y-auto">
+      {groups.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No groups yet</p>
+      ) : (
+        groups.map((g) => {
+          const isExpanded = expandedGroup === g.name;
+          const msgs = groupMessages[g.name] ?? [];
+          return (
+            <div key={g.name} className="border-b border-gray-700/30">
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-700/30 transition-colors flex items-center gap-2"
+                onClick={() => setExpandedGroup(isExpanded ? null : g.name)}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3 h-3 text-gray-500 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3 h-3 text-gray-500 shrink-0" />
+                )}
+                <span className="text-xs font-mono font-semibold text-teal-400 truncate flex-1">{g.name}</span>
+                <span className="text-[10px] font-mono text-gray-500 shrink-0">{g.memberIds.length} members</span>
+              </button>
+              {isExpanded && (
+                <div className="px-2 pb-2 space-y-0.5 max-h-60 overflow-y-auto">
+                  {msgs.length === 0 ? (
+                    <p className="text-[10px] text-gray-600 text-center py-2 font-mono">No messages</p>
+                  ) : (
+                    msgs.map((m) => {
+                      const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      const shortId = m.fromAgentId?.slice(0, 6) ?? '';
+                      return (
+                        <div key={m.id} className="px-2 py-1 rounded bg-gray-800/50 text-xs font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-600 text-[10px] shrink-0">{time}</span>
+                            <span style={{ color: roleColor(m.fromRole) }} className="font-semibold truncate">
+                              {m.fromRole}{shortId ? ` (${shortId})` : ''}:
+                            </span>
+                          </div>
+                          <p className="text-gray-300 break-words mt-0.5 whitespace-pre-wrap">{m.content}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }
 
@@ -1823,7 +2620,7 @@ function InlineMarkdown({ text }: { text: string }) {
   );
 }
 
-/** Renders agent text, separating <!-- command --> blocks from normal markdown */
+/** Renders agent text, separating [[[ command ]]] blocks from normal markdown */
 function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
   if (msg.contentType === 'image' && msg.data) {
     return (
@@ -1866,10 +2663,10 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
   return null;
 }
 
-/** Collapsed-by-default <!-- command --> block with click to expand */
+/** Collapsed-by-default [[[ command ]]] block with click to expand */
 function CollapsibleCommandBlock({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/<!--\s*(\w+)/);
+  const nameMatch = text.match(/\[\[\[\s*(\w+)/);
   const label = nameMatch ? nameMatch[1] : 'command';
   // Extract a preview from the JSON payload
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -1902,18 +2699,18 @@ function CollapsibleCommandBlock({ text }: { text: string }) {
 }
 
 function AgentTextBlock({ text }: { text: string }) {
-  // Split on <!-- ... --> blocks (complete) and also detect unclosed <!-- blocks
-  const segments = text.split(/(<!--[\s\S]*?-->)/g);
+  // Split on [[[ ... ]]] blocks (complete) and also detect unclosed [[[ blocks
+  const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
   return (
     <>
       {segments.map((seg, i) => {
-        // Complete <!-- --> block
-        if (seg.startsWith('<!--') && seg.endsWith('-->')) {
+        // Complete [[[ ]]] block
+        if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
           return <CollapsibleCommandBlock key={i} text={seg} />;
         }
-        // Unclosed <!-- block (still streaming or split across messages)
-        if (seg.includes('<!--') && !seg.includes('-->')) {
-          const idx = seg.indexOf('<!--');
+        // Unclosed [[[ block (still streaming or split across messages)
+        if (seg.includes('[[[') && !seg.includes(']]]')) {
+          const idx = seg.indexOf('[[[');
           const before = seg.slice(0, idx);
           const cmdBlock = seg.slice(idx);
           return (
@@ -1923,9 +2720,9 @@ function AgentTextBlock({ text }: { text: string }) {
             </span>
           );
         }
-        // Dangling --> from a block that started in a previous message
-        if (seg.includes('-->') && !seg.includes('<!--')) {
-          const idx = seg.indexOf('-->') + 3;
+        // Dangling ]]] from a block that started in a previous message
+        if (seg.includes(']]]') && !seg.includes('[[[')) {
+          const idx = seg.indexOf(']]]') + 3;
           const cmdBlock = seg.slice(0, idx);
           const after = seg.slice(idx);
           return (

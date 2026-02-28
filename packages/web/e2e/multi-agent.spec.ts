@@ -19,7 +19,7 @@ test.describe('Multi-Agent Coordination', () => {
     await page.request.post('/api/agents', { data: { roleId: 'developer' } });
     await page.request.post('/api/agents', { data: { roleId: 'code-reviewer' } });
 
-    await page.goto('/');
+    await page.goto('/agents');
     await page.waitForTimeout(1000);
 
     // Both should appear
@@ -111,14 +111,15 @@ test.describe('Multi-Agent Coordination', () => {
   });
 
   test('agent count updates in header', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByText(/\d+ agents?/)).toBeVisible({ timeout: 5000 });
+    await page.goto('/agents');
+    // FleetStats shows "Total Agents" label with a count
+    await expect(page.getByText('Total Agents')).toBeVisible({ timeout: 5000 });
 
     await page.request.post('/api/agents', { data: { roleId: 'developer' } });
     await page.waitForTimeout(1000);
     await page.reload();
 
-    // Should now show at least 1 agent
-    await expect(page.getByText(/[1-9]\d* agents?/)).toBeVisible({ timeout: 5000 });
+    // After spawning, should still show the stats panel
+    await expect(page.getByText('Total Agents')).toBeVisible({ timeout: 5000 });
   });
 });

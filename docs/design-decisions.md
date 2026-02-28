@@ -133,17 +133,19 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Trade-off:** False positives from overly broad globs. Mitigation: agents are instructed to lock specific files, not directories, when possible.
 
-## 10. Permission Gating with Auto-Approve Timeout
+## 10. Permission Gating — Autopilot vs Manual Mode
 
-**Decision:** Tool calls in ACP mode require user approval, with 60-second auto-approve.
+**Decision:** Permission behavior depends on the agent's autopilot mode:
+- **Autopilot ON** (spawned by a lead, or user-selected): tool calls are immediately auto-approved. No user interaction needed.
+- **Autopilot OFF** (manually spawned without autopilot): tool calls show a permission dialog. If the user doesn't respond within 60 seconds, the tool call is **auto-denied** (cancelled) for safety.
 
 **Rationale:**
-- Safety: users should know when agents modify files or run commands
-- Practicality: requiring approval for every action would be impractical during long-running tasks
-- 60-second auto-approve lets agents proceed if the user is AFK
-- "Always allow" option per agent for trusted workflows
+- Agents managed by a lead are trusted to operate autonomously — the lead already approved the task
+- Manually spawned agents without autopilot should default to a safe, supervised mode
+- Auto-deny after timeout prevents unattended agents from making unexpected changes
+- Users can still approve individual tool calls or enable autopilot to opt into full autonomy
 
-**Trade-off:** Auto-approve means agents can act without explicit consent after timeout. Acceptable because the user has already chosen to spawn the agent and assigned it a task.
+**Trade-off:** Non-autopilot agents will stall if the user is AFK and not approving tool calls. This is intentional — if you want unattended operation, enable autopilot.
 
 ## 11. Task Auto-Assignment with Auto-Spawn
 
@@ -196,3 +198,85 @@ ai-crew/
 **Rationale:** Unit tests catch logic regressions fast (<3s). E2E tests validate the full stack integration including WebSocket events, API responses, and UI state. Together they cover both correctness and user workflows.
 
 **Trade-off:** E2E tests are slower and require both servers running. Mitigated by Playwright's webServer config which starts them automatically.
+
+## 14. Drizzle ORM (Replacing Raw SQL)
+
+**Decision:** Migrate from hand-written SQL strings to Drizzle ORM with a typed schema.
+
+**Rationale:**
+- Raw SQL queries (`db.run("INSERT INTO ...")`) offered no compile-time safety — typos in column names or wrong parameter counts silently broke at runtime
+- Drizzle provides full TypeScript inference from schema definitions, so every `select()`, `insert()`, and `where()` is type-checked
+- Migration files are auto-generated numbered SQL files in `packages/server/drizzle/`, giving a clear audit trail of schema changes
+- Drizzle sits on top of `better-sqlite3`, so the underlying driver is unchanged — no performance penalty
+
+**Implementation:**
+- Schema defined in `packages/server/src/db/schema.ts` (13 tables)
+- `Database` class exposes `public readonly drizzle` property for typed queries
+- Legacy `run()`, `get()`, `all()` methods marked `@deprecated` and retained for edge cases during migration
+- All new code uses `db.drizzle.select(...)`, `db.drizzle.insert(...)`, etc.
+
+**Trade-off:** Adds a dependency (~50KB). Accepted because the type-safety gains vastly outweigh the bundle cost, and Drizzle is the lightest ORM option for SQLite.
+
+## 15. Typed Event Bus
+
+**Decision:** Replace raw `EventEmitter` with a generic `TypedEmitter<T>` class that enforces event name and payload types at compile time.
+
+**Rationale:**
+- `AgentManager` emits 27+ events. With raw `EventEmitter`, it was easy to `emit('agent:spawnd', ...)` (typo) or pass wrong payload shapes — both are silent bugs
+- `TypedEmitter<TEvents>` maps each event name to its exact payload type via a TypeScript interface (`AgentManagerEvents`)
+- Listeners get full autocomplete and type errors on mismatched handlers
+
+**Implementation:**
+- `packages/server/src/utils/TypedEmitter.ts` — wraps Node's `EventEmitter` with generic `emit<K>`, `on<K>`, `off<K>`, `once<K>` methods
+- `AgentManager extends TypedEmitter<AgentManagerEvents>` where `AgentManagerEvents` is an interface with 27 event→payload mappings
+- Each event maps to a single typed payload object (e.g., `'agent:spawned': { agent: AgentInfo }`)
+
+**Trade-off:** Requires maintaining the event interface alongside the emitting code. Accepted because the event interface also serves as documentation of the system's event catalog.
+
+## 16. Batched Activity Log Writes
+
+**Decision:** Buffer `ActivityLedger` writes in memory and flush to SQLite every 250ms or when the buffer reaches 64 entries, whichever comes first.
+
+**Rationale:**
+- During peak activity (agent spawns, multiple lock acquisitions, rapid tool calls), the ledger could see dozens of writes per second
+- Individual SQLite inserts under WAL are fast (~0.1ms), but the overhead of many small transactions adds up
+- Batching amortizes transaction overhead while keeping write latency imperceptible to users (250ms max delay)
+
+**Implementation:**
+- `ActivityLedger` holds an in-memory buffer array
+- A `setInterval` timer flushes every 250ms; buffer size check triggers immediate flush at 64 entries
+- All read operations (`getRecent`, `getSummary`) call `flush()` first for read-after-write consistency
+- `stop()` method flushes remaining entries and clears the timer for graceful shutdown
+
+**Trade-off:** Up to 250ms of data could be lost on an unclean crash. Acceptable because activity log entries are informational, not transactional — the source of truth for tasks and locks is always in SQLite directly.
+
+## 17. SQLite Pragma Optimization
+
+**Decision:** Apply a specific set of SQLite pragmas at database open to optimize for our workload.
+
+**Rationale & pragma choices:**
+| Pragma | Value | Why |
+|--------|-------|-----|
+| `journal_mode = WAL` | Write-Ahead Logging | Concurrent reads during writes; critical for multi-agent workload |
+| `synchronous = NORMAL` | Sync on checkpoint only | 10x write speedup vs FULL; acceptable durability (WAL protects against corruption) |
+| `busy_timeout = 5000` | 5 second wait | Prevents `SQLITE_BUSY` errors when multiple subsystems write simultaneously |
+| `cache_size = -64000` | 64MB page cache | Keeps hot pages (locks, activity, tasks) in memory; negative value = KB |
+| `wal_checkpoint(PASSIVE)` | Non-blocking checkpoint | Reclaims WAL space at startup without blocking reads |
+| `foreign_keys = ON` | Enforce FK constraints | Ensures referential integrity (e.g., messages reference valid conversations) |
+
+**Trade-off:** `synchronous=NORMAL` trades a small durability window for speed. In the unlikely event of an OS crash (not app crash), the last few WAL frames may be lost. This is acceptable for a development tool.
+
+## 18. Tool Permission Timeout Behavior
+
+**Decision:** Tool permission requests have a 60-second timeout. The timeout behavior depends on autopilot mode:
+- **Autopilot ON:** Permissions are auto-approved immediately (timeout never reached).
+- **Autopilot OFF:** After 60 seconds without user response, the tool call is **auto-denied** (cancelled).
+
+**Rationale:**
+- AI Crew distinguishes between supervised and autonomous operation modes
+- Lead-spawned agents run in autopilot by default — they are part of a managed workflow and should proceed without blocking
+- Manually spawned agents without autopilot are in supervised mode — the user is expected to be actively watching
+- Auto-deny prevents non-autopilot agents from silently modifying files or running commands when the user is away
+- This makes the permission dialog a true gatekeeping mechanism for supervised agents, not just a notification
+
+**Trade-off:** Non-autopilot agents require active user attention. Users who want fire-and-forget should enable autopilot explicitly.

@@ -1,0 +1,62 @@
+import { defineConfig } from 'vitepress'
+
+export default defineConfig({
+  title: 'AI Crew',
+  description: 'Multi-Agent Copilot CLI Orchestrator',
+  base: '/ai-crew/',
+  head: [['link', { rel: 'icon', href: '/ai-crew/favicon.ico' }]],
+  themeConfig: {
+    logo: '/logo.svg',
+    nav: [
+      { text: 'Guide', link: '/guide/' },
+      { text: 'Reference', link: '/reference/api' },
+      { text: 'GitHub', link: 'https://github.com/justinc/ai-crew' },
+    ],
+    sidebar: {
+      '/guide/': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'Introduction', link: '/guide/' },
+            { text: 'Quick Start', link: '/guide/quickstart' },
+          ],
+        },
+        {
+          text: 'Core Concepts',
+          items: [
+            { text: 'Architecture', link: '/guide/architecture' },
+            { text: 'Roles & Agents', link: '/guide/roles' },
+            { text: 'Agent Commands', link: '/guide/commands' },
+            { text: 'Coordination', link: '/guide/coordination' },
+          ],
+        },
+        {
+          text: 'Dashboard',
+          items: [
+            { text: 'Lead Dashboard', link: '/guide/dashboard-lead' },
+            { text: 'Agents View', link: '/guide/dashboard-agents' },
+            { text: 'Settings', link: '/guide/dashboard-settings' },
+          ],
+        },
+      ],
+      '/reference/': [
+        {
+          text: 'Reference',
+          items: [
+            { text: 'REST API', link: '/reference/api' },
+            { text: 'WebSocket Events', link: '/reference/websocket' },
+            { text: 'Database Schema', link: '/reference/database' },
+            { text: 'Configuration', link: '/reference/configuration' },
+          ],
+        },
+      ],
+    },
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/justinc/ai-crew' },
+    ],
+    search: { provider: 'local' },
+    footer: {
+      message: 'AI-generated orchestration framework',
+    },
+  },
+})
