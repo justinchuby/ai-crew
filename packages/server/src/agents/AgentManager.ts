@@ -9,6 +9,8 @@ import type { MessageBus } from '../comms/MessageBus.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
 import type { AgentMemory, MemoryEntry } from '../coordination/AgentMemory.js';
 import type { ChatGroupRegistry, GroupMessage } from '../comms/ChatGroupRegistry.js';
+import { TaskDAG } from '../coordination/TaskDAG.js';
+import type { DagTaskInput, DagTask } from '../coordination/TaskDAG.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 
@@ -30,6 +32,13 @@ const ADD_TO_GROUP_REGEX = /\[\[\[\s*ADD_TO_GROUP\s*(\{.*?\})\s*\]\]\]/s;
 const REMOVE_FROM_GROUP_REGEX = /\[\[\[\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*\]\]\]/s;
 const GROUP_MESSAGE_REGEX = /\[\[\[\s*GROUP_MESSAGE\s*(\{.*?\})\s*\]\]\]/s;
 const LIST_GROUPS_REGEX = /\[\[\[\s*LIST_GROUPS\s*\]\]\]/s;
+const DECLARE_TASKS_REGEX = /\[\[\[\s*DECLARE_TASKS\s*(\{.*?\})\s*\]\]\]/s;
+const TASK_STATUS_REGEX = /\[\[\[\s*TASK_STATUS\s*\]\]\]/s;
+const PAUSE_TASK_REGEX = /\[\[\[\s*PAUSE_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const RETRY_TASK_REGEX = /\[\[\[\s*RETRY_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const SKIP_TASK_REGEX = /\[\[\[\s*SKIP_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const ADD_TASK_REGEX = /\[\[\[\s*ADD_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const CANCEL_TASK_REGEX = /\[\[\[\s*CANCEL_TASK\s*(\{.*?\})\s*\]\]\]/s;
 
 export interface Delegation {
   id: string;
@@ -55,6 +64,7 @@ export class AgentManager extends EventEmitter {
   private decisionLog: DecisionLog;
   private agentMemory: AgentMemory;
   private chatGroupRegistry: ChatGroupRegistry;
+  private taskDAG: TaskDAG;
   /** If set, auto-kill agents after this many ms past the initial hung detection */
   private autoKillTimeoutMs: number | null;
   private hungTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -79,6 +89,7 @@ export class AgentManager extends EventEmitter {
     decisionLog: DecisionLog,
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
+    taskDAG: TaskDAG,
     { maxRestarts = 3, autoRestart = true }: { maxRestarts?: number; autoRestart?: boolean } = {},
   ) {
     super();
@@ -90,6 +101,7 @@ export class AgentManager extends EventEmitter {
     this.decisionLog = decisionLog;
     this.agentMemory = agentMemory;
     this.chatGroupRegistry = chatGroupRegistry;
+    this.taskDAG = taskDAG;
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
@@ -498,6 +510,13 @@ export class AgentManager extends EventEmitter {
       { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => this.detectRemoveFromGroup(a, d) },
       { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => this.detectGroupMessage(a, d) },
       { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => this.handleListGroups(a) },
+      { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => this.handleDeclareTasks(a, d) },
+      { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => this.handleTaskStatus(a) },
+      { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => this.handlePauseTask(a, d) },
+      { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => this.handleRetryTask(a, d) },
+      { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => this.handleSkipTask(a, d) },
+      { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => this.handleAddTask(a, d) },
+      { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => this.handleCancelTask(a, d) },
     ];
 
     let found = true;
@@ -1104,6 +1123,23 @@ CREW_ROSTER ]]]`;
       content: summary,
     });
     this.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status: 'completed' });
+
+    // Check if this agent was running a DAG task
+    if (agent.parentId) {
+      const dagTask = this.taskDAG.getTaskByAgent(agent.parentId, agent.id);
+      if (dagTask) {
+        const newlyReady = this.taskDAG.completeTask(agent.parentId, dagTask.id);
+        if (newlyReady.length > 0) {
+          const dagParent = this.agents.get(agent.parentId);
+          if (dagParent) {
+            const delegated = this.autoDelegateReadyTasks(dagParent, newlyReady);
+            if (delegated.length > 0) {
+              dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" done. Auto-started: ${delegated.map(d => d.id).join(', ')}`);
+            }
+          }
+        }
+      }
+    }
   }
 
   private notifyParentOfCompletion(agent: Agent, exitCode: number | null): void {
@@ -1156,6 +1192,204 @@ CREW_ROSTER ]]]`;
       content: summary,
     });
     this.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
+
+    if (agent.parentId && exitCode !== 0) {
+      const dagTask = this.taskDAG.getTaskByAgent(agent.parentId, agent.id);
+      if (dagTask) {
+        this.taskDAG.failTask(agent.parentId, dagTask.id);
+        const dagParent = this.agents.get(agent.parentId);
+        if (dagParent) {
+          dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
+        }
+      }
+    }
+  }
+
+  // ── Task DAG handlers ──────────────────────────────────────────────
+
+  private handleDeclareTasks(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') {
+      agent.sendMessage('[System] Only the Project Lead can declare task DAGs.');
+      return;
+    }
+    const match = data.match(DECLARE_TASKS_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (!req.tasks || !Array.isArray(req.tasks)) {
+        agent.sendMessage('[System] DECLARE_TASKS requires a "tasks" array.');
+        return;
+      }
+      const { tasks, conflicts } = this.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
+      let msg = `[System] Task DAG declared: ${tasks.length} tasks added.`;
+      const readyCount = tasks.filter(t => t.dagStatus === 'ready').length;
+      const pendingCount = tasks.filter(t => t.dagStatus === 'pending').length;
+      msg += `\n  Ready: ${readyCount}, Pending (waiting on deps): ${pendingCount}`;
+      if (conflicts.length > 0) {
+        msg += '\n⚠️ FILE CONFLICTS detected (tasks share files without explicit dependency):';
+        for (const c of conflicts) {
+          msg += `\n  - ${c.file}: tasks [${c.tasks.join(', ')}]`;
+        }
+        msg += '\nConsider adding depends_on between these tasks or confirming parallel execution.';
+      }
+      // Auto-delegate ready tasks
+      const readyTasks = tasks.filter(t => t.dagStatus === 'ready');
+      const delegated = this.autoDelegateReadyTasks(agent, readyTasks);
+      if (delegated.length > 0) {
+        msg += `\nAuto-delegated ${delegated.length} ready tasks: ${delegated.map(d => d.id).join(', ')}`;
+      }
+      agent.sendMessage(msg);
+      this.emit('dag:updated', { leadId: agent.id });
+    } catch (err: any) {
+      agent.sendMessage(`[System] DECLARE_TASKS error: ${err.message}`);
+    }
+  }
+
+  private handleTaskStatus(agent: Agent): void {
+    const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+    if (!leadId) {
+      agent.sendMessage('[System] No task DAG found.');
+      return;
+    }
+    const status = this.taskDAG.getStatus(leadId);
+    if (status.tasks.length === 0) {
+      agent.sendMessage('[System] No task DAG declared. Use DECLARE_TASKS to create one.');
+      return;
+    }
+    const { tasks, fileLockMap, summary } = status;
+    let msg = '== TASK DAG STATUS ==\n';
+    msg += `Summary: ${summary.done} done, ${summary.running} running, ${summary.ready} ready, ${summary.pending} pending`;
+    if (summary.failed > 0) msg += `, ${summary.failed} FAILED`;
+    if (summary.blocked > 0) msg += `, ${summary.blocked} blocked`;
+    if (summary.paused > 0) msg += `, ${summary.paused} paused`;
+    if (summary.skipped > 0) msg += `, ${summary.skipped} skipped`;
+    msg += '\n\nTasks:';
+    for (const task of tasks) {
+      const statusIcon = { pending: '⏳', ready: '🟢', running: '🔵', done: '✅', failed: '❌', blocked: '🚫', paused: '⏸️', skipped: '⏭️' }[task.dagStatus] || '?';
+      msg += `\n  ${statusIcon} [${task.dagStatus.toUpperCase()}] ${task.id} (${task.role})`;
+      if (task.description) msg += ` — ${task.description.slice(0, 80)}`;
+      if (task.assignedAgentId) msg += ` [agent: ${task.assignedAgentId.slice(0, 8)}]`;
+      if (task.dependsOn.length > 0) msg += `\n      depends_on: [${task.dependsOn.join(', ')}]`;
+      if (task.files.length > 0) msg += `\n      files: [${task.files.join(', ')}]`;
+    }
+    if (Object.keys(fileLockMap).length > 0) {
+      msg += '\n\nFile Lock Map:';
+      for (const [file, info] of Object.entries(fileLockMap)) {
+        msg += `\n  ${file} → ${info.taskId}${info.agentId ? ` (${info.agentId.slice(0, 8)})` : ''}`;
+      }
+    }
+    agent.sendMessage(msg);
+  }
+
+  private handlePauseTask(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can pause tasks.'); return; }
+    const match = data.match(PAUSE_TASK_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      const ok = this.taskDAG.pauseTask(agent.id, req.id);
+      agent.sendMessage(ok ? `[System] Task "${req.id}" paused.` : `[System] Cannot pause task "${req.id}" (must be pending or ready).`);
+    } catch { agent.sendMessage('[System] PAUSE_TASK error: invalid payload.'); }
+  }
+
+  private handleRetryTask(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can retry tasks.'); return; }
+    const match = data.match(RETRY_TASK_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      const ok = this.taskDAG.retryTask(agent.id, req.id);
+      if (ok) {
+        agent.sendMessage(`[System] Task "${req.id}" reset to ready. Dependents unblocked.`);
+        const ready = this.taskDAG.resolveReady(agent.id).filter(t => t.id === req.id);
+        if (ready.length > 0) {
+          const delegated = this.autoDelegateReadyTasks(agent, ready);
+          if (delegated.length > 0) agent.sendMessage(`[System] Auto-delegated: ${delegated.map(d => d.id).join(', ')}`);
+        }
+      } else {
+        agent.sendMessage(`[System] Cannot retry task "${req.id}" (must be failed).`);
+      }
+    } catch { agent.sendMessage('[System] RETRY_TASK error: invalid payload.'); }
+  }
+
+  private handleSkipTask(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can skip tasks.'); return; }
+    const match = data.match(SKIP_TASK_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      const ok = this.taskDAG.skipTask(agent.id, req.id);
+      if (ok) {
+        agent.sendMessage(`[System] Task "${req.id}" skipped. Dependents may now be ready.`);
+        const ready = this.taskDAG.resolveReady(agent.id);
+        const delegated = this.autoDelegateReadyTasks(agent, ready);
+        if (delegated.length > 0) agent.sendMessage(`[System] Auto-delegated: ${delegated.map(d => d.id).join(', ')}`);
+      } else {
+        agent.sendMessage(`[System] Cannot skip task "${req.id}".`);
+      }
+    } catch { agent.sendMessage('[System] SKIP_TASK error: invalid payload.'); }
+  }
+
+  private handleAddTask(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can add tasks.'); return; }
+    const match = data.match(ADD_TASK_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]) as DagTaskInput;
+      if (!req.id || !req.role) { agent.sendMessage('[System] ADD_TASK requires "id" and "role".'); return; }
+      const task = this.taskDAG.addTask(agent.id, req);
+      let msg = `[System] Task "${task.id}" added (${task.dagStatus}).`;
+      if (task.dagStatus === 'ready') {
+        const delegated = this.autoDelegateReadyTasks(agent, [task]);
+        if (delegated.length > 0) msg += ` Auto-delegated.`;
+      }
+      agent.sendMessage(msg);
+    } catch (err: any) { agent.sendMessage(`[System] ADD_TASK error: ${err.message}`); }
+  }
+
+  private handleCancelTask(agent: Agent, data: string): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can cancel tasks.'); return; }
+    const match = data.match(CANCEL_TASK_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      const ok = this.taskDAG.cancelTask(agent.id, req.id);
+      agent.sendMessage(ok ? `[System] Task "${req.id}" cancelled.` : `[System] Cannot cancel task "${req.id}" (may be running or done).`);
+    } catch { agent.sendMessage('[System] CANCEL_TASK error: invalid payload.'); }
+  }
+
+  /** Auto-delegate ready tasks to idle agents or create new ones */
+  private autoDelegateReadyTasks(lead: Agent, readyTasks: DagTask[]): DagTask[] {
+    const delegated: DagTask[] = [];
+    for (const task of readyTasks) {
+      // Find idle agent with matching role
+      const idle = this.getAll().find(a =>
+        a.parentId === lead.id && a.role.id === task.role && a.status === 'idle'
+      );
+      if (idle) {
+        // Reuse idle agent
+        const taskPrompt = `[DAG Task] ${task.id}: ${task.description}\nFiles: ${task.files.join(', ') || 'none declared'}`;
+        idle.task = task.description.slice(0, 500);
+        idle.sendMessage(taskPrompt);
+        this.taskDAG.startTask(lead.id, task.id, idle.id);
+        delegated.push(task);
+      } else {
+        // Try to create new agent
+        const role = this.roleRegistry?.get(task.role);
+        if (role) {
+          try {
+            const child = this.spawn(role, task.description, lead.id, 'acp', true, task.model, lead.cwd);
+            const taskPrompt = `[DAG Task] ${task.id}: ${task.description}\nFiles: ${task.files.join(', ') || 'none declared'}`;
+            child.sendMessage(taskPrompt);
+            this.taskDAG.startTask(lead.id, task.id, child.id);
+            delegated.push(task);
+          } catch {
+            // Budget limit reached — task stays ready for later
+          }
+        }
+      }
+    }
+    return delegated;
   }
 
   getDelegations(parentId?: string): Delegation[] {
@@ -1173,6 +1407,10 @@ CREW_ROSTER ]]]`;
 
   getChatGroupRegistry(): ChatGroupRegistry {
     return this.chatGroupRegistry;
+  }
+
+  getTaskDAG(): TaskDAG {
+    return this.taskDAG;
   }
 
   private detectCreateGroup(agent: Agent, data: string): void {

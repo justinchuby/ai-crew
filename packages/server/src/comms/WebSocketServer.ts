@@ -190,6 +190,11 @@ export class WebSocketServer {
     chatGroupRegistry.on('group:member_removed', (data: any) => {
       this.broadcastAll({ type: 'group:member_removed', ...data });
     });
+
+    // Forward DAG events
+    agentManager.on('dag:updated', (data: any) => {
+      this.broadcastAll({ type: 'dag:updated', ...data });
+    });
   }
 
   private handleMessage(

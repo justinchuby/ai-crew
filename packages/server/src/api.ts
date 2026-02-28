@@ -334,6 +334,13 @@ export function apiRouter(
     res.json(agentManager.getDelegations(req.params.id));
   });
 
+  router.get('/lead/:id/dag', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    const status = agentManager.getTaskDAG().getStatus(agent.id);
+    res.json(status);
+  });
+
   router.get('/lead/:id/progress', (req, res) => {
     const leadId = req.params.id;
     const delegations = agentManager.getDelegations(leadId);

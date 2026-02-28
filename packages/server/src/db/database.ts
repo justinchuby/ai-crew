@@ -124,6 +124,24 @@ CREATE TABLE IF NOT EXISTS chat_group_messages (
   timestamp TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_group_messages_group ON chat_group_messages(group_name, lead_id);
+
+CREATE TABLE IF NOT EXISTS dag_tasks (
+  id TEXT NOT NULL,
+  lead_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  files TEXT DEFAULT '[]',
+  depends_on TEXT DEFAULT '[]',
+  dag_status TEXT DEFAULT 'pending',
+  priority INTEGER DEFAULT 0,
+  model TEXT,
+  assigned_agent_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  completed_at TEXT,
+  PRIMARY KEY (id, lead_id)
+);
+CREATE INDEX IF NOT EXISTS idx_dag_tasks_lead ON dag_tasks(lead_id);
+CREATE INDEX IF NOT EXISTS idx_dag_tasks_status ON dag_tasks(dag_status);
 `;
 
 export class Database {

@@ -349,6 +349,29 @@ Add/remove members from a group:
 Kill an agent to free a slot (returns their session ID for future resume):
 \`[[[ KILL_AGENT {"id": "agent-id", "reason": "task complete, freeing slot"} ]]]\`
 
+== TASK DAG (Declarative Scheduling) ==
+Declare tasks with dependencies and the system auto-schedules execution:
+
+\`[[[ DECLARE_TASKS {"tasks": [
+  {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"], "priority": 1},
+  {"id": "dead-fields", "role": "developer", "description": "Remove dead fields", "files": ["src/_configs.py"], "depends_on": ["rope-config"]},
+  {"id": "review-rope", "role": "code-reviewer", "description": "Review RoPEConfig", "depends_on": ["rope-config"]},
+  {"id": "rewrite-rules", "role": "developer", "description": "Add fusion rules", "files": ["src/rewrite_rules/"]}
+]} ]]]\`
+
+The system will:
+- Auto-start tasks when dependencies complete
+- Detect file conflicts between parallel tasks
+- Auto-delegate to idle agents or create new ones
+- Show status with: \`[[[ TASK_STATUS ]]]\`
+
+Management commands:
+- \`[[[ PAUSE_TASK {"id": "task-id"} ]]]\` — hold a pending/ready task
+- \`[[[ RETRY_TASK {"id": "task-id"} ]]]\` — retry a failed task
+- \`[[[ SKIP_TASK {"id": "task-id"} ]]]\` — skip and unblock dependents
+- \`[[[ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing-task"]} ]]]\` — add to DAG
+- \`[[[ CANCEL_TASK {"id": "task-id"} ]]]\` — remove from DAG
+
 == SPECIALIST ROLES (with recommended default models) ==
 - "developer" — Code implementation, feature building, bug fixes, writes tests (default: claude-opus-4.6)
 - "code-reviewer" — Readability, maintainability, patterns, best practices (default: gemini-3-pro-preview)

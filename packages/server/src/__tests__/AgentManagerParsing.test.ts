@@ -9,6 +9,13 @@ const AGENT_MESSAGE_REGEX = /\[\[\[\s*AGENT_MESSAGE\s*(\{.*?\})\s*\]\]\]/s;
 const DELEGATE_REGEX = /\[\[\[\s*DELEGATE\s*(\{.*?\})\s*\]\]\]/s;
 const DECISION_REGEX = /\[\[\[\s*DECISION\s*(\{.*?\})\s*\]\]\]/s;
 const PROGRESS_REGEX = /\[\[\[\s*PROGRESS\s*(\{.*?\})\s*\]\]\]/s;
+const DECLARE_TASKS_REGEX = /\[\[\[\s*DECLARE_TASKS\s*(\{.*?\})\s*\]\]\]/s;
+const TASK_STATUS_REGEX = /\[\[\[\s*TASK_STATUS\s*\]\]\]/s;
+const PAUSE_TASK_REGEX = /\[\[\[\s*PAUSE_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const RETRY_TASK_REGEX = /\[\[\[\s*RETRY_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const SKIP_TASK_REGEX = /\[\[\[\s*SKIP_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const ADD_TASK_REGEX = /\[\[\[\s*ADD_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const CANCEL_TASK_REGEX = /\[\[\[\s*CANCEL_TASK\s*(\{.*?\})\s*\]\]\]/s;
 
 describe('AgentManager output parsing regexes', () => {
   describe('SPAWN_REQUEST_REGEX', () => {
@@ -203,6 +210,142 @@ describe('AgentManager output parsing regexes', () => {
       const parsed = JSON.parse(match![1]);
       expect(parsed.to).toBe('abc123');
       expect(parsed.content).toBe('Please review my changes');
+    });
+  });
+
+  describe('DECLARE_TASKS_REGEX', () => {
+    it('matches a single-line DECLARE_TASKS command', () => {
+      const input = '[[[ DECLARE_TASKS {"tasks": [{"id": "a", "role": "developer"}]} ]]]';
+      const match = input.match(DECLARE_TASKS_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.tasks).toHaveLength(1);
+      expect(parsed.tasks[0].id).toBe('a');
+    });
+
+    it('matches a multi-line DECLARE_TASKS with nested task objects', () => {
+      const input = `[[[ DECLARE_TASKS {"tasks": [
+  {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"]},
+  {"id": "dead-fields", "role": "developer", "depends_on": ["rope-config"]}
+]} ]]]`;
+      const match = input.match(DECLARE_TASKS_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.tasks).toHaveLength(2);
+      expect(parsed.tasks[0].files).toEqual(['src/_configs.py']);
+      expect(parsed.tasks[1].depends_on).toEqual(['rope-config']);
+    });
+
+    it('does not match without closing ]]]', () => {
+      const input = '[[[ DECLARE_TASKS {"tasks": [{"id": "a", "role": "dev"}]}';
+      expect(input.match(DECLARE_TASKS_REGEX)).toBeNull();
+    });
+
+    it('does not match other command patterns', () => {
+      expect('[[[ SPAWN_AGENT {"roleId": "dev"} ]]]'.match(DECLARE_TASKS_REGEX)).toBeNull();
+      expect('[[[ TASK_STATUS ]]]'.match(DECLARE_TASKS_REGEX)).toBeNull();
+    });
+  });
+
+  describe('TASK_STATUS_REGEX', () => {
+    it('matches a TASK_STATUS command', () => {
+      expect('[[[ TASK_STATUS ]]]'.match(TASK_STATUS_REGEX)).not.toBeNull();
+    });
+
+    it('matches with extra whitespace', () => {
+      expect('[[[   TASK_STATUS   ]]]'.match(TASK_STATUS_REGEX)).not.toBeNull();
+    });
+
+    it('does not match with payload', () => {
+      // TASK_STATUS has no payload capture — any payload is ignored by the regex
+      // but the command still matches if brackets are present
+      expect('TASK_STATUS'.match(TASK_STATUS_REGEX)).toBeNull();
+    });
+  });
+
+  describe('PAUSE_TASK_REGEX', () => {
+    it('matches a valid PAUSE_TASK command', () => {
+      const input = '[[[ PAUSE_TASK {"id": "rope-config"} ]]]';
+      const match = input.match(PAUSE_TASK_REGEX);
+      expect(match).not.toBeNull();
+      expect(JSON.parse(match![1]).id).toBe('rope-config');
+    });
+  });
+
+  describe('RETRY_TASK_REGEX', () => {
+    it('matches a valid RETRY_TASK command', () => {
+      const input = '[[[ RETRY_TASK {"id": "failed-task"} ]]]';
+      const match = input.match(RETRY_TASK_REGEX);
+      expect(match).not.toBeNull();
+      expect(JSON.parse(match![1]).id).toBe('failed-task');
+    });
+  });
+
+  describe('SKIP_TASK_REGEX', () => {
+    it('matches a valid SKIP_TASK command', () => {
+      const input = '[[[ SKIP_TASK {"id": "optional-task"} ]]]';
+      const match = input.match(SKIP_TASK_REGEX);
+      expect(match).not.toBeNull();
+      expect(JSON.parse(match![1]).id).toBe('optional-task');
+    });
+  });
+
+  describe('ADD_TASK_REGEX', () => {
+    it('matches a valid ADD_TASK command', () => {
+      const input = '[[[ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing"]} ]]]';
+      const match = input.match(ADD_TASK_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.id).toBe('new-task');
+      expect(parsed.role).toBe('developer');
+      expect(parsed.depends_on).toEqual(['existing']);
+    });
+  });
+
+  describe('CANCEL_TASK_REGEX', () => {
+    it('matches a valid CANCEL_TASK command', () => {
+      const input = '[[[ CANCEL_TASK {"id": "unwanted-task"} ]]]';
+      const match = input.match(CANCEL_TASK_REGEX);
+      expect(match).not.toBeNull();
+      expect(JSON.parse(match![1]).id).toBe('unwanted-task');
+    });
+  });
+
+  describe('DAG regex cross-matching', () => {
+    it('each DAG regex only matches its own command', () => {
+      const declare = '[[[ DECLARE_TASKS {"tasks": []} ]]]';
+      const status = '[[[ TASK_STATUS ]]]';
+      const pause = '[[[ PAUSE_TASK {"id": "a"} ]]]';
+      const retry = '[[[ RETRY_TASK {"id": "a"} ]]]';
+      const skip = '[[[ SKIP_TASK {"id": "a"} ]]]';
+      const add = '[[[ ADD_TASK {"id": "a", "role": "dev"} ]]]';
+      const cancel = '[[[ CANCEL_TASK {"id": "a"} ]]]';
+
+      // DECLARE_TASKS only matches declare
+      expect(declare.match(DECLARE_TASKS_REGEX)).not.toBeNull();
+      expect(status.match(DECLARE_TASKS_REGEX)).toBeNull();
+      expect(pause.match(DECLARE_TASKS_REGEX)).toBeNull();
+
+      // TASK_STATUS only matches status
+      expect(status.match(TASK_STATUS_REGEX)).not.toBeNull();
+      expect(declare.match(TASK_STATUS_REGEX)).toBeNull();
+      expect(pause.match(TASK_STATUS_REGEX)).toBeNull();
+
+      // Each single-payload command only matches itself
+      expect(pause.match(PAUSE_TASK_REGEX)).not.toBeNull();
+      expect(retry.match(PAUSE_TASK_REGEX)).toBeNull();
+
+      expect(retry.match(RETRY_TASK_REGEX)).not.toBeNull();
+      expect(skip.match(RETRY_TASK_REGEX)).toBeNull();
+
+      expect(skip.match(SKIP_TASK_REGEX)).not.toBeNull();
+      expect(add.match(SKIP_TASK_REGEX)).toBeNull();
+
+      expect(add.match(ADD_TASK_REGEX)).not.toBeNull();
+      expect(cancel.match(ADD_TASK_REGEX)).toBeNull();
+
+      expect(cancel.match(CANCEL_TASK_REGEX)).not.toBeNull();
+      expect(declare.match(CANCEL_TASK_REGEX)).toBeNull();
     });
   });
 });
