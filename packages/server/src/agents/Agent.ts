@@ -440,7 +440,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 [/CREW CONTEXT]`;
   }
 
-  injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[]): void {
+  injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[], healthHeader?: string): void {
     const isLead = this.role.id === 'lead';
     const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
     const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
@@ -474,7 +474,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       : '';
 
     const update = `[[[ CREW_UPDATE
-${crewStatus}${budgetLine}
+${healthHeader ? healthHeader + '\n' : ''}${crewStatus}${budgetLine}
 == RECENT ACTIVITY ==
 ${activityLines}
 CREW_UPDATE ]]]`;
