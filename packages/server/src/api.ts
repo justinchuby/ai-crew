@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { readdirSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
 import type { AgentManager } from './agents/AgentManager.js';
 import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
@@ -644,6 +646,23 @@ export function apiRouter(
       .slice(0, limit);
 
     res.json({ query: q, count: combined.length, results: combined });
+  });
+
+  // --- Filesystem Browse (for folder picker) ---
+
+  router.get('/browse', (req, res) => {
+    const dir = typeof req.query.path === 'string' ? req.query.path : process.cwd();
+    const resolved = resolve(dir);
+    try {
+      const entries = readdirSync(resolved, { withFileTypes: true });
+      const folders = entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .map((e) => ({ name: e.name, path: join(resolved, e.name) }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      res.json({ current: resolved, parent: dirname(resolved), folders });
+    } catch (err: any) {
+      res.status(400).json({ error: `Cannot read directory: ${err.message}`, current: resolved });
+    }
   });
 
   // --- Projects (persistent) ---

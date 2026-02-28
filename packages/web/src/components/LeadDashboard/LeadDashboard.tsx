@@ -5,6 +5,9 @@ import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '..
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { TaskDagPanelContent } from './TaskDagPanel';
+import { FolderPicker } from '../FolderPicker/FolderPicker';
+
+interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
 interface Props {
   api: any;
@@ -25,6 +28,9 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectModel, setNewProjectModel] = useState('');
   const [newProjectCwd, setNewProjectCwd] = useState('');
   const [resumeSessionId, setResumeSessionId] = useState('');
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -102,6 +108,14 @@ export function LeadDashboard({ api, ws }: Props) {
       }
     }).catch(() => {});
   }, []);
+
+  // Fetch available roles when new project modal opens
+  useEffect(() => {
+    if (!showNewProject) return;
+    fetch('/api/roles').then((r) => r.json()).then((roles: RoleInfo[]) => {
+      setAvailableRoles(roles.filter((r) => r.id !== 'lead'));
+    }).catch(() => {});
+  }, [showNewProject]);
 
   // Subscribe to selected lead agent WS stream and load message history
   useEffect(() => {
@@ -503,13 +517,19 @@ export function LeadDashboard({ api, ws }: Props) {
     setDragOverTab(null);
   }, []);
 
-  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string) => {
+  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string, initialTeam?: string[]) => {
     setStarting(true);
     try {
+      // If initial team is selected, prepend to the task so the lead knows to create them
+      let fullTask = task;
+      if (initialTeam && initialTeam.length > 0) {
+        const teamHint = `\n\n[Initial Team] The user has pre-selected these roles for the initial team: ${initialTeam.join(', ')}. Please create these agents as your first action.`;
+        fullTask = (task || '') + teamHint;
+      }
       const resp = await fetch('/api/lead/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, task, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
+        body: JSON.stringify({ name, task: fullTask, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
       });
       const data = await resp.json();
       if (data.id) {
@@ -524,6 +544,7 @@ export function LeadDashboard({ api, ws }: Props) {
         setNewProjectModel('');
         setNewProjectCwd('');
         setResumeSessionId('');
+        setSelectedRoles(new Set());
       }
     } catch {
       // ignore
@@ -858,13 +879,23 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1 font-medium">Working Directory</label>
-                  <input
-                    type="text"
-                    value={newProjectCwd}
-                    onChange={(e) => setNewProjectCwd(e.target.value)}
-                    placeholder="/path/to/project"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={newProjectCwd}
+                      onChange={(e) => setNewProjectCwd(e.target.value)}
+                      placeholder="/path/to/project"
+                      className="flex-1 bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowFolderPicker(true)}
+                      className="px-2 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md text-xs shrink-0 transition-colors"
+                      title="Browse folders"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1 font-medium">Resume Session <span className="text-gray-600">(optional — paste a session ID to continue previous work)</span></label>
@@ -877,6 +908,38 @@ export function LeadDashboard({ api, ws }: Props) {
                   />
                 </div>
               </div>
+              {/* Initial Team Selection */}
+              {availableRoles.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium">Initial Team <span className="text-gray-600">(optional — pre-select roles to auto-create)</span></label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableRoles.map((role) => {
+                      const isSelected = selectedRoles.has(role.id);
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => setSelectedRoles((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(role.id)) next.delete(role.id); else next.add(role.id);
+                            return next;
+                          })}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors border ${
+                            isSelected
+                              ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-200'
+                              : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-gray-500'
+                          }`}
+                          title={role.description}
+                        >
+                          <span>{role.icon}</span>
+                          <span>{role.name}</span>
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
               <button
@@ -886,7 +949,14 @@ export function LeadDashboard({ api, ws }: Props) {
                 Cancel
               </button>
               <button
-                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined, resumeSessionId.trim() || undefined)}
+                onClick={() => startLead(
+                  newProjectName || 'Untitled',
+                  newProjectTask.trim() || undefined,
+                  newProjectModel || undefined,
+                  newProjectCwd.trim() || undefined,
+                  resumeSessionId.trim() || undefined,
+                  selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
+                )}
                 disabled={starting}
                 className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
               >
@@ -896,6 +966,15 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Folder picker modal */}
+      {showFolderPicker && (
+        <FolderPicker
+          value={newProjectCwd}
+          onChange={(path) => setNewProjectCwd(path)}
+          onClose={() => setShowFolderPicker(false)}
+        />
       )}
 
       {/* Main content */}
