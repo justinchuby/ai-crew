@@ -9,3 +9,5 @@ dist/
 test-results/
 playwright-report/
 packages/web/tsconfig.tsbuildinfo
+
+.ai-crew
