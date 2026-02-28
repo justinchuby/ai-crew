@@ -735,9 +735,18 @@ export class CommandDispatcher {
         siblingSection = `\n== SIBLING LEADS ==\n${siblingLeads.map(r => `- ${r.id} (${r.role}) — ${r.status}, managing ${r.childCount} agents`).join('\n')}\n`;
       }
     } else {
-      rosterLines = roster
-        .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`)
-        .join('\n');
+      // For top-level leads, separate own agents from other projects' agents
+      const ownAgents = roster.filter(r => r.fullParentId === agent.id || r.fullId === agent.id);
+      const otherAgents = roster.filter(r => r.fullParentId !== agent.id && r.fullId !== agent.id);
+      rosterLines = ownAgents
+        .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}`)
+        .join('\n') || '(no agents created yet — use CREATE_AGENT to create specialists)';
+      if (otherAgents.length > 0) {
+        rosterLines += `\n\n== OTHER PROJECTS' AGENTS (read-only — you CANNOT delegate to these) ==\n` +
+          otherAgents
+            .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) | Status: ${r.status} | Parent: ${r.parentId ?? 'none'}`)
+            .join('\n');
+      }
     }
 
     // Include memory entries for the lead
@@ -771,9 +780,10 @@ export class CommandDispatcher {
     }
 
     const response = `[[[ CREW_ROSTER${humanMsgIndicator}
-== ACTIVE CREW MEMBERS ==
+== YOUR CREW (you can DELEGATE to these) ==
 ${rosterLines}
 ${budgetLine}${siblingSection}${memorySection}
+⚠️ You can only DELEGATE to agents you created (your crew). Agents from other projects will return "Agent not found".
 To assign a task to an agent, use their ID:
 \`[[[ DELEGATE {"to": "agent-id", "task": "your task"} ]]]\`
 To create a new agent:
