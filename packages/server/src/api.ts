@@ -257,7 +257,21 @@ export function apiRouter(
 
   router.get('/coordination/timeline', (req, res) => {
     const since = req.query.since as string | undefined;
-    const events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
+    const leadId = req.query.leadId as string | undefined;
+    let events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
+
+    // Filter to a specific lead's team if leadId provided
+    if (leadId) {
+      const teamAgentIds = new Set<string>();
+      teamAgentIds.add(leadId);
+      for (const agent of agentManager.getAll()) {
+        if (agent.parentId === leadId || agent.id === leadId) {
+          teamAgentIds.add(agent.id);
+        }
+      }
+      events = events.filter(ev => teamAgentIds.has(ev.agentId));
+    }
+
     // Sort chronologically (oldest first)
     events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
