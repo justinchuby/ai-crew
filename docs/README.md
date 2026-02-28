@@ -68,3 +68,6 @@ This directory contains design documentation for AI Crew. These docs are the sou
 - **COMMIT** — Scoped git commit. Stages only files the agent has locked, preventing `git add -A` from leaking other agents' work.
 - **COMPLETE_TASK** — Signal that the agent has finished its assigned task, with a status and summary.
 - **LOCK_FILE** / **UNLOCK_FILE** — Acquire or release a file lock to prevent concurrent edits.
+- **DEFER_ISSUE** — Flag a quality issue for later resolution, with severity (P1/P2/P3) and optional source file.
+- **QUERY_DEFERRED** — List deferred issues with optional status filter (open/resolved/dismissed).
+- **RESOLVE_DEFERRED** — Mark a deferred issue as resolved or dismissed.

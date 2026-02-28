@@ -87,11 +87,14 @@ Since PTY mode has no structured protocol, agents communicate intent via HTML co
 <!-- GROUP_MESSAGE {"group": "team-name", "content": "..."} -->
 <!-- QUERY_GROUPS -->
 <!-- COMMIT {"message": "..."} -->
+<!-- DEFER_ISSUE {"description": "...", "severity": "P2", "sourceFile": "..."} -->
+<!-- QUERY_DEFERRED {"status": "open"} -->
+<!-- RESOLVE_DEFERRED {"id": 42} -->
 ```
 
 **Lead-only commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `TERMINATE_AGENT` (terminate agent and free slot), `DECISION`, `PROGRESS`.
 
-**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`, `GROUP_MESSAGE`, `QUERY_GROUPS`, `COMMIT`, `COMPLETE_TASK`.
+**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`, `GROUP_MESSAGE`, `QUERY_GROUPS`, `COMMIT`, `COMPLETE_TASK`, `DEFER_ISSUE`, `QUERY_DEFERRED`, `RESOLVE_DEFERRED`.
 
 These are parsed from agent output and routed to the appropriate subsystem (FileLockRegistry, ActivityLedger, AgentManager).
 

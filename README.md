@@ -79,6 +79,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
                    Scheduler     ContextRefresher
                    ProjectRegistry  ChatGroupRegistry
                    CommandDispatcher  TimelineStore
+                   DeferredIssueRegistry  EventPipeline
 ```
 
 **Monorepo structure** (`npm workspaces`):
@@ -169,6 +170,9 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `UNLOCK_FILE {"filePath": "..."}` | Release a file lock. |
 | `COMMIT {"message": "..."}` | Scoped git commit — stages only files the agent has locked, preventing `git add -A` from leaking other agents' work. |
 | `QUERY_CREW` | Get the current roster of agents with IDs, roles, models, and status. |
+| `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
+| `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
+| `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
 
 ### UI Views
 
