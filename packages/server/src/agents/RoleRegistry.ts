@@ -440,10 +440,10 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 
 const SELF_REPORT_INSTRUCTION = `
 
-When you receive a new task, start by briefly announcing your approach:
+When you receive a new task, send a message to the lead via AGENT_MESSAGE announcing your approach:
 "[Starting] Here's my plan: ..." — 2-3 sentences explaining how you'll tackle the work. This helps your team lead track progress and coordinate the team.
 
-When something is unclear or you need information from another agent, message them directly via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.`;
+When something is unclear or you need information from another agent, send them a message via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();
