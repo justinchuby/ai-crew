@@ -153,6 +153,7 @@ export function ChatPanel({ agentId, ws, api }: Props) {
               updateMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length);
             }}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
               if (mentionSuggestions.length > 0) {
                 if (e.key === 'ArrowDown') {
                   e.preventDefault();

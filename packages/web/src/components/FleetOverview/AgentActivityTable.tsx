@@ -67,6 +67,7 @@ const STATUS_DOT: Record<string, string> = {
   idle: 'bg-blue-400',
   completed: 'bg-gray-400',
   failed: 'bg-red-400',
+  terminated: 'bg-orange-400',
 };
 
 function elapsed(createdAt: string): string {
@@ -117,6 +118,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   if (agent.status === 'creating') return { text: 'Starting up...' };
   if (agent.status === 'completed') return { text: 'Finished' };
   if (agent.status === 'failed') return { text: 'Crashed' };
+  if (agent.status === 'terminated') return { text: 'Terminated' };
   return { text: 'Idle' };
 }
 
@@ -314,7 +316,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     >
                       <Terminal size={14} />
                     </button>
-                    {(agent.status === 'completed' || agent.status === 'failed') && (
+                    {(agent.status === 'completed' || agent.status === 'failed' || agent.status === 'terminated') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

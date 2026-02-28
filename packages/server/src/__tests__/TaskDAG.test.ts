@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { TaskDAG } from '../tasks/TaskDAG.js';
+import { TaskDAG, VALID_TRANSITIONS } from '../tasks/TaskDAG.js';
 import type { DagTaskInput, DagTask } from '../tasks/TaskDAG.js';
 
 const TEST_DB = ':memory:';
@@ -214,7 +214,8 @@ describe('TaskDAG', () => {
       // completeTask promotes c to ready since its dep (b) is done and
       // a holds src/a.ts which does not overlap src/c.ts
       const newlyReady = dag.completeTask('lead-1', 'b');
-      expect(newlyReady.map(t => t.id)).toContain('c');
+      expect(newlyReady).not.toBeNull();
+      expect(newlyReady!.map(t => t.id)).toContain('c');
       expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('ready');
     });
   });
@@ -233,7 +234,7 @@ describe('TaskDAG', () => {
       expect(a.completedAt).toBeTruthy();
 
       // b should have been promoted
-      expect(newlyReady.map(t => t.id)).toContain('b');
+      expect(newlyReady!.map(t => t.id)).toContain('b');
       const b = dag.getTask('lead-1', 'b')!;
       expect(b.dagStatus).toBe('ready');
     });
@@ -247,14 +248,14 @@ describe('TaskDAG', () => {
 
       dag.startTask('lead-1', 'a', 'agent-1');
       const afterA = dag.completeTask('lead-1', 'a');
-      expect(afterA.map(t => t.id)).not.toContain('c');
+      expect(afterA!.map(t => t.id)).not.toContain('c');
 
       const c1 = dag.getTask('lead-1', 'c')!;
       expect(c1.dagStatus).toBe('pending');
 
       dag.startTask('lead-1', 'b', 'agent-2');
       const afterB = dag.completeTask('lead-1', 'b');
-      expect(afterB.map(t => t.id)).toContain('c');
+      expect(afterB!.map(t => t.id)).toContain('c');
 
       const c2 = dag.getTask('lead-1', 'c')!;
       expect(c2.dagStatus).toBe('ready');
@@ -594,18 +595,18 @@ describe('TaskDAG', () => {
       // Complete a => b and c become ready
       dag.startTask('lead-1', 'a', 'agent-1');
       const afterA = dag.completeTask('lead-1', 'a');
-      const afterAIds = afterA.map(t => t.id).sort();
+      const afterAIds = afterA!.map(t => t.id).sort();
       expect(afterAIds).toEqual(['b', 'c']);
 
       // Complete b => d is still pending (c not done yet)
       dag.startTask('lead-1', 'b', 'agent-2');
       const afterB = dag.completeTask('lead-1', 'b');
-      expect(afterB.map(t => t.id)).not.toContain('d');
+      expect(afterB!.map(t => t.id)).not.toContain('d');
 
       // Complete c => d becomes ready
       dag.startTask('lead-1', 'c', 'agent-3');
       const afterC = dag.completeTask('lead-1', 'c');
-      expect(afterC.map(t => t.id)).toContain('d');
+      expect(afterC!.map(t => t.id)).toContain('d');
       expect(dag.getTask('lead-1', 'd')!.dagStatus).toBe('ready');
 
       // Complete d
@@ -617,6 +618,178 @@ describe('TaskDAG', () => {
       expect(status.summary.pending).toBe(0);
       expect(status.summary.ready).toBe(0);
       expect(status.summary.running).toBe(0);
+    });
+  });
+
+  describe('state transition guards', () => {
+    it('startTask returns null for non-ready task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      // b is pending, not ready
+      expect(dag.startTask('lead-1', 'b', 'agent-1')).toBeNull();
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
+    });
+
+    it('startTask returns null for already running task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      expect(dag.startTask('lead-1', 'a', 'agent-2')).toBeNull();
+    });
+
+    it('startTask returns null for done task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      expect(dag.startTask('lead-1', 'a', 'agent-2')).toBeNull();
+    });
+
+    it('completeTask returns null for pending task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      expect(dag.completeTask('lead-1', 'b')).toBeNull();
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
+    });
+
+    it('completeTask returns null for skipped task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.skipTask('lead-1', 'a');
+      expect(dag.completeTask('lead-1', 'a')).toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('skipped');
+    });
+
+    it('completeTask returns null for paused task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.pauseTask('lead-1', 'a');
+      expect(dag.completeTask('lead-1', 'a')).toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('paused');
+    });
+
+    it('completeTask returns null for already done task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      expect(dag.completeTask('lead-1', 'a')).toBeNull();
+    });
+
+    it('completeTask returns null for nonexistent task', () => {
+      expect(dag.completeTask('lead-1', 'nonexistent')).toBeNull();
+    });
+
+    it('failTask returns false for pending task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      expect(dag.failTask('lead-1', 'b')).toBe(false);
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
+    });
+
+    it('failTask returns false for ready task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      expect(dag.failTask('lead-1', 'a')).toBe(false);
+    });
+
+    it('failTask returns false for done task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      expect(dag.failTask('lead-1', 'a')).toBe(false);
+    });
+
+    it('failTask returns true for running task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      expect(dag.failTask('lead-1', 'a')).toBe(true);
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('failed');
+    });
+
+    it('skipTask returns false for already skipped task', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.skipTask('lead-1', 'a');
+      expect(dag.skipTask('lead-1', 'a')).toBe(false);
+    });
+  });
+
+  describe('getTransitionError', () => {
+    it('returns error for invalid transition', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.pauseTask('lead-1', 'a');
+      const error = dag.getTransitionError('lead-1', 'a', 'complete');
+      expect(error).not.toBeNull();
+      expect(error!.currentStatus).toBe('paused');
+      expect(error!.attemptedAction).toBe('complete');
+      expect(error!.validStatuses).toEqual(VALID_TRANSITIONS.complete);
+    });
+
+    it('returns error for nonexistent task', () => {
+      const error = dag.getTransitionError('lead-1', 'nope', 'start');
+      expect(error).not.toBeNull();
+      expect(error!.currentStatus).toBe('not_found');
+    });
+
+    it('returns null for valid transition', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      expect(dag.getTransitionError('lead-1', 'a', 'start')).toBeNull();
+    });
+  });
+
+  describe('formatTransitionError', () => {
+    it('formats not_found error', () => {
+      const msg = TaskDAG.formatTransitionError({
+        taskId: 'x', currentStatus: 'not_found', attemptedAction: 'complete', validStatuses: ['running', 'ready'],
+      });
+      expect(msg).toContain('task not found');
+    });
+
+    it('formats invalid status error', () => {
+      const msg = TaskDAG.formatTransitionError({
+        taskId: 'x', currentStatus: 'paused', attemptedAction: 'complete', validStatuses: ['running', 'ready'],
+      });
+      expect(msg).toContain('current status is "paused"');
+      expect(msg).toContain('running, ready');
+    });
+  });
+
+  describe('resetDAG', () => {
+    it('removes all tasks for a lead', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      const count = dag.resetDAG('lead-1');
+      expect(count).toBe(2);
+      expect(dag.getTasks('lead-1')).toHaveLength(0);
+    });
+
+    it('does not affect other leads', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.declareTaskBatch('lead-2', [{ id: 'b', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      expect(dag.getTasks('lead-1')).toHaveLength(0);
+      expect(dag.getTasks('lead-2')).toHaveLength(1);
+    });
+
+    it('returns 0 when no tasks exist', () => {
+      expect(dag.resetDAG('lead-1')).toBe(0);
+    });
+
+    it('emits dag:updated event', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      let emitted = false;
+      dag.on('dag:updated', () => { emitted = true; });
+      dag.resetDAG('lead-1');
+      expect(emitted).toBe(true);
+    });
+
+    it('allows re-declaring tasks after reset', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      const result = dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      expect(result.tasks).toHaveLength(1);
     });
   });
 });

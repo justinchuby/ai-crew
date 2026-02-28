@@ -197,6 +197,24 @@ export class ChatGroupRegistry extends EventEmitter {
     }));
   }
 
+  isMember(groupName: string, leadId: string, agentId: string): boolean {
+    return !!this.db.drizzle
+      .select()
+      .from(chatGroupMembers)
+      .where(and(
+        eq(chatGroupMembers.groupName, groupName),
+        eq(chatGroupMembers.leadId, leadId),
+        eq(chatGroupMembers.agentId, agentId),
+      ))
+      .get();
+  }
+
+  /** Find a group by name across all leads that a given agent belongs to */
+  findGroupForAgent(groupName: string, agentId: string): ChatGroup | undefined {
+    const groups = this.getGroupsForAgent(agentId);
+    return groups.find((g) => g.name === groupName);
+  }
+
   exists(name: string, leadId: string): boolean {
     return !!this.db.drizzle
       .select()

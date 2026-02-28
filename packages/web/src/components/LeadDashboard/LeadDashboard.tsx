@@ -658,6 +658,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
                       onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) return;
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           const trimmed = renameValue.trim();
@@ -1291,6 +1292,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) return;
                     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                       e.preventDefault();
                       sendMessage('queue');
@@ -1498,7 +1500,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="space-y-1">
                     {progress.teamAgents.map((ta) => (
                       <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-700/50 text-xs font-mono">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : 'bg-gray-500'}`} />
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
                         <span className="text-gray-200">{ta.role?.name || 'Agent'}</span>
                         <span className="text-gray-500">{ta.id.slice(0, 8)}</span>
                         <span className="ml-auto text-gray-400">{ta.status}</span>
@@ -2508,7 +2510,7 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+            onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
             placeholder="/path/to/project"
             className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
             autoFocus

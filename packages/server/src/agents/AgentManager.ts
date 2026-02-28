@@ -1,4 +1,4 @@
-import { Agent } from './Agent.js';
+import { Agent, isTerminalStatus } from './Agent.js';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
@@ -315,7 +315,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
       // Flush buffered messages on turn boundaries
-      if (status === 'idle' || status === 'completed' || status === 'failed') {
+      if (status === 'idle' || isTerminalStatus(status)) {
         this.flushAgentMessage(agent.id);
       }
 
@@ -403,7 +403,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
               // Verify parent is still alive before restarting
               if (agent.parentId) {
                 const parent = this.agents.get(agent.parentId);
-                if (!parent || parent.status === 'completed' || parent.status === 'failed') {
+                if (!parent || isTerminalStatus(parent.status)) {
                   logger.warn('agent', `Skipping auto-restart: parent ${agent.parentId.slice(0, 8)} no longer active`);
                   return;
                 }
@@ -451,7 +451,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return agent;
   }
 
-  kill(id: string): boolean {
+  kill(id: string, visited: Set<string> = new Set()): boolean {
+    if (visited.has(id)) return false;
+    visited.add(id);
+
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.clearHungTimer(id);
@@ -466,9 +469,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Cascade: kill orphaned children recursively
     for (const childId of [...agent.childIds]) {
       const child = this.agents.get(childId);
-      if (child && child.status !== 'completed' && child.status !== 'failed') {
+      if (child && !isTerminalStatus(child.status)) {
         logger.info('agent', `Cascade-killing orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
-        this.kill(childId);
+        this.kill(childId, visited);
       }
     }
 
@@ -486,7 +489,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.kill();
     this.emit('agent:killed', id);
-    this.emit('agent:status', { agentId: id, status: 'completed' });
 
     // Clean up heartbeat tracking
     this.heartbeat.trackRemoved(id);
@@ -579,7 +581,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   shutdownAll(): void {
     this.heartbeat.stop();
     for (const agent of this.agents.values()) {
-      if (agent.status !== 'completed' && agent.status !== 'failed') {
+      if (!isTerminalStatus(agent.status)) {
         agent.kill();
       }
     }

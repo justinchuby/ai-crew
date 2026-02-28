@@ -1,4 +1,5 @@
 import type { Agent } from './Agent.js';
+import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { logger } from '../utils/logger.js';
 
@@ -80,17 +81,21 @@ export class HeartbeatMonitor {
       const children = this.ctx.getAllAgents().filter((a) => a.parentId === lead.id);
       if (children.length === 0) continue; // no team → legitimately idle
 
-      // If any child is still running, work is in progress — wait
-      const anyRunning = children.some((a) => a.status === 'running');
-      if (anyRunning) continue;
+      // If any child is still actively working (running or being created), wait
+      const anyActive = children.some((a) => a.status === 'running' || a.status === 'creating');
+      if (anyActive) continue;
 
       // Check if there are active (incomplete) delegations
       const activeDelegations = Array.from(this.ctx.getDelegationsMap().values()).filter(
         (d) => d.fromAgentId === lead.id && d.status === 'active'
       );
 
-      // Check if there are remaining DAG tasks (pending, ready, blocked, paused)
+      // Check DAG summary for running tasks and remaining work
       const dagSummary = this.ctx.getDagSummary(lead.id);
+
+      // If DAG tasks are actively running, work is in progress — wait
+      if (dagSummary && dagSummary.running > 0) continue;
+
       const remainingDagTasks = dagSummary
         ? dagSummary.pending + dagSummary.ready + dagSummary.blocked + dagSummary.paused
         : 0;
@@ -100,7 +105,7 @@ export class HeartbeatMonitor {
 
       // All children are idle/completed but there is remaining work — team is stalled
       const idleChildren = children.filter((a) => a.status === 'idle');
-      const completedChildren = children.filter((a) => a.status === 'completed' || a.status === 'failed');
+      const completedChildren = children.filter((a) => isTerminalStatus(a.status));
 
       const nudgeCount = (this.leadNudgeCount.get(lead.id) ?? 0) + 1;
       this.leadNudgeCount.set(lead.id, nudgeCount);

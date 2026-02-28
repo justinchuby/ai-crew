@@ -18,6 +18,7 @@ export type ActionType =
   | 'lock_denied'
   | 'message_sent'
   | 'delegated'
+  | 'delegation_cancelled'
   | 'heartbeat_halted'
   | 'limit_change_requested'
   | 'error';

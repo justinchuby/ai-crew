@@ -119,7 +119,7 @@ function PendingDecisionCard({
             type="text"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSendReply(); }}
+            onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') handleSendReply(); }}
             placeholder="Your feedback..."
             className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
             autoFocus
@@ -637,7 +637,7 @@ export function OverviewPage({ api, ws }: Props) {
               <textarea
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { handleFeedback(feedbackText); } }}
+                onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { handleFeedback(feedbackText); } }}
                 placeholder="Tell the team what you'd like done differently..."
                 rows={3}
                 className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 resize-y"

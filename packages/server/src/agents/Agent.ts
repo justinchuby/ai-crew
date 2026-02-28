@@ -8,7 +8,11 @@ import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { agentFlagForRole } from './agentFiles.js';
 
-export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
+export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
+
+export function isTerminalStatus(status: AgentStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'terminated';
+}
 
 export interface AgentContextInfo {
   id: string;
@@ -533,6 +537,19 @@ CREW_UPDATE ]]]`;
     return this.pendingMessages.length;
   }
 
+  /** Clear all pending (queued, not yet started) messages. Returns the count and previews of cleared messages. */
+  clearPendingMessages(): { count: number; previews: string[] } {
+    const count = this.pendingMessages.length;
+    const previews = this.pendingMessages.map((msg) => msg.slice(0, 100));
+    this.pendingMessages.length = 0;
+    return { count, previews };
+  }
+
+  /** Get summaries of pending messages for queue visibility (first 100 chars each) */
+  getPendingMessageSummaries(): string[] {
+    return this.pendingMessages.map((msg) => msg.slice(0, 100));
+  }
+
   /** Cancel the agent's current work (ACP cancel signal) */
   async interrupt(): Promise<void> {
     if (this.acpConnection) {
@@ -547,8 +564,9 @@ CREW_UPDATE ]]]`;
   }
 
   kill(): void {
+    if (this.killed) return;
     this.killed = true;
-    this.status = 'completed';
+    this.status = 'terminated';
     for (const listener of this.statusListeners) {
       listener(this.status);
     }

@@ -215,6 +215,46 @@ describe('ChatGroupRegistry', () => {
     });
   });
 
+  describe('isMember', () => {
+    it('returns true for a group member', () => {
+      registry.create('lead-1', 'team', ['agent-a']);
+      expect(registry.isMember('team', 'lead-1', 'agent-a')).toBe(true);
+    });
+
+    it('returns true for the lead (auto-included)', () => {
+      registry.create('lead-1', 'team', ['agent-a']);
+      expect(registry.isMember('team', 'lead-1', 'lead-1')).toBe(true);
+    });
+
+    it('returns false for a non-member', () => {
+      registry.create('lead-1', 'team', ['agent-a']);
+      expect(registry.isMember('team', 'lead-1', 'agent-z')).toBe(false);
+    });
+
+    it('returns false for non-existent group', () => {
+      expect(registry.isMember('nope', 'lead-1', 'agent-a')).toBe(false);
+    });
+  });
+
+  describe('findGroupForAgent', () => {
+    it('finds a group the agent belongs to', () => {
+      registry.create('lead-1', 'team', ['agent-a']);
+      const group = registry.findGroupForAgent('team', 'agent-a');
+      expect(group).not.toBeUndefined();
+      expect(group!.name).toBe('team');
+      expect(group!.leadId).toBe('lead-1');
+    });
+
+    it('returns undefined when agent is not a member', () => {
+      registry.create('lead-1', 'team', ['agent-a']);
+      expect(registry.findGroupForAgent('team', 'agent-z')).toBeUndefined();
+    });
+
+    it('returns undefined for non-existent group', () => {
+      expect(registry.findGroupForAgent('nope', 'agent-a')).toBeUndefined();
+    });
+  });
+
   describe('exists', () => {
     it('returns true for existing group', () => {
       registry.create('lead-1', 'team', []);

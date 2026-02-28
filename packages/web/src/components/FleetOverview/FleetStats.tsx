@@ -11,12 +11,14 @@ export function FleetStats({ agents, locks }: Props) {
   const running = agents.filter((a) => a.status === 'running' || a.status === 'creating').length;
   const completed = agents.filter((a) => a.status === 'completed').length;
   const failed = agents.filter((a) => a.status === 'failed').length;
+  const terminated = agents.filter((a) => a.status === 'terminated').length;
 
   const stats = [
     { label: 'Total Agents', value: agents.length, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     { label: 'Active', value: running, icon: Zap, color: 'text-green-400', bg: 'bg-green-500/10' },
     { label: 'Completed', value: completed, icon: CheckCircle, color: 'text-gray-400', bg: 'bg-gray-500/10' },
     { label: 'Failed', value: failed, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10' },
+    { label: 'Terminated', value: terminated, icon: AlertTriangle, color: 'text-orange-400', bg: 'bg-orange-500/10' },
     { label: 'File Locks', value: locks.length, icon: Lock, color: 'text-purple-400', bg: 'bg-purple-500/10' },
   ];
 

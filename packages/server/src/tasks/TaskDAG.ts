@@ -5,6 +5,25 @@ import { dagTasks } from '../db/schema.js';
 
 export type DagTaskStatus = 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
 
+/** Valid source states for each state transition method */
+export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
+  start:    ['ready'],
+  complete: ['running', 'ready'],
+  fail:     ['running'],
+  pause:    ['pending', 'ready'],
+  resume:   ['paused'],
+  retry:    ['failed'],
+  skip:     ['pending', 'ready', 'blocked', 'paused', 'failed'],
+  cancel:   ['pending', 'ready', 'blocked', 'paused', 'failed', 'skipped'],
+};
+
+export interface InvalidTransitionError {
+  taskId: string;
+  currentStatus: DagTaskStatus | 'not_found';
+  attemptedAction: string;
+  validStatuses: DagTaskStatus[];
+}
+
 export interface DagTask {
   id: string;
   leadId: string;
@@ -194,8 +213,31 @@ export class TaskDAG extends EventEmitter {
     return true;
   }
 
+  /** Validate that a state transition is allowed, returning an error object if not */
+  private validateTransition(leadId: string, taskId: string, action: string): InvalidTransitionError | null {
+    const task = this.getTask(leadId, taskId);
+    const validStatuses = VALID_TRANSITIONS[action];
+    if (!task) {
+      return { taskId, currentStatus: 'not_found', attemptedAction: action, validStatuses };
+    }
+    if (!validStatuses.includes(task.dagStatus)) {
+      return { taskId, currentStatus: task.dagStatus, attemptedAction: action, validStatuses };
+    }
+    return null;
+  }
+
+  /** Format an InvalidTransitionError into a human-readable message */
+  static formatTransitionError(error: InvalidTransitionError): string {
+    if (error.currentStatus === 'not_found') {
+      return `Cannot ${error.attemptedAction} task "${error.taskId}": task not found.`;
+    }
+    return `Cannot ${error.attemptedAction} task "${error.taskId}": current status is "${error.currentStatus}". Valid source states: [${error.validStatuses.join(', ')}].`;
+  }
+
   /** Mark a task as running and assign to an agent */
   startTask(leadId: string, taskId: string, agentId: string): DagTask | null {
+    const error = this.validateTransition(leadId, taskId, 'start');
+    if (error) return null;
     this.db.drizzle
       .update(dagTasks)
       .set({ dagStatus: 'running', assignedAgentId: agentId })
@@ -205,8 +247,10 @@ export class TaskDAG extends EventEmitter {
     return this.getTask(leadId, taskId);
   }
 
-  /** Mark a task as complete. Returns newly ready tasks. */
-  completeTask(leadId: string, taskId: string): DagTask[] {
+  /** Mark a task as complete. Returns newly ready tasks, or null if transition is invalid. */
+  completeTask(leadId: string, taskId: string): DagTask[] | null {
+    const error = this.validateTransition(leadId, taskId, 'complete');
+    if (error) return null;
     this.db.drizzle
       .update(dagTasks)
       .set({ dagStatus: 'done', completedAt: sql`datetime('now')` })
@@ -225,8 +269,10 @@ export class TaskDAG extends EventEmitter {
     return newlyReady;
   }
 
-  /** Mark a task as failed. Block dependents. */
-  failTask(leadId: string, taskId: string): void {
+  /** Mark a task as failed. Block dependents. Returns false if transition is invalid. */
+  failTask(leadId: string, taskId: string): boolean {
+    const error = this.validateTransition(leadId, taskId, 'fail');
+    if (error) return false;
     this.db.drizzle
       .update(dagTasks)
       .set({ dagStatus: 'failed', completedAt: sql`datetime('now')` })
@@ -244,22 +290,27 @@ export class TaskDAG extends EventEmitter {
       }
     }
     this.emit('dag:updated', { leadId });
+    return true;
   }
 
   /** Pause a task (hold even if dependencies are met) */
   pauseTask(leadId: string, taskId: string): boolean {
-    const result = this.db.run(
-      `UPDATE dag_tasks SET dag_status = 'paused' WHERE id = ? AND lead_id = ? AND dag_status IN ('pending', 'ready')`,
-      [taskId, leadId],
-    );
-    if (result.changes > 0) this.emit('dag:updated', { leadId });
-    return result.changes > 0;
+    const error = this.validateTransition(leadId, taskId, 'pause');
+    if (error) return false;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ dagStatus: 'paused' })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return true;
   }
 
   /** Resume a paused task */
   resumeTask(leadId: string, taskId: string): boolean {
-    const task = this.getTask(leadId, taskId);
-    if (!task || task.dagStatus !== 'paused') return false;
+    const error = this.validateTransition(leadId, taskId, 'resume');
+    if (error) return false;
+    const task = this.getTask(leadId, taskId)!;
     const newStatus = task.dependsOn.every(depId => {
       const dep = this.getTask(leadId, depId);
       return dep && (dep.dagStatus === 'done' || dep.dagStatus === 'skipped');
@@ -275,8 +326,8 @@ export class TaskDAG extends EventEmitter {
 
   /** Retry a failed task (reset to ready, optionally reassign) */
   retryTask(leadId: string, taskId: string): boolean {
-    const task = this.getTask(leadId, taskId);
-    if (!task || task.dagStatus !== 'failed') return false;
+    const error = this.validateTransition(leadId, taskId, 'retry');
+    if (error) return false;
     this.db.drizzle
       .update(dagTasks)
       .set({ dagStatus: 'ready', assignedAgentId: null, completedAt: null })
@@ -299,8 +350,8 @@ export class TaskDAG extends EventEmitter {
 
   /** Skip a task (mark as skipped, unblock dependents with warning) */
   skipTask(leadId: string, taskId: string): boolean {
-    const task = this.getTask(leadId, taskId);
-    if (!task || task.dagStatus === 'done' || task.dagStatus === 'running') return false;
+    const error = this.validateTransition(leadId, taskId, 'skip');
+    if (error) return false;
     this.db.drizzle
       .update(dagTasks)
       .set({ dagStatus: 'skipped', completedAt: sql`datetime('now')` })
@@ -320,12 +371,14 @@ export class TaskDAG extends EventEmitter {
 
   /** Cancel a task (remove from DAG entirely) */
   cancelTask(leadId: string, taskId: string): boolean {
-    const result = this.db.run(
-      `DELETE FROM dag_tasks WHERE id = ? AND lead_id = ? AND dag_status NOT IN ('running', 'done')`,
-      [taskId, leadId],
-    );
-    if (result.changes > 0) this.emit('dag:updated', { leadId });
-    return result.changes > 0;
+    const error = this.validateTransition(leadId, taskId, 'cancel');
+    if (error) return false;
+    this.db.drizzle
+      .delete(dagTasks)
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return true;
   }
 
   /** Add a single task to an existing DAG */
@@ -392,5 +445,22 @@ export class TaskDAG extends EventEmitter {
       ))
       .get();
     return row ? rowToTask(row) : null;
+  }
+
+  /** Get a transition validation error (for use by CommandDispatcher error messages) */
+  getTransitionError(leadId: string, taskId: string, action: string): InvalidTransitionError | null {
+    return this.validateTransition(leadId, taskId, action);
+  }
+
+  /** Reset (clear) all DAG tasks for a lead */
+  resetDAG(leadId: string): number {
+    const tasks = this.getTasks(leadId);
+    if (tasks.length === 0) return 0;
+    this.db.drizzle
+      .delete(dagTasks)
+      .where(eq(dagTasks.leadId, leadId))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return tasks.length;
   }
 }

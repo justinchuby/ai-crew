@@ -60,7 +60,7 @@ export interface GroupMessage {
   timestamp: string;
 }
 
-export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
+export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
 
 // ACP Protocol Types
 

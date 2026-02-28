@@ -16,6 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
   idle: 'text-blue-400',
   completed: 'text-gray-400',
   failed: 'text-red-400',
+  terminated: 'text-orange-400',
 };
 
 const AVAILABLE_MODELS = [
@@ -66,7 +67,7 @@ export function AgentCard({ agent, api }: Props) {
           >
             <Terminal size={14} />
           </button>
-          {(agent.status === 'completed' || agent.status === 'failed') && (
+          {(agent.status === 'completed' || agent.status === 'failed' || agent.status === 'terminated') && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

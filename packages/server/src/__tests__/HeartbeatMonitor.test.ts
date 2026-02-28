@@ -158,6 +158,39 @@ describe('HeartbeatMonitor', () => {
     expect(lead.sendMessage).not.toHaveBeenCalled();
   });
 
+  // ── 3b. No nudge when a child is in 'creating' status ─────────────
+
+  it('does not nudge when a child agent is being created', () => {
+    const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Team Lead' }, status: 'idle' });
+    const child = makeAgent({ id: 'child-1', parentId: 'lead-1', status: 'creating' });
+    ctx.getAllAgents.mockReturnValue([lead, child]);
+    ctx.getDelegationsMap.mockReturnValue(new Map([['d1', makeDelegation({ fromAgentId: 'lead-1' })]]));
+
+    monitor.trackIdle('lead-1');
+    vi.advanceTimersByTime(90_000);
+
+    triggerCheck();
+
+    expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
+
+  // ── 3c. No nudge when DAG has running tasks ───────────────────────
+
+  it('does not nudge when DAG has running tasks', () => {
+    const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Team Lead' }, status: 'idle' });
+    const child = makeAgent({ id: 'child-1', parentId: 'lead-1', status: 'idle' });
+    ctx.getAllAgents.mockReturnValue([lead, child]);
+    ctx.getDelegationsMap.mockReturnValue(new Map([['d1', makeDelegation({ fromAgentId: 'lead-1' })]]));
+    ctx.getDagSummary.mockReturnValue(makeDagSummary({ running: 2, pending: 1 }));
+
+    monitor.trackIdle('lead-1');
+    vi.advanceTimersByTime(90_000);
+
+    triggerCheck();
+
+    expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
+
   // ── 4. No nudge when no active delegations and no DAG tasks ───────
 
   it('does not nudge when there are no active delegations and no DAG tasks remaining', () => {

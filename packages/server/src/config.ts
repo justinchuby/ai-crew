@@ -1,3 +1,6 @@
+/** Hard ceiling for auto-scaling concurrency. Prevents runaway agent spawning. */
+export const MAX_CONCURRENCY_LIMIT = 200;
+
 export interface ServerConfig {
   port: number;
   host: string;
@@ -12,7 +15,7 @@ const defaults: ServerConfig = {
   host: process.env.HOST || '127.0.0.1',
   cliCommand: process.env.COPILOT_CLI_PATH || 'copilot',
   cliArgs: [],
-  maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '10', 10),
+  maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '50', 10),
   dbPath: process.env.DB_PATH || './ai-crew.db',
 };
 

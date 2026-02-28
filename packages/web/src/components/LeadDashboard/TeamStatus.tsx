@@ -17,6 +17,7 @@ const STATUS_ICON: Record<string, typeof CheckCircle> = {
   running: Loader2,
   completed: CheckCircle,
   failed: XCircle,
+  terminated: XCircle,
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -25,6 +26,7 @@ const STATUS_COLOR: Record<string, string> = {
   idle: 'text-yellow-400',
   completed: 'text-green-400',
   failed: 'text-red-400',
+  terminated: 'text-orange-400',
 };
 
 /** Shorten model ID for display (e.g. "claude-sonnet-4.6" → "Sonnet 4.6") */

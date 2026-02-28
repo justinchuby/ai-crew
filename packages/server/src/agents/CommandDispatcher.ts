@@ -1,6 +1,7 @@
-import { Agent } from './Agent.js';
+import { Agent, isTerminalStatus } from './Agent.js';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
+import { MAX_CONCURRENCY_LIMIT } from '../config.js';
 import type { ServerConfig } from '../config.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
@@ -32,13 +33,16 @@ const GROUP_MESSAGE_REGEX = /\[\[\[\s*GROUP_MESSAGE\s*(\{.*?\})\s*\]\]\]/s;
 const LIST_GROUPS_REGEX = /\[\[\[\s*LIST_GROUPS\s*\]\]\]/s;
 const DECLARE_TASKS_REGEX = /\[\[\[\s*DECLARE_TASKS\s*(\{.*?\})\s*\]\]\]/s;
 const TASK_STATUS_REGEX = /\[\[\[\s*TASK_STATUS\s*\]\]\]/s;
+const QUERY_TASKS_REGEX = /\[\[\[\s*QUERY_TASKS\s*\]\]\]/s;
 const PAUSE_TASK_REGEX = /\[\[\[\s*PAUSE_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const RETRY_TASK_REGEX = /\[\[\[\s*RETRY_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const SKIP_TASK_REGEX = /\[\[\[\s*SKIP_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const ADD_TASK_REGEX = /\[\[\[\s*ADD_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const CANCEL_TASK_REGEX = /\[\[\[\s*CANCEL_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const RESET_DAG_REGEX = /\[\[\[\s*RESET_DAG\s*\]\]\]/s;
 const HALT_HEARTBEAT_REGEX = /\[\[\[\s*HALT_HEARTBEAT\s*\]\]\]/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /\[\[\[\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*\]\]\]/s;
+const CANCEL_DELEGATION_REGEX = /\[\[\[\s*CANCEL_DELEGATION\s*(\{.*?\})\s*\]\]\]/s;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -49,7 +53,7 @@ export interface Delegation {
   toRole: string;
   task: string;
   context?: string;
-  status: 'active' | 'completed' | 'failed';
+  status: 'active' | 'completed' | 'failed' | 'cancelled' | 'terminated';
   createdAt: string;
   completedAt?: string;
   result?: string;
@@ -123,24 +127,42 @@ export class CommandDispatcher {
       { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => this.handleListGroups(a) },
       { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => this.handleDeclareTasks(a, d) },
       { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => this.handleTaskStatus(a) },
+      { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => this.handleTaskStatus(a) },
       { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => this.handlePauseTask(a, d) },
       { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => this.handleRetryTask(a, d) },
       { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => this.handleSkipTask(a, d) },
       { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => this.handleAddTask(a, d) },
       { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => this.handleCancelTask(a, d) },
+      { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => this.handleResetDAG(a) },
       { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => this.handleHaltHeartbeat(a) },
       { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => this.handleRequestLimitChange(a, d) },
+      { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => this.handleCancelDelegation(a, d) },
     ];
 
     let found = true;
     while (found) {
       found = false;
+      // Find the leftmost match across ALL patterns to prevent inner [[[ from
+      // being parsed before the outer command that contains them (issue #26).
+      let best: { index: number; end: number; name: string; handler: (a: Agent, d: string) => void; text: string } | null = null;
       for (const { regex, name, handler } of patterns) {
         const match = buf.match(regex);
-        if (match) {
-          logger.debug('agent', `Command: ${name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
-          handler(agent, match[0]);
-          buf = buf.slice(0, match.index!) + buf.slice(match.index! + match[0].length);
+        if (match && match.index !== undefined) {
+          if (!best || match.index < best.index) {
+            best = { index: match.index, end: match.index + match[0].length, name, handler, text: match[0] };
+          }
+        }
+      }
+      if (best) {
+        // Skip commands whose [[[ is nested inside another [[[ ]]] block
+        if (CommandDispatcher.isInsideCommandBlock(buf, best.index)) {
+          logger.debug('agent', `Skipped nested command: ${best.name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+          buf = buf.slice(0, best.index) + buf.slice(best.end);
+          found = true;
+        } else {
+          logger.debug('agent', `Command: ${best.name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+          best.handler(agent, best.text);
+          buf = buf.slice(0, best.index) + buf.slice(best.end);
           found = true;
         }
       }
@@ -204,7 +226,7 @@ export class CommandDispatcher {
       const dagTask = this.ctx.taskDAG.getTaskByAgent(agent.parentId, agent.id);
       if (dagTask) {
         const newlyReady = this.ctx.taskDAG.completeTask(agent.parentId, dagTask.id);
-        if (newlyReady.length > 0) {
+        if (newlyReady && newlyReady.length > 0) {
           const dagParent = this.ctx.getAgent(agent.parentId);
           if (dagParent) {
             const readyNames = newlyReady.map(d => d.id).join(', ');
@@ -249,7 +271,7 @@ export class CommandDispatcher {
       }
     }
 
-    const status = exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
+    const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
     const rawOutput2 = agent.getRecentOutput(8000);
     const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-6000);
     const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
@@ -306,12 +328,12 @@ export class CommandDispatcher {
     }
   }
 
-  /** Remove completed/failed delegations older than the given age (ms). Returns count removed. */
+  /** Remove completed/failed/cancelled delegations older than the given age (ms). Returns count removed. */
   cleanupStaleDelegations(maxAgeMs = 300_000): number {
     const cutoff = Date.now() - maxAgeMs;
     let count = 0;
     for (const [id, del] of this.delegations) {
-      if ((del.status === 'completed' || del.status === 'failed') && new Date(del.createdAt).getTime() <= cutoff) {
+      if ((del.status === 'completed' || del.status === 'failed' || del.status === 'cancelled') && new Date(del.createdAt).getTime() <= cutoff) {
         this.delegations.delete(id);
         count++;
       }
@@ -342,7 +364,7 @@ export class CommandDispatcher {
     agent.sendMessage(`[System] SPAWN_AGENT is not available. Only the Project Lead can create agents using CREATE_AGENT. If you need help, ask the lead via AGENT_MESSAGE.`);
   }
 
-  private detectCreateAgent(agent: Agent, data: string): void {
+  private detectCreateAgent(agent: Agent, data: string, _autoScaleRetry = false): void {
     const match = data.match(CREATE_AGENT_REGEX);
     if (!match) return;
 
@@ -370,6 +392,8 @@ export class CommandDispatcher {
       const child = this.ctx.spawnAgent(role, req.task, agent.id, true, req.model, agent.cwd);
       if (role.id === 'lead') {
         child.hierarchyLevel = agent.hierarchyLevel + 1;
+        // Set projectName at creation so it won't change when tasks are delegated
+        child.projectName = req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`;
       }
       logger.info('agent', `${agent.role.name} (${agent.id.slice(0, 8)}) created ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${child.id.slice(0, 8)}`);
 
@@ -419,14 +443,31 @@ export class CommandDispatcher {
 
       this.ctx.emit('agent:sub_spawned', { parentId: agent.id, child: child.toJSON() });
     } catch (err: any) {
-      // Send meaningful error back to the lead with budget info
+      // If this is an auto-scale retry, propagate error to the parent catch
+      if (_autoScaleRetry) throw err;
+      // Auto-scale concurrency limit when the cap is hit (only once per attempt)
       if (err.message?.includes('Concurrency limit')) {
-        const running = this.ctx.getRunningCount();
-        const idle = this.ctx.getAllAgents().filter((a) => a.parentId === agent.id && a.status === 'idle');
-        const idleList = idle.length > 0
-          ? `\nIdle agents you can kill to free slots:\n${idle.map((a) => `- ${a.id.slice(0, 8)} — ${a.role.name}${a.sessionId ? ` (session: ${a.sessionId})` : ''}`).join('\n')}`
-          : '\nNo idle agents to kill — wait for a running agent to finish.';
-        agent.sendMessage(`[System] Cannot create agent: concurrency limit reached (${running}/${this.ctx.maxConcurrent}).${idleList}\nUse TERMINATE_AGENT to free a slot, then try CREATE_AGENT again.`);
+        const currentLimit = this.ctx.maxConcurrent;
+        if (currentLimit >= MAX_CONCURRENCY_LIMIT) {
+          agent.sendMessage(`[System] Concurrency limit reached hard cap (${MAX_CONCURRENCY_LIMIT}). Cannot create more agents.`);
+          this.ctx.emit('agent:spawn_error', { agentId: agent.id, message: `Hard concurrency cap ${MAX_CONCURRENCY_LIMIT} reached` });
+          return;
+        }
+        const newLimit = Math.min(currentLimit + 10, MAX_CONCURRENCY_LIMIT);
+        this.ctx.maxConcurrent = newLimit;
+        logger.info('agent', `Auto-scaled concurrency limit: ${currentLimit} → ${newLimit} (triggered by ${agent.role.name} ${agent.id.slice(0, 8)})`);
+        agent.sendMessage(`[System] Concurrency limit auto-increased: ${currentLimit} → ${newLimit}. Retrying agent creation...`);
+        this.ctx.emit('config:concurrency_changed', { old: currentLimit, new: newLimit, reason: 'auto-scale' });
+
+        // Retry the CREATE_AGENT command after scaling up
+        try {
+          this.detectCreateAgent(agent, data, true);
+          return;
+        } catch (retryErr: any) {
+          agent.sendMessage(`[System] Failed to create agent after auto-scaling: ${retryErr.message}`);
+          this.ctx.emit('agent:spawn_error', { agentId: agent.id, message: retryErr.message });
+          return;
+        }
       } else {
         agent.sendMessage(`[System] Failed to create agent: ${err.message}`);
       }
@@ -700,7 +741,7 @@ export class CommandDispatcher {
   private handleQueryCrew(agent: Agent): void {
     const allAgents = this.ctx.getAllAgents();
     const roster = allAgents
-      .filter((a) => a.status !== 'completed' && a.status !== 'failed')
+      .filter((a) => !isTerminalStatus(a.status))
       .map((a) => ({
         id: a.id.slice(0, 8),
         fullId: a.id,
@@ -1044,6 +1085,16 @@ CREW_ROSTER ]]]`;
     } catch { agent.sendMessage('[System] CANCEL_TASK error: invalid payload.'); }
   }
 
+  private handleResetDAG(agent: Agent): void {
+    if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reset the DAG.'); return; }
+    const count = this.ctx.taskDAG.resetDAG(agent.id);
+    if (count > 0) {
+      agent.sendMessage(`[System] DAG reset: ${count} task(s) removed. You can now DECLARE_TASKS again.`);
+    } else {
+      agent.sendMessage('[System] No DAG tasks to reset.');
+    }
+  }
+
   private handleHaltHeartbeat(agent: Agent): void {
     if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can halt heartbeat.'); return; }
     this.ctx.markHumanInterrupt(agent.id);
@@ -1110,6 +1161,10 @@ CREW_ROSTER ]]]`;
           agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
         }
       }
+      // Ensure the calling agent is always a member of their own group
+      if (!resolvedIds.includes(agent.id)) {
+        resolvedIds.push(agent.id);
+      }
       const group = this.ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds);
       const memberNames = group.memberIds.map((id) => {
         const a = this.ctx.getAgent(id);
@@ -1136,9 +1191,26 @@ CREW_ROSTER ]]]`;
     if (!match) return;
     try {
       const req = JSON.parse(match[1]);
-      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
-      if (!leadId) { agent.sendMessage('[System] Cannot manage groups — no lead context found.'); return; }
       if (!req.group || !req.members) return;
+
+      // Allow any group member to add others (not just the lead)
+      // First, check if the agent is already a member of this group
+      const existingGroup = this.ctx.chatGroupRegistry.findGroupForAgent(req.group, agent.id);
+      let leadId: string | undefined;
+      if (existingGroup) {
+        leadId = existingGroup.leadId;
+      } else {
+        // Fall back to hierarchical resolution for new groups
+        leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      }
+      if (!leadId) { agent.sendMessage('[System] Cannot manage groups — no lead context found.'); return; }
+
+      // If agent is not a group member and not the lead, reject
+      if (!existingGroup && agent.role.id !== 'lead' && agent.id !== leadId) {
+        agent.sendMessage(`[System] You must be a member of "${req.group}" to add others. Ask a current member to add you first.`);
+        return;
+      }
+
       const resolvedIds = req.members.map((m: string) => {
         const found = this.ctx.getAllAgents().find((a) => (a.id === m || a.id.startsWith(m)) && (a.parentId === leadId || a.id === leadId));
         return found?.id;
@@ -1244,5 +1316,126 @@ CREW_ROSTER ]]]`;
       return `- "${g.name}" — ${g.memberIds.length} members: ${memberNames}`;
     });
     agent.sendMessage(`[System] Your groups:\n${lines.join('\n')}\nSend messages: [[[ GROUP_MESSAGE {"group": "name", "content": "..."} ]]]`);
+  }
+
+  private handleCancelDelegation(agent: Agent, data: string): void {
+    const match = data.match(CANCEL_DELEGATION_REGEX);
+    if (!match) return;
+
+    try {
+      const req = JSON.parse(match[1]);
+
+      // Only lead agents can cancel delegations
+      if (agent.role.id !== 'lead') {
+        logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CANCEL_DELEGATION — rejected.`);
+        agent.sendMessage(`[System] Only the Project Lead can cancel delegations.`);
+        return;
+      }
+
+      // Support cancelling by agentId (all pending for that agent) or by delegationId (specific delegation)
+      if (req.agentId) {
+        const targetId = this.resolveAgentId(agent, req.agentId);
+        if (!targetId) {
+          agent.sendMessage(`[System] Agent not found: ${req.agentId}. Use QUERY_CREW to see available agents.`);
+          return;
+        }
+
+        const targetAgent = this.ctx.getAgent(targetId);
+        if (!targetAgent) {
+          agent.sendMessage(`[System] Agent not found: ${req.agentId}.`);
+          return;
+        }
+
+        // Cancel active delegations to this agent
+        let cancelledCount = 0;
+        for (const [, del] of this.delegations) {
+          if (del.toAgentId === targetId && del.status === 'active' && del.fromAgentId === agent.id) {
+            del.status = 'cancelled';
+            del.completedAt = new Date().toISOString();
+            cancelledCount++;
+          }
+        }
+
+        // Clear the agent's pending message queue
+        const cleared = targetAgent.clearPendingMessages();
+
+        const summary = `[System] Cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}). Cleared ${cleared.count} queued message(s).`;
+        agent.sendMessage(summary);
+
+        this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegations to ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+          targetAgentId: targetId,
+          cancelledDelegations: cancelledCount,
+          clearedMessages: cleared.count,
+        });
+
+        logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}), cleared ${cleared.count} queued message(s)`);
+
+      } else if (req.delegationId) {
+        const del = this.delegations.get(req.delegationId);
+        if (!del) {
+          agent.sendMessage(`[System] Delegation not found: ${req.delegationId}. Use TASK_STATUS to see active delegations.`);
+          return;
+        }
+        if (del.fromAgentId !== agent.id) {
+          agent.sendMessage(`[System] Cannot cancel delegation ${req.delegationId} — it belongs to another lead.`);
+          return;
+        }
+        if (del.status !== 'active') {
+          agent.sendMessage(`[System] Delegation ${req.delegationId} is already ${del.status} — cannot cancel.`);
+          return;
+        }
+
+        del.status = 'cancelled';
+        del.completedAt = new Date().toISOString();
+
+        // Clear pending messages on the target agent
+        const targetAgent = this.ctx.getAgent(del.toAgentId);
+        const cleared = targetAgent ? targetAgent.clearPendingMessages() : { count: 0, previews: [] };
+
+        agent.sendMessage(`[System] Delegation ${req.delegationId} cancelled. Cleared ${cleared.count} queued message(s) from ${del.toRole} (${del.toAgentId.slice(0, 8)}).`);
+
+        this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegation ${req.delegationId}`, {
+          delegationId: req.delegationId,
+          targetAgentId: del.toAgentId,
+          clearedMessages: cleared.count,
+        });
+
+        logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled delegation ${req.delegationId} to ${del.toRole} (${del.toAgentId.slice(0, 8)})`);
+
+      } else {
+        agent.sendMessage(`[System] CANCEL_DELEGATION requires either "agentId" or "delegationId". Example: [[[ CANCEL_DELEGATION {"agentId": "agent-id"} ]]]`);
+      }
+    } catch (err) {
+      logger.debug('command', 'Failed to parse CANCEL_DELEGATION command', { error: (err as Error).message });
+    }
+  }
+
+  /** Resolve a potentially short agent ID to a full ID within the lead's scope */
+  private resolveAgentId(lead: Agent, idOrPrefix: string): string | null {
+    const allAgents = this.ctx.getAllAgents();
+    const match = allAgents.find((a) =>
+      (a.id === idOrPrefix || a.id.startsWith(idOrPrefix)) &&
+      (a.parentId === lead.id || a.id === lead.id)
+    );
+    return match?.id ?? null;
+  }
+
+  /**
+   * Check if a position in the buffer is nested inside a [[[ ]]] command block.
+   * Counts unmatched [[[ before the given position — depth > 0 means nested.
+   * This prevents command injection via task text containing [[[ delimiters (#26).
+   */
+  private static isInsideCommandBlock(buf: string, pos: number): boolean {
+    let depth = 0;
+    for (let i = 0; i < pos - 2; i++) {
+      if (buf[i] === '[' && buf[i + 1] === '[' && buf[i + 2] === '[') {
+        depth++;
+        i += 2;
+      } else if (buf[i] === ']' && buf[i + 1] === ']' && buf[i + 2] === ']') {
+        depth = Math.max(0, depth - 1);
+        i += 2;
+      }
+    }
+    return depth > 0;
   }
 }

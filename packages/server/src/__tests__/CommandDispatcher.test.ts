@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CommandDispatcher, type CommandContext, type Delegation } from '../agents/CommandDispatcher.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
+import { MAX_CONCURRENCY_LIMIT } from '../config.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -286,7 +287,31 @@ describe('CommandDispatcher', () => {
       );
     });
 
-    it('sends error when concurrency limit is reached', () => {
+    it('auto-scales concurrency limit and retries when limit is reached', () => {
+      const devRole = makeRole();
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+      (ctx.getRunningCount as any).mockReturnValue(10);
+      (ctx.getAllAgents as any).mockReturnValue([]);
+      let callCount = 0;
+      const newChild = makeChildAgent(leadAgent.id, { id: 'agent-new-0099' });
+      (ctx.spawnAgent as any).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) throw new Error('Concurrency limit reached');
+        return newChild;
+      });
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "build"} ]]]');
+
+      // Should have auto-scaled and retried
+      expect(ctx.maxConcurrent).toBe(20); // 10 + 10
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('auto-increased'),
+      );
+      // The retry should have succeeded
+      expect(ctx.spawnAgent).toHaveBeenCalledTimes(2);
+    });
+
+    it('sends error when auto-scale retry also fails', () => {
       const devRole = makeRole();
       (ctx.roleRegistry.get as any).mockReturnValue(devRole);
       (ctx.getRunningCount as any).mockReturnValue(10);
@@ -297,8 +322,33 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "build"} ]]]');
 
+      // Should have auto-scaled once, then reported failure on retry
+      expect(ctx.maxConcurrent).toBe(20);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('concurrency limit'),
+        expect.stringContaining('auto-increased'),
+      );
+      // The retry fails with a regular error message since auto-scale was already tried
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create agent'),
+      );
+    });
+
+    it('rejects auto-scaling when hard concurrency cap is reached', () => {
+      const devRole = makeRole();
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+      ctx.maxConcurrent = MAX_CONCURRENCY_LIMIT;
+      (ctx.getRunningCount as any).mockReturnValue(MAX_CONCURRENCY_LIMIT);
+      (ctx.getAllAgents as any).mockReturnValue([]);
+      (ctx.spawnAgent as any).mockImplementation(() => {
+        throw new Error('Concurrency limit reached');
+      });
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "build"} ]]]');
+
+      // Should NOT auto-scale past the hard cap
+      expect(ctx.maxConcurrent).toBe(MAX_CONCURRENCY_LIMIT);
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('hard cap'),
       );
     });
   });
@@ -624,6 +674,296 @@ describe('CommandDispatcher', () => {
         'context',
         'PR #42',
       );
+    });
+  });
+
+  // ── CANCEL_DELEGATION ────────────────────────────────────────────────
+
+  describe('CANCEL_DELEGATION', () => {
+    it('cancels delegations by agentId and clears pending messages', () => {
+      const clearPendingMessages = vi.fn().mockReturnValue({ count: 2, previews: ['task 1...', 'task 2...'] });
+      const child = makeChildAgent(leadAgent.id, {
+        clearPendingMessages,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === child.id) return child;
+        return undefined;
+      });
+
+      // First create a delegation so there's something to cancel
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "review code"} ]]]`);
+
+      // Now cancel it
+      dispatch(dispatcher, leadAgent, `[[[ CANCEL_DELEGATION {"agentId": "${child.id}"} ]]]`);
+
+      // Delegation should be cancelled
+      const delegations = Array.from(dispatcher.getDelegationsMap().values());
+      expect(delegations[0].status).toBe('cancelled');
+
+      // Pending messages should be cleared
+      expect(clearPendingMessages).toHaveBeenCalled();
+
+      // Lead should get confirmation
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Cancelled 1 delegation(s)'),
+      );
+    });
+
+    it('cancels delegation by delegationId', () => {
+      const clearPendingMessages = vi.fn().mockReturnValue({ count: 1, previews: ['some task'] });
+      const child = makeChildAgent(leadAgent.id, {
+        clearPendingMessages,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === child.id) return child;
+        return undefined;
+      });
+
+      // Create a delegation
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "build feature"} ]]]`);
+
+      const delegations = Array.from(dispatcher.getDelegationsMap().values());
+      const delegationId = delegations[0].id;
+
+      // Cancel by delegation ID
+      dispatch(dispatcher, leadAgent, `[[[ CANCEL_DELEGATION {"delegationId": "${delegationId}"} ]]]`);
+
+      expect(delegations[0].status).toBe('cancelled');
+      expect(clearPendingMessages).toHaveBeenCalled();
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining(`Delegation ${delegationId} cancelled`),
+      );
+    });
+
+    it('rejects non-lead agents', () => {
+      const devAgent = makeAgent({
+        id: 'agent-dev-0010-0000-000000000010',
+        role: makeRole(),
+      });
+
+      dispatch(dispatcher, devAgent, '[[[ CANCEL_DELEGATION {"agentId": "some-agent"} ]]]');
+
+      expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Only the Project Lead'),
+      );
+    });
+
+    it('reports error when agent not found', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent]);
+      (ctx.getAgent as any).mockReturnValue(undefined);
+
+      dispatch(dispatcher, leadAgent, '[[[ CANCEL_DELEGATION {"agentId": "nonexistent"} ]]]');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Agent not found'),
+      );
+    });
+
+    it('reports error when delegation not found by ID', () => {
+      dispatch(dispatcher, leadAgent, '[[[ CANCEL_DELEGATION {"delegationId": "del-nonexistent"} ]]]');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Delegation not found'),
+      );
+    });
+
+    it('reports error when no agentId or delegationId provided', () => {
+      dispatch(dispatcher, leadAgent, '[[[ CANCEL_DELEGATION {} ]]]');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('requires either "agentId" or "delegationId"'),
+      );
+    });
+
+    it('cancels delegation by short agent ID prefix', () => {
+      const clearPendingMessages = vi.fn().mockReturnValue({ count: 0, previews: [] });
+      const child = makeChildAgent(leadAgent.id, {
+        clearPendingMessages,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === child.id) return child;
+        return undefined;
+      });
+
+      // Create a delegation
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "test task"} ]]]`);
+
+      // Cancel using short ID prefix (first 8 chars)
+      const shortId = child.id.slice(0, 8);
+      dispatch(dispatcher, leadAgent, `[[[ CANCEL_DELEGATION {"agentId": "${shortId}"} ]]]`);
+
+      const delegations = Array.from(dispatcher.getDelegationsMap().values());
+      expect(delegations[0].status).toBe('cancelled');
+    });
+
+    it('rejects cancelling already-completed delegation', () => {
+      const clearPendingMessages = vi.fn().mockReturnValue({ count: 0, previews: [] });
+      const child = makeChildAgent(leadAgent.id, {
+        clearPendingMessages,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === child.id) return child;
+        return undefined;
+      });
+
+      // Create delegation and mark as completed
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "done task"} ]]]`);
+      const delegations = Array.from(dispatcher.getDelegationsMap().values());
+      delegations[0].status = 'completed';
+
+      // Try to cancel it
+      dispatch(dispatcher, leadAgent, `[[[ CANCEL_DELEGATION {"delegationId": "${delegations[0].id}"} ]]]`);
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('already completed'),
+      );
+    });
+
+    it('cleanupStaleDelegations also removes cancelled delegations', () => {
+      const clearPendingMessages = vi.fn().mockReturnValue({ count: 0, previews: [] });
+      const child = makeChildAgent(leadAgent.id, {
+        clearPendingMessages,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === child.id) return child;
+        return undefined;
+      });
+
+      // Create and cancel a delegation
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "cancelled task"} ]]]`);
+      dispatch(dispatcher, leadAgent, `[[[ CANCEL_DELEGATION {"agentId": "${child.id}"} ]]]`);
+
+      // Cleanup with maxAge=0 should remove cancelled delegations
+      const removed = dispatcher.cleanupStaleDelegations(0);
+      expect(removed).toBe(1);
+      expect(dispatcher.getDelegations().length).toBe(0);
+    });
+  });
+
+  // ── Feature: Sub-lead projectName (Issue #22.1) ──────────────────────
+
+  describe('CREATE_AGENT sets projectName for sub-leads', () => {
+    it('sets projectName from task when creating a sub-lead', () => {
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
+      (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
+      const subLead = makeAgent({
+        id: 'agent-sublead-0000-000000000009',
+        role: leadRole,
+        parentId: leadAgent.id,
+        hierarchyLevel: 0,
+        projectName: undefined,
+      });
+      (ctx.spawnAgent as any).mockReturnValue(subLead);
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "lead", "task": "Handle deployment"} ]]]');
+
+      expect(subLead.projectName).toBe('Handle deployment');
+    });
+
+    it('sets projectName from explicit name when provided', () => {
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
+      (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
+      const subLead = makeAgent({
+        id: 'agent-sublead-0000-000000000010',
+        role: leadRole,
+        parentId: leadAgent.id,
+        hierarchyLevel: 0,
+        projectName: undefined,
+      });
+      (ctx.spawnAgent as any).mockReturnValue(subLead);
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "lead", "task": "Handle deployment", "name": "Deploy v2"} ]]]');
+
+      expect(subLead.projectName).toBe('Deploy v2');
+    });
+
+    it('does NOT set projectName for non-lead roles', () => {
+      const devRole = makeRole();
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+      const child = makeChildAgent(leadAgent.id, { id: 'agent-dev-0000-000000000011', projectName: undefined });
+      (ctx.spawnAgent as any).mockReturnValue(child);
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "Fix bug"} ]]]');
+
+      expect(child.projectName).toBeUndefined();
+    });
+  });
+
+  // ── Feature: Group member management (Issue #22.3) ─────────────────
+
+  describe('ADD_TO_GROUP by non-lead group member', () => {
+    it('allows a group member to add new members', () => {
+      const devAgent = makeAgent({
+        id: 'agent-dev-member-0000-000000000012',
+        role: makeRole(),
+        parentId: leadAgent.id,
+        status: 'running',
+      });
+      const newAgent = makeAgent({
+        id: 'agent-new-member-0000-000000000013',
+        role: makeRole({ id: 'tester', name: 'Tester' }),
+        parentId: leadAgent.id,
+        status: 'running',
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent, newAgent]);
+
+      // Mock: devAgent is already a member of the group
+      (ctx.chatGroupRegistry as any).findGroupForAgent = vi.fn().mockReturnValue({
+        name: 'config-team',
+        leadId: leadAgent.id,
+        memberIds: [leadAgent.id, devAgent.id],
+        createdAt: new Date().toISOString(),
+      });
+      (ctx.chatGroupRegistry.addMembers as any).mockReturnValue([newAgent.id]);
+      (ctx.chatGroupRegistry.getMembers as any).mockReturnValue([leadAgent.id, devAgent.id, newAgent.id]);
+      (ctx.chatGroupRegistry.getMessages as any).mockReturnValue([]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === devAgent.id) return devAgent;
+        if (id === newAgent.id) return newAgent;
+        if (id === leadAgent.id) return leadAgent;
+        return undefined;
+      });
+
+      dispatch(dispatcher, devAgent, `[[[ ADD_TO_GROUP {"group": "config-team", "members": ["${newAgent.id}"]} ]]]`);
+
+      expect(ctx.chatGroupRegistry.addMembers).toHaveBeenCalledWith(
+        leadAgent.id,
+        'config-team',
+        [newAgent.id],
+      );
+      expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Added'),
+      );
+    });
+
+    it('rejects non-member non-lead trying to add to a group', () => {
+      const devAgent = makeAgent({
+        id: 'agent-outsider-0000-000000000014',
+        role: makeRole(),
+        parentId: leadAgent.id,
+        status: 'running',
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent]);
+
+      // Mock: devAgent is NOT a member of the group
+      (ctx.chatGroupRegistry as any).findGroupForAgent = vi.fn().mockReturnValue(undefined);
+
+      dispatch(dispatcher, devAgent, '[[[ ADD_TO_GROUP {"group": "config-team", "members": ["some-agent"]} ]]]');
+
+      expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('must be a member'),
+      );
+      expect(ctx.chatGroupRegistry.addMembers).not.toHaveBeenCalled();
     });
   });
 });

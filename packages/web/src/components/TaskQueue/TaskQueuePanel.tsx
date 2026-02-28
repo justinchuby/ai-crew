@@ -89,6 +89,7 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
                   a.status === 'idle' ? 'border-green-500/50 bg-green-500/10 text-green-300' :
                   a.status === 'completed' ? 'border-gray-500/50 bg-gray-500/10 text-gray-400' :
                   a.status === 'failed' ? 'border-red-500/50 bg-red-500/10 text-red-300' :
+                  a.status === 'terminated' ? 'border-orange-500/50 bg-orange-500/10 text-orange-300' :
                   'border-gray-600 text-gray-400'
                 }`}
               >
@@ -192,7 +193,7 @@ export function TaskQueuePanel({ api }: Props) {
   useEffect(() => {
     if (!activeLeadId) return;
     const lead = agents.find((a: AgentInfo) => a.id === activeLeadId);
-    if (!lead || lead.status === 'completed' || lead.status === 'failed') return;
+    if (!lead || lead.status === 'completed' || lead.status === 'failed' || lead.status === 'terminated') return;
     const interval = setInterval(() => fetchData(activeLeadId), 5000);
     return () => clearInterval(interval);
   }, [activeLeadId, agents, fetchData]);
@@ -265,6 +266,7 @@ export function TaskQueuePanel({ api }: Props) {
                     l.status === 'running' ? 'bg-blue-400 animate-pulse' :
                     l.status === 'idle' ? 'bg-green-400' :
                     l.status === 'completed' ? 'bg-gray-500' :
+                    l.status === 'terminated' ? 'bg-orange-400' :
                     'bg-red-400'
                   }`} />
                 </button>
