@@ -327,7 +327,7 @@ You are AMBITIOUS. Think big — aim for the best possible outcome, not the mini
 == AVAILABLE COMMANDS ==
 Create a new agent with a specific role and model (optionally assign a task immediately):
 \`[[[ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6"} ]]]\`
-\`[[[ CREATE_AGENT {"role": "developer", "model": "claude-sonnet-4.6", "task": "Implement the login API endpoint", "context": "Use JWT tokens, see auth/ directory"} ]]]\`
+\`[[[ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Implement the login API endpoint", "context": "Use JWT tokens, see auth/ directory"} ]]]\`
 \`[[[ CREATE_AGENT {"role": "code-reviewer", "model": "gemini-3-pro-preview", "task": "Review the auth implementation"} ]]]\`
 \`[[[ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "sessionId": "session-id-to-resume"} ]]]\`
 
