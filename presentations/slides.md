@@ -358,25 +358,25 @@ WebSocket + SSE
 </div>
 
 <div class="grid grid-cols-4 gap-2 mt-2 text-sm">
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+<div class="bg-gray-800 rounded-lg p-3 border border-cyan-500 text-center">
 
 ### 🖥️ Dashboard
 React + Vite
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+<div class="bg-gray-800 rounded-lg p-3 border border-orange-500 text-center">
 
 ### 📖 Docs
 VitePress
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+<div class="bg-gray-800 rounded-lg p-3 border border-pink-500 text-center">
 
 ### 🎬 This Presentation
 Slidev
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+<div class="bg-gray-800 rounded-lg p-3 border border-teal-500 text-center">
 
 ### 🤖 Models
 Claude, GPT, Gemini
@@ -428,7 +428,7 @@ Agents embed **structured commands** in their natural language output:
 
 </div>
 
-<p class="text-xs text-gray-500 mt-2">50+ commands across 11 modules. Unicode <code>⟦ ⟧</code> delimiters never appear in code — zero false positives. All Zod-validated.</p>
+<p class="text-sm text-gray-500 mt-2">50+ commands across 11 modules. Unicode <code>⟦ ⟧</code> delimiters — zero false positives. All Zod-validated.</p>
 
 <!--
 The command system is the core primitive. Agents embed structured commands
@@ -451,17 +451,14 @@ system enabling autonomous coordination.
 ### 💬 Direct Messages
 
 <div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
-⟦ AGENT_MESSAGE<br/>
-&nbsp; {"to": "437a822b",<br/>
-&nbsp;&nbsp; "content": "Architecture<br/>
-&nbsp;&nbsp; spec is ready"} ⟧
+⟦ AGENT_MESSAGE {"to": "437a822b",<br/>
+&nbsp; "content": "Spec is ready"} ⟧
 </div>
 
-<div class="text-xs text-gray-400 mt-2">
+<div class="text-sm text-gray-400 mt-2">
 
 - Point-to-point, queued
 - Resolves by ID prefix or role
-- Architect → Developer direct
 
 </div>
 </div>
@@ -470,17 +467,14 @@ system enabling autonomous coordination.
 ### 👥 Group Chat
 
 <div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
-⟦ GROUP_MESSAGE<br/>
-&nbsp; {"group": "presentation-team",<br/>
-&nbsp;&nbsp; "content": "Slides are<br/>
-&nbsp;&nbsp; ready for review"} ⟧
+⟦ GROUP_MESSAGE {"group":<br/>
+&nbsp; "presentation-team", ...} ⟧
 </div>
 
-<div class="text-xs text-gray-400 mt-2">
+<div class="text-sm text-gray-400 mt-2">
 
 - Persistent, SQLite-backed
 - 5 agents coordinated this deck
-- Auto-suggested by the system
 
 </div>
 </div>
@@ -489,23 +483,20 @@ system enabling autonomous coordination.
 ### 📢 Broadcast
 
 <div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
-⟦ BROADCAST<br/>
-&nbsp; {"content": "Never use<br/>
-&nbsp;&nbsp; git add -A — it picks<br/>
-&nbsp;&nbsp; up other agents' work"} ⟧
+⟦ BROADCAST {"content":<br/>
+&nbsp; "Never use git add -A"} ⟧
 </div>
 
-<div class="text-xs text-gray-400 mt-2">
+<div class="text-sm text-gray-400 mt-2">
 
 - One-to-all, urgent
-- Lead broadcast git warning
 - All 13 agents received it
 
 </div>
 </div>
 </div>
 
-<p class="text-xs text-gray-500 mt-2">This presentation was coordinated via the group chat channel — 5 agents discussing slide content in real-time. That's meta AND concrete.</p>
+<p class="text-sm text-gray-500 mt-2">This presentation was coordinated via group chat — 5 agents discussing slides in real-time.</p>
 
 <!--
 Three channels, each for a different purpose. Direct messages for
@@ -528,20 +519,10 @@ escalate through broadcast when needed.
 <span class="text-gray-500">// Injected every 60s or on significant events</span>
 <br/>⟦ CREW_UPDATE
 <br/>== CURRENT CREW STATUS ==
-<br/>- Agent 2cf55f61 (Developer) — Status: running,
-<br/>&nbsp; Working on: Implement auto-DAG creation,
-<br/>&nbsp; Files locked: AgentLifecycle.ts, TaskCommands.ts
-<br/>- Agent 0b85de78 (Developer) — Status: running,
-<br/>&nbsp; Working on: Write auto-DAG tests,
-<br/>&nbsp; Files locked: AutoDAG.integration.test.ts
-<br/>- Agent b529689d (Critical Reviewer) — Status: idle
-<br/>
-<br/>== AGENT BUDGET ==
-<br/>Running: 12 / 20 | Available slots: 8
-<br/>
-<br/>== RECENT ACTIVITY ==
-<br/>[17:41:20] 2cf55f61: lock_acquired — AgentLifecycle.ts
-<br/>[17:41:18] 173808e0: delegated → Developer (3194c4df)
+<br/>- Agent 2cf55f61 (Developer) — <span class="text-green-400">running</span>, Files locked: AgentLifecycle.ts
+<br/>- Agent 0b85de78 (Developer) — <span class="text-green-400">running</span>, Files locked: AutoDAG.test.ts
+<br/>- Agent b529689d (Critical Reviewer) — <span class="text-gray-500">idle</span>
+<br/>== AGENT BUDGET == Running: 12 / 20 | Available: 8
 <br/>CREW_UPDATE ⟧
 
 </div>
@@ -573,39 +554,37 @@ defines their personality, capabilities, and instructions.
 
 # Five registries, one source of truth
 
-<div class="grid grid-cols-5 gap-2 mt-2 text-sm">
+<div class="grid grid-cols-3 gap-2 mt-2 text-sm">
 <div class="bg-gray-800 rounded-lg p-2 border border-blue-500 text-center">
 
-### 🤖
-**Agent Manager**
+### 🤖 Agent Manager
 <div class="text-xs text-gray-400">Lifecycle, status, model, parent</div>
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500 text-center">
 
-### 📋
-**Task DAG**
+### 📋 Task DAG
 <div class="text-xs text-gray-400">Dependencies, states, progress</div>
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500 text-center">
 
-### 🔒
-**File Locks**
+### 🔒 File Locks
 <div class="text-xs text-gray-400">Who owns which file</div>
 
 </div>
+</div>
+
+<div class="grid grid-cols-2 gap-2 mt-2 text-sm">
 <div class="bg-gray-800 rounded-lg p-2 border border-purple-500 text-center">
 
-### 💬
-**Chat Groups**
+### 💬 Chat Groups
 <div class="text-xs text-gray-400">Members, messages, history</div>
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-red-500 text-center">
 
-### 📊
-**Activity Ledger**
+### 📊 Activity Ledger
 <div class="text-xs text-gray-400">Every action, logged</div>
 
 </div>
