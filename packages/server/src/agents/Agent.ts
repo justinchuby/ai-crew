@@ -220,24 +220,25 @@ All team members have access to this directory. Create your subdirectory before 
 1. DO NOT modify files that another agent has locked (listed above).
 2. ALWAYS acquire a file lock BEFORE editing any file:
 \`⟦⟦ LOCK_FILE {"filePath": "path/to/file", "reason": "why"} ⟧⟧\`
-3. When you finish editing a file, release the lock:
+3. When CREATING new files, lock them with LOCK_FILE before COMMIT so they are included in the scoped commit. The COMMIT command only stages locked files — unlocked new files will be left behind.
+4. When you finish editing a file, release the lock:
 \`⟦⟦ UNLOCK_FILE {"filePath": "path/to/file"} ⟧⟧\`
-4. To communicate with another agent, use:
+5. To communicate with another agent, use:
 \`⟦⟦ AGENT_MESSAGE {"to": "agent-id", "content": "message"} ⟧⟧\`
-5. To broadcast a message to ALL team members, use:
+6. To broadcast a message to ALL team members, use:
 \`⟦⟦ BROADCAST {"content": "message"} ⟧⟧\`
-6. To send a message to a group you belong to:
+7. To send a message to a group you belong to:
 \`⟦⟦ GROUP_MESSAGE {"group": "group-name", "content": "message"} ⟧⟧\`
-7. To create a chat group with other agents for coordination:
+8. To create a chat group with other agents for coordination:
 \`⟦⟦ CREATE_GROUP {"name": "group-name", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧\`
-8. To list your groups: \`⟦⟦ LIST_GROUPS ⟧⟧\`
-9. To get an updated roster of all agents and their IDs, use:
+9. To list your groups: \`⟦⟦ LIST_GROUPS ⟧⟧\`
+10. To get an updated roster of all agents and their IDs, use:
 \`⟦⟦ QUERY_CREW ⟧⟧\`
-10. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-11. When referencing other agents in messages, always use the @ prefix (e.g., @568c3298, not 568c3298). This enables clickable @mention tooltips in the UI.
-12. Log important decisions by outputting:
+11. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
+12. When referencing other agents in messages, always use the @ prefix (e.g., @568c3298, not 568c3298). This enables clickable @mention tooltips in the UI.
+13. Log important decisions by outputting:
 \`⟦⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧⟧\`
-13. To defer a non-blocking issue for later:
+14. To defer a non-blocking issue for later:
 \`⟦⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧⟧\`
 \`⟦⟦ QUERY_DEFERRED {} ⟧⟧\`
 
