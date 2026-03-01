@@ -278,4 +278,117 @@ describe('CoordCommands — COMMIT handler', () => {
 
     expect(agent.sendMessage).not.toHaveBeenCalled();
   });
+
+  // ── A6: Post-commit verification tests ──────────────────────────────
+
+  it('does not warn when all committed files match expected', async () => {
+    mockExecSuccess(undefined, ['src/auth.ts', 'src/utils.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([
+          { filePath: 'src/auth.ts' },
+          { filePath: 'src/utils.ts' },
+        ]),
+      },
+    });
+    const agent = makeAgent();
+    const commit = getCommitHandler(ctx);
+
+    commit.handler(agent, '[[[ COMMIT {"message": "verified commit"} ]]]');
+
+    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('COMMIT succeeded'),
+    ));
+    // Should NOT have a warning about missing files
+    const warnings = agent.sendMessage.mock.calls.filter(
+      (c: any[]) => (c[0] as string).includes('Warning'),
+    );
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('warns when expected files are missing from the commit', async () => {
+    // Verification diff only returns 1 of 2 expected files
+    mockExecSuccess(undefined, ['src/auth.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([
+          { filePath: 'src/auth.ts' },
+          { filePath: 'src/utils.ts' },
+        ]),
+      },
+    });
+    const agent = makeAgent();
+    const commit = getCommitHandler(ctx);
+
+    commit.handler(agent, '[[[ COMMIT {"message": "partial commit"} ]]]');
+
+    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Warning: 1 expected file(s) not found in commit: src/utils.ts'),
+    ));
+  });
+
+  it('warns with multiple missing files', async () => {
+    mockExecSuccess(undefined, []);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([
+          { filePath: 'a.ts' },
+          { filePath: 'b.ts' },
+          { filePath: 'c.ts' },
+        ]),
+      },
+    });
+    const agent = makeAgent();
+    const commit = getCommitHandler(ctx);
+
+    commit.handler(agent, '[[[ COMMIT {"message": "empty commit"} ]]]');
+
+    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Warning: 3 expected file(s) not found in commit: a.ts, b.ts, c.ts'),
+    ));
+  });
+
+  it('gracefully handles verification diff failure (best-effort)', async () => {
+    mockExecCommitOkVerifyFail();
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent();
+    const commit = getCommitHandler(ctx);
+
+    commit.handler(agent, '[[[ COMMIT {"message": "test"} ]]]');
+
+    // Commit success message should still arrive
+    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('COMMIT succeeded'),
+    ));
+    // No crash — verification failure is swallowed
+    const warnings = agent.sendMessage.mock.calls.filter(
+      (c: any[]) => (c[0] as string).includes('Warning'),
+    );
+    expect(warnings).toHaveLength(0);
+    // Activity ledger still logs (verification is best-effort)
+    await vi.waitFor(() => expect(ctx.activityLedger.log).toHaveBeenCalled());
+  });
+
+  it('does not log to activity ledger on commit failure', async () => {
+    mockExecFailure('nothing to commit');
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent();
+    const commit = getCommitHandler(ctx);
+
+    commit.handler(agent, '[[[ COMMIT {"message": "test"} ]]]');
+
+    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('COMMIT failed'),
+    ));
+    // Activity ledger should NOT be called on failure
+    expect(ctx.activityLedger.log).not.toHaveBeenCalled();
+  });
 });
