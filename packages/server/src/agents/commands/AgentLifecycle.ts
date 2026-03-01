@@ -302,6 +302,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
     maybeAutoCreateGroup(ctx, agent, ctx.delegations);
+    maybeSuggestDagGroup(ctx, agent.id);
   } catch (err: any) {
     ctx.emit('agent:delegate_error', { agentId: agent.id, message: err.message });
   }
@@ -691,4 +692,101 @@ export function requestSecretaryDependencyAnalysis(
     `If no dependencies, ignore this message.`
   );
   logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);
+}
+
+// ── DAG-aware group chat suggestions ──────────────────────────────────
+
+const GROUP_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'all', 'its',
+  'implement', 'create', 'build', 'fix', 'add', 'review', 'update', 'check',
+  'test', 'run', 'verify', 'ensure', 'handle', 'process', 'manage', 'write',
+  'read', 'make', 'use', 'new', 'agent', 'task', 'work', 'code', 'file',
+  'changes', 'based', 'should', 'when', 'after', 'before', 'first', 'each',
+  'your', 'their', 'about', 'will', 'been', 'have', 'need', 'also', 'done',
+]);
+
+/** Extract significant keywords from a task description. */
+function extractKeywords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !GROUP_STOP_WORDS.has(w));
+}
+
+/**
+ * After auto-DAG task creation, check if 3+ agents share common keywords
+ * in their DAG task descriptions. If so, suggest a group to the lead.
+ * Only suggests — does not auto-create.
+ */
+export function maybeSuggestDagGroup(
+  ctx: CommandHandlerContext,
+  leadId: string,
+): void {
+  const tasks = ctx.taskDAG.getTasks(leadId)
+    .filter(t => ['running', 'ready'].includes(t.dagStatus) && t.assignedAgentId);
+
+  if (tasks.length < 3) return;
+
+  // Build keyword → agent mapping (multi-keyword per task)
+  const keywordAgents = new Map<string, Set<string>>();
+  const agentTaskDesc = new Map<string, string>();
+  for (const task of tasks) {
+    const keywords = extractKeywords(task.description || task.title || task.role);
+    agentTaskDesc.set(task.assignedAgentId!, task.description || task.title || task.role);
+    for (const kw of keywords) {
+      if (!keywordAgents.has(kw)) keywordAgents.set(kw, new Set());
+      keywordAgents.get(kw)!.add(task.assignedAgentId!);
+    }
+  }
+
+  // Find clusters: keywords shared by 3+ agents
+  const clusters = new Map<string, Set<string>>();
+  for (const [keyword, agents] of keywordAgents) {
+    if (agents.size >= 3) {
+      // Group overlapping agent sets by merging into the best keyword
+      let merged = false;
+      for (const [existingKw, existingAgents] of clusters) {
+        const overlap = [...agents].filter(a => existingAgents.has(a)).length;
+        if (overlap >= 2) {
+          // Merge into existing cluster, keep the keyword with more agents
+          for (const a of agents) existingAgents.add(a);
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) {
+        clusters.set(keyword, new Set(agents));
+      }
+    }
+  }
+
+  if (clusters.size === 0) return;
+
+  // Check existing groups to avoid re-suggesting
+  const existingGroups = ctx.chatGroupRegistry.getGroups(leadId);
+  const existingGroupNames = new Set(existingGroups.map(g => g.name.toLowerCase()));
+
+  const lead = ctx.getAgent(leadId);
+  if (!lead) return;
+
+  for (const [keyword, agentIds] of clusters) {
+    const groupName = `${keyword}-team`;
+    if (existingGroupNames.has(groupName)) continue;
+
+    const memberList = [...agentIds].map(id => {
+      const a = ctx.getAgent(id);
+      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+    }).join(', ');
+
+    const memberIds = JSON.stringify([...agentIds, leadId]);
+
+    lead.sendMessage(
+      `[System suggestion] ${agentIds.size} agents are working on ${keyword}-related tasks: ${memberList}. ` +
+      `Consider creating a coordination group:\n` +
+      `⟦ CREATE_GROUP {"name": "${groupName}", "members": ${memberIds}} ⟧`
+    );
+    logger.info('delegation', `Suggested group "${groupName}" for ${agentIds.size} agents on ${keyword} tasks`);
+    break; // One suggestion per delegation event
+  }
 }

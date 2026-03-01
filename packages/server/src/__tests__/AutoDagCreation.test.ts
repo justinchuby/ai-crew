@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getLifecycleCommands } from '../agents/commands/AgentLifecycle.js';
-import { generateAutoTaskId, requestSecretaryDependencyAnalysis } from '../agents/commands/AgentLifecycle.js';
+import { generateAutoTaskId, requestSecretaryDependencyAnalysis, maybeSuggestDagGroup } from '../agents/commands/AgentLifecycle.js';
 import type { CommandHandlerContext } from '../agents/commands/types.js';
 
 function makeLeadAgent(overrides: Record<string, any> = {}) {
@@ -719,5 +719,123 @@ describe('requestSecretaryDependencyAnalysis (unit)', () => {
     const activeSection = msg.split('Active tasks:\n')[1]?.split('\n\nDoes')[0] || '';
     expect(activeSection).not.toContain('new-task');
     expect(activeSection).toContain('other-task');
+  });
+});
+
+// ── DAG-aware group chat suggestions ──────────────────────────────────
+
+describe('maybeSuggestDagGroup', () => {
+  function makeGroupCtx(tasks: any[], existingGroups: any[] = []): { ctx: CommandHandlerContext; leadAgent: any } {
+    const leadAgent = makeLeadAgent();
+    const agents = new Map<string, any>([['lead-001', leadAgent]]);
+    for (const t of tasks) {
+      if (t.assignedAgentId && !agents.has(t.assignedAgentId)) {
+        agents.set(t.assignedAgentId, {
+          id: t.assignedAgentId,
+          role: { id: t.role || 'developer', name: 'Developer' },
+          status: 'running',
+          sendMessage: vi.fn(),
+        });
+      }
+    }
+    const ctx = makeCtx({
+      taskDAG: {
+        ...makeCtx().taskDAG,
+        getTasks: vi.fn().mockReturnValue(tasks),
+      },
+      chatGroupRegistry: {
+        getGroups: vi.fn().mockReturnValue(existingGroups),
+      },
+      getAgent: vi.fn().mockImplementation((id: string) => agents.get(id) || undefined),
+    });
+    return { ctx, leadAgent };
+  }
+
+  it('suggests group when 3+ agents share a keyword', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'running', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'running', assignedAgentId: 'agent-bbb', description: 'Review presentation flow', role: 'code-reviewer' },
+      { id: 't3', dagStatus: 'running', assignedAgentId: 'agent-ccc', description: 'Polish presentation narrative', role: 'tech-writer' },
+    ];
+    const { ctx, leadAgent } = makeGroupCtx(tasks);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('presentation-team')
+    );
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('CREATE_GROUP')
+    );
+  });
+
+  it('does not suggest when fewer than 3 agents', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'running', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'running', assignedAgentId: 'agent-bbb', description: 'Review presentation flow', role: 'code-reviewer' },
+    ];
+    const { ctx, leadAgent } = makeGroupCtx(tasks);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    expect(leadAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not suggest when group already exists', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'running', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'running', assignedAgentId: 'agent-bbb', description: 'Review presentation flow', role: 'code-reviewer' },
+      { id: 't3', dagStatus: 'running', assignedAgentId: 'agent-ccc', description: 'Polish presentation narrative', role: 'tech-writer' },
+    ];
+    const existingGroups = [{ name: 'presentation-team', leadId: 'lead-001' }];
+    const { ctx, leadAgent } = makeGroupCtx(tasks, existingGroups);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    expect(leadAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores done/skipped tasks', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'done', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'running', assignedAgentId: 'agent-bbb', description: 'Review presentation flow', role: 'code-reviewer' },
+      { id: 't3', dagStatus: 'running', assignedAgentId: 'agent-ccc', description: 'Polish presentation narrative', role: 'tech-writer' },
+    ];
+    const { ctx, leadAgent } = makeGroupCtx(tasks);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    // Only 2 active agents — not enough for suggestion
+    expect(leadAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('ignores tasks without assigned agents', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'running', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'ready', assignedAgentId: undefined, description: 'Review presentation flow', role: 'code-reviewer' },
+      { id: 't3', dagStatus: 'running', assignedAgentId: 'agent-ccc', description: 'Polish presentation narrative', role: 'tech-writer' },
+    ];
+    const { ctx, leadAgent } = makeGroupCtx(tasks);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    expect(leadAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('includes member names in suggestion', () => {
+    const tasks = [
+      { id: 't1', dagStatus: 'running', assignedAgentId: 'agent-aaa', description: 'Write presentation slides', role: 'developer' },
+      { id: 't2', dagStatus: 'running', assignedAgentId: 'agent-bbb', description: 'Review presentation flow', role: 'code-reviewer' },
+      { id: 't3', dagStatus: 'running', assignedAgentId: 'agent-ccc', description: 'Polish presentation narrative', role: 'tech-writer' },
+    ];
+    const { ctx, leadAgent } = makeGroupCtx(tasks);
+
+    maybeSuggestDagGroup(ctx, 'lead-001');
+
+    const msg = leadAgent.sendMessage.mock.calls[0][0];
+    expect(msg).toContain('agent-aa');
+    expect(msg).toContain('agent-bb');
+    expect(msg).toContain('agent-cc');
+    expect(msg).toContain('System suggestion');
   });
 });
