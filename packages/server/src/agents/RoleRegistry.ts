@@ -372,6 +372,11 @@ Terminate an agent to free a slot (WARNING: the agent's context is permanently l
 Interrupt an agent to stop their current work and redirect (use sparingly — cancels in-progress LLM turn):
 \`⟦ INTERRUPT {"to": "agent-id", "content": "Drop current task and do X instead"} ⟧\`
 
+Set reminders using timers (useful for checking builds, following up on delegations):
+\`⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧\`
+\`⟦ CANCEL_TIMER {"name": "check-build"} ⟧\`
+\`⟦ LIST_TIMERS {} ⟧\`
+
 == TASK DAG (Declarative Scheduling) ==
 Declare tasks with dependencies and the system auto-schedules execution:
 
