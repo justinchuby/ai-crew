@@ -7,7 +7,7 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 **Why AI Crew?** Instead of one AI agent doing everything sequentially, AI Crew runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
 
-> **Status**: Waves 1–17 complete. See [branch `team-work-2`](https://github.com/github/ai-crew/tree/team-work-2) and [PR #35](https://github.com/github/ai-crew/pull/35) for recent changes.
+> **Status**: Waves 1–20 complete. See [branch `team-work-2`](https://github.com/github/ai-crew/tree/team-work-2) for recent changes.
 
 ## Features
 
@@ -26,7 +26,7 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Unread Badges** — Sidebar shows unread message counts for group chats
 
 ### 📈 Visualization & Monitoring
-- **Mission Control** — Single-screen project overview with 6 panels: health summary, agent fleet, token economics, alerts, activity feed, and DAG minimap
+- **Mission Control** — Single-screen project overview with 8 configurable panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards. Drag-and-drop panel reordering in Settings.
 - **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, and hover tooltips showing task details and duration
 - **Token Economics** — Per-agent token breakdown with context pressure bars (80% yellow, 90% red warning thresholds)
 - **Proactive Alerts** — Automatic detection of stuck agents (10min), context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min)
@@ -50,8 +50,9 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 ### 💾 Persistence & Recovery
 - **Session Resume** — Resume from a previous Copilot session ID
-- **Persistent Projects** — Projects survive lead sessions; resume with full context briefing
+- **Persistent Projects** — Projects survive lead sessions; resume with full context briefing. Chat history and project state auto-load on app startup.
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
+- **Theme Persistence** — Light, Dark, and Follow System themes persist across sessions via shared store
 
 ## Quick Start
 
@@ -124,6 +125,19 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **EventPipeline** | Reactive event handlers: run CI after commits, log summaries on task completion, trigger webhooks |
 | **CapabilityRegistry** | Tracks acquired agent expertise (files, technologies, domains) for smart matching |
 | **EagerScheduler** | Pre-assigns upcoming tasks to idle agents before they become active |
+| **TaskTemplates** | Reusable task templates with natural-language decomposition |
+| **SearchEngine** | Full-text search across messages, tasks, decisions, and activity |
+| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, cost efficiency |
+| **DecisionRecords** | ADR-style structured decision records with status tracking |
+| **CoverageTracker** | Test coverage monitoring with regression detection and trend analysis |
+| **ComplexityMonitor** | File complexity analysis with 4-tier scoring and hotspot detection |
+| **NotificationManager** | User notification preferences, quiet hours, priority-based routing |
+| **EscalationManager** | Auto-escalation for stale decisions and blocked tasks |
+| **ModelSelector** | Auto-picks optimal model based on task complexity, agent role, and budget |
+| **TokenBudgetOptimizer** | Priority-weighted token allocation across active agents |
+| **ParallelAnalyzer** | DAG bottleneck detection with critical path analysis |
+| **ReportGenerator** | Session report generation in HTML and Markdown |
+| **KnowledgeTransfer** | Cross-project knowledge sharing and context reuse |
 
 > See [docs/architecture-decisions.md](docs/architecture-decisions.md) for the rationale behind key design choices.
 
@@ -135,10 +149,10 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 |------|------|-------|---------------|
 | **Project Lead** | 👑 | Orchestration, delegation, team coordination | Claude Opus 4.6 |
 | **Developer** | 💻 | Code implementation, tests, bug fixes | Claude Opus 4.6 |
-| **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | GPT-5.3 Codex |
+| **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
 | **Critical Reviewer** | 🛡️ | Security, performance, edge cases | Gemini 3 Pro |
-| **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.2 Codex |
+| **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.3 Codex |
 | **Technical Writer** | 📝 | Documentation, API design review, developer experience | GPT-5.2 |
 | **Designer** | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
 | **Generalist** | 🔧 | Cross-disciplinary problem solving | Claude Opus 4.6 |
@@ -200,13 +214,13 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | View | Description |
 |------|-------------|
 | **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), team/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
-| **Mission Control** | Single-screen project overview: health summary, agent fleet, token economics, proactive alerts, activity feed, DAG minimap |
+| **Mission Control** | Single-screen project overview: health summary, agent fleet, token economics, proactive alerts, activity feed, DAG minimap, comm heatmap, performance scorecards. Drag-and-drop panel reorder. |
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls, project grouping |
 | **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, duplicate detection |
 | **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns, hover tooltips |
 | **Group Chat** | Tabbed group chat with human participation, unread badges in sidebar, real-time messaging |
 | **Overview** | Progress tracking, decision management, global search |
-| **Settings** | Concurrency limits (1–20 agents), model defaults, custom role editor |
+| **Settings** | Concurrency limits (1–50 agents), model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
 
 ## Tech Stack
 
@@ -217,7 +231,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
-- **Testing**: Vitest with v8 coverage, Codecov integration (1000+ tests including 30 Task DAG E2E + 40 Timeline E2E)
+- **Testing**: Vitest with v8 coverage, Codecov integration (1,180+ tests including 30 Task DAG E2E + 40 Timeline E2E)
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
 ## Documentation
