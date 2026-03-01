@@ -265,6 +265,37 @@ the audience already uses — this isn't sci-fi, it's a multiplier.
 -->
 
 ---
+
+# Built by the thing it builds
+
+<div class="space-y-3 mt-2">
+
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
+<strong class="text-blue-400">Day 1:</strong> One human described an idea. One Copilot CLI agent built the first prototype.
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+<strong class="text-blue-400">Then it got recursive:</strong> Version 1 of AI Crew was used to build Version 2. Version 2 built Version 3.
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<strong class="text-green-400">Right now:</strong> This session — 13 agents improving the system that coordinates them. The tool is building the next version of itself.
+</div>
+
+</div>
+
+<p class="text-sm text-gray-500 mt-3">Every feature you'll see today was built by a previous version of what you're looking at.</p>
+
+<!--
+Let the recursion land. "This tool was built by a single AI agent. Then
+that tool built the next version. Then THAT version built the next. Right
+now, in this session, 13 agents are improving the system that runs them.
+The tool is building itself." Pause. Let the audience sit with the
+implication. This sets up the meta-reveal later — they'll spend the
+whole talk knowing something recursive is happening.
+-->
+
+---
 layout: center
 ---
 
@@ -987,6 +1018,62 @@ it happens automatically on every change. And complexity — the hardest
 tasks for a single agent (50-file refactors, cross-cutting changes) are
 exactly where a team excels. A single agent drowns. A team with an
 architect splits it up and conquers it.
+-->
+
+---
+
+# These agents don't just write code — they ship it
+
+<div class="grid grid-cols-4 gap-3 mt-2">
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+
+### 🔀 Commits
+<div class="text-sm">
+
+Each agent commits only its own files. **15+ scoped commits** this session, zero cross-contamination.
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+
+### 📋 Pull Requests
+<div class="text-sm">
+
+Creates PRs with full context — what changed, why, which agent did it. **Ready for your review.**
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+
+### 🎫 Issues
+<div class="text-sm">
+
+Found a bug during development? The crew **files a GitHub issue** and keeps working. No manual triage.
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-purple-500">
+
+### 📊 Analysis
+<div class="text-sm">
+
+Architecture audits, security reviews, cost breakdowns — **produced while you do other work.**
+
+</div>
+</div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">The boring parts of your workflow? They're handled. You review the output and decide what ships.</p>
+
+<!--
+This slide is about production credibility. The audience needs to know
+this isn't a demo toy — it actually ships artifacts. Commits are scoped
+and atomic. PRs get opened. Issues get filed. Analysis reports appear.
+Everything the audience does manually today? The crew handles it. Point
+at each column briefly: "15 scoped commits, zero conflicts. PRs created
+with context. Issues filed automatically when bugs are found. Architecture
+audits and cost analysis produced in the background." Then: "The boring
+parts of your workflow? Handled."
 -->
 
 ---
