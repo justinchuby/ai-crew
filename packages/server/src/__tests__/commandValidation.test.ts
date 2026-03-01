@@ -661,4 +661,61 @@ describe('TaskCommands validation', () => {
       expect.stringContaining('DECLARE_TASKS validation error'),
     );
   });
+
+  // ── Size-limit enforcement (.max()) ───────────────────────────────
+
+  it('AGENT_MSG rejects oversized content', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
+    const bigContent = 'x'.repeat(50_001);
+    cmd.handler(agent, `[[[ AGENT_MESSAGE {"to":"lead","content":"${bigContent}"} ]]]`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('AGENT_MESSAGE validation error'),
+    );
+  });
+
+  it('BROADCAST rejects oversized content', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCommCommands(ctx), 'BROADCAST');
+    const bigContent = 'x'.repeat(50_001);
+    cmd.handler(agent, `[[[ BROADCAST {"content":"${bigContent}"} ]]]`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('BROADCAST validation error'),
+    );
+  });
+
+  it('CREATE_GROUP rejects too many members', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCommCommands(ctx), 'CREATE_GROUP');
+    const members = Array.from({ length: 101 }, (_, i) => `m${i}`);
+    cmd.handler(agent, `[[[ CREATE_GROUP ${JSON.stringify({ name: 'grp', members })} ]]]`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('CREATE_GROUP validation error'),
+    );
+  });
+
+  it('DECLARE_TASKS rejects too many tasks', () => {
+    const ctx = makeCtx();
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getTaskCommands(ctx), 'DECLARE_TASKS');
+    const tasks = Array.from({ length: 501 }, (_, i) => ({ id: `t${i}`, role: 'dev' }));
+    cmd.handler(agent, `[[[ DECLARE_TASKS ${JSON.stringify({ tasks })} ]]]`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('DECLARE_TASKS validation error'),
+    );
+  });
+
+  it('DELEGATE rejects oversized task text', () => {
+    const ctx = makeCtx();
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getAgentCommands(ctx), 'DELEGATE');
+    const bigTask = 'x'.repeat(50_001);
+    cmd.handler(agent, `[[[ DELEGATE {"to":"dev","task":"${bigTask}"} ]]]`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('DELEGATE validation error'),
+    );
+  });
 });

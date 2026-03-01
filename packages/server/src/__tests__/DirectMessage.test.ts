@@ -128,7 +128,7 @@ describe('DIRECT_MESSAGE', () => {
     dmCmd.handler(sender, `[[[ DIRECT_MESSAGE {"content": "Oops no target"} ]]]`);
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('requires'),
+      expect.stringContaining('Missing required field "to"'),
     );
   });
 
