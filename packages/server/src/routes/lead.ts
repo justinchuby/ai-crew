@@ -269,6 +269,20 @@ export function leadRoutes(ctx: AppContext): Router {
     res.json(timers);
   });
 
+  router.delete('/timers/:timerId', (req, res) => {
+    const registry = agentManager.getTimerRegistry();
+    if (!registry) return res.status(404).json({ error: 'Timer system not available' });
+
+    const timer = registry.getAllTimers().find(t => t.id === req.params.timerId);
+    if (!timer) return res.status(404).json({ error: 'Timer not found' });
+    if (timer.status !== 'pending') return res.status(409).json({ error: `Timer already ${timer.status}` });
+
+    // Web user (operator) can cancel any timer — use the timer's own agentId
+    const ok = registry.cancel(timer.id, timer.agentId);
+    if (!ok) return res.status(500).json({ error: 'Cancel failed' });
+    res.json({ success: true });
+  });
+
   router.get('/lead/:id/progress', (req, res) => {
     const leadId = req.params.id;
     const delegations = agentManager.getDelegations(leadId);

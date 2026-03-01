@@ -95,4 +95,26 @@ describe('Timer API data shape', () => {
     registry.cancel(timer!.id, 'agent-1');
     expect(registry.getPendingTimers()).toHaveLength(0);
   });
+
+  describe('cancel by timer ID (web UI path)', () => {
+    it('cancels a pending timer using its own agentId', () => {
+      const timer = registry.create('agent-1', { label: 'web-cancel', message: 'X', delaySeconds: 300 })!;
+      // Simulates what DELETE /timers/:id does: look up timer, cancel with its own agentId
+      const found = registry.getAllTimers().find(t => t.id === timer.id);
+      expect(found).toBeDefined();
+      expect(found!.status).toBe('pending');
+
+      const ok = registry.cancel(found!.id, found!.agentId);
+      expect(ok).toBe(true);
+      expect(registry.getAllTimers().find(t => t.id === timer.id)!.status).toBe('cancelled');
+    });
+
+    it('cannot cancel an already cancelled timer', () => {
+      const timer = registry.create('agent-1', { label: 'double-cancel', message: 'X', delaySeconds: 300 })!;
+      registry.cancel(timer.id, 'agent-1');
+      // Second cancel should fail (not in pending map)
+      const ok = registry.cancel(timer.id, 'agent-1');
+      expect(ok).toBe(false);
+    });
+  });
 });
