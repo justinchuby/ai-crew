@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTimelineSSE } from './useTimelineSSE';
 import type { ConnectionHealth } from './useTimelineSSE';
 
@@ -119,10 +119,16 @@ function useTimelinePolling(leadId: string | null, enabled: boolean) {
 export function useTimelineData(leadId: string | null) {
   const sse = useTimelineSSE(leadId);
   const polling = useTimelinePolling(leadId, sse.sseUnavailable);
+  const lastKnownGoodRef = useRef<TimelineData | null>(null);
 
-  const data = sse.sseUnavailable ? polling.data : sse.data;
+  const liveData = sse.sseUnavailable ? polling.data : sse.data;
+
+  // Preserve last known good data during SSE→polling transitions to avoid data=null flash
+  if (liveData) lastKnownGoodRef.current = liveData;
+  const data = liveData ?? lastKnownGoodRef.current;
+
   const loading = sse.sseUnavailable ? polling.loading : sse.loading;
-  const error = sse.sseUnavailable ? polling.error : sse.error;
+  const error = sse.sseUnavailable ? (polling.error ?? sse.error) : sse.error;
 
   const connectionHealth: ConnectionHealth = sse.sseUnavailable
     ? (polling.error ? 'degraded' : polling.data ? 'connected' : 'connecting')

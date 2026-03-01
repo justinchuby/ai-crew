@@ -42,6 +42,7 @@ export function useWebSocket() {
       // Dispatch raw message for terminal components
       window.dispatchEvent(new MessageEvent('ws-message', { data: event.data }));
 
+      try {
       const msg: WsMessage = JSON.parse(event.data);
       switch (msg.type) {
         case 'init':
@@ -223,6 +224,9 @@ export function useWebSocket() {
         case 'system:paused':
           useAppStore.getState().setSystemPaused(msg.paused);
           break;
+      }
+      } catch (err) {
+        console.error('[useWebSocket] Failed to parse message:', err);
       }
     };
   }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
