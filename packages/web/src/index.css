@@ -21,7 +21,7 @@
   --st-creating: #b45309;
   --st-running: #2563eb;
   --st-idle: #6b7280;
-  --st-completed: #2563eb;
+  --st-completed: #059669;
   --st-failed: #dc2626;
   --st-terminated: #ea580c;
   --st-pending: #6b7280;
@@ -35,7 +35,7 @@
   --st-creating-fill: rgba(180, 83, 9, 0.25);
   --st-running-fill: rgba(37, 99, 235, 0.25);
   --st-idle-fill: rgba(107, 114, 128, 0.15);
-  --st-completed-fill: rgba(37, 99, 235, 0.25);
+  --st-completed-fill: rgba(5, 150, 105, 0.25);
   --st-failed-fill: rgba(220, 38, 38, 0.25);
   --st-terminated-fill: rgba(234, 88, 12, 0.25);
 
@@ -89,7 +89,7 @@
   --st-creating: #d29922;
   --st-running: #58a6ff;
   --st-idle: #484f58;
-  --st-completed: #58a6ff;
+  --st-completed: #3fb950;
   --st-failed: #f85149;
   --st-terminated: #f0883e;
   --st-pending: #6b7280;
@@ -103,7 +103,7 @@
   --st-creating-fill: rgba(210, 153, 34, 0.3);
   --st-running-fill: rgba(88, 166, 255, 0.3);
   --st-idle-fill: rgba(72, 79, 88, 0.2);
-  --st-completed-fill: rgba(88, 166, 255, 0.3);
+  --st-completed-fill: rgba(63, 185, 80, 0.3);
   --st-failed-fill: rgba(248, 81, 73, 0.3);
   --st-terminated-fill: rgba(240, 136, 62, 0.3);
 

@@ -4,19 +4,19 @@ import type { TimelineAgent } from './useTimelineData';
 
 /** Status → Tailwind color map matching the existing app palette */
 const STATUS_STYLES: Record<string, { bg: string; border: string; fill: string }> = {
-  running:    { bg: 'bg-emerald-500/30', border: 'border-emerald-500', fill: 'rgb(16 185 129 / 0.35)' },
+  running:    { bg: 'bg-blue-500/30',    border: 'border-blue-500',    fill: 'rgb(59 130 246 / 0.35)' },
   idle:       { bg: 'bg-gray-300/30',    border: 'border-gray-400',    fill: 'rgb(156 163 175 / 0.25)' },
   creating:   { bg: 'bg-amber-400/30',   border: 'border-amber-500',   fill: 'rgb(251 191 36 / 0.35)' },
-  completed:  { bg: 'bg-blue-500/30',    border: 'border-blue-500',    fill: 'rgb(59 130 246 / 0.35)' },
+  completed:  { bg: 'bg-green-500/30',   border: 'border-green-500',   fill: 'rgb(5 150 105 / 0.35)' },
   failed:     { bg: 'bg-red-500/30',     border: 'border-red-500',     fill: 'rgb(239 68 68 / 0.35)' },
   terminated: { bg: 'bg-orange-500/30',  border: 'border-orange-500',  fill: 'rgb(249 115 22 / 0.35)' },
 };
 
 const STATUS_STROKE: Record<string, string> = {
-  running:    'rgb(16 185 129)',
+  running:    'rgb(59 130 246)',
   idle:       'rgb(156 163 175)',
   creating:   'rgb(251 191 36)',
-  completed:  'rgb(59 130 246)',
+  completed:  'rgb(5 150 105)',
   failed:     'rgb(239 68 68)',
   terminated: 'rgb(249 115 22)',
 };
