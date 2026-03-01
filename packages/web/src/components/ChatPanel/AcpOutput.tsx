@@ -3,7 +3,6 @@ import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
-import { classifyHighlight } from '../../utils/isUserDirectedMessage';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { InlineMarkdownWithMentions } from '../../utils/markdown';
 import { PromptNav, hasUserMention } from '../PromptNav';
@@ -188,7 +187,8 @@ export function AcpOutput({ agentId }: Props) {
   }, [agentId, messages]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+    <div className="flex-1 relative min-h-0">
+    <div ref={containerRef} className="absolute inset-0 overflow-y-auto p-3 space-y-3">
       {/* Plan Section */}
       {plan.length > 0 && (
         <div className="border border-th-border rounded-lg bg-surface-raised">
@@ -264,7 +264,7 @@ export function AcpOutput({ agentId }: Props) {
             // User messages — right-aligned blue bubble
             if (sender === 'user') {
               return (
-                <div key={`msg-${item.index}`} className="flex justify-end items-start gap-2 py-1">
+                <div key={`msg-${item.index}`} data-user-prompt={item.index} className="flex justify-end items-start gap-2 py-1">
                   <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                   <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
                     {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
@@ -305,8 +305,9 @@ export function AcpOutput({ agentId }: Props) {
 
             // Rich content (image, audio, resource)
             if (msg.contentType && msg.contentType !== 'text') {
+              const mentionAttr = hasUserMention(typeof msg.text === 'string' ? msg.text : '') ? { 'data-user-prompt': item.index } : {};
               return (
-                <div key={`msg-${item.index}`} className="py-1">
+                <div key={`msg-${item.index}`} className="py-1" {...mentionAttr}>
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       {msg.contentType === 'image' && msg.data && (
@@ -342,8 +343,9 @@ export function AcpOutput({ agentId }: Props) {
 
             // Agent messages — flowing text, no bubble
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
+            const agentMentionAttr = hasUserMention(text) ? { 'data-user-prompt': item.index } : {};
             return (
-              <div key={`msg-${item.index}`} className="py-1">
+              <div key={`msg-${item.index}`} className="py-1" {...agentMentionAttr}>
                 <div className="flex items-start gap-2">
                   <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
                     <AgentTextBlockSimple text={text} />
@@ -392,6 +394,8 @@ export function AcpOutput({ agentId }: Props) {
           ))}
         </div>
       )}
+    </div>
+    <PromptNav containerRef={containerRef} messages={messages} useOriginalIndices />
     </div>
   );
 }
