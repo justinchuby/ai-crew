@@ -1303,14 +1303,15 @@ export function apiRouter(
     res.json(sessions);
   });
 
-  // Resume a specific session by its row ID
+  // Resume a specific session by its row ID or Copilot session ID
   router.post('/sessions/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
 
-    const sessionRowId = Number(req.params.id);
-    if (isNaN(sessionRowId)) return res.status(400).json({ error: 'Invalid session ID' });
-
-    const session = projectRegistry.getSessionById(sessionRowId);
+    const idParam = req.params.id as string;
+    const sessionRowId = Number(idParam);
+    const session = isNaN(sessionRowId)
+      ? projectRegistry.getSessionByCopilotId(idParam)
+      : projectRegistry.getSessionById(sessionRowId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (!session.sessionId) return res.status(400).json({ error: 'Session has no Copilot session ID — cannot resume' });
     if (session.status === 'active') return res.status(409).json({ error: 'Session is still active' });
@@ -1335,16 +1336,16 @@ export function apiRouter(
 
       projectRegistry.startSession(project.id, agent.id, task);
 
-      // Send briefing from previous sessions
+      // Send briefing once the agent's session is connected
       const briefing = projectRegistry.buildBriefing(project.id);
       if (briefing && briefing.sessions.length > 1) {
         const briefingText = projectRegistry.formatBriefing(briefing);
-        setTimeout(() => {
+        agent.onSessionReady(() => {
           agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nYou are resuming a previous session. Continue from where you left off.`);
-        }, 3000);
+        });
       }
 
-      logger.info('session', `Resumed session ${sessionRowId} for project "${project.name}" (${agent.id.slice(0, 8)})`);
+      logger.info('session', `Resumed session ${idParam} for project "${project.name}" (${agent.id.slice(0, 8)})`);
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error('session', `Failed to resume session: ${err.message}`);

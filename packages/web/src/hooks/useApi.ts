@@ -64,15 +64,9 @@ export function useApi() {
   }, []);
 
   const resumeAgent = useCallback(async (id: string, sessionId: string) => {
-    const agent = useAppStore.getState().agents.find((a) => a.id === id);
-    return apiFetch('/agents', {
+    return apiFetch(`/sessions/${encodeURIComponent(sessionId)}/resume`, {
       method: 'POST',
-      body: JSON.stringify({
-        roleId: agent?.role.id ?? 'lead',
-        task: agent?.task,
-        model: agent?.model,
-        sessionId,
-      }),
+      body: JSON.stringify({}),
     });
   }, []);
 

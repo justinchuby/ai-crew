@@ -114,6 +114,23 @@ describe('Session Resume', () => {
     });
   });
 
+  describe('getSessionByCopilotId', () => {
+    it('returns a session by its Copilot session ID', () => {
+      const project = registry.create('Copilot Lookup');
+      registry.startSession(project.id, 'lead-c', 'Copilot session');
+      registry.setSessionId('lead-c', 'copilot-abc-123');
+
+      const found = registry.getSessionByCopilotId('copilot-abc-123');
+      expect(found).toBeDefined();
+      expect(found!.leadId).toBe('lead-c');
+      expect(found!.task).toBe('Copilot session');
+    });
+
+    it('returns undefined for non-existent Copilot session ID', () => {
+      expect(registry.getSessionByCopilotId('nonexistent')).toBeUndefined();
+    });
+  });
+
   describe('resume flow integration', () => {
     it('full lifecycle: create → start → set sessionId → end → find resumable → get by ID', () => {
       // Create project and start a session

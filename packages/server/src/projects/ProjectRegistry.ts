@@ -258,6 +258,15 @@ export class ProjectRegistry {
       .get() as ProjectSession | undefined;
   }
 
+  /** Get a single session by its Copilot session ID */
+  getSessionByCopilotId(copilotSessionId: string): ProjectSession | undefined {
+    return this.db.drizzle
+      .select()
+      .from(projectSessions)
+      .where(eq(projectSessions.sessionId, copilotSessionId))
+      .get() as ProjectSession | undefined;
+  }
+
   /** Delete a project and all associated sessions */
   delete(id: string): boolean {
     const project = this.get(id);
