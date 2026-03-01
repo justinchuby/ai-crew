@@ -211,64 +211,66 @@ export class ChatGroupRegistry extends EventEmitter {
   // ── Reactions ──────────────────────────────────────────────────────
 
   addReaction(messageId: string, agentId: string, emoji: string): boolean {
-    const row = this.db.drizzle
-      .select()
-      .from(chatGroupMessages)
-      .where(eq(chatGroupMessages.id, messageId))
-      .get();
-    if (!row) return false;
+    let emitPayload: { messageId: string; groupName: string; leadId: string; agentId: string; emoji: string; action: 'add' } | null = null;
 
-    const reactions: Record<string, string[]> = JSON.parse(row.reactions || '{}');
-    if (!reactions[emoji]) reactions[emoji] = [];
-    if (reactions[emoji].includes(agentId)) return false; // already reacted
+    this.db.drizzle.transaction((tx) => {
+      const row = tx
+        .select()
+        .from(chatGroupMessages)
+        .where(eq(chatGroupMessages.id, messageId))
+        .get();
+      if (!row) return;
 
-    reactions[emoji].push(agentId);
-    this.db.drizzle
-      .update(chatGroupMessages)
-      .set({ reactions: JSON.stringify(reactions) })
-      .where(eq(chatGroupMessages.id, messageId))
-      .run();
+      const reactions: Record<string, string[]> = JSON.parse(row.reactions || '{}');
+      if (!reactions[emoji]) reactions[emoji] = [];
+      if (reactions[emoji].includes(agentId)) return; // already reacted
 
-    this.emit('group:reaction', {
-      messageId,
-      groupName: row.groupName,
-      leadId: row.leadId,
-      agentId,
-      emoji,
-      action: 'add' as const,
+      reactions[emoji].push(agentId);
+      tx.update(chatGroupMessages)
+        .set({ reactions: JSON.stringify(reactions) })
+        .where(eq(chatGroupMessages.id, messageId))
+        .run();
+
+      emitPayload = { messageId, groupName: row.groupName, leadId: row.leadId, agentId, emoji, action: 'add' as const };
     });
-    return true;
+
+    if (emitPayload) {
+      this.emit('group:reaction', emitPayload);
+      return true;
+    }
+    return false;
   }
 
   removeReaction(messageId: string, agentId: string, emoji: string): boolean {
-    const row = this.db.drizzle
-      .select()
-      .from(chatGroupMessages)
-      .where(eq(chatGroupMessages.id, messageId))
-      .get();
-    if (!row) return false;
+    let emitPayload: { messageId: string; groupName: string; leadId: string; agentId: string; emoji: string; action: 'remove' } | null = null;
 
-    const reactions: Record<string, string[]> = JSON.parse(row.reactions || '{}');
-    if (!reactions[emoji] || !reactions[emoji].includes(agentId)) return false;
+    this.db.drizzle.transaction((tx) => {
+      const row = tx
+        .select()
+        .from(chatGroupMessages)
+        .where(eq(chatGroupMessages.id, messageId))
+        .get();
+      if (!row) return;
 
-    reactions[emoji] = reactions[emoji].filter((id) => id !== agentId);
-    if (reactions[emoji].length === 0) delete reactions[emoji];
+      const reactions: Record<string, string[]> = JSON.parse(row.reactions || '{}');
+      if (!reactions[emoji] || !reactions[emoji].includes(agentId)) return;
 
-    this.db.drizzle
-      .update(chatGroupMessages)
-      .set({ reactions: JSON.stringify(reactions) })
-      .where(eq(chatGroupMessages.id, messageId))
-      .run();
+      reactions[emoji] = reactions[emoji].filter((id) => id !== agentId);
+      if (reactions[emoji].length === 0) delete reactions[emoji];
 
-    this.emit('group:reaction', {
-      messageId,
-      groupName: row.groupName,
-      leadId: row.leadId,
-      agentId,
-      emoji,
-      action: 'remove' as const,
+      tx.update(chatGroupMessages)
+        .set({ reactions: JSON.stringify(reactions) })
+        .where(eq(chatGroupMessages.id, messageId))
+        .run();
+
+      emitPayload = { messageId, groupName: row.groupName, leadId: row.leadId, agentId, emoji, action: 'remove' as const };
     });
-    return true;
+
+    if (emitPayload) {
+      this.emit('group:reaction', emitPayload);
+      return true;
+    }
+    return false;
   }
 
   isMember(groupName: string, leadId: string, agentId: string): boolean {
