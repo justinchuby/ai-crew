@@ -6,6 +6,7 @@ import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { getAuthSecret } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 import { v4 as uuid } from 'uuid';
 
 interface ClientConnection {
@@ -273,7 +274,10 @@ export class WebSocketServer {
         if (msg.agentId) {
           const agent = agentManager.get(msg.agentId);
           if (agent) {
+            logger.info('ws', `Input → ${agent.role.name} (${msg.agentId.slice(0, 8)}): "${(msg.text || '').slice(0, 80)}"`);
             agent.write(msg.text);
+          } else {
+            logger.warn('ws', `Input for unknown agent ${msg.agentId.slice(0, 8)}`);
           }
         }
         break;
