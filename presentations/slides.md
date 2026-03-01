@@ -304,10 +304,10 @@ control, but you don't need to micromanage.
 
 # The delegation loop
 
-<div class="grid grid-cols-2 gap-3 mt-2">
+<div class="grid grid-cols-2 gap-3 mt-2 text-sm">
 <div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500">
 
 ### Creating agents
 
@@ -319,49 +319,35 @@ control, but you don't need to micromanage.
 } ⟧
 ```
 
-The lead picks the **role** (developer, reviewer, architect...) and the **model** (Claude, GPT, Gemini) for each agent based on the task.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500 mt-2">
-
-### Delegating work
-
-```
-⟦ DELEGATE {
-  "to": "3194c4df",
-  "task": "Now harden the commit system"
-} ⟧
-```
-
-Reuse existing agents for new tasks. The lead manages the queue.
+The lead picks the **role** and **model** for each agent.
 
 </div>
 
 </div>
 <div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 h-full">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
-### The coordination cycle
+### Delegating work
 
-1. **You** describe what you want
-2. **Lead** analyzes and plans the approach
-3. **Lead** creates/delegates to specialist agents
-4. **Agents** work in parallel, report results
-5. **Lead** reviews, coordinates next steps
-6. **Lead** assigns reviewers for quality
-7. **Results** flow back to you
+```
+⟦ DELEGATE {
+  "to": "3194c4df",
+  "task": "Harden the commit system"
+} ⟧
+```
 
-<div class="bg-gray-900 rounded p-2 mt-2 text-xs">
-
-The lead can manage **multiple workstreams simultaneously** — coding, reviewing, testing, docs — all running in parallel.
+Reuse existing agents for new tasks.
 
 </div>
 
 </div>
-
 </div>
+
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700 mt-2 text-sm">
+
+**The cycle:** You describe what you want → Lead plans → Lead creates/delegates → Agents work in parallel → Lead reviews → Lead assigns reviewers → Results flow back to you
+
 </div>
 
 <!--
@@ -653,39 +639,29 @@ routing messages, assigning tasks, and resolving conflicts in real-time.
 
 # Organizational structure
 
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-2">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500 mt-1 text-sm">
 
-**Parent-child hierarchy** — the lead creates agents, agents report to the lead. No agent can control a sibling — only the lead has authority.
+**Parent-child hierarchy** — the lead creates agents, agents report to the lead. No agent can control a sibling.
 
 </div>
-
-<div class="bg-gray-900 rounded-lg p-3 mt-3">
 
 ```mermaid
 graph TD
-    Lead["🎯 Lead Agent"]
-    Lead --> Dev1["👷 Developer A<br/>Feature work"]
-    Lead --> Dev2["👷 Developer B<br/>Bug fixes"]
-    Lead --> Arch["🏗️ Architect<br/>System design"]
-    Lead --> Rev["🔍 Code Reviewer"]
-    Lead --> Sec["📝 Secretary<br/>Progress tracking"]
-    Dev1 -.->|"AGENT_MESSAGE"| Arch
-    Dev2 -.->|"AGENT_MESSAGE"| Rev
-    Arch -.->|"GROUP_MESSAGE"| Dev1
-    Arch -.->|"GROUP_MESSAGE"| Dev2
+    Lead["🎯 Lead"] --> Dev1["👷 Dev A"] & Dev2["👷 Dev B"] & Arch["🏗️ Architect"] & Rev["🔍 Reviewer"] & Sec["📝 Secretary"]
+    Dev1 -.->|"DM"| Arch
+    Dev2 -.->|"DM"| Rev
+    Arch -.->|"Group"| Dev1 & Dev2
 ```
 
-</div>
-
-<div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+<div class="grid grid-cols-2 gap-2 mt-1 text-sm">
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
-**Lead → Agents**: CREATE_AGENT, DELEGATE, INTERRUPT, TERMINATE — full lifecycle control
+**Lead → Agents**: CREATE, DELEGATE, INTERRUPT, TERMINATE
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
 
-**Agents ↔ Agents**: AGENT_MESSAGE, GROUP_MESSAGE — peer communication is async, never interrupts
+**Agents ↔ Agents**: AGENT_MESSAGE, GROUP_MESSAGE (async)
 
 </div>
 </div>
@@ -767,64 +743,50 @@ Here's how.
 
 # How agents communicate
 
-<div class="grid grid-cols-3 gap-3 mt-2 text-sm">
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+<div class="grid grid-cols-3 gap-2 mt-2 text-sm">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500">
 
 ### 💬 Direct Messages
 
-<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
-⟦ AGENT_MESSAGE {"to": "437a822b",<br/>
-&nbsp; "content": "Spec is ready"} ⟧
+<div class="bg-gray-900 rounded p-1 mt-1 text-xs font-mono">
+⟦ AGENT_MESSAGE {"to": "437a",<br/>
+&nbsp; "content": "Spec ready"} ⟧
 </div>
-
-<div class="text-sm text-gray-400 mt-2">
 
 - Point-to-point, async
-- Resolves by ID prefix or role
-- Developer asks architect for clarification
+- Resolve by ID or role
 
 </div>
-</div>
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### 👥 Group Chat
 
-<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
+<div class="bg-gray-900 rounded p-1 mt-1 text-xs font-mono">
 ⟦ CREATE_GROUP {<br/>
-&nbsp; "name": "presentation-team",<br/>
-&nbsp; "members": ["dev", "arch",<br/>
-&nbsp;&nbsp; "writer", "thinker"]} ⟧
+&nbsp; "name": "pres-team",<br/>
+&nbsp; "members": ["dev","arch"]} ⟧
 </div>
-
-<div class="text-sm text-gray-400 mt-2">
 
 - Persistent, SQLite-backed
-- Any member can post, all members see it
-- **This deck**: 5 agents debating slides in real-time
+- **This deck**: 5 agents collaborating
 
 </div>
-</div>
-<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
 
 ### 📢 Broadcast + Interrupt
 
-<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
+<div class="bg-gray-900 rounded p-1 mt-1 text-xs font-mono">
 ⟦ BROADCAST {"content":<br/>
-&nbsp; "Never use git add -A"} ⟧<br/>
-⟦ INTERRUPT {"to": "bf1e",<br/>
-&nbsp; "content": "Stop, new task"} ⟧
+&nbsp; "Never use git add -A"} ⟧
 </div>
 
-<div class="text-sm text-gray-400 mt-2">
-
-- Broadcast: one-to-all announcements
-- Interrupt: stop agent mid-task, redirect
+- Broadcast: one-to-all
+- Interrupt: redirect mid-task
 
 </div>
 </div>
-</div>
 
-<p class="text-sm text-gray-500 mt-2">Agents self-organize: they create groups, query peers, message directly, and escalate through broadcast when needed.</p>
+<p class="text-sm text-gray-500 mt-1">Agents self-organize: create groups, query peers, message directly, escalate via broadcast.</p>
 
 <!--
 Three communication channels plus interrupt. Direct messages are
@@ -935,7 +897,7 @@ zero operational overhead.
 
 # Task DAG: Plan, track, auto-schedule
 
-<div class="grid grid-cols-2 gap-4 mt-2">
+<div class="grid grid-cols-2 gap-3 mt-2">
 <div>
 
 **Explicit planning** with DECLARE_TASKS:
@@ -945,46 +907,35 @@ zero operational overhead.
   "tasks": [
     {"id": "api",  "depends_on": []},
     {"id": "ui",   "depends_on": ["api"]},
-    {"id": "test", "depends_on": ["api","ui"]},
-    {"id": "review", "depends_on": ["api"]}
+    {"id": "test", "depends_on": ["api","ui"]}
   ]
 } ⟧
 ```
 
-When `api` completes → `ui` AND `review` auto-start
-When `api` + `ui` complete → `test` auto-starts
+`api` completes → `ui` auto-starts
+`api` + `ui` complete → `test` auto-starts
 
 </div>
 <div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700 text-sm">
 
-**Task states:**
-
-<div class="text-sm space-y-1 mt-1">
-<div>⬜ <code>pending</code> — waiting for dependencies</div>
-<div>🟦 <code>ready</code> — all deps done, waiting for agent</div>
-<div>🟢 <code>in_progress</code> — agent working on it</div>
-<div>✅ <code>done</code> — completed</div>
-<div>🔴 <code>blocked</code> / <code>failed</code></div>
-</div>
+**Task states:** ⬜ pending → 🟦 ready → 🟢 in_progress → ✅ done (or 🔴 blocked/failed)
 
 </div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500 mt-2">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500 mt-2 text-sm">
 
 **Runtime adjustments:**
 
 ```
 ⟦ ADD_DEPENDENCY {
   "task": "deploy",
-  "depends_on": "security-review"
-} ⟧
+  "depends_on": "security-review"} ⟧
 
 ⟦ COMPLETE_TASK {
   "taskId": "api",
-  "summary": "Built 5 endpoints"
-} ⟧
+  "summary": "Built 5 endpoints"} ⟧
 ```
 
 </div>
