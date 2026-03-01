@@ -1282,15 +1282,15 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Agent Reports — separate from lead output */}
             {agentReports.length > 0 && (
-              <div className="border-b border-indigo-700/40 bg-indigo-950/20">
+              <div className="border-b border-th-border bg-amber-500/5 dark:bg-amber-500/10">
                 <button
-                  className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-indigo-400 hover:bg-indigo-900/20 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
                   onClick={() => setReportsExpanded(!reportsExpanded)}
                 >
                   {reportsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   <MessageSquare className="w-3 h-3" />
                   <span className="font-mono font-medium">Agent Reports</span>
-                  <span className="bg-indigo-500/20 px-1.5 rounded text-[10px]">{agentReports.length}</span>
+                  <span className="bg-amber-500/20 px-1.5 rounded text-[10px]">{agentReports.length}</span>
                 </button>
                 {reportsExpanded && (
                   <div className="max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
@@ -1299,12 +1299,12 @@ export function LeadDashboard({ api, ws }: Props) {
                       return (
                         <div
                           key={r.id}
-                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-blue-500/[0.06] border border-blue-400/20 border-l-2 border-l-blue-400/30 cursor-pointer hover:bg-blue-500/[0.10] transition-colors"
+                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-amber-500/[0.06] border border-amber-400/20 border-l-2 border-l-amber-500/30 cursor-pointer hover:bg-amber-500/[0.10] transition-colors"
                           onClick={() => setExpandedReport(r)}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-xs font-mono font-semibold text-indigo-400">{r.fromRole}</span>
+                              <span className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">{r.fromRole}</span>
                               <span className="text-[10px] text-th-text-muted ml-auto">{time}</span>
                             </div>
                             <AgentReportBlock content={r.content} compact />
@@ -1377,9 +1377,9 @@ export function LeadDashboard({ api, ws }: Props) {
 
                 if (msg.sender === 'external') {
                   return (
-                    <div key={i} className="flex items-start gap-2 py-1 bg-blue-500/[0.06] rounded-md border-l-2 border-blue-400/30 pl-2">
-                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-indigo-900/40 border border-indigo-700/50 font-mono text-sm whitespace-pre-wrap text-th-text-alt">
-                        <div className="flex items-center gap-1.5 mb-1 text-indigo-400 text-xs font-medium">
+                    <div key={i} className="flex items-start gap-2 py-1 bg-amber-500/[0.06] rounded-md border-l-2 border-amber-500/30 pl-2">
+                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-amber-500/10 dark:bg-amber-900/30 border border-amber-400/20 dark:border-amber-600/30 font-mono text-sm whitespace-pre-wrap text-th-text-alt">
+                        <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400 text-xs font-medium">
                           <MessageSquare className="w-3 h-3" />
                           {msg.fromRole || 'Agent'}
                         </div>
@@ -1477,7 +1477,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       {catchUpSummary.tasksCompleted > 0 && <span className="text-emerald-400">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
                       {catchUpSummary.pendingDecisions > 0 && <span className="text-amber-400">⚠ {catchUpSummary.pendingDecisions} decision{catchUpSummary.pendingDecisions !== 1 ? 's' : ''} pending</span>}
                       {catchUpSummary.newMessages > 0 && <span className="text-blue-400">{catchUpSummary.newMessages} new message{catchUpSummary.newMessages !== 1 ? 's' : ''}</span>}
-                      {catchUpSummary.newReports > 0 && <span className="text-indigo-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
+                      {catchUpSummary.newReports > 0 && <span className="text-amber-600 dark:text-amber-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
                     </div>
                     <div className="flex gap-2 mt-2.5">
                       <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-th-bg-alt border border-th-border text-th-text-alt hover:bg-th-bg-muted transition-colors">Dismiss</button>
@@ -1866,8 +1866,8 @@ export function LeadDashboard({ api, ws }: Props) {
           <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-indigo-400" />
-                <span className="text-sm font-semibold text-indigo-400">{expandedReport.fromRole}</span>
+                <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{expandedReport.fromRole}</span>
                 <span className="text-xs text-th-text-muted">→ Project Lead</span>
               </div>
               <div className="flex items-center gap-3">
@@ -1947,8 +1947,8 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
   if (parsed.isAck) {
     return (
       <div className="text-xs font-mono flex items-center gap-1.5">
-        <Check className="w-3 h-3 text-blue-400 shrink-0" />
-        <span className="text-blue-600 dark:text-blue-300">{parsed.header}</span>
+        <Check className="w-3 h-3 text-amber-500 shrink-0" />
+        <span className="text-amber-600 dark:text-amber-400">{parsed.header}</span>
         {parsed.task && <span className="text-th-text-muted"> — {compact && parsed.task.length > 60 ? parsed.task.slice(0, 60) + '…' : parsed.task}</span>}
       </div>
     );
