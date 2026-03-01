@@ -721,7 +721,7 @@ CREW_UPDATE ]]]`;
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
-      outputPreview: this.getRecentOutput(500),
+      outputPreview: this.getRecentOutput(4000),
       plan: this.plan,
       toolCalls: this.toolCalls.slice(-50),
       sessionId: this.sessionId,
