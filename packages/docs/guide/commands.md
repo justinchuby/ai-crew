@@ -1,6 +1,6 @@
 # Agent Commands
 
-Agents communicate via structured commands embedded in their output. Commands use triple-bracket syntax with JSON payloads, detected by the `CommandDispatcher`.
+Agents communicate via structured commands embedded in their output. Commands use `⟦ ⟧` bracket syntax with JSON payloads, detected by the `CommandDispatcher`.
 
 ## Command Format
 
@@ -221,6 +221,22 @@ Send a message to all members of a chat group:
 ```
 ⟦ GROUP_MESSAGE {"group": "backend-team", "content": "API design is finalized"} ⟧
 ```
+
+### REACT
+
+Add or remove an emoji reaction on a group chat message:
+
+```
+⟦ REACT {"group": "backend-team", "messageId": "msg-id", "emoji": "👍"} ⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `group` | ✅ | Group name |
+| `messageId` | ✅ | Target message ID |
+| `emoji` | ✅ | Single emoji character |
+
+Toggle behavior: if the agent already reacted with that emoji, it is removed.
 
 ### ADD_TO_GROUP / REMOVE_FROM_GROUP
 

@@ -141,13 +141,13 @@ export class ChatGroupRegistry extends EventEmitter {
 
 #### AgentManager Integration
 
-New regex patterns in `AgentManager.ts`:
+Command regex patterns in the handler modules use `⟦ ⟧` delimiters:
 ```typescript
-const CREATE_GROUP_REGEX = /<!--\s*CREATE_GROUP\s*(\{.*?\})\s*-->/s;
-const ADD_TO_GROUP_REGEX = /<!--\s*ADD_TO_GROUP\s*(\{.*?\})\s*-->/s;
-const REMOVE_FROM_GROUP_REGEX = /<!--\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*-->/s;
-const GROUP_MESSAGE_REGEX = /<!--\s*GROUP_MESSAGE\s*(\{.*?\})\s*-->/s;
-const LIST_GROUPS_REGEX = /<!--\s*LIST_GROUPS\s*-->/s;
+const CREATE_GROUP_REGEX = /⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧/s;
+const ADD_TO_GROUP_REGEX = /⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧/s;
+const REMOVE_FROM_GROUP_REGEX = /⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧/s;
+const GROUP_MESSAGE_REGEX = /⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧/s;
+const LIST_GROUPS_REGEX = /⟦\s*LIST_GROUPS\s*⟧/s;
 ```
 
 New handlers:
@@ -164,16 +164,16 @@ In `buildContextManifest()`, if the agent belongs to groups, show them:
 == YOUR GROUPS ==
 - "config-team" (3 members: Developer, Architect, Code Reviewer)
 - "testing" (2 members: Developer, Critical Reviewer)
-Send messages: <!-- GROUP_MESSAGE {"group": "config-team", "content": "..."} -->
+Send messages: ⟦ GROUP_MESSAGE {"group": "config-team", "content": "..."} ⟧
 ```
 
 In the lead's prompt, add to AVAILABLE COMMANDS:
 ```
 Create a chat group for agents working on related tasks:
-`<!-- CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} -->`
+`⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧`
 
 Send a message to a group:
-`<!-- GROUP_MESSAGE {"group": "config-team", "content": "Use factory pattern for services"} -->`
+`⟦ GROUP_MESSAGE {"group": "config-team", "content": "Use factory pattern for services"} ⟧`
 ```
 
 ### WebSocket Events (UI)
@@ -182,6 +182,7 @@ Send a message to a group:
 |-------|---------|-------------|
 | `group:created` | `{ group, leadId }` | New group created |
 | `group:message` | `{ message, groupName, leadId }` | Message sent in a group |
+| `group:reaction` | `{ leadId, groupName, messageId, emoji, agentId, action }` | Reaction added/removed |
 | `group:member_added` | `{ group, agentId, leadId }` | Member added to group |
 | `group:member_removed` | `{ group, agentId, leadId }` | Member removed from group |
 | `group:archived` | `{ group, leadId }` | Group archived (all members terminated) |
@@ -282,6 +283,53 @@ Developer abc12345 responds:
 Architect def67890 (in their context):
 [Group "config-team" — Developer (abc12345)]: Understood. I'll wait for Architect to finish the RoPEConfig extraction before I touch _configs.py.
 ```
+
+## Emoji Reactions
+
+Group chat messages support emoji reactions. Agents and users can react to messages to signal agreement, acknowledgment, or sentiment.
+
+### REACT Command
+
+```
+⟦ REACT {"group": "config-team", "messageId": "msg-123", "emoji": "👍"} ⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `group` | ✅ | Group name |
+| `messageId` | ✅ | Target message ID |
+| `emoji` | ✅ | Single emoji character |
+
+**Toggle behavior:** Reacting with the same emoji a second time removes it.
+
+### REST API
+
+```
+POST   /api/lead/:id/groups/:name/messages/:messageId/reactions   { emoji }
+DELETE /api/lead/:id/groups/:name/messages/:messageId/reactions/:emoji
+```
+
+### WebSocket Event
+
+When a reaction changes, a `group:reaction` event is broadcast:
+
+```json
+{
+  "type": "group:reaction",
+  "leadId": "lead-123",
+  "groupName": "config-team",
+  "messageId": "msg-123",
+  "emoji": "👍",
+  "agentId": "abc12345",
+  "action": "add"
+}
+```
+
+The `action` field is `"add"` or `"remove"`.
+
+### UI
+
+Reactions appear as badges below each message. Clicking a reaction badge toggles it (adds if not reacted, removes if already reacted). A `+` button opens a picker with common emoji: 👍 👎 🎉 ❤️ 🤔 👀.
 
 ## Auto-Creation for Parallel Work
 

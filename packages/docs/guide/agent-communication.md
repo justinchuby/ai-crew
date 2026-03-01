@@ -2,7 +2,7 @@
 
 ## Overview
 
-AI Crew supports two communication modes with Copilot CLI: the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging, and **PTY** as a fallback for raw terminal interaction. ACP is the default and recommended mode.
+AI Crew uses the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging with Copilot CLI agents.
 
 ## ACP Mode (Default)
 
@@ -57,48 +57,7 @@ When an ACP agent wants to execute a tool (file write, terminal command, etc.), 
 
 ### Sending User Input
 
-In ACP mode, each user message is sent as a `session/prompt` call. This starts a new prompt turn — the agent processes the message, potentially makes tool calls, and returns a `stopReason` when complete. This is fundamentally different from PTY mode where input is raw keystrokes.
-
-## PTY Mode (Fallback)
-
-Spawns Copilot CLI in a pseudo-terminal via `node-pty`. Raw terminal I/O — the system writes to stdin and reads from stdout. Used when:
-
-- ACP is not supported by the CLI version
-- User explicitly sets `AGENT_MODE=pty`
-- Terminal-faithful rendering is needed
-
-### Structured Commands in PTY Mode
-
-Since PTY mode has no structured protocol, agents communicate intent via HTML comment patterns detected by regex in `AgentManager`:
-
-```
-<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "..."} -->
-<!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
-<!-- TERMINATE_AGENT {"id": "agent-id", "reason": "..."} -->
-<!-- LOCK_REQUEST {"filePath": "src/auth.ts", "reason": "editing auth logic"} -->
-<!-- LOCK_RELEASE {"filePath": "src/auth.ts"} -->
-<!-- ACTIVITY {"actionType": "decision_made", "summary": "chose JWT over sessions"} -->
-<!-- AGENT_MESSAGE {"to": "agent-id", "content": "please review my changes"} -->
-<!-- BROADCAST {"content": "use factory pattern for all services"} -->
-<!-- DECISION {"title": "Use JWT", "rationale": "stateless, scalable"} -->
-<!-- PROGRESS {"summary": "2/4 done", "completed": [...], "in_progress": [...], "blocked": [...]} -->
-<!-- QUERY_CREW -->
-<!-- CREATE_GROUP {"name": "team-name", "members": ["id1"], "roles": ["developer"]} -->
-<!-- GROUP_MESSAGE {"group": "team-name", "content": "..."} -->
-<!-- QUERY_GROUPS -->
-<!-- COMMIT {"message": "..."} -->
-<!-- DEFER_ISSUE {"description": "...", "severity": "P2", "sourceFile": "..."} -->
-<!-- QUERY_DEFERRED {"status": "open"} -->
-<!-- RESOLVE_DEFERRED {"id": 42} -->
-```
-
-**Lead and Architect commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `TERMINATE_AGENT` (terminate agent and free slot), `DECISION`, `PROGRESS`.
-
-> **Sub-lead delegation:** Architects can use `CREATE_AGENT` and `DELEGATE` in addition to leads. This enables architects to spin up helper agents for sub-tasks without routing everything through the lead.
-
-**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`, `GROUP_MESSAGE`, `QUERY_GROUPS`, `COMMIT`, `COMPLETE_TASK`, `DEFER_ISSUE`, `QUERY_DEFERRED`, `RESOLVE_DEFERRED`.
-
-These are parsed from agent output and routed to the appropriate subsystem (FileLockRegistry, ActivityLedger, AgentManager).
+In ACP mode, each user message is sent as a `session/prompt` call. This starts a new prompt turn — the agent processes the message, potentially makes tool calls, and returns a `stopReason` when complete.
 
 ## @Mentions
 
@@ -204,7 +163,7 @@ All events are broadcast to connected UI clients in real time:
 ### Agent Events
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `agent:data` | `{ agentId, data }` | Raw output (PTY mode) |
+| `agent:data` | `{ agentId, data }` | Raw agent output |
 | `agent:spawned` | `{ agent }` | New agent created |
 | `agent:terminated` | `{ agentId }` | Agent manually terminated |
 | `agent:exit` | `{ agentId, code }` | Agent process exited |

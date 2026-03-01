@@ -238,7 +238,7 @@ Crash count is tracked per `roleId:taskId` combination to avoid infinite loops.
 
 ## Hung Process Detection
 
-The PTY watchdog monitors agent output:
+The agent watchdog monitors output activity:
 - If no output for **5 minutes** (configurable), emits `agent:hung`
 - Checks every 30 seconds
 - Optionally auto-kills after a second timeout (disabled by default)

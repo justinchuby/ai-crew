@@ -3,7 +3,7 @@
 ## System Overview
 
 ```
-React UI ←→ WebSocket ←→ Node.js Server ←→ ACP/PTY ←→ Copilot CLI ×N
+React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
                               │
                          AgentManager (TypedEmitter)
                         ┌─────┴──────┐
@@ -28,7 +28,7 @@ The central orchestrator. Extends `TypedEmitter<AgentManagerEvents>` with 27 typ
 
 ### Agent
 
-Wraps a single Copilot CLI process using ACP (Agent Communication Protocol) or PTY mode.
+Wraps a single Copilot CLI process using ACP (Agent Communication Protocol).
 
 **Lifecycle:** `creating` → `running` → `idle` → `completed` / `failed`
 

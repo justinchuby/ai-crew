@@ -74,3 +74,4 @@ All events follow the shape `{ type: string, payload: object }`.
 | `dag:updated` | `{ leadId }` | Task DAG changed |
 | `group:created` | `{ group, leadId }` | Group chat created |
 | `group:message` | `{ message, groupName, leadId }` | Message in group chat |
+| `group:reaction` | `{ leadId, groupName, messageId, emoji, agentId, action }` | Reaction added/removed (`action`: `"add"` or `"remove"`) |

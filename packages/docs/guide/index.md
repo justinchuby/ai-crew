@@ -39,7 +39,7 @@ ai-crew/
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS 4, Zustand, ReactFlow |
-| Backend | Node.js, Express, ws, node-pty |
+| Backend | Node.js, Express, ws |
 | Database | SQLite (WAL mode, Drizzle ORM) |
 | Validation | Zod schemas on all API routes |
 | Agent Protocol | ACP (Agent Communication Protocol) |

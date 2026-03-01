@@ -50,28 +50,23 @@ The emoji fence **eliminates the entire category of problems** — `⟦` never a
 
 ## Migration Path
 
-### Phase 1: Dual syntax (backward compatible)
+The migration from `[[[ ]]]` to `⟦ ⟧` was completed in four phases:
 
-```typescript
-// CommandDispatcher: accept BOTH old and new syntax
-// Each command module's regex becomes:
-const CREATE_AGENT_REGEX = /(?:\[\[\[|⟦)\s*CREATE_AGENT\s*(\{.*?\})\s*(?:\]\]\]|⟧)/s;
-```
+1. **Phase 1:** Updated all ~50 command regex patterns in 11 handler modules to use `⟦ ⟧`
+2. **Phase 2:** Updated `CommandDispatcher.scanBuffer()` to detect `⟦` instead of `[[[`
+3. **Phase 3:** Updated all UI components (regex patterns, display logic)
+4. **Phase 4:** Updated all test files to use `⟦ ⟧` syntax
 
-This is a mechanical regex change across ~50 patterns in 11 command modules. The `isInsideCommandBlock` guard stays active for `[[[` matches but is skipped for `⟦` matches (no ambiguity possible).
+The `[[[` syntax is **no longer supported**. All commands must use `⟦ ⟧`.
 
-**Agent prompts updated** to show new syntax but mention old syntax still works:
-```
-Use ⟦ COMMAND {json} ⟧ syntax. Legacy [[[ ]]] also accepted.
-```
+### Escaping Brackets in Text
 
-### Phase 2: Prompt-only migration
+When agents need to discuss the bracket characters themselves (e.g., in documentation or instructions), they reference them by Unicode codepoint:
 
-Update `RoleRegistry.ts` prompts to use `⟦ ⟧` exclusively. Old syntax still parsed. Agents naturally start using new syntax because that's what they see in their prompt.
+- `U+27E6` for `⟦`
+- `U+27E7` for `⟧`
 
-### Phase 3: Deprecate `[[[` (optional, months later)
-
-Add a warning when `[[[` is used. Eventually remove the dual-regex patterns. At this point `isInsideCommandBlock` can be deleted entirely.
+This avoids accidental command detection. There is no backslash-escape mechanism — the parser has no escape handling.
 
 ## Downsides & Mitigations
 
@@ -81,7 +76,7 @@ Add a warning when `[[[` is used. Eventually remove the dual-regex patterns. At 
 
 ### 2. Keyboard input difficulty
 **Risk:** Users can't type `⟦` directly (no standard keyboard shortcut).  
-**Mitigation:** Users rarely type commands manually — agents generate them. For the rare manual case: copy-paste from docs, or use `[[[ ]]]` legacy syntax.
+**Mitigation:** Users rarely type commands manually — agents generate them. For the rare manual case: copy-paste from docs.
 
 ### 3. LLM tokenizer behavior
 **Risk:** Some tokenizers might split `⟦` into multiple tokens or not recognize it.  
@@ -92,8 +87,8 @@ Add a warning when `[[[` is used. Eventually remove the dual-regex patterns. At 
 **Mitigation:** Phase 1 only changes regex patterns (mechanical, reviewable). No logic changes.
 
 ### 5. Incomplete command detection
-**Risk:** `buf.lastIndexOf('[[[')` at line 141 of CommandDispatcher.ts needs to also check for `⟦`.  
-**Mitigation:** Change to: `Math.max(buf.lastIndexOf('[[['), buf.lastIndexOf('⟦'))`.
+**Risk:** `scanBuffer()` in CommandDispatcher.ts needs to detect partial `⟦` commands.  
+**Mitigation:** `buf.lastIndexOf('⟦')` handles this cleanly with a single character check.
 
 ## Implementation Effort
 
@@ -109,4 +104,4 @@ Add a warning when `[[[` is used. Eventually remove the dual-regex patterns. At 
 
 ## Decision
 
-**Use `⟦ ⟧` (U+27E6/U+27E7).** It eliminates the entire class of bracket-parsing bugs at the source. Dual-syntax migration is safe and mechanical. The 10x win: delete `isInsideCommandBlock` entirely once `[[[` is deprecated.
+**Use `⟦ ⟧` (U+27E6/U+27E7).** It eliminates the entire class of bracket-parsing bugs at the source. Migration was completed in a single session across four phases. The `isInsideCommandBlock` guard was removed entirely — zero false matches with Unicode brackets.

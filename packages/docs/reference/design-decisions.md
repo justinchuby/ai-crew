@@ -2,9 +2,9 @@
 
 Key architectural choices and their rationale.
 
-## 1. ACP over PTY as Default Communication
+## 1. ACP Communication
 
-**Decision:** Use the Agent Client Protocol (ACP) as the primary communication mode, with PTY as a fallback.
+**Decision:** Use the Agent Client Protocol (ACP) as the communication mode with Copilot CLI agents.
 
 **Rationale:** ACP provides structured JSON-RPC messaging instead of raw terminal I/O. This gives us:
 - Typed session management (initialize → newSession → prompt)
@@ -13,19 +13,15 @@ Key architectural choices and their rationale.
 - Permission gating for file writes and terminal commands
 - Proper cancellation support
 
-PTY is retained for backward compatibility and for scenarios where full terminal fidelity is needed.
+**Configuration:** `AGENT_MODE=acp` environment variable.
 
-**Trade-off:** ACP requires Copilot CLI to support `--acp` flag. Older CLI versions fall back to PTY.
+## 2. Agent Architecture
 
-**Configuration:** `AGENT_MODE=acp|pty` environment variable, default `acp`.
+**Decision:** Each `Agent` instance uses ACP mode for structured communication.
 
-## 2. Dual-Mode Agent Architecture
+**Rationale:** A single Agent class with ACP provides a consistent API surface. The `AgentManager`, `TaskQueue`, and UI interact through the same interface (`write()`, `onData()`, `toJSON()`).
 
-**Decision:** Each `Agent` instance supports both ACP and PTY modes, selected at spawn time.
-
-**Rationale:** Rather than separate classes, a single Agent with mode branching keeps the API surface consistent. The `AgentManager`, `TaskQueue`, and UI don't need to know which mode an agent uses — they interact through the same interface (`write()`, `onData()`, `toJSON()`).
-
-**Implementation:** `start()` delegates to `startAcp()` or `startPty()`. User input calls `prompt()` in ACP mode vs raw `pty.write()` in PTY mode.
+**Implementation:** `start()` delegates to `startAcp()`. User input calls `prompt()` in ACP mode.
 
 ## 3. SQLite with WAL Mode
 
@@ -88,26 +84,12 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Protocol:** The lead creates agents with `<!-- CREATE_AGENT {"role": "developer", "model": "...", "task": "..."} -->` and assigns tasks to existing agents with `<!-- DELEGATE {"to": "agent-id", "task": "..."} -->`. Both are detected by regex in `AgentManager`.
 
-## 6. HTML Comment Protocol for PTY Mode
-
-**Decision:** Use HTML comment patterns (`<!-- COMMAND {...} -->`) for structured communication in PTY mode.
-
-**Rationale:**
-- Invisible in normal terminal rendering
-- Unambiguous — won't collide with regular agent output
-- JSON payload is flexible and extensible
-- Easy to parse with simple regex
-
-**Commands:** `CREATE_AGENT`, `DELEGATE`, `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `DECISION`, `PROGRESS`, `QUERY_CREW`
-
-**Trade-off:** Relies on the AI correctly formatting these patterns. In ACP mode, this is replaced by structured protocol messages.
-
-## 7. WebSocket for Real-Time Updates
+## 6. WebSocket for Real-Time Updates
 
 **Decision:** WebSocket for bidirectional real-time communication between server and UI.
 
 **Rationale:**
-- Terminal output needs to stream in real time (character by character for PTY)
+- Agent output needs to stream in real time
 - User input needs low-latency delivery to agents
 - Events (agent spawned, task updated, lock acquired) need instant broadcast
 - SSE is unidirectional; polling adds latency; WebSocket is the natural fit
@@ -116,7 +98,7 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Subscription model:** Clients subscribe to specific agent output streams. `*` subscribes to all agents. On subscribe, the server sends buffered output history.
 
-## 8. Configurable Concurrency at Runtime
+## 7. Configurable Concurrency at Runtime
 
 **Decision:** Max concurrent agents is adjustable via UI slider (1–50) without restart.
 
@@ -175,7 +157,7 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 **Structure:**
 ```
 ai-crew/
-├── packages/server/    # Express + ws + node-pty + ACP
+├── packages/server/    # Express + ws + ACP
 ├── packages/web/       # React + Vite + Tailwind + xterm.js
 ├── docs/               # Architecture documentation
 ├── tsconfig.base.json  # Shared TS config
