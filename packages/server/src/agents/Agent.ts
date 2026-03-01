@@ -58,6 +58,7 @@ export class Agent {
   public readonly autopilot: boolean;
   public status: AgentStatus = 'creating';
   public task?: string;
+  public dagTaskId?: string;
   public parentId?: string;
   public childIds: string[] = [];
   public plan: PlanEntry[] = [];

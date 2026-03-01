@@ -56,7 +56,8 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   const cleanPreview = rawOutput.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
-  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
+  const dagLabel = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
+  const summary = `[Agent Report]${dagLabel} ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
   parent.sendMessage(summary);
@@ -127,7 +128,8 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
   const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief2 = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
-  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
+  const dagLabel2 = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
+  const summary = `[Agent Report]${dagLabel2} ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
   parent.sendMessage(summary);
@@ -275,6 +277,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
           const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
           if (started) {
             dagNote = ` [DAG: "${dagTask.id}" → running]`;
+            child.dagTaskId = dagTask.id;
             logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
           }
         } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
@@ -284,7 +287,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
         }
       }
 
-      const taskPrompt = req.context ? `${req.task}\n\nContext: ${req.context}` : req.task;
+      const dagPrefix = child.dagTaskId ? `[DAG Task: ${child.dagTaskId}]\n` : '';
+      const taskPrompt = req.context ? `${dagPrefix}${req.task}\n\nContext: ${req.context}` : `${dagPrefix}${req.task}`;
       child.sendMessage(taskPrompt);
 
       const dupMatch = req.task ? findSimilarActiveDelegation(ctx, req.task, child.id) : null;
@@ -404,6 +408,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
         const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
         if (started) {
           dagNote = ` [DAG: "${dagTask.id}" → running]`;
+          child.dagTaskId = dagTask.id;
           logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
         }
       } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
@@ -415,9 +420,10 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
     if (req.context) ctx.agentMemory.store(agent.id, child.id, 'context', req.context.slice(0, 200));
 
+    const dagPrefix = child.dagTaskId ? `[DAG Task: ${child.dagTaskId}]\n` : '';
     const taskPrompt = req.context
-      ? `${req.task}\n\nContext: ${req.context}`
-      : req.task;
+      ? `${dagPrefix}${req.task}\n\nContext: ${req.context}`
+      : `${dagPrefix}${req.task}`;
     ctx.reportedCompletions.delete(`${child.id}:idle`);
     ctx.reportedCompletions.delete(`${child.id}:exit`);
     child.sendMessage(taskPrompt);
