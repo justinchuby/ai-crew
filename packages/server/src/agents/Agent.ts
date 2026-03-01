@@ -234,9 +234,10 @@ All team members have access to this directory. Create your subdirectory before 
 9. To get an updated roster of all agents and their IDs, use:
 \`⟦⟦ QUERY_CREW ⟧⟧\`
 10. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-11. Log important decisions by outputting:
+11. When referencing other agents in messages, always use the @ prefix (e.g., @568c3298, not 568c3298). This enables clickable @mention tooltips in the UI.
+12. Log important decisions by outputting:
 \`⟦⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧⟧\`
-12. To defer a non-blocking issue for later:
+13. To defer a non-blocking issue for later:
 \`⟦⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧⟧\`
 \`⟦⟦ QUERY_DEFERRED {} ⟧⟧\`
 
