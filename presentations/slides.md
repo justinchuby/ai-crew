@@ -2,19 +2,18 @@
 theme: default
 title: "AI Crew — Building a Multi-Agent AI Development System"
 info: |
-  How we built a system where 13 AI agents coordinate, review, and ship code together.
+  How we built a system where AI agents coordinate, review, and ship code together.
 highlighter: shiki
 drawings:
   persist: false
 transition: slide-left
 css: unocss
 colorSchema: dark
+layout: center
 fonts:
   sans: Inter
   mono: Fira Code
 
----
-layout: center
 ---
 
 <div class="text-center max-w-3xl mx-auto">
@@ -114,7 +113,7 @@ Walk through the sequence crisply. The lead AI read the GitHub issue.
 Analyzed 10 items. Built a dependency graph — like a project manager
 mapping out "this blocks that." Then it started hiring. Not random
 generalists — specific specialists for specific tasks. Within 2 minutes,
-13 agents were running simultaneously, each with its own terminal. Think
+Agents were running simultaneously, each with its own terminal. Think
 of it as spinning up an entire engineering team in the time it takes to
 make coffee.
 -->
@@ -163,7 +162,7 @@ Use **version N** of AI Crew → to build **version N+1**. Each generation is bu
 <div class="bg-gray-800 rounded-lg p-3 border border-green-500">
 
 ### ⚡ This session — right now
-The 13 agents you're about to meet? They're building the **next version** of the system they're running on. New features, bug fixes, even this presentation — all produced by the tool itself.
+The agents you're about to meet? They're building the **next version** of the system they're running on. New features, bug fixes, even this presentation — all produced by the tool itself.
 
 </div>
 
@@ -179,7 +178,7 @@ already use — got one prompt and wrote the first prototype. Then we used
 version 1 to build version 2. Version 2 had more features, so it built
 version 3 faster. Each generation improves the next.
 
-This session? The 13 agents are building the next version of the system
+This session? The agents are building the next version of the system
 they're running on. They found bugs in their own infrastructure and fixed
 them. One agent found a race condition in the commit system all the agents
 use to save their work.
@@ -456,7 +455,7 @@ Now let's see how the lead **keeps it all running**.
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### 💻 Code
-8 developers implementing features, fixing bugs, writing tests
+Multiple developers implementing features, fixing bugs, writing tests
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
@@ -469,7 +468,7 @@ Code reviewers and critical reviewers auditing every commit
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
 
-The lead doesn't context-switch — it holds **all workstreams in parallel**. When a developer finishes a feature, the lead assigns a reviewer. When a reviewer finds a bug, the lead assigns a fix. Meanwhile, the presentation team keeps iterating. **13 agents, multiple domains, one coordinator.**
+The lead doesn't context-switch — it holds **all workstreams in parallel**. When a developer finishes a feature, the lead assigns a reviewer. When a reviewer finds a bug, the lead assigns a fix. Meanwhile, the presentation team keeps iterating. **As many agents as you need, multiple domains, one coordinator.**
 
 </div>
 
@@ -531,7 +530,7 @@ routing messages, assigning tasks, and resolving conflicts in real-time.
 <div class="text-sm text-gray-400 mt-2">
 
 - One-to-all, urgent
-- All 13 agents received it
+- All agents received it
 
 </div>
 </div>
@@ -546,7 +545,7 @@ who needs them. Group chat for team coordination — our presentation-team
 group had 5 agents (lead, architect, developer, radical thinker, tech
 writer) all collaborating on these slides in real-time. And broadcast
 for urgent announcements — when the lead discovered the git add -A
-problem, it broadcast a warning to all 13 agents simultaneously. The
+problem, it broadcast a warning to all agents simultaneously. The
 agents self-organize: they create groups, message peers directly, and
 escalate through broadcast when needed.
 -->
@@ -633,7 +632,7 @@ defines their personality, capabilities, and instructions.
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
 
-All backed by **SQLite** — state survives restarts, one file, zero ops. The Task DAG **auto-creates** tasks from delegations and **auto-completes** them when agents report done. File locks are the coordination primitive: 8 developers editing different files simultaneously, zero conflicts.
+All backed by **SQLite** — state survives restarts, one file, zero ops. The Task DAG **auto-creates** tasks from delegations and **auto-completes** them when agents report done. File locks are the coordination primitive: multiple developers editing different files simultaneously, zero conflicts.
 
 </div>
 
@@ -769,7 +768,7 @@ Developer A finishes and commits. But the commit includes Developer B's half-fin
 ### How the system responded
 
 1. **Code reviewer** caught the missing files immediately
-2. **Lead** broadcast a warning to all 13 agents: *"Never use git add -A"*
+2. **Lead** broadcast a warning to all agents: *"Never use git add -A"*
 3. **Architect** audited the commit system and found 4 gaps
 4. **Developer** hardened the commit command — now only stages files you've locked
 
@@ -777,7 +776,7 @@ Developer A finishes and commits. But the commit includes Developer B's half-fin
 
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500 mt-2">
 
-🔒 **The fix: file locking.** 8 developers, 15+ files, zero conflicts. Each agent claims files before editing — no merge conflicts, no overwrites.
+🔒 **The fix: file locking.** Multiple developers, 15+ files, zero conflicts. Each agent claims files before editing — no merge conflicts, no overwrites.
 
 </div>
 
@@ -786,7 +785,7 @@ This is the messy reality of multiple agents sharing one repo. Developer A
 commits and accidentally grabs Developer B's uncommitted changes. The code
 reviewer caught it. The lead broadcast a warning. The architect audited
 the system. They built file locking — each developer claims files like
-checking out a library book. 8 developers, 15+ files, zero conflicts.
+checking out a library book. Multiple developers, 15+ files, zero conflicts.
 -->
 
 
@@ -1024,7 +1023,7 @@ product this entire time." This is the mic drop moment.
 ### Your AI Crew
 <div class="text-sm">
 
-- 13 agents in parallel
+- Agents in parallel (as many as you need)
 - Fresh, focused context per agent
 - Built-in code review on every change
 - The Lead manages the team for you
@@ -1447,7 +1446,7 @@ after compaction.
 
 ---
 
-# Appendix: All 13 Roles
+# Appendix: All Roles
 
 <div class="grid grid-cols-2 gap-2 text-sm">
 <div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
@@ -1476,7 +1475,7 @@ after compaction.
 </div>
 
 <!--
-All 13 roles reference. Each has a purpose-built system prompt with
+All roles reference. Each has a purpose-built system prompt with
 specific instructions, behavioral guidelines, and model preferences.
 Custom roles can be defined for specialized needs.
 -->
