@@ -18,6 +18,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { DagStatus, DagTask } from '../../types';
+import { computeCriticalPath, type CriticalPathTask } from './dagCriticalPath';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -68,11 +69,28 @@ function edgeColor(status: DagTaskStatus): string {
 // ---------------------------------------------------------------------------
 // Custom node component
 // ---------------------------------------------------------------------------
-type DagTaskNodeData = { task: DagTask };
+type DagTaskNodeData = { task: DagTask; onCriticalPath?: boolean };
+
+function formatNodeElapsed(createdAt: string, completedAt?: string): string {
+  const start = new Date(createdAt).getTime();
+  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+  const ms = Math.max(0, end - start);
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${secs}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
 
 function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
   const task = data.task;
   const style = STATUS_STYLES[task.dagStatus];
+  const onCritical = data.onCriticalPath ?? false;
+
+  const borderColor = onCritical ? '#f97316' : style.border;
+  const borderWidth = onCritical ? 2 : 1.5;
 
   return (
     <div
@@ -80,7 +98,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
         width: NODE_W,
         height: NODE_H,
         background: style.bg,
-        border: `1.5px solid ${style.border}`,
+        border: `${borderWidth}px solid ${borderColor}`,
         borderRadius: 8,
         opacity: style.opacity,
         padding: '6px 10px',
@@ -95,10 +113,10 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: style.border, width: 6, height: 6, border: 'none' }}
+        style={{ background: borderColor, width: 6, height: 6, border: 'none' }}
       />
 
-      {/* Row 1: icon + task ID */}
+      {/* Row 1: icon + task ID + critical path star */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 18 }}>
         <span style={{ fontSize: 13, lineHeight: 1 }}>{style.icon}</span>
         <span
@@ -109,24 +127,33 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            flex: 1,
           }}
         >
-          {truncate(task.title || task.id, 16)}
+          {truncate(task.title || task.id, 14)}
         </span>
+        {onCritical && <span style={{ fontSize: 10, color: '#fb923c', lineHeight: 1 }} title="Critical path">★</span>}
       </div>
 
-      {/* Row 2: role */}
+      {/* Row 2: role + elapsed time */}
       <div
         style={{
           fontSize: 10,
-          color: '#9ca3af',
-          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
         }}
       >
-        {task.role}
+        <span style={{ color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {task.role}
+        </span>
+        {(task.dagStatus === 'running' || task.dagStatus === 'done') && (
+          <span style={{ color: task.dagStatus === 'running' ? '#60a5fa' : '#6b7280', fontSize: 9, flexShrink: 0, marginLeft: 4 }}>
+            ⏱ {formatNodeElapsed(task.createdAt, task.completedAt)}
+          </span>
+        )}
       </div>
 
       {/* Row 3: description (2 lines max) */}
@@ -170,7 +197,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: style.border, width: 6, height: 6, border: 'none' }}
+        style={{ background: borderColor, width: 6, height: 6, border: 'none' }}
       />
     </div>
   );
@@ -383,9 +410,19 @@ function DagNodeTooltip({
 // ---------------------------------------------------------------------------
 // Layout: layered topological sort → React Flow nodes & edges
 // ---------------------------------------------------------------------------
-function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: Edge[] } {
+function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: Edge[]; criticalPath: Set<string> } {
   const taskMap = new Map<string, DagTask>();
   for (const t of tasks) taskMap.set(t.id, t);
+
+  // Compute critical path
+  const now = Date.now();
+  const cpTasks: CriticalPathTask[] = tasks.map(t => ({
+    id: t.id,
+    dependsOn: t.dependsOn,
+    createdAt: new Date(t.createdAt).getTime(),
+    completedAt: t.completedAt ? new Date(t.completedAt).getTime() : undefined,
+  }));
+  const criticalPath = computeCriticalPath(cpTasks, now);
 
   // 1. Assign layers via longest-path topological layering
   const layers = new Map<string, number>();
@@ -494,7 +531,7 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
       id: task.id,
       type: 'dagTask',
       position: pos,
-      data: { task },
+      data: { task, onCriticalPath: criticalPath.has(task.id) },
       width: NODE_W,
       height: NODE_H,
     };
@@ -507,14 +544,19 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
       if (taskMap.has(dep)) {
         const depTask = taskMap.get(dep)!;
         const status = depTask.dagStatus;
-        const color = edgeColor(status);
+        const isCritEdge = criticalPath.has(t.id) && criticalPath.has(dep);
+        const color = isCritEdge ? '#f97316' : edgeColor(status);
         flowEdges.push({
           id: `${dep}->${t.id}`,
           source: dep,
           target: t.id,
           type: 'smoothstep',
           animated: status === 'running',
-          style: { stroke: color, strokeWidth: 1.5, opacity: 0.8 },
+          style: {
+            stroke: color,
+            strokeWidth: isCritEdge ? 2.5 : 1.5,
+            opacity: isCritEdge ? 1 : 0.8,
+          },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color,
@@ -526,7 +568,7 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
     }
   }
 
-  return { nodes: flowNodes, edges: flowEdges };
+  return { nodes: flowNodes, edges: flowEdges, criticalPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -536,9 +578,9 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
   const { fitView, flowToScreenPosition } = useReactFlow();
   const prevTaskKeyRef = useRef('');
 
-  const { initialNodes, initialEdges } = useMemo(() => {
-    const { nodes, edges } = dagToFlow(dagStatus.tasks);
-    return { initialNodes: nodes, initialEdges: edges };
+  const { initialNodes, initialEdges, criticalPath } = useMemo(() => {
+    const { nodes, edges, criticalPath } = dagToFlow(dagStatus.tasks);
+    return { initialNodes: nodes, initialEdges: edges, criticalPath };
   }, [dagStatus]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -649,8 +691,43 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
   const activeTooltip = pinnedTooltip ?? hoverTooltip;
   const containerHeight = containerRef.current?.clientHeight ?? 500;
 
+  // Progress stats
+  const totalTasks = dagStatus.tasks.length;
+  const doneTasks = dagStatus.tasks.filter(t => t.dagStatus === 'done').length;
+  const runningTasks = dagStatus.tasks.filter(t => t.dagStatus === 'running').length;
+  const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const criticalCount = criticalPath.size;
+
   return (
     <>
+      {/* Progress header overlay */}
+      <div
+        data-testid="dag-progress-header"
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          zIndex: 20,
+          background: 'rgba(17, 24, 39, 0.9)',
+          borderRadius: 6,
+          padding: '6px 10px',
+          fontSize: 11,
+          color: '#e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          pointerEvents: 'none',
+        }}
+      >
+        <span style={{ fontWeight: 600 }}>{progressPct}%</span>
+        <span style={{ color: '#9ca3af' }}>{doneTasks}/{totalTasks} done</span>
+        {runningTasks > 0 && <span style={{ color: '#60a5fa' }}>🔵 {runningTasks} running</span>}
+        {criticalCount > 0 && (
+          <span style={{ color: '#fb923c', display: 'flex', alignItems: 'center', gap: 3 }}>
+            ★ {criticalCount} critical
+          </span>
+        )}
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}

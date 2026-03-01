@@ -5,6 +5,7 @@ import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archi
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
 import { DagGraph } from './DagGraph';
 import { DagGantt } from './DagGantt';
+import { DagResourceView } from './DagResourceView';
 import type { GanttTask } from './DagGantt';
 import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
 
@@ -125,7 +126,7 @@ export function TaskQueuePanel({ api }: Props) {
   const leadProjects = useLeadStore((s) => s.projects);
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
-  const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | null>('graph');
+  const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | 'resource' | null>('graph');
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
 
@@ -382,6 +383,7 @@ export function TaskQueuePanel({ api }: Props) {
               const viewIcon =
                 effectiveView === 'graph' ? <Network size={14} className="text-blue-400" /> :
                 effectiveView === 'gantt' ? <BarChart2 size={14} className="text-purple-400" /> :
+                effectiveView === 'resource' ? <Users size={14} className="text-cyan-400" /> :
                 <LayoutList size={14} className="text-blue-400" />;
 
               return (
@@ -422,6 +424,15 @@ export function TaskQueuePanel({ api }: Props) {
                       >
                         <BarChart2 size={13} />
                       </button>
+                      <button
+                        onClick={() => setDagView('resource')}
+                        className={`p-1 rounded transition-colors ${
+                          effectiveView === 'resource' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+                        }`}
+                        title="Resource view"
+                      >
+                        <Users size={13} />
+                      </button>
                     </div>
                   </div>
                   {effectiveView === 'graph' ? (
@@ -431,6 +442,10 @@ export function TaskQueuePanel({ api }: Props) {
                   ) : effectiveView === 'gantt' ? (
                     <div className="p-4 overflow-auto" style={{ maxHeight: 520 }}>
                       <DagGantt tasks={ganttTasks} />
+                    </div>
+                  ) : effectiveView === 'resource' ? (
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <DagResourceView dagStatus={dagStatus} />
                     </div>
                   ) : (
                     <div className="max-h-[500px] overflow-y-auto">
