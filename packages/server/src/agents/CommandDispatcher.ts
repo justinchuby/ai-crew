@@ -188,6 +188,11 @@ export class CommandDispatcher {
     this.handlerCtx.sessionExporter = exporter;
   }
 
+  /** Expose the handler context so the MCP SSE routes can share it */
+  getHandlerContext(): CommandHandlerContext {
+    return this.handlerCtx;
+  }
+
   // ── Static helpers ─────────────────────────────────────────────────
 
   /**

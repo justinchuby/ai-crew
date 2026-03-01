@@ -255,6 +255,14 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// MCP SSE endpoints for agent tool calls (no auth — local machine-to-machine only)
+import { createMcpRoutes } from './mcp/index.js';
+const mcpRoutes = createMcpRoutes({
+  ctx: agentManager.getHandlerContext(),
+  getAgent: (id) => agentManager.get(id),
+});
+app.use(mcpRoutes);
+
 // Auth middleware for API routes
 app.use('/api', authMiddleware);
 

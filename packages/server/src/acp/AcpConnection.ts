@@ -7,6 +7,8 @@ export interface AcpConnectionOptions {
   cliCommand: string;
   cliArgs?: string[];
   cwd?: string;
+  /** MCP servers to connect the Copilot CLI session to */
+  mcpServers?: Array<{ type: 'sse'; name: string; url: string; headers?: Array<{ name: string; value: string }> }>;
 }
 
 export interface ToolCallInfo {
@@ -71,9 +73,17 @@ export class AcpConnection extends EventEmitter {
   async start(opts: AcpConnectionOptions): Promise<string> {
     await this.spawnAndConnect(opts);
 
+    // Build the mcpServers array for the ACP newSession call
+    const mcpServers = (opts.mcpServers || []).map((s) => ({
+      type: s.type as 'sse',
+      name: s.name,
+      url: s.url,
+      headers: (s.headers || []).map((h) => ({ name: h.name, value: h.value })),
+    }));
+
     const sessionResult = await this.connection!.newSession({
       cwd: opts.cwd || process.cwd(),
-      mcpServers: [],
+      mcpServers,
     });
 
     const { sessionId } = sessionResult;

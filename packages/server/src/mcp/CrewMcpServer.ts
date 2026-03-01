@@ -10,6 +10,8 @@
  */
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { Router, type Request, type Response } from 'express';
 import type { Agent } from '../agents/Agent.js';
 import type { CommandEntry, CommandHandlerContext } from '../agents/commands/types.js';
 import { getAgentCommands } from '../agents/commands/AgentCommands.js';
@@ -587,4 +589,118 @@ export function createCrewMcpServer(options: CrewMcpServerOptions): McpServer {
   );
 
   return server;
+}
+
+// ── SSE Transport Routes ───────────────────────────────────────────────
+
+/**
+ * Options for creating per-agent MCP SSE route handlers.
+ */
+export interface CrewMcpRouteOptions {
+  /** The shared command handler context (from CommandDispatcher) */
+  ctx: CommandHandlerContext;
+  /** Resolve a live Agent instance by its full ID */
+  getAgent: (agentId: string) => Agent | undefined;
+}
+
+/** Tracks an active SSE session: the transport and its MCP server instance */
+interface McpSession {
+  transport: SSEServerTransport;
+  mcpServer: McpServer;
+  agentId: string;
+}
+
+/**
+ * Create an Express router that serves per-agent MCP endpoints over SSE.
+ *
+ * Mount at the app root (NOT under /api) since the Copilot CLI MCP client
+ * connects directly to these endpoints from the same machine.
+ *
+ * Endpoints:
+ *   GET  /mcp/:agentId/sse      — Establish SSE stream
+ *   POST /mcp/:agentId/message   — Receive client JSON-RPC messages
+ */
+export function createMcpRoutes(options: CrewMcpRouteOptions): Router {
+  const router = Router();
+
+  // Keyed by the transport's random sessionId (UUID) so POST messages
+  // are routed to the correct SSE stream even with multiple connections.
+  const sessions = new Map<string, McpSession>();
+
+  // SSE connection endpoint — one per agent per connection
+  router.get('/mcp/:agentId/sse', (req: Request, res: Response) => {
+    const agentId = req.params.agentId as string;
+    const agent = options.getAgent(agentId);
+    if (!agent) {
+      res.status(404).json({ error: `Agent not found: ${agentId}` });
+      return;
+    }
+
+    const mcpServer = createCrewMcpServer({
+      ctx: options.ctx,
+      getCallingAgent: () => options.getAgent(agentId),
+    });
+
+    // The endpoint path tells the SSE client where to POST messages.
+    // SSEServerTransport appends ?sessionId=<uuid> automatically.
+    const transport = new SSEServerTransport(`/mcp/${agentId}/message`, res);
+    const sessionId = transport.sessionId;
+
+    sessions.set(sessionId, { transport, mcpServer, agentId });
+    logger.info('mcp', `SSE connected: agent ${agentId.slice(0, 8)} (session ${sessionId.slice(0, 8)})`);
+
+    // Clean up when the SSE connection drops
+    res.on('close', () => {
+      sessions.delete(sessionId);
+      mcpServer.close().catch(() => {});
+      logger.debug('mcp', `SSE disconnected: agent ${agentId.slice(0, 8)} (session ${sessionId.slice(0, 8)})`);
+    });
+
+    // connect() calls transport.start() which writes SSE headers
+    mcpServer.connect(transport).catch((err) => {
+      logger.error('mcp', `SSE connect failed for agent ${agentId.slice(0, 8)}: ${err?.message}`);
+      sessions.delete(sessionId);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'MCP connection failed' });
+      }
+    });
+  });
+
+  // Message POST endpoint — SSE clients POST JSON-RPC messages here
+  router.post('/mcp/:agentId/message', (req: Request, res: Response) => {
+    const sessionId = req.query.sessionId as string | undefined;
+    if (!sessionId) {
+      res.status(400).json({ error: 'Missing sessionId query parameter' });
+      return;
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: `No active MCP session: ${sessionId}` });
+      return;
+    }
+
+    // Pass req.body as parsedBody since Express JSON middleware already consumed the stream
+    session.transport.handlePostMessage(req, res, req.body).catch((err) => {
+      logger.error('mcp', `POST message error (session ${sessionId.slice(0, 8)}): ${err?.message}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to process MCP message' });
+      }
+    });
+  });
+
+  return router;
+}
+
+/**
+ * Close all active MCP SSE sessions for a given agent.
+ * Called during agent termination to clean up resources.
+ */
+export function closeMcpSessions(sessions: Map<string, McpSession>, agentId: string): void {
+  for (const [sessionId, session] of sessions) {
+    if (session.agentId === agentId) {
+      session.mcpServer.close().catch(() => {});
+      sessions.delete(sessionId);
+    }
+  }
 }

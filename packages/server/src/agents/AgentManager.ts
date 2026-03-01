@@ -241,6 +241,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
     }
 
+    // Set MCP server URL so the agent's Copilot CLI connects to crew tools
+    agent.mcpServerUrl = `http://${this.config.host}:${this.config.port}/mcp/${agent.id}/sse`;
+
     // Track parent-child relationship (deduplicate for restart with same ID)
     if (parentId) {
       const parent = this.agents.get(parentId);
@@ -660,6 +663,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getTaskDAG(): TaskDAG {
     return this.taskDAG;
+  }
+
+  /** Expose the CommandHandlerContext for MCP SSE routes */
+  getHandlerContext(): import('./commands/types.js').CommandHandlerContext {
+    return this.dispatcher.getHandlerContext();
   }
 
   /** Persist a human message to the agent's conversation history */

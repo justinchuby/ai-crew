@@ -78,6 +78,8 @@ export class Agent {
   public budget?: { maxConcurrent: number; runningCount: number };
   /** Hierarchy depth: 0 = root lead, 1 = sub-lead, 2 = sub-sub-lead, etc. */
   public hierarchyLevel: number = 0;
+  /** MCP server URL for this agent (set by AgentManager before start) */
+  public mcpServerUrl?: string;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -151,10 +153,16 @@ export class Agent {
       ...(this.resumeSessionId ? ['--resume', this.resumeSessionId] : []),
     ];
 
+    // Build MCP server config if a URL was provided by AgentManager
+    const mcpServers = this.mcpServerUrl
+      ? [{ type: 'sse' as const, name: 'ai-crew', url: this.mcpServerUrl, headers: [] }]
+      : undefined;
+
     this.acpConnection.start({
       cliCommand: this.config.cliCommand,
       cliArgs,
       cwd: this.cwd || process.cwd(),
+      mcpServers,
     }).then((sessionId) => {
       this.sessionId = sessionId;
       for (const listener of this.sessionReadyListeners) listener(sessionId);

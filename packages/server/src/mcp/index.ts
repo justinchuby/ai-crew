@@ -1,5 +1,5 @@
 /**
  * Barrel exports for the MCP server module.
  */
-export { createCrewMcpServer } from './CrewMcpServer.js';
-export type { CrewMcpServerOptions } from './CrewMcpServer.js';
+export { createCrewMcpServer, createMcpRoutes } from './CrewMcpServer.js';
+export type { CrewMcpServerOptions, CrewMcpRouteOptions } from './CrewMcpServer.js';
