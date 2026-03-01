@@ -22,7 +22,7 @@ export function TokenSparkline({
   dataPoints,
   width  = 80,
   height = 24,
-  color  = '#58a6ff',
+  color  = 'var(--graph-sparkline)',
 }: TokenSparklineProps) {
   const pad = 2;
 
@@ -112,7 +112,7 @@ export function TokenSparkline({
       <polyline
         points={polylinePoints}
         fill="none"
-        stroke={overThreshold ? '#f87171' : color}
+        stroke={overThreshold ? 'var(--graph-sparkline-warn)' : color}
         strokeWidth={1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -123,7 +123,7 @@ export function TokenSparkline({
         cx={lastX}
         cy={lastY}
         r={2}
-        fill={overThreshold ? '#f87171' : color}
+        fill={overThreshold ? 'var(--graph-sparkline-warn)' : color}
       />
     </svg>
   );

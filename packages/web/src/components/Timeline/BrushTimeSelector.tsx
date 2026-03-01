@@ -31,12 +31,12 @@ const MINI_LANE_GAP = 1;
 const PADDING = { top: 8, bottom: 4, left: 0, right: 0 };
 
 const MINI_STATUS_COLORS: Record<string, string> = {
-  creating:   '#d29922',
-  running:    '#3fb950',
-  idle:       '#484f58',
-  completed:  '#58a6ff',
-  failed:     '#f85149',
-  terminated: '#f0883e',
+  creating:   'var(--st-creating)',
+  running:    'var(--st-running)',
+  idle:       'var(--st-idle)',
+  completed:  'var(--st-completed)',
+  failed:     'var(--st-failed)',
+  terminated: 'var(--st-terminated)',
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ export function BrushTimeSelector({
             onBrushEnd={handleBrushEnd}
             selectedBoxStyle={{
               fill: 'rgba(88, 166, 255, 0.25)',
-              stroke: '#58a6ff',
+              stroke: 'var(--st-completed)',
               strokeWidth: 1,
               strokeOpacity: 0.8,
               cursor: 'grab',

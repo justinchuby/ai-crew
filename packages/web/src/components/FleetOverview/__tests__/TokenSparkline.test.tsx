@@ -88,7 +88,7 @@ describe('TokenSparkline', () => {
     const polyline = container.querySelector('polyline')!;
     // Over threshold → stroke should be the red shade, not the supplied colour.
     expect(polyline.getAttribute('stroke')).not.toBe('#58a6ff');
-    expect(polyline.getAttribute('stroke')).toContain('#f87171');
+    expect(polyline.getAttribute('stroke')).toContain('var(--graph-sparkline-warn)');
   });
 
   it('keeps the supplied colour when last value is ≤ 80 % of max', () => {

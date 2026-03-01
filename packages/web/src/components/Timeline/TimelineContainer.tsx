@@ -33,12 +33,12 @@ const ZOOM_FACTOR_OUT = 1.5;
 const MIN_VISIBLE_MS = 5_000; // 5 seconds minimum visible range
 
 const STATUS_COLORS: Record<string, { fill: string; border: string }> = {
-  creating:   { fill: 'rgba(210,153,34,0.3)',  border: '#d29922' },
-  running:    { fill: 'rgba(63,185,80,0.3)',   border: '#3fb950' },
-  idle:       { fill: 'rgba(72,79,88,0.2)',    border: '#484f58' },
-  completed:  { fill: 'rgba(88,166,255,0.3)',  border: '#58a6ff' },
-  failed:     { fill: 'rgba(248,81,73,0.3)',   border: '#f85149' },
-  terminated: { fill: 'rgba(240,136,62,0.3)',  border: '#f0883e' },
+  creating:   { fill: 'var(--st-creating-fill)',  border: 'var(--st-creating)' },
+  running:    { fill: 'var(--st-running-fill)',   border: 'var(--st-running)' },
+  idle:       { fill: 'var(--st-idle-fill)',      border: 'var(--st-idle)' },
+  completed:  { fill: 'var(--st-completed-fill)', border: 'var(--st-completed)' },
+  failed:     { fill: 'var(--st-failed-fill)',     border: 'var(--st-failed)' },
+  terminated: { fill: 'var(--st-terminated-fill)', border: 'var(--st-terminated)' },
 };
 
 const ROLE_ICONS: Record<string, string> = {
@@ -52,16 +52,16 @@ const ROLE_ORDER: Record<string, number> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  lead: '#d29922', architect: '#f0883e', developer: '#3fb950',
-  'code-reviewer': '#a371f7', 'critical-reviewer': '#a371f7',
-  designer: '#f778ba', secretary: '#79c0ff', qa: '#79c0ff',
+  lead: 'var(--role-lead)', architect: 'var(--role-architect)', developer: 'var(--role-developer)',
+  'code-reviewer': 'var(--role-code-reviewer)', 'critical-reviewer': 'var(--role-critical-reviewer)',
+  designer: 'var(--role-designer)', secretary: 'var(--role-secretary)', qa: 'var(--role-qa)',
 };
 
 const segmentTooltipStyles: React.CSSProperties = {
   ...defaultStyles,
-  background: '#1e1e2e',
-  border: '1px solid #3f3f46',
-  color: '#e4e4e7',
+  background: 'var(--graph-bg)',
+  border: '1px solid var(--graph-border)',
+  color: 'var(--graph-text)',
   padding: '8px 10px',
   fontSize: '11px',
   fontFamily: 'ui-monospace, monospace',
@@ -89,7 +89,7 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick, fullRange }
   return (
     <div
       className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 timeline-focusable timeline-lane-animate ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
-      style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}`, transition: 'height 200ms ease-out, background-color 150ms ease' }}
+      style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? 'var(--st-idle)'}`, transition: 'height 200ms ease-out, background-color 150ms ease' }}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -124,7 +124,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
   return (
     <g role="row" aria-label={`${agent.role} agent ${agent.shortId} timeline`} aria-roledescription="agent timeline lane">
       {/* Lane background */}
-      <rect x={0} y={y} width={width} height={height} fill="transparent" stroke="#27272a" strokeWidth={0.5} />
+      <rect x={0} y={y} width={width} height={height} fill="transparent" stroke="var(--graph-border)" strokeWidth={0.5} />
 
       {/* Status segments */}
       {agent.segments.map((seg, i) => {
@@ -165,7 +165,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
         const x = timeScale(new Date(lock.acquiredAt));
         return (
           <g key={`lock-${i}`}>
-            <text x={x} y={y + height - 4} fontSize={10} fill="#d29922">🔒</text>
+            <text x={x} y={y + height - 4} fontSize={10} fill="var(--st-creating)">🔒</text>
             <title>{lock.filePath}</title>
           </g>
         );
@@ -715,17 +715,17 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(113,120,130,0.25)" strokeWidth="1.5" />
               </pattern>
               <filter id="error-glow">
-                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#f85149" floodOpacity="0.5" />
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="var(--st-failed)" floodOpacity="0.5" />
               </filter>
             </defs>
             {/* Time axis (sticky behavior via SVG position) */}
             <Group top={AXIS_HEIGHT - 4}>
               <AxisTop
                 scale={timeScale}
-                stroke="#3f3f46"
-                tickStroke="#3f3f46"
+                stroke="var(--graph-border)"
+                tickStroke="var(--graph-border)"
                 tickLabelProps={() => ({
-                  fill: '#a1a1aa',
+                  fill: 'var(--graph-text-muted)',
                   fontSize: 10,
                   fontFamily: 'monospace',
                   textAnchor: 'middle' as const,
@@ -768,8 +768,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 if (x >= 0 && x <= chartWidth) {
                   return (
                     <g aria-label="You left off here marker">
-                      <line x1={x} y1={0} x2={x} y2={totalHeight} stroke="#58a6ff" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
-                      <text x={x + 4} y={12} fontSize={9} fill="#58a6ff" fontFamily="monospace" opacity={0.8}>You left off here</text>
+                      <line x1={x} y1={0} x2={x} y2={totalHeight} stroke="var(--st-completed)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
+                      <text x={x + 4} y={12} fontSize={9} fill="var(--st-completed)" fontFamily="monospace" opacity={0.8}>You left off here</text>
                     </g>
                   );
                 }

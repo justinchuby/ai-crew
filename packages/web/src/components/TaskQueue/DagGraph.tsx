@@ -43,14 +43,14 @@ interface StatusStyle {
 }
 
 const STATUS_STYLES: Record<DagTaskStatus, StatusStyle> = {
-  pending:  { bg: '#374151', border: '#6b7280', icon: '⏳', opacity: 1,   pulse: false },
-  ready:    { bg: '#065f46', border: '#10b981', icon: '🟢', opacity: 1,   pulse: false },
-  running:  { bg: '#1e3a5f', border: '#3b82f6', icon: '🔵', opacity: 1,   pulse: true  },
-  done:     { bg: '#064e3b', border: '#34d399', icon: '✅', opacity: 0.7, pulse: false },
-  failed:   { bg: '#7f1d1d', border: '#ef4444', icon: '❌', opacity: 1,   pulse: false },
-  blocked:  { bg: '#78350f', border: '#f59e0b', icon: '🟠', opacity: 1,   pulse: false },
-  paused:   { bg: '#713f12', border: '#eab308', icon: '⏸️', opacity: 1,   pulse: false },
-  skipped:  { bg: '#1f2937', border: '#4b5563', icon: '⏭️', opacity: 0.5, pulse: false },
+  pending:  { bg: 'var(--st-pending-bg)', border: 'var(--st-pending)', icon: '⏳', opacity: 1,   pulse: false },
+  ready:    { bg: 'var(--st-ready-bg)', border: 'var(--st-ready)', icon: '🟢', opacity: 1,   pulse: false },
+  running:  { bg: 'var(--st-running-bg)', border: 'var(--st-running)', icon: '🔵', opacity: 1,   pulse: true  },
+  done:     { bg: 'var(--st-done-bg)', border: 'var(--st-done)', icon: '✅', opacity: 0.7, pulse: false },
+  failed:   { bg: 'var(--st-failed-bg)', border: 'var(--st-failed)', icon: '❌', opacity: 1,   pulse: false },
+  blocked:  { bg: 'var(--st-blocked-bg)', border: 'var(--st-blocked)', icon: '🟠', opacity: 1,   pulse: false },
+  paused:   { bg: 'var(--st-paused-bg)', border: 'var(--st-paused)', icon: '⏸️', opacity: 1,   pulse: false },
+  skipped:  { bg: 'var(--st-skipped-bg)', border: 'var(--st-skipped)', icon: '⏭️', opacity: 0.5, pulse: false },
 };
 
 // ---------------------------------------------------------------------------
@@ -61,9 +61,9 @@ function truncate(s: string, maxLen: number): string {
 }
 
 function edgeColor(status: DagTaskStatus): string {
-  if (status === 'done') return '#34d399';
-  if (status === 'failed') return '#ef4444';
-  return '#4b5563';
+  if (status === 'done') return 'var(--st-done)';
+  if (status === 'failed') return 'var(--st-failed)';
+  return 'var(--st-skipped)';
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
   const style = STATUS_STYLES[task.dagStatus];
   const onCritical = data.onCriticalPath ?? false;
 
-  const borderColor = onCritical ? '#f97316' : style.border;
+  const borderColor = onCritical ? 'var(--graph-critical)' : style.border;
   const borderWidth = onCritical ? 2 : 1.5;
 
   return (
@@ -110,7 +110,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
           style={{
             fontFamily: 'monospace',
             fontSize: 11,
-            color: '#e5e7eb',
+            color: 'var(--graph-text)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -119,7 +119,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
         >
           {truncate(task.title || task.id, 14)}
         </span>
-        {onCritical && <span style={{ fontSize: 10, color: '#fb923c', lineHeight: 1 }} title="Critical path">★</span>}
+        {onCritical && <span style={{ fontSize: 10, color: 'var(--graph-critical)', lineHeight: 1 }} title="Critical path">★</span>}
       </div>
 
       {/* Row 2: role + elapsed time */}
@@ -133,11 +133,11 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
           overflow: 'hidden',
         }}
       >
-        <span style={{ color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ color: 'var(--graph-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {task.role}
         </span>
         {(task.dagStatus === 'running' || task.dagStatus === 'done') && (
-          <span style={{ color: task.dagStatus === 'running' ? '#60a5fa' : '#6b7280', fontSize: 9, flexShrink: 0, marginLeft: 4 }}>
+          <span style={{ color: task.dagStatus === 'running' ? 'var(--graph-text-accent)' : 'var(--st-pending)', fontSize: 9, flexShrink: 0, marginLeft: 4 }}>
             ⏱ {formatElapsed(task.createdAt, task.completedAt)}
           </span>
         )}
@@ -148,7 +148,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
         <div
           style={{
             fontSize: 9,
-            color: '#6b7280',
+            color: 'var(--st-pending)',
             lineHeight: '1.2',
             overflow: 'hidden',
             display: '-webkit-box',
@@ -165,8 +165,8 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
         <div
           style={{
             fontSize: 8,
-            color: '#60a5fa',
-            background: '#1e3a5f',
+            color: 'var(--graph-text-accent)',
+            background: 'var(--st-running-bg)',
             borderRadius: 3,
             padding: '1px 4px',
             alignSelf: 'flex-start',
@@ -197,14 +197,14 @@ const nodeTypes = { dagTask: DagTaskNode };
 // Tooltip status colors (top border accent)
 // ---------------------------------------------------------------------------
 const TOOLTIP_STATUS_COLORS: Record<DagTaskStatus, string> = {
-  pending: '#6b7280',
-  ready:   '#10b981',
-  running: '#22c55e',
-  done:    '#3b82f6',
-  failed:  '#ef4444',
-  blocked: '#f59e0b',
-  paused:  '#eab308',
-  skipped: '#4b5563',
+  pending: 'var(--st-pending)',
+  ready:   'var(--st-ready)',
+  running: 'var(--st-running)',
+  done:    'var(--st-done)',
+  failed:  'var(--st-failed)',
+  blocked: 'var(--st-blocked)',
+  paused:  'var(--st-paused)',
+  skipped: 'var(--st-skipped)',
 };
 
 function formatTooltipDuration(ms: number): string {
@@ -282,22 +282,22 @@ function DagNodeTooltip({
         maxWidth: 360,
         borderRadius: 8,
         borderTop: `4px solid ${statusColor}`,
-        background: '#1f2937',
+        background: 'var(--graph-bg)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        color: '#e5e7eb',
+        color: 'var(--graph-text)',
         fontSize: 12,
         pointerEvents: pinned ? 'auto' : 'none',
       }}
     >
       {/* Header */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--graph-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           {task.title && (
-            <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#e5e7eb' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--graph-text)' }}>
               {task.title}
             </span>
           )}
-          <span style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.title ? '#9ca3af' : undefined }}>
+          <span style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.title ? 'var(--graph-text-muted)' : undefined }}>
             {task.id}
           </span>
           <span
@@ -320,7 +320,7 @@ function DagNodeTooltip({
           <button
             aria-label="Close tooltip"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+            style={{ background: 'none', border: 'none', color: 'var(--graph-text-muted)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
           >
             ✕
           </button>
@@ -328,24 +328,24 @@ function DagNodeTooltip({
       </div>
 
       {/* Agent section */}
-      <div style={{ padding: '6px 12px', borderBottom: '1px solid #374151' }}>
-        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Agent</div>
+      <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--graph-border)' }}>
+        <div style={{ color: 'var(--graph-text-muted)', fontSize: 10, marginBottom: 2 }}>Agent</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span>{task.role}</span>
-          {task.model && <span style={{ color: '#9ca3af' }}>· {task.model}</span>}
+          {task.model && <span style={{ color: 'var(--graph-text-muted)' }}>· {task.model}</span>}
           {task.assignedAgentId && (
-            <span style={{ color: '#60a5fa', fontSize: 11 }}>🤖 {truncate(task.assignedAgentId, 14)}</span>
+            <span style={{ color: 'var(--graph-text-accent)', fontSize: 11 }}>🤖 {truncate(task.assignedAgentId, 14)}</span>
           )}
         </div>
       </div>
 
       {/* Dependencies section */}
       {(task.dependsOn.length > 0 || downstream.length > 0) && (
-        <div style={{ padding: '6px 12px', borderBottom: '1px solid #374151' }}>
-          <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Dependencies</div>
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--graph-border)' }}>
+          <div style={{ color: 'var(--graph-text-muted)', fontSize: 10, marginBottom: 2 }}>Dependencies</div>
           {task.dependsOn.length > 0 && (
             <div style={{ marginBottom: 2 }}>
-              <span style={{ color: '#9ca3af', fontSize: 10 }}>↑ Upstream: </span>
+              <span style={{ color: 'var(--graph-text-muted)', fontSize: 10 }}>↑ Upstream: </span>
               {task.dependsOn.map((depId) => {
                 const dep = taskMap.get(depId);
                 return (
@@ -358,7 +358,7 @@ function DagNodeTooltip({
           )}
           {downstream.length > 0 && (
             <div>
-              <span style={{ color: '#9ca3af', fontSize: 10 }}>↓ Downstream: </span>
+              <span style={{ color: 'var(--graph-text-muted)', fontSize: 10 }}>↓ Downstream: </span>
               {downstream.map((d) => (
                 <span key={d.id} style={{ marginRight: 6, fontSize: 11 }}>
                   {truncate(d.description || d.id, 24)}
@@ -371,11 +371,11 @@ function DagNodeTooltip({
 
       {/* Detail section */}
       <div style={{ padding: '6px 12px', maxHeight: 160, overflowY: 'auto' }}>
-        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Detail</div>
+        <div style={{ color: 'var(--graph-text-muted)', fontSize: 10, marginBottom: 2 }}>Detail</div>
         {task.description && (
           <div style={{ marginBottom: 4, lineHeight: 1.4 }}>{task.description}</div>
         )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 11, color: '#9ca3af' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 11, color: 'var(--graph-text-muted)' }}>
           {task.priority > 0 && <span>Priority: {task.priority}</span>}
           {duration && <span>Duration: {duration}</span>}
           {task.createdAt && <span>Created: {new Date(task.createdAt).toLocaleTimeString()}</span>}
@@ -383,8 +383,8 @@ function DagNodeTooltip({
         </div>
         {task.files.length > 0 && (
           <div style={{ marginTop: 4 }}>
-            <span style={{ color: '#9ca3af', fontSize: 10 }}>Files: </span>
-            <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#93c5fd' }}>
+            <span style={{ color: 'var(--graph-text-muted)', fontSize: 10 }}>Files: </span>
+            <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--graph-text-accent)' }}>
               {task.files.map((f) => truncate(f, 30)).join(', ')}
             </span>
           </div>
@@ -532,7 +532,7 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
         const depTask = taskMap.get(dep)!;
         const status = depTask.dagStatus;
         const isCritEdge = criticalPath.has(t.id) && criticalPath.has(dep);
-        const color = isCritEdge ? '#f97316' : edgeColor(status);
+        const color = isCritEdge ? 'var(--graph-critical)' : edgeColor(status);
         flowEdges.push({
           id: `${dep}->${t.id}`,
           source: dep,
@@ -699,7 +699,7 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
           borderRadius: 6,
           padding: '6px 10px',
           fontSize: 11,
-          color: '#e5e7eb',
+          color: 'var(--graph-text)',
           display: 'flex',
           alignItems: 'center',
           gap: 10,
@@ -707,10 +707,10 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
         }}
       >
         <span style={{ fontWeight: 600 }}>{progressPct}%</span>
-        <span style={{ color: '#9ca3af' }}>{doneTasks}/{totalTasks} done</span>
-        {runningTasks > 0 && <span style={{ color: '#60a5fa' }}>🔵 {runningTasks} running</span>}
+        <span style={{ color: 'var(--graph-text-muted)' }}>{doneTasks}/{totalTasks} done</span>
+        {runningTasks > 0 && <span style={{ color: 'var(--graph-text-accent)' }}>🔵 {runningTasks} running</span>}
         {criticalCount > 0 && (
-          <span style={{ color: '#fb923c', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ color: 'var(--graph-critical)', display: 'flex', alignItems: 'center', gap: 3 }}>
             ★ {criticalCount} critical
           </span>
         )}
@@ -735,10 +735,10 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
         nodesConnectable={false}
         elementsSelectable={false}
       >
-        <Background color="#374151" gap={20} size={1} />
+        <Background color="var(--graph-border)" gap={20} size={1} />
         <Controls
           showInteractive={false}
-          style={{ background: '#1f2937', borderColor: '#374151' }}
+          style={{ background: 'var(--graph-bg)', borderColor: 'var(--graph-border)' }}
         />
         <MiniMap
           nodeColor={(node) => {
@@ -746,7 +746,7 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
             return STATUS_STYLES[task.dagStatus].border;
           }}
           maskColor="rgba(0, 0, 0, 0.7)"
-          style={{ background: '#111827', borderColor: '#374151' }}
+          style={{ background: 'var(--graph-bg-alt)', borderColor: 'var(--graph-border)' }}
           position="bottom-right"
         />
       </ReactFlow>
@@ -769,19 +769,19 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
 // ---------------------------------------------------------------------------
 const darkStyles = `
   .dag-flow-container .react-flow__controls button {
-    background: #1f2937;
-    border-color: #374151;
-    color: #9ca3af;
-    fill: #9ca3af;
+    background: var(--graph-bg);
+    border-color: var(--graph-border);
+    color: var(--graph-text-muted);
+    fill: var(--graph-text-muted);
   }
   .dag-flow-container .react-flow__controls button:hover {
-    background: #374151;
-    color: #e5e7eb;
-    fill: #e5e7eb;
+    background: var(--graph-border);
+    color: var(--graph-text);
+    fill: var(--graph-text);
   }
   .dag-flow-container .react-flow__minimap {
-    background: #111827;
-    border: 1px solid #374151;
+    background: var(--graph-bg-alt);
+    border: 1px solid var(--graph-border);
   }
   @keyframes dagNodePulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }

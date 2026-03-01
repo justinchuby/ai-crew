@@ -16,6 +16,59 @@
   --th-border: 229 231 235;
   --th-border-hover: 209 213 219;
   --th-border-muted: 243 244 246;
+
+  /* Status colors (agent lifecycle & DAG tasks) */
+  --st-creating: #b45309;
+  --st-running: #059669;
+  --st-idle: #6b7280;
+  --st-completed: #2563eb;
+  --st-failed: #dc2626;
+  --st-terminated: #ea580c;
+  --st-pending: #6b7280;
+  --st-ready: #10b981;
+  --st-done: #2563eb;
+  --st-blocked: #d97706;
+  --st-paused: #ca8a04;
+  --st-skipped: #6b7280;
+
+  /* Status fills (semitransparent, for timeline segments) */
+  --st-creating-fill: rgba(180, 83, 9, 0.25);
+  --st-running-fill: rgba(5, 150, 105, 0.25);
+  --st-idle-fill: rgba(107, 114, 128, 0.15);
+  --st-completed-fill: rgba(37, 99, 235, 0.25);
+  --st-failed-fill: rgba(220, 38, 38, 0.25);
+  --st-terminated-fill: rgba(234, 88, 12, 0.25);
+
+  /* Status backgrounds (dark-tinted card bgs for DAG nodes) */
+  --st-pending-bg: #e5e7eb;
+  --st-ready-bg: #d1fae5;
+  --st-running-bg: #dbeafe;
+  --st-done-bg: #d1fae5;
+  --st-failed-bg: #fee2e2;
+  --st-blocked-bg: #fef3c7;
+  --st-paused-bg: #fef9c3;
+  --st-skipped-bg: #f3f4f6;
+
+  /* Role colors */
+  --role-lead: #b45309;
+  --role-architect: #ea580c;
+  --role-developer: #059669;
+  --role-code-reviewer: #7c3aed;
+  --role-critical-reviewer: #7c3aed;
+  --role-designer: #db2777;
+  --role-secretary: #2563eb;
+  --role-qa: #2563eb;
+
+  /* Graph structural colors */
+  --graph-bg: #f9fafb;
+  --graph-bg-alt: #f3f4f6;
+  --graph-border: #e5e7eb;
+  --graph-text: #111827;
+  --graph-text-muted: #6b7280;
+  --graph-text-accent: #2563eb;
+  --graph-critical: #ea580c;
+  --graph-sparkline: #2563eb;
+  --graph-sparkline-warn: #dc2626;
 }
 
 /* Dark mode */
@@ -31,6 +84,59 @@
   --th-border: 55 65 81;
   --th-border-hover: 75 85 99;
   --th-border-muted: 31 41 55;
+
+  /* Status colors (agent lifecycle & DAG tasks) */
+  --st-creating: #d29922;
+  --st-running: #3fb950;
+  --st-idle: #484f58;
+  --st-completed: #58a6ff;
+  --st-failed: #f85149;
+  --st-terminated: #f0883e;
+  --st-pending: #6b7280;
+  --st-ready: #10b981;
+  --st-done: #3b82f6;
+  --st-blocked: #f59e0b;
+  --st-paused: #eab308;
+  --st-skipped: #4b5563;
+
+  /* Status fills (semitransparent, for timeline segments) */
+  --st-creating-fill: rgba(210, 153, 34, 0.3);
+  --st-running-fill: rgba(63, 185, 80, 0.3);
+  --st-idle-fill: rgba(72, 79, 88, 0.2);
+  --st-completed-fill: rgba(88, 166, 255, 0.3);
+  --st-failed-fill: rgba(248, 81, 73, 0.3);
+  --st-terminated-fill: rgba(240, 136, 62, 0.3);
+
+  /* Status backgrounds (dark-tinted card bgs for DAG nodes) */
+  --st-pending-bg: #374151;
+  --st-ready-bg: #065f46;
+  --st-running-bg: #1e3a5f;
+  --st-done-bg: #064e3b;
+  --st-failed-bg: #7f1d1d;
+  --st-blocked-bg: #78350f;
+  --st-paused-bg: #713f12;
+  --st-skipped-bg: #1f2937;
+
+  /* Role colors */
+  --role-lead: #d29922;
+  --role-architect: #f0883e;
+  --role-developer: #3fb950;
+  --role-code-reviewer: #a371f7;
+  --role-critical-reviewer: #a371f7;
+  --role-designer: #f778ba;
+  --role-secretary: #79c0ff;
+  --role-qa: #79c0ff;
+
+  /* Graph structural colors */
+  --graph-bg: #1f2937;
+  --graph-bg-alt: #111827;
+  --graph-border: #374151;
+  --graph-text: #e5e7eb;
+  --graph-text-muted: #9ca3af;
+  --graph-text-accent: #60a5fa;
+  --graph-critical: #f97316;
+  --graph-sparkline: #58a6ff;
+  --graph-sparkline-warn: #f87171;
 }
 
 body {
