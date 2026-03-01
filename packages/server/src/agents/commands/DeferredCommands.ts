@@ -62,6 +62,8 @@ function handleQueryDeferred(ctx: CommandHandlerContext, agent: Agent, data: str
   let statusFilter: 'open' | 'resolved' | 'dismissed' | undefined;
   const match = data.match(QUERY_DEFERRED_REGEX);
   if (match?.[1]) {
+    // Note: invalid status values now return an error instead of silently showing all issues.
+    // This is intentional — agents should use valid values: "open", "resolved", "dismissed".
     const req = parseCommandPayload(agent, match[1], queryDeferredSchema, 'QUERY_DEFERRED');
     if (!req) return;
     statusFilter = req.status;
