@@ -74,7 +74,7 @@ The chat UI supports `@mention` autocomplete for targeting messages to specific 
 The `COMMIT` command provides safe, server-enforced git operations for multi-agent workflows:
 
 ```
-⟦ COMMIT {"message": "feat: implement login endpoint"} ⟧
+⟦⟦ COMMIT {"message": "feat: implement login endpoint"} ⟧⟧
 ```
 
 **How it works:**

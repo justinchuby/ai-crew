@@ -1,11 +1,11 @@
 # Agent Commands
 
-Agents communicate via structured commands embedded in their output. Commands use `⟦ ⟧` bracket syntax with JSON payloads, detected by the `CommandDispatcher`.
+Agents communicate via structured commands embedded in their output. Commands use `⟦⟦ ⟧⟧` bracket syntax with JSON payloads, detected by the `CommandDispatcher`.
 
 ## Command Format
 
 ```
-⟦ COMMAND_NAME {"key": "value", ...} ⟧
+⟦⟦ COMMAND_NAME {"key": "value", ...} ⟧⟧
 ```
 
 ## Available Commands
@@ -15,7 +15,7 @@ Agents communicate via structured commands embedded in their output. Commands us
 Creates a new agent with a specific role. The **lead** and **architect** can use this.
 
 ```
-⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Implement auth module", "context": "Use JWT tokens"} ⟧
+⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Implement auth module", "context": "Use JWT tokens"} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -32,7 +32,7 @@ Creates a new agent with a specific role. The **lead** and **architect** can use
 Terminates an agent. Only the **lead** can use this, and only on agents in its own hierarchy (direct children or sub-lead children). This is an **absolute last resort** — it destroys the agent's accumulated context.
 
 ```
-⟦ TERMINATE_AGENT {"id": "a1b2c3", "reason": "need slot for different role"} ⟧
+⟦⟦ TERMINATE_AGENT {"id": "a1b2c3", "reason": "need slot for different role"} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -45,7 +45,7 @@ Terminates an agent. Only the **lead** can use this, and only on agents in its o
 Assigns a task to an existing agent. Only the **lead** can use this.
 
 ```
-⟦ DELEGATE {"to": "a1b2c3", "task": "Write unit tests for auth", "context": "Focus on edge cases"} ⟧
+⟦⟦ DELEGATE {"to": "a1b2c3", "task": "Write unit tests for auth", "context": "Focus on edge cases"} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -61,7 +61,7 @@ Assigns a task to an existing agent. Only the **lead** can use this.
 Send a direct message to another agent.
 
 ```
-⟦ AGENT_MESSAGE {"to": "a1b2c3", "content": "Can you review my approach?"} ⟧
+⟦⟦ AGENT_MESSAGE {"to": "a1b2c3", "content": "Can you review my approach?"} ⟧⟧
 ```
 
 ### BROADCAST
@@ -69,7 +69,7 @@ Send a direct message to another agent.
 Send a message to all agents in the crew.
 
 ```
-⟦ BROADCAST {"content": "Switching to approach B for the API layer"} ⟧
+⟦⟦ BROADCAST {"content": "Switching to approach B for the API layer"} ⟧⟧
 ```
 
 ### CREATE_GROUP
@@ -77,7 +77,7 @@ Send a message to all agents in the crew.
 Create a group chat for focused discussion.
 
 ```
-⟦ CREATE_GROUP {"name": "api-design", "members": ["a1b2c3", "d4e5f6"]} ⟧
+⟦⟦ CREATE_GROUP {"name": "api-design", "members": ["a1b2c3", "d4e5f6"]} ⟧⟧
 ```
 
 ### DECISION
@@ -85,7 +85,7 @@ Create a group chat for focused discussion.
 Record an architectural decision.
 
 ```
-⟦ DECISION {"title": "Use JWT for auth", "rationale": "Stateless, scalable", "alternatives": ["Session cookies", "OAuth only"], "impact": "high", "needsConfirmation": true} ⟧
+⟦⟦ DECISION {"title": "Use JWT for auth", "rationale": "Stateless, scalable", "alternatives": ["Session cookies", "OAuth only"], "impact": "high", "needsConfirmation": true} ⟧⟧
 ```
 
 Decisions with `needsConfirmation: true` appear in the dashboard for user review.
@@ -95,7 +95,7 @@ Decisions with `needsConfirmation: true` appear in the dashboard for user review
 Report task progress.
 
 ```
-⟦ PROGRESS {"summary": "Auth module 60% complete", "completed": ["Login endpoint", "Token refresh"], "in_progress": ["Logout"], "blocked": []} ⟧
+⟦⟦ PROGRESS {"summary": "Auth module 60% complete", "completed": ["Login endpoint", "Token refresh"], "in_progress": ["Logout"], "blocked": []} ⟧⟧
 ```
 
 ### COMPLETE_TASK
@@ -103,7 +103,7 @@ Report task progress.
 Mark a DAG task as done. Any agent can use this — non-lead agents relay completion to the parent lead's DAG with authorization validation.
 
 ```
-⟦ COMPLETE_TASK {"id": "task-id", "summary": "Auth module implemented with full test coverage", "output": "..."} ⟧
+⟦⟦ COMPLETE_TASK {"id": "task-id", "summary": "Auth module implemented with full test coverage", "output": "..."} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -120,7 +120,7 @@ Mark a DAG task as done. Any agent can use this — non-lead agents relay comple
 Declare a batch of tasks in the DAG (directed acyclic graph).
 
 ```
-⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "title": "Build auth", "depends_on": []}, {"id": "api", "title": "Build API", "depends_on": ["auth"]}]} ⟧
+⟦⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "title": "Build auth", "depends_on": []}, {"id": "api", "title": "Build API", "depends_on": ["auth"]}]} ⟧⟧
 ```
 
 ### LOCK_FILE / UNLOCK_FILE
@@ -128,8 +128,8 @@ Declare a batch of tasks in the DAG (directed acyclic graph).
 Acquire or release a file lock to prevent concurrent edits.
 
 ```
-⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing auth"} ⟧
-⟦ UNLOCK_FILE {"filePath": "src/auth.ts"} ⟧
+⟦⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing auth"} ⟧⟧
+⟦⟦ UNLOCK_FILE {"filePath": "src/auth.ts"} ⟧⟧
 ```
 
 ### ACTIVITY
@@ -137,7 +137,7 @@ Acquire or release a file lock to prevent concurrent edits.
 Log an activity entry to the crew activity ledger.
 
 ```
-⟦ ACTIVITY {"actionType": "file_edit", "summary": "Updated auth module"} ⟧
+⟦⟦ ACTIVITY {"actionType": "file_edit", "summary": "Updated auth module"} ⟧⟧
 ```
 
 ### QUERY_CREW
@@ -145,7 +145,7 @@ Log an activity entry to the crew activity ledger.
 Request the current crew manifest (team roster, delegations, locks).
 
 ```
-⟦ QUERY_CREW ⟧
+⟦⟦ QUERY_CREW ⟧⟧
 ```
 
 The system responds with a formatted crew status message injected into the agent's context.
@@ -155,7 +155,7 @@ The system responds with a formatted crew status message injected into the agent
 Queue a message to another agent without interrupting their current work. Matches agents by ID prefix.
 
 ```
-⟦ DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "Can you check the auth tests?"} ⟧
+⟦⟦ DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "Can you check the auth tests?"} ⟧⟧
 ```
 
 ### QUERY_PEERS
@@ -163,7 +163,7 @@ Queue a message to another agent without interrupting their current work. Matche
 Discover other active agents available for direct messaging.
 
 ```
-⟦ QUERY_PEERS ⟧
+⟦⟦ QUERY_PEERS ⟧⟧
 ```
 
 ### ACQUIRE_CAPABILITY / RELEASE_CAPABILITY
@@ -171,9 +171,9 @@ Discover other active agents available for direct messaging.
 Temporarily gain capabilities beyond the agent's role.
 
 ```
-⟦ ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "found bug during development"} ⟧
-⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧
-⟦ LIST_CAPABILITIES ⟧
+⟦⟦ ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "found bug during development"} ⟧⟧
+⟦⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧⟧
+⟦⟦ LIST_CAPABILITIES ⟧⟧
 ```
 
 Available capabilities: `code-review`, `architecture`, `delegation`, `testing`, `devops`.
@@ -183,9 +183,9 @@ Available capabilities: `code-review`, `architecture`, `delegation`, `testing`, 
 Set reminders that fire after a delay, with optional repeat.
 
 ```
-⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧
-⟦ CANCEL_TIMER {"name": "check-build"} ⟧
-⟦ LIST_TIMERS ⟧
+⟦⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧⟧
+⟦⟦ CANCEL_TIMER {"name": "check-build"} ⟧⟧
+⟦⟦ LIST_TIMERS ⟧⟧
 ```
 
 ### SPAWN_AGENT
@@ -193,7 +193,7 @@ Set reminders that fire after a delay, with optional repeat.
 Request parent to create a new agent. Non-lead agents use this to request help:
 
 ```
-⟦ SPAWN_AGENT {"role": "developer", "task": "Help me fix the database migration"} ⟧
+⟦⟦ SPAWN_AGENT {"role": "developer", "task": "Help me fix the database migration"} ⟧⟧
 ```
 
 ### CANCEL_DELEGATION
@@ -201,7 +201,7 @@ Request parent to create a new agent. Non-lead agents use this to request help:
 Cancel an active delegation to an agent. The agent is terminated and the task is freed:
 
 ```
-⟦ CANCEL_DELEGATION {"agentId": "agent-id-prefix"} ⟧
+⟦⟦ CANCEL_DELEGATION {"agentId": "agent-id-prefix"} ⟧⟧
 ```
 
 ### COMMIT
@@ -209,7 +209,7 @@ Cancel an active delegation to an agent. The agent is terminated and the task is
 Commit changes from the agent's locked files. Auto-scopes to only files the agent has locked:
 
 ```
-⟦ COMMIT {"message": "feat: add input validation for all commands"} ⟧
+⟦⟦ COMMIT {"message": "feat: add input validation for all commands"} ⟧⟧
 ```
 
 Optional `files` parameter to commit specific files instead of all locked files.
@@ -219,7 +219,7 @@ Optional `files` parameter to commit specific files instead of all locked files.
 Send a message to all members of a chat group:
 
 ```
-⟦ GROUP_MESSAGE {"group": "backend-team", "content": "API design is finalized"} ⟧
+⟦⟦ GROUP_MESSAGE {"group": "backend-team", "content": "API design is finalized"} ⟧⟧
 ```
 
 ### REACT
@@ -227,7 +227,7 @@ Send a message to all members of a chat group:
 Add or remove an emoji reaction on a group chat message:
 
 ```
-⟦ REACT {"group": "backend-team", "messageId": "msg-id", "emoji": "👍"} ⟧
+⟦⟦ REACT {"group": "backend-team", "messageId": "msg-id", "emoji": "👍"} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -243,8 +243,8 @@ Toggle behavior: if the agent already reacted with that emoji, it is removed.
 Manage group membership:
 
 ```
-⟦ ADD_TO_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧
-⟦ REMOVE_FROM_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧
+⟦⟦ ADD_TO_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧⟧
+⟦⟦ REMOVE_FROM_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧⟧
 ```
 
 ### QUERY_GROUPS / LIST_GROUPS
@@ -252,7 +252,7 @@ Manage group membership:
 List all groups the agent belongs to, with member info and recent messages:
 
 ```
-⟦ QUERY_GROUPS ⟧
+⟦⟦ QUERY_GROUPS ⟧⟧
 ```
 
 ### ADD_DEPENDENCY
@@ -260,7 +260,7 @@ List all groups the agent belongs to, with member info and recent messages:
 Add dependencies between DAG tasks. Any agent can use this:
 
 ```
-⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 Validates that both tasks exist and the new dependency doesn't create a cycle. See [Auto-DAG](./auto-dag.md) for details.

@@ -14,35 +14,35 @@ Any agent can create groups. The lead is auto-included for visibility. Groups su
 
 **Group creation (any agent):**
 ```
-⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧
+⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧
 ```
 Creates a named group. Members are agent IDs (short 8-char prefixes work). The lead is automatically added. Responds with a confirmation including the group name and resolved member list.
 
 **Role-based membership:**
 ```
-⟦ CREATE_GROUP {"name": "frontend-team", "roles": ["developer", "designer"]} ⟧
+⟦⟦ CREATE_GROUP {"name": "frontend-team", "roles": ["developer", "designer"]} ⟧⟧
 ```
 Auto-adds all active agents with matching roles. Terminated/completed agents are excluded via `isTerminalStatus()` filter. Can be combined with explicit `members`.
 
 ```
-⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧
+⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧⟧
 ```
 Adds members to an existing group. The new member receives the group's recent message history (last 20 messages) so they have context.
 
 ```
-⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧
+⟦⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧⟧
 ```
 Removes members. The lead cannot be removed.
 
 **Any group member:**
 ```
-⟦ GROUP_MESSAGE {"group": "config-team", "content": "I found a pattern we should all follow..."} ⟧
+⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "I found a pattern we should all follow..."} ⟧⟧
 ```
 Sends a message to all other group members. The sender sees a delivery confirmation. Each recipient receives the message with the sender's role and ID.
 
 **Any agent — discover groups:**
 ```
-⟦ QUERY_GROUPS ⟧
+⟦⟦ QUERY_GROUPS ⟧⟧
 ```
 Lists all groups the agent belongs to, with member names/roles, message count, and last message preview (first 100 chars). Also aliased as `LIST_GROUPS`.
 
@@ -141,13 +141,13 @@ export class ChatGroupRegistry extends EventEmitter {
 
 #### AgentManager Integration
 
-Command regex patterns in the handler modules use `⟦ ⟧` delimiters:
+Command regex patterns in the handler modules use `⟦⟦ ⟧⟧` delimiters:
 ```typescript
-const CREATE_GROUP_REGEX = /⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧/s;
-const ADD_TO_GROUP_REGEX = /⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧/s;
-const REMOVE_FROM_GROUP_REGEX = /⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧/s;
-const GROUP_MESSAGE_REGEX = /⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧/s;
-const LIST_GROUPS_REGEX = /⟦\s*LIST_GROUPS\s*⟧/s;
+const CREATE_GROUP_REGEX = /⟦⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const ADD_TO_GROUP_REGEX = /⟦⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const REMOVE_FROM_GROUP_REGEX = /⟦⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const GROUP_MESSAGE_REGEX = /⟦⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
+const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
 ```
 
 New handlers:
@@ -164,16 +164,16 @@ In `buildContextManifest()`, if the agent belongs to groups, show them:
 == YOUR GROUPS ==
 - "config-team" (3 members: Developer, Architect, Code Reviewer)
 - "testing" (2 members: Developer, Critical Reviewer)
-Send messages: ⟦ GROUP_MESSAGE {"group": "config-team", "content": "..."} ⟧
+Send messages: ⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "..."} ⟧⟧
 ```
 
 In the lead's prompt, add to AVAILABLE COMMANDS:
 ```
 Create a chat group for agents working on related tasks:
-`⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧`
+`⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧`
 
 Send a message to a group:
-`⟦ GROUP_MESSAGE {"group": "config-team", "content": "Use factory pattern for services"} ⟧`
+`⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "Use factory pattern for services"} ⟧⟧`
 ```
 
 ### WebSocket Events (UI)
@@ -291,7 +291,7 @@ Group chat messages support emoji reactions. Agents and users can react to messa
 ### REACT Command
 
 ```
-⟦ REACT {"group": "config-team", "messageId": "msg-123", "emoji": "👍"} ⟧
+⟦⟦ REACT {"group": "config-team", "messageId": "msg-123", "emoji": "👍"} ⟧⟧
 ```
 
 | Field | Required | Description |

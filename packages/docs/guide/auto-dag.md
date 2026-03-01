@@ -59,11 +59,11 @@ Dependencies are detected through three complementary mechanisms, from most reli
 Include a `depends_on` array in the delegation payload:
 
 ```
-⟦ DELEGATE {"to": "agent-id", "task": "Review the API changes", "depends_on": ["implement-api"]} ⟧
+⟦⟦ DELEGATE {"to": "agent-id", "task": "Review the API changes", "depends_on": ["implement-api"]} ⟧⟧
 ```
 
 ```
-⟦ CREATE_AGENT {"role": "developer", "task": "Build the frontend", "depends_on": ["design-api", "setup-db"]} ⟧
+⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 This is the most reliable path — no inference needed, dependencies are exact.
@@ -74,19 +74,19 @@ When delegating to a `code-reviewer` or `critical-reviewer`, the system automati
 
 **Agent ID reference** — mentions an agent's ID in the task text:
 ```
-⟦ DELEGATE {"to": "reviewer-id", "task": "Review the fix by developer 0b85de78"} ⟧
+⟦⟦ DELEGATE {"to": "reviewer-id", "task": "Review the fix by developer 0b85de78"} ⟧⟧
 // → auto-links to the DAG task assigned to agent 0b85de78
 ```
 
 **Task ID reference** — mentions a DAG task ID:
 ```
-⟦ DELEGATE {"to": "reviewer-id", "task": "Review P0-2 autolink changes"} ⟧
+⟦⟦ DELEGATE {"to": "reviewer-id", "task": "Review P0-2 autolink changes"} ⟧⟧
 // → auto-links to task "p0-2-autolink"
 ```
 
 **Role reference** — mentions a role with "by" or "from":
 ```
-⟦ DELEGATE {"to": "reviewer-id", "task": "Review the API changes from the architect"} ⟧
+⟦⟦ DELEGATE {"to": "reviewer-id", "task": "Review the API changes from the architect"} ⟧⟧
 // → auto-links to the most recent architect task
 ```
 
@@ -95,7 +95,7 @@ When delegating to a `code-reviewer` or `critical-reviewer`, the system automati
 When Tiers 1 and 2 produce no dependencies and a Secretary agent is active, the system sends the Secretary a dependency analysis request. The Secretary uses LLM reasoning to evaluate whether the new task depends on any active tasks and can respond with:
 
 ```
-⟦ ADD_DEPENDENCY {"taskId": "auto-developer-fix-bugs-1a2b", "depends_on": ["implement-api"]} ⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "auto-developer-fix-bugs-1a2b", "depends_on": ["implement-api"]} ⟧⟧
 ```
 
 This is **asynchronous** — the task starts running immediately, and late-added dependencies are informational for DAG visualization and progress tracking.
@@ -111,7 +111,7 @@ When an agent completes its work (reports idle, sends a completion message, or e
 No manual `COMPLETE_TASK` call is needed from the lead. Agents can also explicitly complete their own task:
 
 ```
-⟦ COMPLETE_TASK {"summary": "Implemented the feature", "dagTaskId": "my-task-id"} ⟧
+⟦⟦ COMPLETE_TASK {"summary": "Implemented the feature", "dagTaskId": "my-task-id"} ⟧⟧
 ```
 
 ## The ADD_DEPENDENCY Command
@@ -119,7 +119,7 @@ No manual `COMPLETE_TASK` call is needed from the lead. Agents can also explicit
 Any agent can add dependencies between tasks using `ADD_DEPENDENCY`:
 
 ```
-⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 The system validates:
@@ -134,40 +134,40 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 ### Planned Work with Explicit DAG
 
 ```
-⟦ DECLARE_TASKS {"tasks": [
+⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "design-api", "role": "architect", "title": "Design REST API"},
   {"id": "impl-api", "role": "developer", "title": "Implement API", "depends_on": ["design-api"]},
   {"id": "review-api", "role": "code-reviewer", "title": "Review API", "depends_on": ["impl-api"]}
-]} ⟧
+]} ⟧⟧
 
-⟦ CREATE_AGENT {"role": "architect", "task": "Design the REST API", "dagTaskId": "design-api"} ⟧
+⟦⟦ CREATE_AGENT {"role": "architect", "task": "Design the REST API", "dagTaskId": "design-api"} ⟧⟧
 // Links to pre-declared task, marks it running
 ```
 
 ### Ad-Hoc Work with Auto-DAG
 
 ```
-⟦ DELEGATE {"to": "dev-agent-id", "task": "Fix the login bug reported by the user"} ⟧
+⟦⟦ DELEGATE {"to": "dev-agent-id", "task": "Fix the login bug reported by the user"} ⟧⟧
 // Auto-creates: "auto-developer-fix-login-bug-3x4y" → running
 
-⟦ DELEGATE {"to": "reviewer-id", "task": "Review the login fix by developer 0b85de78"} ⟧
+⟦⟦ DELEGATE {"to": "reviewer-id", "task": "Review the login fix by developer 0b85de78"} ⟧⟧
 // Auto-creates review task, auto-links dependency to 0b85de78's task
 ```
 
 ### Mixed Mode (Explicit + Auto)
 
 ```
-⟦ DECLARE_TASKS {"tasks": [
+⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "auth", "role": "developer", "title": "Build auth module"},
   {"id": "api", "role": "developer", "title": "Build API", "depends_on": ["auth"]}
-]} ⟧
+]} ⟧⟧
 
 // These link to declared tasks:
-⟦ CREATE_AGENT {"role": "developer", "task": "Build auth module", "dagTaskId": "auth"} ⟧
-⟦ CREATE_AGENT {"role": "developer", "task": "Build API", "dagTaskId": "api"} ⟧
+⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build auth module", "dagTaskId": "auth"} ⟧⟧
+⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build API", "dagTaskId": "api"} ⟧⟧
 
 // This ad-hoc task auto-creates since it's not in the DAG:
-⟦ DELEGATE {"to": "dev-id", "task": "Fix the CSS styling issue", "depends_on": ["api"]} ⟧
+⟦⟦ DELEGATE {"to": "dev-id", "task": "Fix the CSS styling issue", "depends_on": ["api"]} ⟧⟧
 // Auto-creates "auto-developer-fix-css-styling-5z6w" with explicit dependency on "api"
 ```
 

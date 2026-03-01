@@ -46,13 +46,13 @@ When enabled, worktree isolation provides:
 SQLite-backed mutual exclusion on file paths.
 
 ```
-Agent A: ⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing login"} ⟧
+Agent A: ⟦⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing login"} ⟧⟧
 System:  Lock acquired ✓
 
-Agent B: ⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "fixing bug"} ⟧
+Agent B: ⟦⟦ LOCK_FILE {"filePath": "src/auth.ts", "reason": "fixing bug"} ⟧⟧
 System:  Lock denied — held by Agent A (expires in 4m30s)
 
-Agent A: ⟦ UNLOCK_FILE {"filePath": "src/auth.ts"} ⟧
+Agent A: ⟦⟦ UNLOCK_FILE {"filePath": "src/auth.ts"} ⟧⟧
 System:  Lock released ✓
 ```
 
@@ -88,7 +88,7 @@ DELETE /api/coordination/locks/:path  — release: ?agentId=...
 The `COMMIT` command **executes** a scoped git commit server-side and verifies the result — it doesn't just suggest a command.
 
 ```
-⟦ COMMIT {"message": "feat: add login endpoint"} ⟧
+⟦⟦ COMMIT {"message": "feat: add login endpoint"} ⟧⟧
 ```
 
 **How it works:**

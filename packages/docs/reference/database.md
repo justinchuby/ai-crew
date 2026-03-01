@@ -132,7 +132,7 @@ This ensures plan state survives agent restarts and is available for post-mortem
 
 The `decisions` table supports a confirmation workflow with reason comments:
 
-1. An agent logs a decision via `⟦ DECISION {...} ⟧`
+1. An agent logs a decision via `⟦⟦ DECISION {...} ⟧⟧`
 2. If `needsConfirmation` is set, the decision appears in the lead dashboard's Decisions panel with "Accept" / "Reject" actions
 3. Users can provide a **reason comment** when accepting or rejecting — this context is fed back to agents
 4. Lead confirms or rejects via `POST /api/lead/:id/decisions/:decisionId/:action`

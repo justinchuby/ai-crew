@@ -63,7 +63,7 @@ AcpOutput renders five message variants:
 | `system` | Centered, muted | System messages (separators, notifications) |
 | `activity` | Inline, tiny timestamp | Activity events (tool calls, delegations, completions) |
 
-Agent text is parsed for inline markdown (`**bold**`, `*italic*`, `` `code` ``), tables, and `⟦ command ⟧` blocks (rendered as collapsible sections).
+Agent text is parsed for inline markdown (`**bold**`, `*italic*`, `` `code` ``), tables, and `⟦⟦ command ⟧⟧` blocks (rendered as collapsible sections).
 
 ## Streaming Implementation
 
@@ -97,7 +97,7 @@ The `agent:thinking` handler follows the same pattern — appending to the last 
 
 ### Unclosed Command Handling
 
-The handler detects unclosed `⟦ ... ⟧` command blocks and always appends to keep multi-token commands intact, even across message boundaries.
+The handler detects unclosed `⟦⟦ ... ⟧⟧` command blocks and always appends to keep multi-token commands intact, even across message boundaries.
 
 ## State Management
 
@@ -177,7 +177,7 @@ Messages sent to a busy agent are marked as `queued` and shown in a separate sec
 | **Token concatenation** | Prevents 100s of messages per turn | `useWebSocket.ts:94-111` |
 | **CSS text wrapping** | No JS layout calculation for variable heights | `whitespace-pre-wrap` on all message types |
 | **Content truncation** | Tool call output capped at 500 chars | `stringifyContent()` in `AcpOutput.tsx` |
-| **Collapsible commands** | `⟦ ⟧` blocks collapsed by default, render full text on demand | `CollapsibleCommandBlockSimple` |
+| **Collapsible commands** | `⟦⟦ ⟧⟧` blocks collapsed by default, render full text on demand | `CollapsibleCommandBlockSimple` |
 | **Mention filtering** | `useMemo` on active agents and mention suggestions | `ChatPanel.tsx:30-43` |
 
 ### What's Not Optimized (and Why)
