@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
@@ -88,9 +88,11 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
 
 export function MissionControlPage() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
-  const projectKeys = useLeadStore((s) => Object.keys(s.projects));
+  const projects = useLeadStore((s) => s.projects);
   const agents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
+
+  const projectKeys = Object.keys(projects);
 
   // Auto-discover lead agents from appStore if leadStore has no projects yet
   const leadAgents = useMemo(
@@ -101,13 +103,15 @@ export function MissionControlPage() {
   // Auto-select: prefer selectedLeadId, then leadStore projects, then any live lead agent
   const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? null;
 
-  // Auto-register discovered leads into leadStore so panels can use them
+  // Auto-register discovered leads into leadStore so panels can use them (run once per leadId)
+  const registeredRef = useRef<string | null>(null);
   useEffect(() => {
-    if (leadId && !projectKeys.includes(leadId)) {
+    if (leadId && leadId !== registeredRef.current && !projects[leadId]) {
+      registeredRef.current = leadId;
       useLeadStore.getState().addProject(leadId);
       useLeadStore.getState().selectLead(leadId);
     }
-  }, [leadId, projectKeys]);
+  }, [leadId, projects]);
 
   const teamAgents = useMemo(() => {
     if (!leadId) return [];
