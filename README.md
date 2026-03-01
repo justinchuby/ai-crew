@@ -7,7 +7,7 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 **Why AI Crew?** Instead of one AI agent doing everything sequentially, AI Crew runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
 
-> **Status**: Waves 1–20 complete. See [branch `team-work-2`](https://github.com/github/ai-crew/tree/team-work-2) for recent changes.
+> **Status**: Active development on [branch `team-work-3`](https://github.com/github/ai-crew/tree/team-work-3).
 
 ## Features
 
@@ -15,15 +15,15 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
 - **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
 - **12 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
-- **Task DAG** — Declarative task scheduling with dependencies; `PROGRESS` auto-reads DAG state when one exists
-- **Human-in-the-Loop** — Message any agent directly; queued messages show with blue bubbles and a spinner until delivered
+- **Task DAG** — Declarative task scheduling with dependencies; `PROGRESS` auto-reads DAG state when one exists. DAG auto-links to agents via `DELEGATE`/`CREATE_AGENT` — no manual tracking needed.
+- **Human-in-the-Loop** — Message any agent directly; queued messages show with blue bubbles and a spinner. Remove or reorder queued messages before delivery.
+- **System Pause/Resume** — Halt all message delivery system-wide; agents are notified to hold position. Queued messages stay in place until resumed.
 
 ### 💬 Communication
 - **Direct Messaging** — Agents send structured messages to each other by ID
 - **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
 - **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
 - **Broadcasts** — Send a message to every active agent at once
-- **Unread Badges** — Sidebar shows unread message counts for group chats
 
 ### 📈 Visualization & Monitoring
 - **Mission Control** — Single-screen project overview with 8 configurable panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards. Drag-and-drop panel reordering in Settings.
@@ -31,13 +31,14 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Token Economics** — Per-agent token breakdown with context pressure bars (80% yellow, 90% red warning thresholds)
 - **Proactive Alerts** — Automatic detection of stuck agents (10min), context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min)
 - **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint), agent reply highlighting via WebSocket
+- **User-Directed Message Highlighting** — Lead marks messages intended for the user with `@user`; these render with accent border + background to stand out from system reactions
 - **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed) with filter toggles
 - **Catch-Up Summary** — After 60s of inactivity, a floating banner summarizes what happened while you were away
 - **Project Health Header** — `CREW_UPDATE` messages include a health summary: completion %, agent fleet status, pending decisions, blocked tasks
 - **Project Grouping** — Group and filter projects in the Tasks view with duplicate task detection
 
 ### ✅ Decision & Progress Tracking
-- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; optimistic UI updates
+- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
 - **PROGRESS/DAG Consolidation** — A single `PROGRESS` command auto-reads DAG state, eliminating the need for separate queries
 - **Global Search** — Search across messages, tasks, decisions, and activity
 
@@ -192,9 +193,16 @@ Agents communicate via structured triple-bracket commands detected in their outp
 |---------|-------------|
 | `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `title`, `depends_on`. |
 | `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
-| `COMPLETE_TASK {"summary": "..."}` | Signal that the agent has finished its assigned task. *(Any agent)* |
+| `COMPLETE_TASK {"summary": "..."}` | Signal that the agent has finished its assigned task. Lead: completes a DAG task. Non-lead: signals done to parent. *(Any agent)* |
+| `TASK_STATUS` | Query current task DAG status. |
+| `PAUSE_TASK {"taskId": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
+| `RETRY_TASK {"taskId": "..."}` | Retry a failed task. *(Lead-only)* |
+| `SKIP_TASK {"taskId": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
+| `ADD_TASK {"task": {...}}` | Add a new task to an existing DAG. *(Lead-only)* |
+| `CANCEL_TASK {"taskId": "..."}` | Cancel a task. *(Lead-only)* |
+| `RESET_DAG` | Reset the entire DAG (clear all tasks). *(Lead-only)* |
 | `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
-| `QUERY_TASKS` | Query current task DAG status. |
+| `QUERY_TASKS` | Query current task DAG status (alias for TASK_STATUS). |
 | `CANCEL_DELEGATION {"delegationId": "...", "reason": "..."}` | Cancel an active delegation. |
 
 ### Coordination (All agents)
@@ -218,8 +226,8 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls, project grouping |
 | **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, duplicate detection |
 | **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns, hover tooltips |
-| **Group Chat** | Tabbed group chat with human participation, unread badges in sidebar, real-time messaging |
-| **Overview** | Progress tracking, decision management, global search |
+| **Group Chat** | Tabbed group chat with human participation, project-level tab grouping, real-time messaging |
+| **Overview** | Progress tracking, decision timeline grouped by project, global search |
 | **Settings** | Concurrency limits (1–50 agents), model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
 
 ## Tech Stack
@@ -231,7 +239,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
-- **Testing**: Vitest with v8 coverage, Codecov integration (1,180+ tests including 30 Task DAG E2E + 40 Timeline E2E)
+- **Testing**: Vitest with v8 coverage, Codecov integration (1,200+ tests including 30 Task DAG E2E + 40 Timeline E2E)
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
 ## Documentation

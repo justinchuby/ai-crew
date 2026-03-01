@@ -168,6 +168,48 @@
 
 ---
 
+### `GET /agents/:id/queue`
+
+**Description**: Returns summaries (first 100 chars) of each pending queued message for an agent.
+
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `id` | path | string | yes | Agent UUID |
+
+**Response**: `{ "agentId": "...", "queue": ["[USER MESSAGE] ...", "..."] }`
+
+---
+
+### `DELETE /agents/:id/queue/:index`
+
+**Description**: Removes a queued message by its zero-based index. The message is discarded and will never be delivered.
+
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `id` | path | string | yes | Agent UUID |
+| `index` | path | number | yes | Zero-based index in the pending queue |
+
+**Response**: `{ "ok": true, "queue": ["...remaining messages..."] }`
+
+---
+
+### `POST /agents/:id/queue/reorder`
+
+**Description**: Moves a queued message from one position to another, changing the delivery order.
+
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `id` | path | string | yes | Agent UUID |
+| `from` | body | number | yes | Source index (zero-based) |
+| `to` | body | number | yes | Destination index (zero-based) |
+
+**Response**: `{ "ok": true, "queue": ["...reordered messages..."] }`
+
+---
+
 ### `POST /agents/:id/permission`
 
 **Description**: Resolves a pending permission prompt for an agent (e.g. file write approval).
@@ -1203,6 +1245,36 @@
 
 ---
 
+### `POST /system/pause`
+
+**Description**: Pauses the entire system. Halts message delivery to all agents — queued messages stay in the queue. Running agents finish their current prompt but won't receive new messages. All running/idle agents are notified to hold position.
+
+**Parameters**: None
+
+**Response**: `{ "paused": true }`
+
+---
+
+### `POST /system/resume`
+
+**Description**: Resumes the system after a pause. All idle agents drain their pending message queues. Normal message delivery resumes.
+
+**Parameters**: None
+
+**Response**: `{ "paused": false }`
+
+---
+
+### `GET /system/status`
+
+**Description**: Returns the current system pause state.
+
+**Parameters**: None
+
+**Response**: `{ "paused": false }`
+
+---
+
 ### `GET /browse`
 
 **Description**: Lists non-hidden subdirectories of a path on the server filesystem. Powers the folder picker in the UI.
@@ -1358,18 +1430,36 @@ ws://localhost:3001?token=<your-token>
 
 | Event | Description |
 |-------|-------------|
-| `agent_output` | Streaming output chunk from an agent process |
-| `agent_status` | Agent status change (`idle`, `running`, `completed`, `failed`) |
-| `agent_spawned` | New agent created |
-| `agent_terminated` | Agent terminated |
-| `message_received` | Inter-agent message delivered |
-| `decision_created` | New decision logged |
-| `decision_updated` | Decision confirmed or rejected |
-| `delegation_created` | New task delegation |
-| `delegation_completed` | Delegation marked complete |
-| `lock_acquired` | File lock acquired |
-| `lock_released` | File lock released |
-| `group_message` | Message sent to a chat group |
-| `alert` | Proactive alert fired |
-| `project_updated` | Project metadata changed |
-| `crew_update` | Health summary broadcast from the lead |
+| `init` | Sent on connect with full agent list, locks, and `systemPaused` state |
+| `agent:text` | Streaming text output from an agent |
+| `agent:status` | Agent status change (`idle`, `running`, `completed`, `failed`) |
+| `agent:spawned` | New agent created — includes full agent JSON |
+| `agent:terminated` | Agent terminated |
+| `agent:exit` | Agent process exited with code |
+| `agent:tool_call` | Agent invoked a tool |
+| `agent:content` | Rich content from agent (image, audio, resource) |
+| `agent:thinking` | Agent thinking/reasoning text |
+| `agent:plan` | Agent plan updated |
+| `agent:permission_request` | Agent requesting tool permission |
+| `agent:session_ready` | Agent ACP session established |
+| `agent:context_compacted` | Agent context window compacted |
+| `agent:sub_spawned` | Child agent created by parent |
+| `agent:delegated` | Task delegated to agent |
+| `agent:completion_reported` | Agent reported task completion |
+| `agent:message_sent` | Inter-agent message delivered |
+| `agent:crashed` | Agent process crashed |
+| `agent:auto_restarted` | Agent automatically restarted after crash |
+| `agent:restart_limit` | Agent hit max restart limit |
+| `lead:decision` | New decision logged by lead |
+| `lead:progress` | Lead progress update |
+| `dag:updated` | Task DAG state changed |
+| `group:created` | Chat group created |
+| `group:message` | Message sent to a chat group |
+| `group:member_added` | Agent added to a group |
+| `group:member_removed` | Agent removed from a group |
+| `system:paused` | System pause state changed — `{ "paused": true/false }` |
+| `decision:confirmed` | Decision confirmed by user |
+| `decision:rejected` | Decision rejected by user |
+| `lock:acquired` | File lock acquired |
+| `lock:released` | File lock released |
+| `activity` | Activity ledger entry |
