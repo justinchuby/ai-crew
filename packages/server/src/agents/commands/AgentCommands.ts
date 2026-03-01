@@ -245,12 +245,27 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       };
       ctx.delegations.set(delegation.id, delegation);
 
+      // Link to DAG: mark the corresponding DAG task as running
+      let dagNote = '';
+      if (agent.role.id === 'lead') {
+        const dagTask = req.dagTaskId
+          ? ctx.taskDAG.getTask(agent.id, req.dagTaskId)
+          : ctx.taskDAG.findReadyTaskByRole(agent.id, role.id);
+        if (dagTask) {
+          const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
+          if (started) {
+            dagNote = ` [DAG: "${dagTask.id}" → running]`;
+            logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
+          }
+        }
+      }
+
       const taskPrompt = req.context ? `${req.task}\n\nContext: ${req.context}` : req.task;
       child.sendMessage(taskPrompt);
 
       const dupMatch = req.task ? findSimilarActiveDelegation(ctx, req.task, child.id) : null;
       const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
-      const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''}${dupNote}`;
+      const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''}${dagNote}${dupNote}`;
       agent.sendMessage(ackMsg);
       ctx.emit('agent:message_sent', {
         from: child.id, fromRole: role.name,
@@ -355,6 +370,20 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
 
     child.task = req.task;
 
+    // Link to DAG: mark the corresponding DAG task as running
+    let dagNote = '';
+    if (agent.role.id === 'lead') {
+      const dagTask = req.dagTaskId
+        ? ctx.taskDAG.getTask(agent.id, req.dagTaskId)
+        : ctx.taskDAG.findReadyTaskByRole(agent.id, child.role.id);
+      if (dagTask) {
+        const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
+        if (started) {
+          dagNote = ` [DAG: "${dagTask.id}" → running]`;
+          logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
+        }
+      }
+    }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
     if (req.context) ctx.agentMemory.store(agent.id, child.id, 'context', req.context.slice(0, 200));
 
@@ -367,7 +396,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const statusNote = child.status === 'running' ? ' (agent is busy — task queued)' : '';
     const dupMatch = findSimilarActiveDelegation(ctx, req.task, child.id);
     const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
-    const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote} — ${req.task.slice(0, 120)}${dupNote}`;
+    const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote}${dagNote} — ${req.task.slice(0, 120)}${dupNote}`;
     agent.sendMessage(ackMsg);
     ctx.emit('agent:message_sent', {
       from: child.id,

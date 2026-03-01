@@ -96,15 +96,19 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       declareTaskBatch: vi.fn().mockReturnValue({ tasks: [], conflicts: [] }),
       getStatus: vi.fn().mockReturnValue({ tasks: [], fileLockMap: {}, summary: {} }),
       getTaskByAgent: vi.fn().mockReturnValue(null),
+      getTask: vi.fn().mockReturnValue(null),
+      findReadyTaskByRole: vi.fn().mockReturnValue(null),
+      getTransitionError: vi.fn().mockReturnValue(null),
       completeTask: vi.fn().mockReturnValue([]),
       failTask: vi.fn(),
-      startTask: vi.fn(),
+      startTask: vi.fn().mockReturnValue(null),
       pauseTask: vi.fn(),
       retryTask: vi.fn(),
       skipTask: vi.fn(),
       resolveReady: vi.fn().mockReturnValue([]),
       addTask: vi.fn(),
       cancelTask: vi.fn(),
+      resetDAG: vi.fn().mockReturnValue(0),
     } as any,
     deferredIssueRegistry: {
       add: vi.fn().mockReturnValue({ id: 'issue-1' }),
@@ -1087,6 +1091,172 @@ describe('CommandDispatcher', () => {
       dispatcher.notifyParentOfIdle(child);
 
       expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
+    });
+  });
+
+  // ── DELEGATE → DAG auto-linking ────────────────────────────────────
+
+  describe('DELEGATE → DAG auto-linking', () => {
+    it('links to DAG task via explicit dagTaskId', () => {
+      const child = makeChildAgent(leadAgent.id);
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      const dagTask = { id: 'auth-impl', dagStatus: 'ready', role: 'developer' };
+      (ctx.taskDAG.getTask as any).mockReturnValue(dagTask);
+      (ctx.taskDAG.startTask as any).mockReturnValue(dagTask);
+
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "implement auth", "dagTaskId": "auth-impl"} ]]]`);
+
+      expect(ctx.taskDAG.getTask).toHaveBeenCalledWith(leadAgent.id, 'auth-impl');
+      expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(leadAgent.id, 'auth-impl', child.id);
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('DAG: "auth-impl"'),
+      );
+    });
+
+    it('auto-matches DAG task by role when no dagTaskId', () => {
+      const child = makeChildAgent(leadAgent.id);
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      const dagTask = { id: 'api-build', dagStatus: 'ready', role: 'developer' };
+      (ctx.taskDAG.findReadyTaskByRole as any).mockReturnValue(dagTask);
+      (ctx.taskDAG.startTask as any).mockReturnValue(dagTask);
+
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "build API"} ]]]`);
+
+      expect(ctx.taskDAG.findReadyTaskByRole).toHaveBeenCalledWith(leadAgent.id, 'developer');
+      expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(leadAgent.id, 'api-build', child.id);
+    });
+
+    it('skips DAG linking when no matching task found', () => {
+      const child = makeChildAgent(leadAgent.id);
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
+      (ctx.taskDAG.findReadyTaskByRole as any).mockReturnValue(null);
+
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "review code"} ]]]`);
+
+      expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
+    });
+
+    it('does not link DAG for non-lead delegators (architect)', () => {
+      const architectAgent = makeAgent({
+        id: 'agent-arch-0009-0000-000000000009',
+        role: makeRole({ id: 'architect', name: 'Architect' }),
+      });
+      const child = makeChildAgent(architectAgent.id, {
+        id: 'agent-archkid-0010-000000000010',
+        parentId: architectAgent.id,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([architectAgent, child]);
+
+      dispatch(dispatcher, architectAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "implement API"} ]]]`);
+
+      expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── CREATE_AGENT → DAG auto-linking ────────────────────────────────
+
+  describe('CREATE_AGENT → DAG auto-linking', () => {
+    it('links to DAG task via explicit dagTaskId', () => {
+      const child = makeAgent({
+        id: 'agent-new-0099',
+        role: makeRole(),
+        parentId: leadAgent.id,
+      });
+      (ctx.roleRegistry.get as any).mockReturnValue(makeRole());
+      (ctx.spawnAgent as any).mockReturnValue(child);
+      const dagTask = { id: 'auth-impl', dagStatus: 'ready', role: 'developer' };
+      (ctx.taskDAG.getTask as any).mockReturnValue(dagTask);
+      (ctx.taskDAG.startTask as any).mockReturnValue(dagTask);
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "implement auth", "dagTaskId": "auth-impl"} ]]]');
+
+      expect(ctx.taskDAG.getTask).toHaveBeenCalledWith(leadAgent.id, 'auth-impl');
+      expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(leadAgent.id, 'auth-impl', child.id);
+    });
+
+    it('auto-matches DAG task by role when no dagTaskId', () => {
+      const child = makeAgent({
+        id: 'agent-new-0099',
+        role: makeRole(),
+        parentId: leadAgent.id,
+      });
+      (ctx.roleRegistry.get as any).mockReturnValue(makeRole());
+      (ctx.spawnAgent as any).mockReturnValue(child);
+      const dagTask = { id: 'api-build', dagStatus: 'ready', role: 'developer' };
+      (ctx.taskDAG.findReadyTaskByRole as any).mockReturnValue(dagTask);
+      (ctx.taskDAG.startTask as any).mockReturnValue(dagTask);
+
+      dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "build API"} ]]]');
+
+      expect(ctx.taskDAG.findReadyTaskByRole).toHaveBeenCalledWith(leadAgent.id, 'developer');
+      expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(leadAgent.id, 'api-build', child.id);
+    });
+  });
+
+  // ── COMPLETE_TASK ──────────────────────────────────────────────────
+
+  describe('COMPLETE_TASK', () => {
+    it('lead completes a DAG task by ID', () => {
+      (ctx.taskDAG.getTransitionError as any).mockReturnValue(null);
+      (ctx.taskDAG.completeTask as any).mockReturnValue([{ id: 'task-2' }]);
+
+      dispatch(dispatcher, leadAgent, '[[[ COMPLETE_TASK {"id": "task-1", "summary": "Auth done"} ]]]');
+
+      expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('task-1'),
+      );
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('task-2'),
+      );
+    });
+
+    it('lead gets error for non-existent task', () => {
+      (ctx.taskDAG.getTransitionError as any).mockReturnValue({
+        taskId: 'task-999',
+        currentStatus: 'not_found',
+        attemptedAction: 'complete',
+        validStatuses: ['running', 'ready'],
+      });
+
+      dispatch(dispatcher, leadAgent, '[[[ COMPLETE_TASK {"id": "task-999"} ]]]');
+
+      expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('task not found'),
+      );
+    });
+
+    it('lead requires id field', () => {
+      dispatch(dispatcher, leadAgent, '[[[ COMPLETE_TASK {"summary": "done"} ]]]');
+
+      expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('requires an "id" field'),
+      );
+    });
+
+    it('non-lead agent signals completion to parent', () => {
+      const devAgent = makeAgent({
+        id: 'agent-dev-0099',
+        role: makeRole(),
+        parentId: leadAgent.id,
+      });
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : undefined,
+      );
+
+      dispatch(dispatcher, devAgent, '[[[ COMPLETE_TASK {"summary": "Auth module done"} ]]]');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('completed task'),
+      );
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Auth module done'),
+      );
+      expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Task completion signaled'),
+      );
     });
   });
 });

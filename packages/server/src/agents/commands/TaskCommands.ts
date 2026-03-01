@@ -1,7 +1,7 @@
 /**
  * Task DAG command handlers.
  *
- * Commands: DECLARE_TASKS, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
+ * Commands: DECLARE_TASKS, COMPLETE_TASK, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
  *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG
  */
 import type { Agent } from '../Agent.js';
@@ -18,6 +18,7 @@ const RETRY_TASK_REGEX = /\[\[\[\s*RETRY_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const SKIP_TASK_REGEX = /\[\[\[\s*SKIP_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const ADD_TASK_REGEX = /\[\[\[\s*ADD_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const CANCEL_TASK_REGEX = /\[\[\[\s*CANCEL_TASK\s*(\{.*?\})\s*\]\]\]/s;
+const COMPLETE_TASK_REGEX = /\[\[\[\s*COMPLETE_TASK\s*(\{.*?\})\s*\]\]\]/s;
 const RESET_DAG_REGEX = /\[\[\[\s*RESET_DAG\s*\]\]\]/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -172,11 +173,59 @@ function handleResetDAG(ctx: CommandHandlerContext, agent: Agent, _data: string)
   }
 }
 
+function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  const match = data.match(COMPLETE_TASK_REGEX);
+  if (!match) return;
+
+  try {
+    const req = JSON.parse(match[1]);
+
+    // Non-lead agents: signal delegation completion to parent
+    if (agent.role.id !== 'lead') {
+      if (agent.parentId) {
+        const parent = ctx.getAgent(agent.parentId);
+        if (parent) {
+          const summary = req.summary || '(no summary)';
+          parent.sendMessage(`[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) completed task.\nSummary: ${summary}`);
+          ctx.emit('agent:message_sent', {
+            from: agent.id, fromRole: agent.role.name,
+            to: parent.id, toRole: parent.role.name,
+            content: `COMPLETE_TASK: ${summary}`,
+          });
+        }
+      }
+      agent.sendMessage(`[System] Task completion signaled to parent.`);
+      return;
+    }
+
+    // Lead: complete a DAG task by ID
+    if (!req.id) {
+      agent.sendMessage('[System] COMPLETE_TASK requires an "id" field (the DAG task ID).');
+      return;
+    }
+    const error = ctx.taskDAG.getTransitionError(agent.id, req.id, 'complete');
+    if (error) {
+      agent.sendMessage(`[System] Cannot complete task "${req.id}": ${error.currentStatus === 'not_found' ? 'task not found.' : `current status is "${error.currentStatus}". Must be running or ready.`}`);
+      return;
+    }
+    const newlyReady = ctx.taskDAG.completeTask(agent.id, req.id);
+    let msg = `[System] Task "${req.id}" marked as done.`;
+    if (newlyReady && newlyReady.length > 0) {
+      const readyNames = newlyReady.map(d => d.id).join(', ');
+      msg += ` Newly ready tasks: ${readyNames}. Use DELEGATE or CREATE_AGENT to assign them.`;
+    }
+    agent.sendMessage(msg);
+  } catch (err: any) {
+    agent.sendMessage(`[System] COMPLETE_TASK error: ${err.message}`);
+  }
+}
+
 // ── Module export ─────────────────────────────────────────────────────
 
 export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => handleDeclareTasks(ctx, a, d) },
+    { regex: COMPLETE_TASK_REGEX, name: 'COMPLETE_TASK', handler: (a, d) => handleCompleteTask(ctx, a, d) },
     { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => handleTaskStatus(ctx, a, _d) },
     { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => handleTaskStatus(ctx, a, _d) },
     { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d) },

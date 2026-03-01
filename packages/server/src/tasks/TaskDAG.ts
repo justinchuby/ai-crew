@@ -452,9 +452,10 @@ export class TaskDAG extends EventEmitter {
     return { tasks, fileLockMap, summary };
   }
 
-  /** Find task by assigned agent ID */
+  /** Find task by assigned agent ID (checks running first, then ready as fallback) */
   getTaskByAgent(leadId: string, agentId: string): DagTask | null {
-    const row = this.db.drizzle
+    // Primary: look for running tasks assigned to this agent
+    const running = this.db.drizzle
       .select()
       .from(dagTasks)
       .where(and(
@@ -462,6 +463,33 @@ export class TaskDAG extends EventEmitter {
         eq(dagTasks.assignedAgentId, agentId),
         eq(dagTasks.dagStatus, 'running'),
       ))
+      .get();
+    if (running) return rowToTask(running);
+
+    // Fallback: look for ready tasks assigned to this agent (edge case safety net)
+    const ready = this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(and(
+        eq(dagTasks.leadId, leadId),
+        eq(dagTasks.assignedAgentId, agentId),
+        eq(dagTasks.dagStatus, 'ready'),
+      ))
+      .get();
+    return ready ? rowToTask(ready) : null;
+  }
+
+  /** Find a ready DAG task matching a role (for auto-linking DELEGATE to DAG) */
+  findReadyTaskByRole(leadId: string, role: string): DagTask | null {
+    const row = this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(and(
+        eq(dagTasks.leadId, leadId),
+        eq(dagTasks.role, role),
+        eq(dagTasks.dagStatus, 'ready'),
+      ))
+      .orderBy(desc(dagTasks.priority), asc(dagTasks.createdAt))
       .get();
     return row ? rowToTask(row) : null;
   }

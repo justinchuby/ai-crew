@@ -588,6 +588,68 @@ describe('TaskDAG', () => {
       dag.completeTask('lead-1', 'a');
       expect(dag.getTaskByAgent('lead-1', 'agent-1')).toBeNull();
     });
+
+    it('falls back to ready task with assigned agent', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      // Manually assign agent without calling startTask (simulates the gap)
+      db.run(
+        `UPDATE dag_tasks SET assigned_agent_id = 'agent-1' WHERE id = 'a' AND lead_id = 'lead-1'`,
+      );
+      const task = dag.getTaskByAgent('lead-1', 'agent-1');
+      expect(task).not.toBeNull();
+      expect(task!.id).toBe('a');
+      expect(task!.dagStatus).toBe('ready');
+    });
+
+    it('prefers running over ready when both exist', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      // Assign same agent to 'b' as ready (edge case)
+      db.run(
+        `UPDATE dag_tasks SET assigned_agent_id = 'agent-1' WHERE id = 'b' AND lead_id = 'lead-1'`,
+      );
+      const task = dag.getTaskByAgent('lead-1', 'agent-1');
+      expect(task).not.toBeNull();
+      expect(task!.id).toBe('a');
+      expect(task!.dagStatus).toBe('running');
+    });
+  });
+
+  describe('findReadyTaskByRole', () => {
+    it('finds a ready task matching the role', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'developer' },
+        { id: 'b', role: 'reviewer' },
+      ]);
+      const task = dag.findReadyTaskByRole('lead-1', 'developer');
+      expect(task).not.toBeNull();
+      expect(task!.id).toBe('a');
+      expect(task!.role).toBe('developer');
+    });
+
+    it('returns null when no ready task for role', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'developer' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      expect(dag.findReadyTaskByRole('lead-1', 'developer')).toBeNull();
+    });
+
+    it('returns highest priority ready task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'low', role: 'developer', priority: 1 },
+        { id: 'high', role: 'developer', priority: 10 },
+      ]);
+      const task = dag.findReadyTaskByRole('lead-1', 'developer');
+      expect(task).not.toBeNull();
+      expect(task!.id).toBe('high');
+    });
+
+    it('returns null for non-existent role', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'developer' }]);
+      expect(dag.findReadyTaskByRole('lead-1', 'designer')).toBeNull();
+    });
   });
 
   describe('getTasks', () => {
