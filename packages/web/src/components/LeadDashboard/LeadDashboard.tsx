@@ -14,6 +14,7 @@ import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
+import { agentStatusText } from '../../utils/statusColors';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -2160,10 +2161,6 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
 }
 
 function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
-  const STATUS_COLOR: Record<string, string> = {
-    creating: 'text-th-text-muted', running: 'text-blue-400', idle: 'text-yellow-600 dark:text-yellow-400',
-    completed: 'text-green-400', failed: 'text-red-400',
-  };
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
 
@@ -2179,7 +2176,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
         ) : (
           agents.map((agent: any) => {
             const delegation = [...delegations].reverse().find((d: any) => d.toAgentId === agent.id);
-            const colorClass = STATUS_COLOR[agent.status] || 'text-th-text-muted';
+            const colorClass = agentStatusText(agent.status);
             return (
               <div
                 key={agent.id}
@@ -2254,7 +2251,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-semibold text-th-text">{selectedAgent.role.name}</span>
-                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${STATUS_COLOR[selectedAgent.status] || 'text-th-text-muted'} bg-th-bg-muted`}>
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${agentStatusText(selectedAgent.status)} bg-th-bg-muted`}>
                     {selectedAgent.status}
                   </span>
                 </div>
