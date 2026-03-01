@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useLeadStore } from '../../stores/leadStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,33 @@ export function CommandPalette({ onClose, onOpenSearch }: Props) {
           const next = store.resolvedTheme === 'dark' ? 'light' : 'dark';
           store.setThemeMode(next);
           onClose();
+        },
+      },
+      {
+        id: 'action-export',
+        label: 'Export Session',
+        description: 'Export current project session to disk (summary, agents, decisions, DAG)',
+        icon: '📦',
+        category: 'action',
+        action: async () => {
+          const leadId = useLeadStore.getState().selectedLeadId;
+          if (!leadId || leadId.startsWith('project:')) {
+            alert('Select an active project first');
+            onClose();
+            return;
+          }
+          onClose();
+          try {
+            const res = await fetch(`/api/export/${leadId}`);
+            const data = await res.json();
+            if (data.error) {
+              alert(`Export failed: ${data.error}`);
+            } else {
+              alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+            }
+          } catch {
+            alert('Export failed — server may be unavailable');
+          }
         },
       },
 

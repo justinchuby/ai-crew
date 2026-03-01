@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter, Download } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
@@ -1206,6 +1206,26 @@ export function LeadDashboard({ api, ws }: Props) {
                   className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
                 >
                   copy
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/export/${selectedLeadId}`);
+                      const data = await res.json();
+                      if (data.error) {
+                        alert(`Export failed: ${data.error}`);
+                      } else {
+                        alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+                      }
+                    } catch {
+                      alert('Export failed — server may be unavailable');
+                    }
+                  }}
+                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-1"
+                  title="Export session to disk (summary, agents, decisions, DAG)"
+                >
+                  <Download className="w-3 h-3" />
+                  export
                 </button>
               </div>
             )}
