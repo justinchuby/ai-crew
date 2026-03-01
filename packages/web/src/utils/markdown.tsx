@@ -25,20 +25,40 @@ export function AgentIdBadge({ id, className = '' }: { id: string; className?: s
   );
 }
 
+/**
+ * Resolve a mention token to an agent.
+ * Supports @hexId (e.g. @a1b2c3d4) and @role-name (e.g. @developer, @code-reviewer).
+ * For role matches, returns the first agent with that role. Hex ID takes priority.
+ */
+function resolveMention(token: string, agents: Array<MentionAgent>): MentionAgent | undefined {
+  // Try hex ID match first
+  if (/^[a-f0-9]{4,8}$/.test(token)) {
+    return agents.find((a) => a.id.startsWith(token));
+  }
+  // Try role name/id match (case-insensitive)
+  const lower = token.toLowerCase();
+  return agents.find((a) =>
+    a.role.id?.toLowerCase() === lower ||
+    a.role.name.toLowerCase() === lower ||
+    a.role.name.toLowerCase().replace(/\s+/g, '-') === lower,
+  );
+}
+
 /** Render text with @mentions as clickable agent badges with detail tooltips */
 export function MentionText({ text, agents, onClickAgent }: {
   text: string;
   agents: Array<MentionAgent>;
   onClickAgent?: (agentId: string) => void;
 }) {
-  const MENTION_RE = /@([a-f0-9]{4,8})\b/g;
+  // Match @hexId or @role-name (hyphenated words like "code-reviewer")
+  const MENTION_RE = /@([a-f0-9]{4,8}|[a-zA-Z][\w-]*)\b/g;
   const parts: React.ReactNode[] = [];
   let lastIdx = 0;
   let match: RegExpExecArray | null;
 
   while ((match = MENTION_RE.exec(text)) !== null) {
-    const shortId = match[1];
-    const agent = agents.find((a) => a.id.startsWith(shortId));
+    const token = match[1];
+    const agent = resolveMention(token, agents);
     if (agent) {
       if (match.index > lastIdx) {
         parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
@@ -50,7 +70,7 @@ export function MentionText({ text, agents, onClickAgent }: {
             style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
             onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
           >
-            @{agent.role.name.toLowerCase()}-{shortId.slice(0, 6)}
+            @{agent.role.name.toLowerCase()}-{agent.id.slice(0, 6)}
           </span>
         </AgentMentionTooltip>,
       );
@@ -88,7 +108,7 @@ function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
             </code>
           );
         }
-        if (mentionAgents && mentionAgents.length > 0 && /@[a-f0-9]{4,8}\b/.test(part)) {
+        if (mentionAgents && mentionAgents.length > 0 && /@(?:[a-f0-9]{4,8}|[a-zA-Z][\w-]*)\b/.test(part)) {
           return <MentionText key={i} text={part} agents={mentionAgents} onClickAgent={onMentionClick} />;
         }
         return <span key={i}>{part}</span>;
