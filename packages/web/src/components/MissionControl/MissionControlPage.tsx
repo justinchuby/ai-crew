@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
@@ -92,8 +92,22 @@ export function MissionControlPage() {
   const agents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
 
-  // Auto-select first lead if none selected
-  const leadId = selectedLeadId ?? projectKeys[0] ?? null;
+  // Auto-discover lead agents from appStore if leadStore has no projects yet
+  const leadAgents = useMemo(
+    () => agents.filter((a) => a.role?.id === 'lead' && !a.parentId),
+    [agents],
+  );
+
+  // Auto-select: prefer selectedLeadId, then leadStore projects, then any live lead agent
+  const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? null;
+
+  // Auto-register discovered leads into leadStore so panels can use them
+  useEffect(() => {
+    if (leadId && !projectKeys.includes(leadId)) {
+      useLeadStore.getState().addProject(leadId);
+      useLeadStore.getState().selectLead(leadId);
+    }
+  }, [leadId, projectKeys]);
 
   const teamAgents = useMemo(() => {
     if (!leadId) return [];
