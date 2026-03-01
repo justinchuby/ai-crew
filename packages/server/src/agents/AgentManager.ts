@@ -739,6 +739,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this._systemPaused = false;
     for (const agent of this.agents.values()) {
       agent.systemPaused = false;
+      // Notify running/idle agents that the system has resumed
+      if (agent.status === 'running' || agent.status === 'idle') {
+        agent.queueMessage('[System] ▶️ The system has been resumed. You may continue your work.');
+      }
     }
     this.emit('system:paused', { paused: false });
     logger.info('system', 'System resumed by user');
