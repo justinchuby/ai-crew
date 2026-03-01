@@ -99,6 +99,9 @@ export class CommandDispatcher {
     let buf = this.textBuffers.get(agent.id) || '';
     if (!buf) return;
 
+    // Normalize legacy triple-bracket delimiters to Unicode brackets
+    buf = CommandDispatcher.normalizeBrackets(buf);
+
     let found = true;
     while (found) {
       found = false;
@@ -189,6 +192,35 @@ export class CommandDispatcher {
   }
 
   // ── Static helpers ─────────────────────────────────────────────────
+
+  /**
+   * Normalize all supported delimiter syntaxes to single Unicode brackets
+   * so downstream regex patterns only need to match one format.
+   *
+   * Supported input syntaxes (all produce single Unicode bracket output):
+   *   - Doubled Unicode brackets: two open-brackets ... two close-brackets (new preferred syntax)
+   *   - Single Unicode brackets: open-bracket ... close-bracket (current syntax)
+   *   - Legacy triple square brackets: `[[[` ... `]]]` (deprecated, backward compat)
+   *
+   * Backslash-escaped brackets produce inert placeholder characters that
+   * will not be matched by command regexes. The placeholders (U+FFFC) are
+   * visually neutral in output text.
+   */
+  static normalizeBrackets(text: string): string {
+    // 1. Replace backslash-escaped brackets with inert placeholders
+    //    so they are never matched as command delimiters
+    let result = text
+      .replace(/\\⟦/g, '\uFFFC')
+      .replace(/\\⟧/g, '\uFFFD');
+
+    // 2. Normalize doubled Unicode brackets to single
+    result = result.replace(/⟦⟦/g, '⟦').replace(/⟧⟧/g, '⟧');
+
+    // 3. Normalize legacy triple square brackets to single Unicode
+    result = result.replace(/\[\[\[/g, '⟦').replace(/\]\]\]/g, '⟧');
+
+    return result;
+  }
 
   /**
    * Check if a position in the buffer is nested inside a ⟦ ⟧ command block
