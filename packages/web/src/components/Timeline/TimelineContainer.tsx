@@ -215,6 +215,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const [focusedLaneIdx, setFocusedLaneIdx] = useState(-1);
   const [sortDirection, setSortDirection] = useState<SortDirection>('oldest-first');
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const userCollapsedRef = useRef<Set<string>>(new Set());
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -330,17 +331,24 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const toggleExpand = useCallback((id: string) => {
     setExpandedAgents(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        userCollapsedRef.current.add(id);
+      } else {
+        next.add(id);
+        userCollapsedRef.current.delete(id);
+      }
       return next;
     });
   }, []);
 
   // Auto-expand agents with failed segments so errors are visible
+  // Skip agents the user has explicitly collapsed
   useEffect(() => {
     const failedIds = data.agents
       .filter(a => a.segments.some(s => s.status === 'failed'))
-      .map(a => a.id);
+      .map(a => a.id)
+      .filter(id => !userCollapsedRef.current.has(id));
     if (failedIds.length > 0) {
       setExpandedAgents(prev => {
         const next = new Set(prev);
@@ -472,7 +480,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         }
         break;
       case 'f':
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey && e.target === containerRef.current) {
           e.preventDefault();
           containerRef.current?.dispatchEvent(new CustomEvent('timeline:focus-filter', { bubbles: true }));
         }
