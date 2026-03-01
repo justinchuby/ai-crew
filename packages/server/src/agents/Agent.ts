@@ -67,6 +67,8 @@ export class Agent {
   public plan: PlanEntry[] = [];
   public toolCalls: ToolCallInfo[] = [];
   public messages: string[] = [];
+  /** Index into messages[] marking the start of the current task's output */
+  public taskOutputStartIndex: number = 0;
   public sessionId: string | null = null;
   public projectName?: string;
   public projectId?: string;
@@ -516,6 +518,16 @@ CREW_UPDATE ⟧⟧`;
   getRecentOutput(maxChars = 8000): string {
     let result = '';
     for (let i = this.messages.length - 1; i >= 0 && result.length < maxChars; i--) {
+      result = this.messages[i] + result;
+    }
+    return result.length > maxChars ? result.slice(-maxChars) : result;
+  }
+
+  /** Get output scoped to the current task (from taskOutputStartIndex onward) */
+  getTaskOutput(maxChars = 16000): string {
+    let result = '';
+    const startIdx = Math.max(this.taskOutputStartIndex, 0);
+    for (let i = this.messages.length - 1; i >= startIdx && result.length < maxChars; i--) {
       result = this.messages[i] + result;
     }
     return result.length > maxChars ? result.slice(-maxChars) : result;
