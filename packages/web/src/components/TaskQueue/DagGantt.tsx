@@ -5,7 +5,8 @@
  * time-range. Dependency edges are drawn as SVG cubic-bezier curves.
  * The critical path (longest-duration dependency chain) is highlighted.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ const ROW_H   = 28; // bar height in px
 const ROW_GAP = 6;  // vertical gap between rows
 const LABEL_W = 176; // fixed label column width
 const VB_W    = 1000; // SVG viewBox virtual width
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 0.5;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -134,6 +139,13 @@ function computeCriticalPath(tasks: GanttTask[], now: number): Set<string> {
 export function DagGantt({ tasks }: DagGanttProps) {
   const now = Date.now();
 
+  const [zoom, setZoom] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomIn = useCallback(() => setZoom(z => Math.min(z + ZOOM_STEP, MAX_ZOOM)), []);
+  const handleZoomOut = useCallback(() => setZoom(z => Math.max(z - ZOOM_STEP, MIN_ZOOM)), []);
+  const handleZoomReset = useCallback(() => setZoom(1), []);
+
   const [tooltip, setTooltip] = useState<{
     task: GanttTask;
     x: number;
@@ -177,135 +189,182 @@ export function DagGantt({ tasks }: DagGanttProps) {
 
   return (
     <div className="relative select-none text-th-text">
-      {/* ── Time axis header ── */}
-      <div className="flex mb-1.5" style={{ paddingLeft: LABEL_W }}>
-        <div className="flex-1 flex justify-between text-[10px] text-th-text-muted px-1">
+      {/* ── Zoom controls ── */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5" role="toolbar" aria-label="Gantt chart zoom controls">
+          <button
+            onClick={handleZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            aria-label="Zoom out"
+            className="p-1 rounded text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 disabled:opacity-30 transition-colors"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <span className="text-[10px] text-th-text-muted min-w-[3ch] text-center">{zoom === 1 ? '1×' : `${zoom}×`}</span>
+          <button
+            onClick={handleZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            aria-label="Zoom in"
+            className="p-1 rounded text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 disabled:opacity-30 transition-colors"
+          >
+            <ZoomIn size={14} />
+          </button>
+          {zoom !== 1 && (
+            <button
+              onClick={handleZoomReset}
+              aria-label="Reset zoom"
+              className="p-1 rounded text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 transition-colors"
+            >
+              <RotateCcw size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* ── Time axis header ── */}
+        <div className="text-[10px] text-th-text-muted flex gap-4">
           <span>{fmtTime(minTime)}</span>
-          <span>{fmtTime(minTime + timeRange * 0.5)}</span>
+          <span>—</span>
           <span>{fmtTime(minTime + timeRange)}</span>
         </div>
       </div>
 
-      {/* ── Main body ── */}
-      <div className="flex" style={{ height: totalH }}>
-        {/* Label column */}
-        <div className="shrink-0 relative overflow-hidden" style={{ width: LABEL_W }}>
-          {tasks.map((task, i) => (
-            <div
-              key={task.id}
-              className={`absolute flex items-center gap-1 pr-2 ${
-                criticalPath.has(task.id) ? 'text-orange-300' : 'text-th-text-alt'
-              }`}
-              style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H, width: '100%' }}
-            >
-              {criticalPath.has(task.id) && (
-                <span className="text-orange-400 text-[9px] shrink-0 leading-none">★</span>
-              )}
-              <span className="text-[11px] truncate leading-tight">{task.title}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Timeline column */}
-        <div className="flex-1 relative overflow-hidden border-l border-th-border/50">
-          {/* Subtle vertical grid lines */}
-          {[0.25, 0.5, 0.75].map(p => (
-            <div
-              key={p}
-              className="absolute top-0 bottom-0 w-px bg-th-border/20 pointer-events-none"
-              style={{ left: `${p * 100}%` }}
-            />
-          ))}
-
-          {/* Alternating row backgrounds */}
-          {tasks.map((_, i) => (
-            <div
-              key={i}
-              className={`absolute w-full pointer-events-none ${i % 2 === 0 ? 'bg-th-bg-alt/10' : ''}`}
-              style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H }}
-            />
-          ))}
-
-          {/* Task bars */}
-          {tasks.map((task, i) => {
-            const start     = task.startedAt  ?? task.createdAt ?? now;
-            const end       = task.completedAt ?? now;
-            const leftPct   = Math.max(0, ((start - minTime) / timeRange) * 100);
-            const widthPct  = Math.max(0.3, ((end - start) / timeRange) * 100);
-            const onCrit    = criticalPath.has(task.id);
-
-            return (
+      {/* ── Scrollable main body ── */}
+      <div
+        ref={scrollRef}
+        className="overflow-auto max-h-[60vh] border border-th-border/30 rounded"
+        role="region"
+        aria-label="Gantt chart scrollable area"
+        tabIndex={0}
+      >
+        <div className="flex" style={{ height: totalH, minWidth: `${100 * zoom}%` }}>
+          {/* Label column */}
+          <div className="shrink-0 relative sticky left-0 z-10 bg-th-bg" style={{ width: LABEL_W }}>
+            {tasks.map((task, i) => (
               <div
                 key={task.id}
-                className={`absolute rounded flex items-center px-1.5 overflow-hidden cursor-default
-                  ${STATUS_COLORS[task.status] ?? 'bg-gray-500'}
-                  ${onCrit ? 'ring-1 ring-orange-400/80' : ''}
-                `}
-                style={{
-                  top:    i * (ROW_H + ROW_GAP) + 2,
-                  left:   `${leftPct}%`,
-                  width:  `${widthPct}%`,
-                  height: ROW_H - 4,
-                }}
-                onMouseEnter={e => setTooltip({ task, x: e.clientX, y: e.clientY })}
-                onMouseLeave={() => setTooltip(null)}
-                onMouseMove={e =>
-                  setTooltip(prev => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null))
-                }
+                className={`absolute flex items-center gap-1 pr-2 ${
+                  criticalPath.has(task.id) ? 'text-orange-300' : 'text-th-text-alt'
+                }`}
+                style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H, width: '100%' }}
               >
-                {task.assignee && (
-                  <span className="text-[9px] text-white/80 truncate">{task.assignee}</span>
+                {criticalPath.has(task.id) && (
+                  <span className="text-orange-400 text-[9px] shrink-0 leading-none">★</span>
                 )}
+                <span className="text-[11px] truncate leading-tight">{task.title}</span>
               </div>
-            );
-          })}
+            ))}
+          </div>
 
-          {/* SVG dependency arrows — drawn in the same coordinate space as the bars */}
-          <svg
-            className="absolute inset-0 pointer-events-none overflow-visible"
-            style={{ width: '100%', height: '100%' }}
-            viewBox={`0 0 ${VB_W} ${totalH}`}
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <defs>
-              <marker id="gantt-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-                <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(148,163,184,0.45)" />
-              </marker>
-              <marker id="gantt-arrow-crit" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-                <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(251,146,60,0.8)" />
-              </marker>
-            </defs>
+          {/* Timeline column */}
+          <div className="flex-1 relative border-l border-th-border/50">
+            {/* Time axis ticks inside the chart */}
+            <div className="absolute top-0 left-0 right-0 flex justify-between text-[10px] text-th-text-muted px-1 -mt-0.5 pointer-events-none" style={{ height: 0, overflow: 'visible' }}>
+              <span>{fmtTime(minTime)}</span>
+              <span>{fmtTime(minTime + timeRange * 0.25)}</span>
+              <span>{fmtTime(minTime + timeRange * 0.5)}</span>
+              <span>{fmtTime(minTime + timeRange * 0.75)}</span>
+              <span>{fmtTime(minTime + timeRange)}</span>
+            </div>
 
-            {tasks.flatMap((task, targetIdx) =>
-              (task.dependsOn ?? []).map(depId => {
-                const srcTask  = taskMap.get(depId);
-                const srcIdx   = taskIndex.get(depId);
-                if (!srcTask || srcIdx === undefined) return null;
+            {/* Subtle vertical grid lines */}
+            {[0.25, 0.5, 0.75].map(p => (
+              <div
+                key={p}
+                className="absolute top-0 bottom-0 w-px bg-th-border/20 pointer-events-none"
+                style={{ left: `${p * 100}%` }}
+              />
+            ))}
 
-                const srcEnd  = srcTask.completedAt ?? now;
-                const tgtStart = task.startedAt ?? task.createdAt ?? now;
+            {/* Alternating row backgrounds */}
+            {tasks.map((_, i) => (
+              <div
+                key={i}
+                className={`absolute w-full pointer-events-none ${i % 2 === 0 ? 'bg-th-bg-alt/10' : ''}`}
+                style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H }}
+              />
+            ))}
 
-                const x1 = toX(srcEnd);
-                const y1 = rowCY(srcIdx);
-                const x2 = toX(tgtStart);
-                const y2 = rowCY(targetIdx);
-                const mx = (x1 + x2) / 2;
-                const isCrit = criticalPath.has(task.id) && criticalPath.has(depId);
+            {/* Task bars */}
+            {tasks.map((task, i) => {
+              const start     = task.startedAt  ?? task.createdAt ?? now;
+              const end       = task.completedAt ?? now;
+              const leftPct   = Math.max(0, ((start - minTime) / timeRange) * 100);
+              const widthPct  = Math.max(0.3, ((end - start) / timeRange) * 100);
+              const onCrit    = criticalPath.has(task.id);
 
-                return (
-                  <path
-                    key={`${depId}→${task.id}`}
-                    d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
-                    fill="none"
-                    stroke={isCrit ? 'rgba(251,146,60,0.65)' : 'rgba(148,163,184,0.28)'}
-                    strokeWidth={isCrit ? 1.8 : 1.2}
-                    markerEnd={isCrit ? 'url(#gantt-arrow-crit)' : 'url(#gantt-arrow)'}
-                  />
-                );
-              }),
-            )}
-          </svg>
+              return (
+                <div
+                  key={task.id}
+                  className={`absolute rounded flex items-center px-1.5 overflow-hidden cursor-default
+                    ${STATUS_COLORS[task.status] ?? 'bg-gray-500'}
+                    ${onCrit ? 'ring-1 ring-orange-400/80' : ''}
+                  `}
+                  style={{
+                    top:    i * (ROW_H + ROW_GAP) + 2,
+                    left:   `${leftPct}%`,
+                    width:  `${widthPct}%`,
+                    height: ROW_H - 4,
+                  }}
+                  onMouseEnter={e => setTooltip({ task, x: e.clientX, y: e.clientY })}
+                  onMouseLeave={() => setTooltip(null)}
+                  onMouseMove={e =>
+                    setTooltip(prev => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null))
+                  }
+                >
+                  {task.assignee && (
+                    <span className="text-[9px] text-white/80 truncate">{task.assignee}</span>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* SVG dependency arrows — drawn in the same coordinate space as the bars */}
+            <svg
+              className="absolute inset-0 pointer-events-none overflow-visible"
+              style={{ width: '100%', height: '100%' }}
+              viewBox={`0 0 ${VB_W} ${totalH}`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <defs>
+                <marker id="gantt-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                  <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(148,163,184,0.45)" />
+                </marker>
+                <marker id="gantt-arrow-crit" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                  <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(251,146,60,0.8)" />
+                </marker>
+              </defs>
+
+              {tasks.flatMap((task, targetIdx) =>
+                (task.dependsOn ?? []).map(depId => {
+                  const srcTask  = taskMap.get(depId);
+                  const srcIdx   = taskIndex.get(depId);
+                  if (!srcTask || srcIdx === undefined) return null;
+
+                  const srcEnd  = srcTask.completedAt ?? now;
+                  const tgtStart = task.startedAt ?? task.createdAt ?? now;
+
+                  const x1 = toX(srcEnd);
+                  const y1 = rowCY(srcIdx);
+                  const x2 = toX(tgtStart);
+                  const y2 = rowCY(targetIdx);
+                  const mx = (x1 + x2) / 2;
+                  const isCrit = criticalPath.has(task.id) && criticalPath.has(depId);
+
+                  return (
+                    <path
+                      key={`${depId}→${task.id}`}
+                      d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
+                      fill="none"
+                      stroke={isCrit ? 'rgba(251,146,60,0.65)' : 'rgba(148,163,184,0.28)'}
+                      strokeWidth={isCrit ? 1.8 : 1.2}
+                      markerEnd={isCrit ? 'url(#gantt-arrow-crit)' : 'url(#gantt-arrow)'}
+                    />
+                  );
+                }),
+              )}
+            </svg>
+          </div>
         </div>
       </div>
 
