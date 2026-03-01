@@ -328,6 +328,20 @@ export class TaskDAG extends EventEmitter {
     return this.getTask(leadId, taskId);
   }
 
+  /** Reassign a running task to a different agent. Returns the old agent ID, or null if invalid. */
+  reassignTask(leadId: string, taskId: string, newAgentId: string): { oldAgentId: string } | null {
+    const task = this.getTask(leadId, taskId);
+    if (!task || task.dagStatus !== 'running' || !task.assignedAgentId) return null;
+    const oldAgentId = task.assignedAgentId;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ assignedAgentId: newAgentId })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return { oldAgentId };
+  }
+
   /** Mark a task as complete. Returns newly ready tasks, or null if transition is invalid. */
   completeTask(leadId: string, taskId: string): DagTask[] | null {
     const error = this.validateTransition(leadId, taskId, 'complete');
