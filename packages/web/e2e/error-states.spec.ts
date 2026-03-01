@@ -10,7 +10,7 @@ test.describe('Error States & Edge Cases', () => {
 
   test('spawning agent with invalid role returns 400', async ({ page }) => {
     const res = await page.request.post('/api/agents', {
-      data: { roleId: 'nonexistent-role' },
+      data: { roleId: 'nonexistent-role', task: 'test' },
     });
     expect(res.status()).toBe(400);
     const body = await res.json();

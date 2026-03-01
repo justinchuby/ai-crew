@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Agent Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/agents');
-    await expect(page.locator('h2')).toHaveText('Agents');
+    await expect(page.getByRole('button', { name: /Spawn Agent/i })).toBeVisible({ timeout: 5000 });
   });
 
   test('shows spawn agent button', async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe('Agent Dashboard', () => {
   test('spawning an agent shows it in the dashboard', async ({ page }) => {
     // Use API to spawn an agent (avoids flaky CLI spawning in tests)
     const response = await page.request.post('/api/agents', {
-      data: { roleId: 'developer' },
+      data: { roleId: 'developer', task: 'test task' },
     });
     expect(response.ok()).toBeTruthy();
 
@@ -61,7 +61,7 @@ test.describe('Agent Dashboard', () => {
   test('selecting an agent highlights the card', async ({ page }) => {
     // Spawn via API
     const response = await page.request.post('/api/agents', {
-      data: { roleId: 'code-reviewer' },
+      data: { roleId: 'code-reviewer', task: 'test task' },
     });
     const agent = await response.json();
 

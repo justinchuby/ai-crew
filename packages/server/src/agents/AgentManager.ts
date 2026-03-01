@@ -655,7 +655,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const old = this.maxConcurrent;
     this.maxConcurrent = n;
     // Keep dispatcher context in sync
-    (this.dispatcher as any).ctx.maxConcurrent = n;
+    (this.dispatcher as any).handlerCtx.maxConcurrent = n;
     if (n !== old) {
       // Notify all running leads about the change
       const running = this.getRunningCount();

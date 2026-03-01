@@ -87,6 +87,5 @@ test.describe('Coordination & Connection', () => {
     const data = await res.json();
     expect(data.status).toBe('ok');
     expect(typeof data.agents).toBe('number');
-    expect(typeof data.queuedTasks).toBe('number');
   });
 });

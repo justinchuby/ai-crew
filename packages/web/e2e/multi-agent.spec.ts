@@ -16,8 +16,8 @@ test.describe('Multi-Agent Coordination', () => {
   });
 
   test('spawning multiple agents shows them all in dashboard', async ({ page }) => {
-    await page.request.post('/api/agents', { data: { roleId: 'developer' } });
-    await page.request.post('/api/agents', { data: { roleId: 'code-reviewer' } });
+    await page.request.post('/api/agents', { data: { roleId: 'developer', task: 'test task' } });
+    await page.request.post('/api/agents', { data: { roleId: 'code-reviewer', task: 'test task' } });
 
     await page.goto('/agents');
     await page.waitForTimeout(1000);
@@ -28,8 +28,8 @@ test.describe('Multi-Agent Coordination', () => {
   });
 
   test('coordination status shows all active agents', async ({ page }) => {
-    await page.request.post('/api/agents', { data: { roleId: 'architect' } });
-    await page.request.post('/api/agents', { data: { roleId: 'designer' } });
+    await page.request.post('/api/agents', { data: { roleId: 'architect', task: 'test task' } });
+    await page.request.post('/api/agents', { data: { roleId: 'designer', task: 'test task' } });
 
     const res = await page.request.get('/api/coordination/status');
     const status = await res.json();
@@ -115,7 +115,7 @@ test.describe('Multi-Agent Coordination', () => {
     // FleetStats shows "Total Agents" label with a count
     await expect(page.getByText('Total Agents')).toBeVisible({ timeout: 5000 });
 
-    await page.request.post('/api/agents', { data: { roleId: 'developer' } });
+    await page.request.post('/api/agents', { data: { roleId: 'developer', task: 'test task' } });
     await page.waitForTimeout(1000);
     await page.reload();
 

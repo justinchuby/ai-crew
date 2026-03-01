@@ -12,7 +12,7 @@ test.describe('AI Crew Smoke Tests', () => {
     // Navigate to Agents
     await page.locator('nav a[href="/agents"]').click();
     await expect(page).toHaveURL(/\/agents/);
-    await expect(page.getByText('Total Agents')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /Spawn Agent/i })).toBeVisible({ timeout: 5000 });
 
     // Navigate to Settings
     await page.locator('nav a[href="/settings"]').click();
