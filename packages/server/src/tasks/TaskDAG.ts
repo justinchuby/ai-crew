@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, and, desc, asc, sql, ne } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ne, inArray } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { dagTasks } from '../db/schema.js';
 
@@ -230,7 +230,7 @@ export class TaskDAG extends EventEmitter {
     const pendingTasks = this.db.drizzle
       .select()
       .from(dagTasks)
-      .where(and(eq(dagTasks.leadId, leadId), eq(dagTasks.dagStatus, 'pending')))
+      .where(and(eq(dagTasks.leadId, leadId), inArray(dagTasks.dagStatus, ['pending', 'blocked'])))
       .all()
       .map(rowToTask);
 
