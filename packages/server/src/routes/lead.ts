@@ -206,7 +206,7 @@ export function leadRoutes(ctx: AppContext): Router {
   // --- Reactions ---
   router.post('/lead/:id/groups/:name/messages/:messageId/reactions', (req, res) => {
     const { emoji } = req.body;
-    if (!emoji) return res.status(400).json({ error: 'emoji required' });
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 8) return res.status(400).json({ error: 'emoji required (max 8 chars)' });
     const chatGroups = agentManager.getChatGroupRegistry();
     const success = chatGroups.addReaction(req.params.messageId, 'human', emoji);
     res.json({ success });

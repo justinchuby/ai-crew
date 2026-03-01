@@ -239,7 +239,7 @@ The tool is improving itself. That's not a demo — that's a feedback loop.
 
 <!--
 All 13 built-in roles from RoleRegistry. Each is a real Copilot CLI
-session with full terminal access. The key insight: it's a real
+session with full tool access. The key insight: it's a real
 engineering org. Lead manages, developers code, reviewers catch bugs,
 architect designs, secretary tracks progress, radical thinker challenges
 assumptions. Users pick which roles they need — and can define custom
