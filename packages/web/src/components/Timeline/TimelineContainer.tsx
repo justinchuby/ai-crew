@@ -242,22 +242,33 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         const newStart = Math.max(fullRange.start.getTime(), newEnd - span);
         return { start: new Date(newStart), end: new Date(newEnd) };
       });
-    } else {
-      // Not live: reset to full range on first load only
-      setVisibleRange(fullRange);
     }
-  }, [fullRange]); // eslint-disable-line react-hooks/exhaustive-deps
+    // When not live, preserve user's current zoom/pan — don't reset visibleRange
+  }, [fullRange, liveMode]);
 
   // Zoom helpers that adjust visibleRange instead of a zoom scalar
-  const zoomBy = useCallback((factor: number) => {
+  // anchorFraction: 0..1 position within visible range to zoom toward (0.5 = center)
+  const zoomBy = useCallback((factor: number, anchorFraction = 0.5) => {
     onLiveModeChange?.(false);
     setVisibleRange(prev => {
-      const mid = (prev.start.getTime() + prev.end.getTime()) / 2;
-      const halfSpan = (prev.end.getTime() - prev.start.getTime()) / 2 * factor;
+      const start = prev.start.getTime();
+      const end = prev.end.getTime();
+      const span = end - start;
+      const anchor = start + span * anchorFraction;
+      const newSpan = span * factor;
       const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
-      const clampedHalf = Math.max(MIN_VISIBLE_MS / 2, Math.min(fullMs / 2, halfSpan));
-      const newStart = Math.max(fullRange.start.getTime(), mid - clampedHalf);
-      const newEnd = Math.min(fullRange.end.getTime(), mid + clampedHalf);
+      const clampedSpan = Math.max(MIN_VISIBLE_MS, Math.min(fullMs, newSpan));
+      let newStart = anchor - clampedSpan * anchorFraction;
+      let newEnd = anchor + clampedSpan * (1 - anchorFraction);
+      if (newStart < fullRange.start.getTime()) {
+        newStart = fullRange.start.getTime();
+        newEnd = newStart + clampedSpan;
+      }
+      if (newEnd > fullRange.end.getTime()) {
+        newEnd = fullRange.end.getTime();
+        newStart = newEnd - clampedSpan;
+      }
+      newStart = Math.max(newStart, fullRange.start.getTime());
       return { start: new Date(newStart), end: new Date(newEnd) };
     });
   }, [fullRange]);
@@ -334,7 +345,14 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const factor = e.deltaY > 0 ? ZOOM_FACTOR_OUT : ZOOM_FACTOR_IN;
-        zoomBy(factor);
+        const svgEl = el.querySelector('svg');
+        if (svgEl) {
+          const rect = svgEl.getBoundingClientRect();
+          const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          zoomBy(factor, fraction);
+        } else {
+          zoomBy(factor);
+        }
       }
     };
     el.addEventListener('wheel', handler, { passive: false });
