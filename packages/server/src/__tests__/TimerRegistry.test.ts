@@ -1,33 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TimerRegistry } from '../coordination/TimerRegistry.js';
 import type { Timer } from '../coordination/TimerRegistry.js';
-import BetterSqlite3 from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../db/schema.js';
-
-function createTestDb() {
-  const sqlite = new BetterSqlite3(':memory:');
-  sqlite.exec(`CREATE TABLE timers (
-    id TEXT PRIMARY KEY NOT NULL,
-    agent_id TEXT NOT NULL,
-    agent_role TEXT NOT NULL,
-    lead_id TEXT,
-    label TEXT NOT NULL,
-    message TEXT NOT NULL,
-    delay_seconds INTEGER NOT NULL,
-    fire_at TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    status TEXT NOT NULL DEFAULT 'pending',
-    repeat INTEGER DEFAULT 0
-  )`);
-  return drizzle(sqlite, { schema });
-}
+import { createTestTimerDb } from './helpers/createTestTimerDb.js';
 
 describe('TimerRegistry', () => {
   let registry: TimerRegistry;
 
   beforeEach(() => {
-    registry = new TimerRegistry(createTestDb());
+    registry = new TimerRegistry(createTestTimerDb());
   });
 
   afterEach(() => {
@@ -264,7 +244,7 @@ describe('TimerRegistry', () => {
 
   describe('persistence', () => {
     it('loadPending restores timers on start', () => {
-      const db = createTestDb();
+      const db = createTestTimerDb();
       const reg1 = new TimerRegistry(db);
       reg1.create('agent-1', { label: 'persist-test', message: 'hello', delaySeconds: 600 });
       reg1.stop();
@@ -275,6 +255,33 @@ describe('TimerRegistry', () => {
       expect(reg2.getPendingTimers()).toHaveLength(1);
       expect(reg2.getPendingTimers()[0].label).toBe('persist-test');
       reg2.stop();
+    });
+
+    it('repeat timer persists rescheduled fireAt to DB', () => {
+      vi.useFakeTimers();
+
+      const db = createTestTimerDb();
+      const reg1 = new TimerRegistry(db);
+      reg1.create('agent-1', { label: 'recurring', message: 'ping', delaySeconds: 10, repeat: true });
+
+      reg1.start();
+      vi.advanceTimersByTime(15_000);
+
+      // Timer should have fired and been rescheduled — stop this registry
+      reg1.stop();
+
+      // New registry from same DB should load the rescheduled timer as pending
+      const reg2 = new TimerRegistry(db);
+      reg2.start();
+      const pending = reg2.getPendingTimers();
+      expect(pending).toHaveLength(1);
+      expect(pending[0].label).toBe('recurring');
+      expect(pending[0].status).toBe('pending');
+      // fireAt should be in the future (rescheduled), not the original time
+      expect(pending[0].fireAt).toBeGreaterThan(Date.now());
+      reg2.stop();
+
+      vi.useRealTimers();
     });
   });
 

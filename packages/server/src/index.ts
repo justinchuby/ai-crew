@@ -170,7 +170,7 @@ eagerScheduler.start();
 
 // Timer system — agents can set named timers with custom messages
 import { TimerRegistry } from './coordination/TimerRegistry.js';
-const timerRegistry = new TimerRegistry();
+const timerRegistry = new TimerRegistry(db.drizzle);
 timerRegistry.start();
 
 // Dynamic Role Morphing — agents acquire capabilities on demand
@@ -224,14 +224,20 @@ lockRegistry.on('lock:acquired', ({ agentId, agentRole, filePath }: { agentId: s
 import { AgentMatcher } from './coordination/AgentMatcher.js';
 const agentMatcher = new AgentMatcher(agentManager, capabilityRegistry, activityLedger);
 
-// Wire timer:fired events — inject reminder messages into agents
-// Wrap in [System Timer] prefix to prevent ACP command injection
+// Wire timer events — inject reminder messages into agents + broadcast to UI
 timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
   const agent = agentManager.get(timer.agentId);
   if (agent && agent.status === 'running') {
     const safeMsg = timer.message.replace(/\[\[\[/g, '(((').replace(/\]\]\]/g, ')))');
     agent.sendMessage(`[System Timer "${timer.label}"] ${safeMsg}`);
   }
+  wsServer.broadcastEvent({ type: 'timer:fired', timer });
+});
+timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string }) => {
+  wsServer.broadcastEvent({ type: 'timer:created', timer });
+});
+timerRegistry.on('timer:cancelled', (timer: { id: string; agentId: string; label: string }) => {
+  wsServer.broadcastEvent({ type: 'timer:cancelled', timer });
 });
 
 // Wire dag:updated → eager scheduler re-evaluates immediately on any DAG change
