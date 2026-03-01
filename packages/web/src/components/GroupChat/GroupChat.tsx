@@ -25,6 +25,88 @@ function isSystem(msg: GroupMessage): boolean {
   return msg.fromRole.toLowerCase().includes('system');
 }
 
+const REACTION_EMOJIS = ['👍', '👎', '🎉', '❤️', '🤔', '👀'];
+
+function ReactionBadges({
+  msg,
+  leadId,
+  groupName,
+}: {
+  msg: GroupMessage;
+  leadId: string;
+  groupName: string;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const reactions = msg.reactions ?? {};
+  const entries = Object.entries(reactions).filter(([, ids]) => ids.length > 0);
+
+  const toggleReaction = async (emoji: string) => {
+    const gs = useGroupStore.getState();
+    const key = groupKey(leadId, groupName);
+    const hasReacted = reactions[emoji]?.includes('human');
+
+    if (hasReacted) {
+      gs.removeReaction(key, msg.id, emoji, 'human');
+      try {
+        await fetch(
+          `/api/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions/${encodeURIComponent(emoji)}`,
+          { method: 'DELETE' },
+        );
+      } catch { /* best-effort */ }
+    } else {
+      gs.addReaction(key, msg.id, emoji, 'human');
+      try {
+        await fetch(
+          `/api/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) },
+        );
+      } catch { /* best-effort */ }
+    }
+    setShowPicker(false);
+  };
+
+  return (
+    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+      {entries.map(([emoji, ids]) => (
+        <button
+          key={emoji}
+          onClick={() => toggleReaction(emoji)}
+          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+            ids.includes('human')
+              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+              : 'border-th-border bg-th-bg-muted text-th-text-muted hover:border-th-text-muted'
+          }`}
+        >
+          <span>{emoji}</span>
+          <span>{ids.length}</span>
+        </button>
+      ))}
+      <div className="relative">
+        <button
+          onClick={() => setShowPicker((p) => !p)}
+          className="inline-flex items-center px-1 py-0.5 rounded-full text-xs text-th-text-muted hover:bg-th-bg-muted transition-colors"
+          title="Add reaction"
+        >
+          +
+        </button>
+        {showPicker && (
+          <div className="absolute bottom-full left-0 mb-1 flex gap-0.5 bg-th-bg-panel border border-th-border rounded-lg p-1 shadow-lg z-10">
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => toggleReaction(emoji)}
+                className="hover:bg-th-bg-muted rounded p-1 text-sm transition-colors"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
@@ -575,6 +657,9 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         <div className={`text-xs text-th-text-muted mt-0.5 ${human ? 'text-right' : ''}`}>
                           {timeAgo(msg.timestamp)}
                         </div>
+                        {selectedGroup && (
+                          <ReactionBadges msg={msg} leadId={selectedGroup.leadId} groupName={selectedGroup.name} />
+                        )}
                       </div>
                     </div>
                   </div>

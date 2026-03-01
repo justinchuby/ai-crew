@@ -62,6 +62,7 @@ export interface GroupMessage {
   fromRole: string;
   content: string;
   timestamp: string;
+  reactions?: Record<string, string[]>; // { emoji: [agentId, ...] }
 }
 
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';

@@ -223,6 +223,14 @@ export function useWebSocket() {
           }
           break;
         }
+        case 'group:reaction': {
+          const gs = useGroupStore.getState();
+          if (msg.messageId && msg.emoji && msg.agentId) {
+            const key = groupKey(msg.leadId, msg.groupName);
+            gs.addReaction(key, msg.messageId, msg.emoji, msg.agentId);
+          }
+          break;
+        }
         case 'system:paused':
           useAppStore.getState().setSystemPaused(msg.paused);
           break;

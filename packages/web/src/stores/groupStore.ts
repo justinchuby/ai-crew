@@ -13,6 +13,8 @@ interface GroupState {
   setMessages: (key: string, messages: GroupMessage[]) => void;
   addMember: (leadId: string, groupName: string, agentId: string) => void;
   removeMember: (leadId: string, groupName: string, agentId: string) => void;
+  addReaction: (key: string, messageId: string, emoji: string, agentId: string) => void;
+  removeReaction: (key: string, messageId: string, emoji: string, agentId: string) => void;
   selectGroup: (leadId: string, name: string) => void;
   clearSelection: () => void;
   markGroupSeen: (key: string) => void;
@@ -66,6 +68,37 @@ export const useGroupStore = create<GroupState>((set) => ({
           ? { ...g, memberIds: g.memberIds.filter((id) => id !== agentId) }
           : g,
       ),
+    })),
+
+  addReaction: (key, messageId, emoji, agentId) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [key]: (s.messages[key] ?? []).map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                reactions: {
+                  ...m.reactions,
+                  [emoji]: [...new Set([...(m.reactions?.[emoji] ?? []), agentId])],
+                },
+              }
+            : m,
+        ),
+      },
+    })),
+
+  removeReaction: (key, messageId, emoji, agentId) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [key]: (s.messages[key] ?? []).map((m) => {
+          if (m.id !== messageId) return m;
+          const prev = m.reactions?.[emoji]?.filter((id) => id !== agentId) ?? [];
+          const { [emoji]: _, ...rest } = m.reactions ?? {};
+          return { ...m, reactions: prev.length > 0 ? { ...rest, [emoji]: prev } : rest };
+        }),
+      },
     })),
 
   selectGroup: (leadId, name) => set({ selectedGroup: { leadId, name } }),
