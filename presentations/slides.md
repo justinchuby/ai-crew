@@ -2,7 +2,7 @@
 theme: default
 title: "AI Crew — Building a Multi-Agent AI Development System"
 info: |
-  A story about giving one AI a task and watching it hire a team.
+  How we built a system where 13 AI agents coordinate, review, and ship code together.
 highlighter: shiki
 drawings:
   persist: false
@@ -250,6 +250,9 @@ is a project manager who reads every status update. The difference? They
 all start working in the same minute. No onboarding, no standups, no
 context switching. Point out that each agent is the exact same Copilot CLI
 the audience already uses — this isn't sci-fi, it's a multiplier.
+
+[Transition: "Now that you know the team, let me show you the technology
+that connects them — starting with the communication protocol."]
 -->
 
 
@@ -671,6 +674,10 @@ delegations. AI Crew PLANS and TRACKS. DECLARE_TASKS creates explicit
 dependency graphs. Auto-DAG creates them implicitly from DELEGATE commands.
 Tasks auto-start when their dependencies resolve — no polling, no manual
 scheduling. The UI shows this as a live graph with nodes and arrows.
+
+[Transition: "That's how the system works under the hood. Now let me show
+you what happens when real agents use these capabilities — starting with
+two stories from this session."]
 -->
 
 ---
@@ -717,7 +724,7 @@ you want specialists — a generalist might have missed this.
 
 ---
 
-# Story 3: The Commit Catastrophe
+# Story 2: The Commit Catastrophe
 
 <div class="bg-gray-800 rounded-lg p-4 border border-yellow-500 mt-2">
 
