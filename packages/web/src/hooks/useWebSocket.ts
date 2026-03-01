@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useGroupStore, groupKey } from '../stores/groupStore';
+import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
@@ -238,6 +239,27 @@ export function useWebSocket() {
         case 'system:paused':
           useAppStore.getState().setSystemPaused(msg.paused);
           break;
+        case 'timer:created': {
+          const ts = useTimerStore.getState();
+          if (msg.timer) ts.addTimer(msg.timer);
+          break;
+        }
+        case 'timer:fired': {
+          const ts = useTimerStore.getState();
+          const timerId = msg.timerId ?? msg.timer?.id;
+          if (timerId) {
+            ts.fireTimer(timerId);
+            // Flash green for 2s then remove
+            setTimeout(() => useTimerStore.getState().removeTimer(timerId), 2000);
+          }
+          break;
+        }
+        case 'timer:cancelled': {
+          const ts = useTimerStore.getState();
+          const timerId = msg.timerId ?? msg.timer?.id;
+          if (timerId) ts.removeTimer(timerId);
+          break;
+        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);

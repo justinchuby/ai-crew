@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter, Download } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
+import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
@@ -26,6 +27,7 @@ export function LeadDashboard({ api, ws }: Props) {
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
   const agents = useAppStore((s) => s.agents);
+  const activeTimerCount = useTimerStore(selectActiveTimerCount);
   const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
   const setInput = useCallback((text: string) => {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
@@ -1642,7 +1644,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
                         tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
                         costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
-                        timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers' },
+                        timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
                       };
                       const orderedIds = tabOrder.filter((id) => id in allTabs);
                       // Append any missing tabs (safety net)

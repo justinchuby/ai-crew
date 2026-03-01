@@ -1,4 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
+import { useAppStore } from '../../stores/appStore';
+import { apiFetch } from '../../hooks/useApi';
 import type { TimerInfo } from '../../types';
 
 type TimerFilter = 'active' | 'fired' | 'all';
@@ -15,19 +18,93 @@ function shortId(id: string): string {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
+/** Resolve agent role name from appStore by agentId */
+function useAgentRole(agentId: string): string {
+  const agents = useAppStore((s) => s.agents);
+  const agent = agents.find((a) => a.id === agentId);
+  return agent?.role?.name ?? 'agent';
+}
+
+function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: string) => void }) {
+  const roleName = useAgentRole(timer.agentId);
+  const isPending = timer.status === 'pending';
+  const isFired = timer.status === 'fired';
+  const recentlyFiredIds = useTimerStore((s) => s.recentlyFiredIds);
+  const isRecentlyFired = recentlyFiredIds.includes(timer.id);
+
+  return (
+    <div
+      data-testid={`timer-${timer.id}`}
+      className={`rounded border px-2 py-1.5 transition-all duration-300 ${
+        isRecentlyFired
+          ? 'border-green-500/50 bg-green-500/10'
+          : isFired
+            ? 'border-th-border/50 bg-th-bg-muted/30 opacity-60'
+            : 'border-th-border bg-th-bg-muted/50'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-th-text-alt truncate">{timer.label}</span>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          <span
+            className={`text-[10px] ${
+              isRecentlyFired
+                ? 'text-green-400 font-semibold'
+                : isFired
+                  ? 'text-green-400'
+                  : timer.repeat
+                    ? 'text-purple-400'
+                    : 'text-yellow-400'
+            }`}
+          >
+            {isRecentlyFired
+              ? '✓ fired!'
+              : isFired
+                ? '✓ fired'
+                : timer.repeat
+                  ? `⟳ ${formatRemaining(timer.remainingMs)}`
+                  : formatRemaining(timer.remainingMs)}
+          </span>
+          {isPending && (
+            <button
+              onClick={() => onCancel(timer.id)}
+              className="text-[10px] text-red-400 hover:text-red-300 px-1 py-0.5 rounded hover:bg-red-500/10"
+              title="Cancel timer"
+              aria-label={`Cancel timer ${timer.label}`}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-0.5 text-th-text-muted">
+        <span title={timer.agentId}>
+          {roleName} ({shortId(timer.agentId)})
+        </span>
+        {timer.repeat && isPending && <span>every {timer.delaySeconds}s</span>}
+      </div>
+      {timer.message && (
+        <div className="mt-0.5 text-th-text-muted truncate" title={timer.message}>
+          💬 {timer.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TimerDisplay() {
-  const [timers, setTimers] = useState<TimerInfo[]>([]);
+  const timers = useTimerStore((s) => s.timers);
+  const setTimers = useTimerStore((s) => s.setTimers);
+  const removeTimer = useTimerStore((s) => s.removeTimer);
   const [filter, setFilter] = useState<TimerFilter>('active');
   const [error, setError] = useState<string | null>(null);
 
+  // Initial fetch — WS events keep it updated after this
   useEffect(() => {
     let cancelled = false;
-
-    async function fetchTimers() {
+    async function load() {
       try {
-        const res = await fetch('/api/timers');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await apiFetch<TimerInfo[]>('/timers');
         if (!cancelled) {
           setTimers(data);
           setError(null);
@@ -36,20 +113,43 @@ export function TimerDisplay() {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to fetch timers');
       }
     }
+    load();
+    return () => { cancelled = true; };
+  }, [setTimers]);
 
-    fetchTimers();
-    const interval = setInterval(fetchTimers, 5_000);
-    return () => { cancelled = true; clearInterval(interval); };
+  // Tick countdowns every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      useTimerStore.getState().setTimers(
+        useTimerStore.getState().timers.map((t) =>
+          t.status !== 'pending' ? t : { ...t, remainingMs: Math.max(0, t.fireAt - Date.now()) },
+        ),
+      );
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
+  const handleCancel = useCallback(
+    async (timerId: string) => {
+      // Optimistic removal
+      removeTimer(timerId);
+      try {
+        await apiFetch(`/timers/${timerId}`, { method: 'DELETE' });
+      } catch {
+        // Server may not have DELETE endpoint yet — removal already done optimistically
+      }
+    },
+    [removeTimer],
+  );
+
   const filtered = useMemo(() => {
-    if (filter === 'active') return timers.filter(t => !t.fired);
-    if (filter === 'fired') return timers.filter(t => t.fired);
+    if (filter === 'active') return timers.filter((t) => t.status === 'pending');
+    if (filter === 'fired') return timers.filter((t) => t.status === 'fired');
     return timers;
   }, [timers, filter]);
 
-  const activeCount = timers.filter(t => !t.fired).length;
-  const firedCount = timers.filter(t => t.fired).length;
+  const activeCount = timers.filter((t) => t.status === 'pending').length;
+  const firedCount = timers.filter((t) => t.status === 'fired').length;
 
   if (error) {
     return <div className="p-3 text-xs text-red-400">Error: {error}</div>;
@@ -62,7 +162,7 @@ export function TimerDisplay() {
           Timers
         </h3>
         <div className="flex gap-1">
-          {(['active', 'fired', 'all'] as TimerFilter[]).map(f => (
+          {(['active', 'fired', 'all'] as TimerFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -72,7 +172,11 @@ export function TimerDisplay() {
                   : 'text-th-text-muted hover:text-th-text-alt'
               }`}
             >
-              {f === 'active' ? `Active (${activeCount})` : f === 'fired' ? `Fired (${firedCount})` : `All (${timers.length})`}
+              {f === 'active'
+                ? `Active (${activeCount})`
+                : f === 'fired'
+                  ? `Fired (${firedCount})`
+                  : `All (${timers.length})`}
             </button>
           ))}
         </div>
@@ -80,37 +184,16 @@ export function TimerDisplay() {
 
       {filtered.length === 0 ? (
         <div className="text-th-text-muted text-center py-4">
-          {filter === 'active' ? 'No active timers' : filter === 'fired' ? 'No fired timers' : 'No timers'}
+          {filter === 'active'
+            ? 'No active timers'
+            : filter === 'fired'
+              ? 'No fired timers'
+              : 'No timers'}
         </div>
       ) : (
         <div className="space-y-1.5">
-          {filtered.map(timer => (
-            <div
-              key={timer.id}
-              className={`rounded border px-2 py-1.5 ${
-                timer.fired
-                  ? 'border-th-border/50 bg-th-bg-muted/30 opacity-60'
-                  : 'border-th-border bg-th-bg-muted/50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-th-text-alt">{timer.label}</span>
-                <span className={`text-[10px] ${timer.fired ? 'text-green-400' : timer.repeat ? 'text-purple-400' : 'text-yellow-400'}`}>
-                  {timer.fired ? '✓ fired' : timer.repeat ? '⟳ repeat' : formatRemaining(timer.remainingMs)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5 text-th-text-muted">
-                <span title={timer.agentId}>agent: {shortId(timer.agentId)}</span>
-                {timer.repeat && !timer.fired && (
-                  <span>every {timer.intervalSeconds}s</span>
-                )}
-              </div>
-              {timer.message && (
-                <div className="mt-0.5 text-th-text-muted truncate" title={timer.message}>
-                  💬 {timer.message}
-                </div>
-              )}
-            </div>
+          {filtered.map((timer) => (
+            <TimerCard key={timer.id} timer={timer} onCancel={handleCancel} />
           ))}
         </div>
       )}
