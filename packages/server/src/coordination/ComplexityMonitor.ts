@@ -17,7 +17,7 @@
  */
 
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ export class ComplexityMonitor {
    */
   analyzeFile(filePath: string): FileComplexity | null {
     try {
-      const fullPath = filePath.startsWith('/') ? filePath : join(this.projectRoot, filePath);
+      const fullPath = isAbsolute(filePath) ? filePath : join(this.projectRoot, filePath);
       const content = readFileSync(fullPath, 'utf-8');
       const lines = content.split('\n').length;
       const size = Buffer.byteLength(content);

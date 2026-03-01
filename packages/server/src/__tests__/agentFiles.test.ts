@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { sep } from 'path';
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted ensures these are available inside the hoisted vi.mock factories
@@ -69,7 +70,7 @@ describe('writeAgentFiles', () => {
 
     expect(mockMkdirSync).toHaveBeenCalledOnce();
     expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.copilot/agents'),
+      expect.stringContaining(['.copilot', 'agents'].join(sep)),
       { recursive: true },
     );
   });
