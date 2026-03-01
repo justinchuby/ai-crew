@@ -46,7 +46,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "child-001", "content": "Switch to task X now"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "child-001", "content": "Switch to task X now"} ⟧⟧');
 
     expect(child.interruptWithMessage).toHaveBeenCalledTimes(1);
     const msg = child.interruptWithMessage.mock.calls[0][0];
@@ -78,7 +78,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "child-001", "content": "do something"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "child-001", "content": "do something"} ⟧⟧');
 
     expect(child.interruptWithMessage).not.toHaveBeenCalled();
     expect(lead.sendMessage).toHaveBeenCalledWith(expect.stringContaining('not their parent'));
@@ -92,7 +92,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "lead-001", "content": "self"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "lead-001", "content": "self"} ⟧⟧');
 
     expect(lead.interruptWithMessage).not.toHaveBeenCalled();
     expect(lead.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Cannot interrupt yourself'));
@@ -112,7 +112,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "child-001", "content": "wake up"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "child-001", "content": "wake up"} ⟧⟧');
 
     expect(child.interruptWithMessage).not.toHaveBeenCalled();
     expect(lead.sendMessage).toHaveBeenCalledWith(expect.stringContaining('terminated'));
@@ -126,7 +126,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "nonexistent", "content": "hello"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "nonexistent", "content": "hello"} ⟧⟧');
 
     expect(lead.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Cannot resolve agent'));
   });
@@ -145,7 +145,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "child-001", "content": "switch tasks"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "child-001", "content": "switch tasks"} ⟧⟧');
 
     expect(child.interruptWithMessage).toHaveBeenCalledTimes(1);
   });
@@ -164,7 +164,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(lead, '⟦ INTERRUPT {"to": "Developer", "content": "new priority"} ⟧');
+    await handler(lead, '⟦⟦ INTERRUPT {"to": "Developer", "content": "new priority"} ⟧⟧');
 
     expect(child.interruptWithMessage).toHaveBeenCalledTimes(1);
   });
@@ -187,7 +187,7 @@ describe('INTERRUPT command', () => {
     });
 
     const { handler } = findInterruptHandler(ctx);
-    await handler(sublead, '⟦ INTERRUPT {"to": "grandchild-001", "content": "redirect"} ⟧');
+    await handler(sublead, '⟦⟦ INTERRUPT {"to": "grandchild-001", "content": "redirect"} ⟧⟧');
 
     expect(grandchild.interruptWithMessage).toHaveBeenCalledTimes(1);
   });

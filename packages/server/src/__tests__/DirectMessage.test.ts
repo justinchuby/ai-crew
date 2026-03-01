@@ -49,7 +49,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender, target]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello peer!"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello peer!"} ⟧⟧`);
 
     expect(target.queueMessage).toHaveBeenCalledWith(
       expect.stringContaining('Hello peer!'),
@@ -72,7 +72,7 @@ describe('DIRECT_MESSAGE', () => {
     const [dmCmd] = getDirectMessageCommands(ctx);
 
     // Use just first 8 chars as prefix
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "bbbbbbbb", "content": "Hey"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "bbbbbbbb", "content": "Hey"} ⟧⟧`);
 
     expect(target.queueMessage).toHaveBeenCalledWith(expect.stringContaining('Hey'));
   });
@@ -82,7 +82,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "no-such-agent", "content": "Hello"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "no-such-agent", "content": "Hello"} ⟧⟧`);
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('not found'),
@@ -98,7 +98,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender, target]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello"} ⟧⟧`);
 
     expect(target.queueMessage).not.toHaveBeenCalled();
     expect(sender.sendMessage).toHaveBeenCalledWith(
@@ -112,7 +112,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender, target]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Hello"} ⟧⟧`);
 
     expect(target.queueMessage).not.toHaveBeenCalled();
     expect(sender.sendMessage).toHaveBeenCalledWith(
@@ -125,7 +125,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"content": "Oops no target"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"content": "Oops no target"} ⟧⟧`);
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "to"'),
@@ -138,7 +138,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender, target]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Logging test"} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {"to": "${target.id}", "content": "Logging test"} ⟧⟧`);
 
     expect(ctx.activityLedger.log).toHaveBeenCalledWith(
       sender.id,
@@ -154,7 +154,7 @@ describe('DIRECT_MESSAGE', () => {
     const ctx = makeCtx([sender]);
     const [dmCmd] = getDirectMessageCommands(ctx);
 
-    dmCmd.handler(sender, `⟦ DIRECT_MESSAGE {not valid json} ⟧`);
+    dmCmd.handler(sender, `⟦⟦ DIRECT_MESSAGE {not valid json} ⟧⟧`);
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DIRECT_MESSAGE error'),
@@ -172,7 +172,7 @@ describe('QUERY_PEERS', () => {
     const ctx = makeCtx([sender, sibling]);
     const [, queryCmd] = getDirectMessageCommands(ctx);
 
-    queryCmd.handler(sender, '⟦ QUERY_PEERS ⟧');
+    queryCmd.handler(sender, '⟦⟦ QUERY_PEERS ⟧⟧');
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Code Reviewer'),
@@ -189,7 +189,7 @@ describe('QUERY_PEERS', () => {
     const ctx = makeCtx([sender, terminated]);
     const [, queryCmd] = getDirectMessageCommands(ctx);
 
-    queryCmd.handler(sender, '⟦ QUERY_PEERS ⟧');
+    queryCmd.handler(sender, '⟦⟦ QUERY_PEERS ⟧⟧');
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('No active peers'),
@@ -202,7 +202,7 @@ describe('QUERY_PEERS', () => {
     const ctx = makeCtx([sender]); // Only the sender in the list
     const [, queryCmd] = getDirectMessageCommands(ctx);
 
-    queryCmd.handler(sender, '⟦ QUERY_PEERS ⟧');
+    queryCmd.handler(sender, '⟦⟦ QUERY_PEERS ⟧⟧');
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('No active peers'),
@@ -220,7 +220,7 @@ describe('QUERY_PEERS', () => {
     const ctx = makeCtx([lead, sender]);
     const [, queryCmd] = getDirectMessageCommands(ctx);
 
-    queryCmd.handler(sender, '⟦ QUERY_PEERS ⟧');
+    queryCmd.handler(sender, '⟦⟦ QUERY_PEERS ⟧⟧');
 
     expect(sender.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Project Lead'),
@@ -240,7 +240,7 @@ describe('QUERY_PEERS', () => {
     const ctx = makeCtx([sender, runningPeer, idlePeer]);
     const [, queryCmd] = getDirectMessageCommands(ctx);
 
-    queryCmd.handler(sender, '⟦ QUERY_PEERS ⟧');
+    queryCmd.handler(sender, '⟦⟦ QUERY_PEERS ⟧⟧');
 
     const call = (sender.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(call).toContain('🟢');
@@ -262,14 +262,14 @@ describe('getDirectMessageCommands', () => {
   it('DIRECT_MESSAGE regex matches expected patterns', () => {
     const ctx = makeCtx([]);
     const [dmCmd] = getDirectMessageCommands(ctx);
-    expect(dmCmd.regex.test('⟦ DIRECT_MESSAGE {"to":"x","content":"y"} ⟧')).toBe(true);
-    expect(dmCmd.regex.test('⟦DIRECT_MESSAGE{"to":"x","content":"y"}⟧')).toBe(true);
+    expect(dmCmd.regex.test('⟦⟦ DIRECT_MESSAGE {"to":"x","content":"y"} ⟧⟧')).toBe(true);
+    expect(dmCmd.regex.test('⟦⟦DIRECT_MESSAGE{"to":"x","content":"y"}⟧⟧')).toBe(true);
   });
 
   it('QUERY_PEERS regex matches expected patterns', () => {
     const ctx = makeCtx([]);
     const [, queryCmd] = getDirectMessageCommands(ctx);
-    expect(queryCmd.regex.test('⟦ QUERY_PEERS ⟧')).toBe(true);
-    expect(queryCmd.regex.test('⟦QUERY_PEERS⟧')).toBe(true);
+    expect(queryCmd.regex.test('⟦⟦ QUERY_PEERS ⟧⟧')).toBe(true);
+    expect(queryCmd.regex.test('⟦⟦QUERY_PEERS⟧⟧')).toBe(true);
   });
 });

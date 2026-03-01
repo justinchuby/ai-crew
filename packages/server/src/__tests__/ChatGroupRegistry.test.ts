@@ -307,15 +307,15 @@ describe('ChatGroupRegistry', () => {
 
 describe('AgentManager group command regexes', () => {
   // Regex patterns copied from AgentManager.ts (module-level constants, not exported)
-  const CREATE_GROUP_REGEX = /⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧/s;
-  const ADD_TO_GROUP_REGEX = /⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧/s;
-  const REMOVE_FROM_GROUP_REGEX = /⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧/s;
-  const GROUP_MESSAGE_REGEX = /⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧/s;
-  const LIST_GROUPS_REGEX = /⟦\s*LIST_GROUPS\s*⟧/s;
+  const CREATE_GROUP_REGEX = /⟦⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+  const ADD_TO_GROUP_REGEX = /⟦⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+  const REMOVE_FROM_GROUP_REGEX = /⟦⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+  const GROUP_MESSAGE_REGEX = /⟦⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
+  const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
 
   describe('CREATE_GROUP_REGEX', () => {
     it('matches and extracts JSON payload', () => {
-      const input = '⟦ CREATE_GROUP {"name": "config-team", "members": ["abc12345", "def67890"]} ⟧';
+      const input = '⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["abc12345", "def67890"]} ⟧⟧';
       const match = input.match(CREATE_GROUP_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
@@ -324,7 +324,7 @@ describe('AgentManager group command regexes', () => {
     });
 
     it('matches with extra whitespace', () => {
-      const input = '⟦   CREATE_GROUP   {"name": "team", "members": []}   ⟧';
+      const input = '⟦⟦   CREATE_GROUP   {"name": "team", "members": []}   ⟧⟧';
       expect(input.match(CREATE_GROUP_REGEX)).not.toBeNull();
     });
 
@@ -335,7 +335,7 @@ describe('AgentManager group command regexes', () => {
 
   describe('ADD_TO_GROUP_REGEX', () => {
     it('matches and extracts JSON payload', () => {
-      const input = '⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧';
+      const input = '⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧⟧';
       const match = input.match(ADD_TO_GROUP_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
@@ -346,7 +346,7 @@ describe('AgentManager group command regexes', () => {
 
   describe('REMOVE_FROM_GROUP_REGEX', () => {
     it('matches and extracts JSON payload', () => {
-      const input = '⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧';
+      const input = '⟦⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧⟧';
       const match = input.match(REMOVE_FROM_GROUP_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
@@ -357,7 +357,7 @@ describe('AgentManager group command regexes', () => {
 
   describe('GROUP_MESSAGE_REGEX', () => {
     it('matches and extracts JSON payload', () => {
-      const input = '⟦ GROUP_MESSAGE {"group": "config-team", "content": "coordinate before editing"} ⟧';
+      const input = '⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "coordinate before editing"} ⟧⟧';
       const match = input.match(GROUP_MESSAGE_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
@@ -368,11 +368,11 @@ describe('AgentManager group command regexes', () => {
 
   describe('LIST_GROUPS_REGEX', () => {
     it('matches the LIST_GROUPS command', () => {
-      expect('⟦ LIST_GROUPS ⟧'.match(LIST_GROUPS_REGEX)).not.toBeNull();
+      expect('⟦⟦ LIST_GROUPS ⟧⟧'.match(LIST_GROUPS_REGEX)).not.toBeNull();
     });
 
     it('matches with extra whitespace', () => {
-      expect('⟦   LIST_GROUPS   ⟧'.match(LIST_GROUPS_REGEX)).not.toBeNull();
+      expect('⟦⟦   LIST_GROUPS   ⟧⟧'.match(LIST_GROUPS_REGEX)).not.toBeNull();
     });
 
     it('does NOT match plain text', () => {
@@ -382,11 +382,11 @@ describe('AgentManager group command regexes', () => {
 
   describe('cross-matching', () => {
     it('each regex only matches its own command type', () => {
-      const createGroup = '⟦ CREATE_GROUP {"name": "t", "members": []} ⟧';
-      const addToGroup = '⟦ ADD_TO_GROUP {"group": "t", "members": []} ⟧';
-      const removeFromGroup = '⟦ REMOVE_FROM_GROUP {"group": "t", "members": []} ⟧';
-      const groupMsg = '⟦ GROUP_MESSAGE {"group": "t", "content": "hi"} ⟧';
-      const listGroups = '⟦ LIST_GROUPS ⟧';
+      const createGroup = '⟦⟦ CREATE_GROUP {"name": "t", "members": []} ⟧⟧';
+      const addToGroup = '⟦⟦ ADD_TO_GROUP {"group": "t", "members": []} ⟧⟧';
+      const removeFromGroup = '⟦⟦ REMOVE_FROM_GROUP {"group": "t", "members": []} ⟧⟧';
+      const groupMsg = '⟦⟦ GROUP_MESSAGE {"group": "t", "content": "hi"} ⟧⟧';
+      const listGroups = '⟦⟦ LIST_GROUPS ⟧⟧';
 
       expect(createGroup.match(CREATE_GROUP_REGEX)).not.toBeNull();
       expect(createGroup.match(ADD_TO_GROUP_REGEX)).toBeNull();

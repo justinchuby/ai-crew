@@ -109,7 +109,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug"} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).toHaveBeenCalledWith('lead-001', expect.objectContaining({
       role: 'developer',
@@ -129,7 +129,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug"} ⟧⟧');
 
     // Should link to existing, not auto-create
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug in auth"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug in auth"} ⟧⟧');
 
     // Should warn about near-duplicate, not auto-create
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
@@ -166,7 +166,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build the API"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the API"} ⟧⟧');
 
     expect(child.dagTaskId).toBeDefined();
     expect(child.dagTaskId).toMatch(/^auto-developer-/);
@@ -177,7 +177,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent({ role: { id: 'architect', name: 'Architect' } });
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build the API"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the API"} ⟧⟧');
 
     // Architect can create agents, but auto-DAG only triggers for lead
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build API", "dagTaskId": "nonexistent"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build API", "dagTaskId": "nonexistent"} ⟧⟧');
 
     // Explicit dagTaskId miss should warn, not auto-create
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('Auto-DAG creation from DELEGATE', () => {
     const agent = makeLeadAgent();
     const cmd = getDelegateHandler(ctx);
 
-    cmd.handler(agent, '⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).toHaveBeenCalledWith('lead-001', expect.objectContaining({
       role: 'developer',
@@ -223,7 +223,7 @@ describe('Auto-DAG creation from DELEGATE', () => {
     const agent = makeLeadAgent();
     const cmd = getDelegateHandler(ctx);
 
-    cmd.handler(agent, '⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧⟧');
 
     expect(child.dagTaskId).toBeDefined();
     expect(child.dagTaskId).toMatch(/^auto-developer-/);
@@ -241,7 +241,7 @@ describe('Auto-DAG creation from DELEGATE', () => {
     const agent = makeLeadAgent();
     const cmd = getDelegateHandler(ctx);
 
-    cmd.handler(agent, '⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write the tests"} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
   });
@@ -271,7 +271,7 @@ describe('Auto-DAG review dependency linking', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review commit by 0b85de78"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review commit by 0b85de78"} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith(
       'lead-001',
@@ -297,7 +297,7 @@ describe('Auto-DAG review dependency linking', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "critical-reviewer", "task": "Review p0-2-autolink implementation"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "critical-reviewer", "task": "Review p0-2-autolink implementation"} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith(
       'lead-001',
@@ -311,7 +311,7 @@ describe('Auto-DAG review dependency linking', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Review and fix p0-2-autolink"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Review and fix p0-2-autolink"} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
   });
@@ -355,7 +355,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task", "design-task"]} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task", "design-task"]} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).toHaveBeenCalled();
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'api-task');
@@ -370,7 +370,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getDelegateHandler(ctx);
 
-    cmd.handler(agent, '⟦ DELEGATE {"to": "child-001", "task": "Write tests", "depends_on": ["impl-task"]} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write tests", "depends_on": ["impl-task"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'impl-task');
   });
@@ -380,7 +380,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task"]} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('depends on'));
   });
@@ -394,7 +394,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build", "depends_on": ["x"]} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build", "depends_on": ["x"]} ⟧⟧');
 
     // No auto-create, so no addDependency
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -419,7 +419,7 @@ describe('Critical review fixes', () => {
     const cmd = getCreateAgentHandler(ctx);
 
     // Should not throw — gracefully handles the error
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build something"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build something"} ⟧⟧');
 
     // Agent still gets created (ack message sent)
     expect(agent.sendMessage).toHaveBeenCalled();
@@ -451,7 +451,7 @@ describe('Critical review fixes', () => {
     const cmd = getCreateAgentHandler(ctx);
 
     // Same description as old completed task — should NOT be blocked
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Fix the CSS styling"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the CSS styling"} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).toHaveBeenCalled();
   });
@@ -481,7 +481,7 @@ describe('Critical review fixes', () => {
     const cmd = getCreateAgentHandler(ctx);
 
     // 40-char SHA should NOT match as agent ID
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review commit deadbeefcafe1234abcd5678 for bugs"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review commit deadbeefcafe1234abcd5678 for bugs"} ⟧⟧');
 
     // Should not create dependency from long hex string
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -517,7 +517,7 @@ describe('Critical review fixes', () => {
     const cmd = getCreateAgentHandler(ctx);
 
     // "p0-2" should match "p0-2" exactly, not prefix-match "p0-2-autolink"
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review p0-2 implementation"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "code-reviewer", "task": "Review p0-2 implementation"} ⟧⟧');
 
     // The dependency should be on "p0-2" (exact), not "p0-2-autolink" (prefix)
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.any(String), 'p0-2');
@@ -562,7 +562,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build the deployment pipeline"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the deployment pipeline"} ⟧⟧');
 
     expect(secretaryAgent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Dependency analysis needed')
@@ -581,7 +581,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build the deployment pipeline"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the deployment pipeline"} ⟧⟧');
 
     // Should not throw — silently skip
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -596,7 +596,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build something"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build something"} ⟧⟧');
 
     expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();
   });
@@ -614,7 +614,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build deployment"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build deployment"} ⟧⟧');
 
     expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();
   });
@@ -632,7 +632,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build feature", "depends_on": ["setup-task"]} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build feature", "depends_on": ["setup-task"]} ⟧⟧');
 
     // Has explicit dep — Secretary not needed
     expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();

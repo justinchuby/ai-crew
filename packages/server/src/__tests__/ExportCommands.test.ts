@@ -45,7 +45,7 @@ describe('ExportCommands', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmds = getExportCommands(ctx);
-    cmds[0].handler(agent, '⟦ EXPORT_SESSION ⟧');
+    cmds[0].handler(agent, '⟦⟦ EXPORT_SESSION ⟧⟧');
 
     expect(ctx.sessionExporter!.export).toHaveBeenCalledWith(
       'agent-lead-123',
@@ -67,7 +67,7 @@ describe('ExportCommands', () => {
       role: { id: 'secretary', name: 'Secretary' },
     });
     const cmds = getExportCommands(ctx);
-    cmds[0].handler(agent, '⟦ EXPORT_SESSION ⟧');
+    cmds[0].handler(agent, '⟦⟦ EXPORT_SESSION ⟧⟧');
 
     expect(ctx.sessionExporter!.export).toHaveBeenCalledWith(
       'agent-lead-123',
@@ -81,7 +81,7 @@ describe('ExportCommands', () => {
       role: { id: 'developer', name: 'Developer' },
     });
     const cmds = getExportCommands(ctx);
-    cmds[0].handler(agent, '⟦ EXPORT_SESSION ⟧');
+    cmds[0].handler(agent, '⟦⟦ EXPORT_SESSION ⟧⟧');
 
     expect(ctx.sessionExporter!.export).not.toHaveBeenCalled();
     expect(agent.sendMessage).toHaveBeenCalledWith(
@@ -93,7 +93,7 @@ describe('ExportCommands', () => {
     const ctx = makeCtx({ sessionExporter: undefined });
     const agent = makeAgent();
     const cmds = getExportCommands(ctx);
-    cmds[0].handler(agent, '⟦ EXPORT_SESSION ⟧');
+    cmds[0].handler(agent, '⟦⟦ EXPORT_SESSION ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('not available'),
@@ -108,7 +108,7 @@ describe('ExportCommands', () => {
     });
     const agent = makeAgent();
     const cmds = getExportCommands(ctx);
-    cmds[0].handler(agent, '⟦ EXPORT_SESSION ⟧');
+    cmds[0].handler(agent, '⟦⟦ EXPORT_SESSION ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Export failed: disk full'),
@@ -118,8 +118,8 @@ describe('ExportCommands', () => {
   it('matches EXPORT_SESSION regex with optional JSON body', () => {
     const cmds = getExportCommands(makeCtx());
     const regex = cmds[0].regex;
-    expect(regex.test('⟦ EXPORT_SESSION ⟧')).toBe(true);
-    expect(regex.test('⟦EXPORT_SESSION⟧')).toBe(true);
-    expect(regex.test('⟦ EXPORT_SESSION {"format":"zip"} ⟧')).toBe(true);
+    expect(regex.test('⟦⟦ EXPORT_SESSION ⟧⟧')).toBe(true);
+    expect(regex.test('⟦⟦EXPORT_SESSION⟧⟧')).toBe(true);
+    expect(regex.test('⟦⟦ EXPORT_SESSION {"format":"zip"} ⟧⟧')).toBe(true);
   });
 });

@@ -58,7 +58,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"role": "developer"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"role": "developer"}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -69,7 +69,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "", "role": "developer"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "", "role": "developer"}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -80,7 +80,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "   ", "role": "developer"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "   ", "role": "developer"}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -92,7 +92,7 @@ describe('DECLARE_TASKS validation', () => {
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
     const longId = 'x'.repeat(101);
-    cmd.handler(agent, `⟦ DECLARE_TASKS {"tasks": [{"id": "${longId}", "role": "developer"}]} ⟧`);
+    cmd.handler(agent, `⟦⟦ DECLARE_TASKS {"tasks": [{"id": "${longId}", "role": "developer"}]} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('id too long (max 100 chars)'),
     );
@@ -103,7 +103,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "task-1"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "task-1"}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "role"'),
     );
@@ -114,7 +114,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "task-1", "role": "  "}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "task-1", "role": "  "}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "role"'),
     );
@@ -125,7 +125,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "ok", "role": "dev"}, {"id": "bad"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "ok", "role": "dev"}, {"id": "bad"}]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('tasks[1].role'),
     );
@@ -139,7 +139,7 @@ describe('DECLARE_TASKS validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getDeclareHandler(ctx);
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": [{"id": "t1", "role": "developer"}]} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "t1", "role": "developer"}]} ⟧⟧');
     expect(ctx.taskDAG.declareTaskBatch).toHaveBeenCalledWith(agent.id, [{ id: 't1', role: 'developer' }]);
   });
 });
@@ -153,7 +153,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'impl-auth' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Auth module implemented"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Auth module implemented"} ⟧⟧');
 
     expect(ctx.taskDAG.getTransitionError).toHaveBeenCalledWith('lead-001', 'impl-auth', 'complete');
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'impl-auth');
@@ -171,7 +171,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'old-task' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"id": "explicit-task", "summary": "Done"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "explicit-task", "summary": "Done"} ⟧⟧');
 
     expect(ctx.taskDAG.getTransitionError).toHaveBeenCalledWith('lead-001', 'explicit-task', 'complete');
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'explicit-task');
@@ -185,7 +185,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"status": "done", "output": "All tests pass"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"status": "done", "output": "All tests pass"} ⟧⟧');
 
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Status: done'));
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('All tests pass'));
@@ -204,7 +204,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'build-task' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Build done"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Build done"} ⟧⟧');
 
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Newly ready tasks: deploy-task, review-task'));
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('2 task(s) now ready'));
@@ -218,7 +218,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001');
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Done with work"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Done with work"} ⟧⟧');
 
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('completed task'));
@@ -232,7 +232,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const ctx = makeCtx();
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Done"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Done"} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('no parent agent found'));
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
@@ -251,7 +251,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'already-done' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Done again"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Done again"} ⟧⟧');
 
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('completed task "already-done"'));
@@ -266,7 +266,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Implemented feature"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Implemented feature"} ⟧⟧');
 
     expect(ctx.emit).toHaveBeenCalledWith('agent:message_sent', {
       from: agent.id,
@@ -285,7 +285,7 @@ describe('COMPLETE_TASK from non-lead agents (DAG relay)', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {} ⟧⟧');
 
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Status: done'));
     expect(parent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('(no summary)'));
@@ -298,7 +298,7 @@ describe('COMPLETE_TASK from lead agent', () => {
     const agent = makeLeadAgent();
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"id": "task-1"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-1"} ⟧⟧');
 
     expect(ctx.taskDAG.getTransitionError).toHaveBeenCalledWith(agent.id, 'task-1', 'complete');
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(agent.id, 'task-1');
@@ -310,7 +310,7 @@ describe('COMPLETE_TASK from lead agent', () => {
     const agent = makeLeadAgent();
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('requires an "id" field'));
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('COMPLETE_TASK from lead agent', () => {
     const agent = makeLeadAgent();
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"id": "task-1"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-1"} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Cannot complete task'));
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
@@ -338,7 +338,7 @@ describe('COMPLETE_TASK from lead agent', () => {
     const agent = makeLeadAgent();
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"id": "task-1", "output": "Build successful"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-1", "output": "Build successful"} ⟧⟧');
 
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(agent.id, 'task-1');
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Build successful'));
@@ -353,7 +353,7 @@ describe('COMPLETE_TASK edge cases', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Done"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Done"} ⟧⟧');
 
     // DAG task should still be completed even though parent is gone
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'task-1');
@@ -368,7 +368,7 @@ describe('COMPLETE_TASK edge cases', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const cmd = getCompleteHandler(ctx);
 
-    cmd.handler(agent, '⟦ COMPLETE_TASK {"summary": "Done"} ⟧');
+    cmd.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "Done"} ⟧⟧');
 
     // agent:message_sent should NOT be emitted since parent doesn't exist
     expect(ctx.emit).not.toHaveBeenCalledWith('agent:message_sent', expect.anything());
@@ -389,7 +389,7 @@ describe('COMPLETE_TASK security', () => {
     });
     const agent = makeChildAgent('lead-001', { dagTaskId: 'my-task' });
     const handler = getCompleteHandler(ctx);
-    handler.handler(agent, '⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧');
+    handler.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
   });
@@ -406,7 +406,7 @@ describe('COMPLETE_TASK security', () => {
     });
     const agent = makeChildAgent('lead-001', { dagTaskId: 'my-task' });
     const handler = getCompleteHandler(ctx);
-    handler.handler(agent, '⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧');
+    handler.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧⟧');
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'task-x');
   });
 
@@ -422,7 +422,7 @@ describe('COMPLETE_TASK security', () => {
     });
     const agent = makeChildAgent('lead-001', { dagTaskId: 'my-task' });
     const handler = getCompleteHandler(ctx);
-    handler.handler(agent, '⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧');
+    handler.handler(agent, '⟦⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
     expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
   });
@@ -439,7 +439,7 @@ describe('COMPLETE_TASK security', () => {
     });
     const agent = makeChildAgent('lead-001', { dagTaskId: 'my-task' });
     const handler = getCompleteHandler(ctx);
-    handler.handler(agent, '⟦ COMPLETE_TASK {"summary": "done"} ⟧');
+    handler.handler(agent, '⟦⟦ COMPLETE_TASK {"summary": "done"} ⟧⟧');
     expect(ctx.taskDAG.getTask).not.toHaveBeenCalled();
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'my-task');
   });
@@ -456,7 +456,7 @@ describe('COMPLETE_TASK security', () => {
     });
     const agent = makeChildAgent('lead-001', { dagTaskId: 'task-1' });
     const handler = getCompleteHandler(ctx);
-    handler.handler(agent, `⟦ COMPLETE_TASK {"summary": "${longText}"} ⟧`);
+    handler.handler(agent, `⟦⟦ COMPLETE_TASK {"summary": "${longText}"} ⟧⟧`);
 
     const parentAgent = ctx.getAgent('lead-001') as any;
     const parentMsg = parentAgent.sendMessage.mock.calls[0][0];
@@ -483,7 +483,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('✓'));
@@ -500,7 +500,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeChildAgent('lead-001');
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
   });
@@ -516,7 +516,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeChildAgent('lead-001');
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -532,7 +532,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b", "task-c"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b", "task-c"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledTimes(2);
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
@@ -549,7 +549,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('skipped'));
   });
@@ -564,7 +564,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(ctx.emit).toHaveBeenCalledWith('dag:updated', { leadId: 'lead-001' });
   });
@@ -574,7 +574,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"depends_on": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('error'));
   });
@@ -584,7 +584,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": []} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": []} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('error'));
   });
@@ -599,7 +599,7 @@ describe('ADD_DEPENDENCY command', () => {
     } as any;
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('cannot determine lead'));
   });

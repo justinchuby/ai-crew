@@ -99,7 +99,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "Add auth module"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "Add auth module"} ⟧⟧');
 
     expect(ctx.lockRegistry.getByAgent).toHaveBeenCalledWith('agent-dev-abc123');
     // Wait for async exec
@@ -123,7 +123,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "Update docs"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "Update docs"} ⟧⟧');
 
     await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
     const cmd = mockExec.mock.calls[0][0] as string;
@@ -137,7 +137,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "test"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('No file locks held'),
@@ -156,7 +156,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "feat: stuff"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
 
     await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
     const cmd = mockExec.mock.calls[0][0] as string;
@@ -173,7 +173,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {} ⟧⟧');
 
     await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
     const cmd = mockExec.mock.calls[0][0] as string;
@@ -193,7 +193,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "ship it"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
 
     // Activity ledger log now happens after async commit + verification
     await vi.waitFor(() => expect(ctx.activityLedger.log).toHaveBeenCalledWith(
@@ -219,7 +219,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "ship it"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
@@ -236,7 +236,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "test"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT failed'),
@@ -253,7 +253,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent({ cwd: '/my/worktree/path' });
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "test"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
     const opts = mockExec.mock.calls[0][1];
@@ -265,7 +265,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {not valid json} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {not valid json} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT error'),
@@ -297,7 +297,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "verified commit"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "verified commit"} ⟧⟧');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
@@ -322,7 +322,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "partial commit"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "partial commit"} ⟧⟧');
 
     // Should get success message but NOT a warning
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
@@ -347,7 +347,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "empty commit"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "empty commit"} ⟧⟧');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
@@ -367,7 +367,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "test"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     // Commit success message should still arrive
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
@@ -392,7 +392,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦ COMMIT {"message": "test"} ⟧');
+    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT failed'),
@@ -417,7 +417,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "scoped commit"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "scoped commit"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -443,7 +443,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "single file"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "single file"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -467,7 +467,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agentA = makeAgent({ id: 'agent-aaa-111' });
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agentA, '⟦ COMMIT {"message": "agent A commit"} ⟧');
+      commit.handler(agentA, '⟦⟦ COMMIT {"message": "agent A commit"} ⟧⟧');
 
       // Must query locks ONLY for the committing agent
       expect(getByAgent).toHaveBeenCalledWith('agent-aaa-111');
@@ -488,7 +488,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agentA = makeAgent({ id: 'agent-aaa' });
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agentA, '⟦ COMMIT {"message": "A only"} ⟧');
+      commit.handler(agentA, '⟦⟦ COMMIT {"message": "A only"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -513,8 +513,8 @@ describe('CoordCommands — COMMIT handler', () => {
       const agentY = makeAgent({ id: 'agent-y' });
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agentX, '⟦ COMMIT {"message": "X work"} ⟧');
-      commit.handler(agentY, '⟦ COMMIT {"message": "Y work"} ⟧');
+      commit.handler(agentX, '⟦⟦ COMMIT {"message": "X work"} ⟧⟧');
+      commit.handler(agentY, '⟦⟦ COMMIT {"message": "Y work"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalledTimes(2));
       const cmdX = mockExec.mock.calls[0][0] as string;
@@ -543,7 +543,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "all files"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "all files"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -563,7 +563,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "no locks"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "no locks"} ⟧⟧');
 
       expect(mockExec).not.toHaveBeenCalled();
       expect(agent.sendMessage).toHaveBeenCalledWith(
@@ -584,7 +584,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "verify me"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "verify me"} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalledTimes(3));
       // First call: git add + commit -- files
@@ -609,7 +609,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "partial modify"} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "partial modify"} ⟧⟧');
 
       await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('COMMIT succeeded'),
@@ -633,7 +633,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "merge test", "files": ["src/extra.ts"]} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "merge test", "files": ["src/extra.ts"]} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -651,7 +651,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "test", "files": ["src/unlocked.ts"]} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "test", "files": ["src/unlocked.ts"]} ⟧⟧');
 
       expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining("don't hold locks for"),
@@ -668,7 +668,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "manual files", "files": ["src/a.ts"]} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "manual files", "files": ["src/a.ts"]} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -685,7 +685,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦ COMMIT {"message": "dedup", "files": ["src/shared.ts"]} ⟧');
+      commit.handler(agent, '⟦⟦ COMMIT {"message": "dedup", "files": ["src/shared.ts"]} ⟧⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
@@ -718,7 +718,7 @@ describe('CoordCommands — COMMIT handler', () => {
 
       const cmds = getCoordCommands(ctx);
       const unlock = cmds.find((c) => c.name === 'UNLOCK');
-      unlock!.handler(agent, '⟦ UNLOCK_FILE {"filePath": "src/dirty.ts"} ⟧');
+      unlock!.handler(agent, '⟦⟦ UNLOCK_FILE {"filePath": "src/dirty.ts"} ⟧⟧');
 
       await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('uncommitted changes'),
@@ -741,7 +741,7 @@ describe('CoordCommands — COMMIT handler', () => {
 
       const cmds = getCoordCommands(ctx);
       const unlock = cmds.find((c) => c.name === 'UNLOCK');
-      unlock!.handler(agent, '⟦ UNLOCK_FILE {"filePath": "src/clean.ts"} ⟧');
+      unlock!.handler(agent, '⟦⟦ UNLOCK_FILE {"filePath": "src/clean.ts"} ⟧⟧');
 
       await vi.waitFor(() => expect(ctx.lockRegistry.release).toHaveBeenCalled());
       // No warning about uncommitted changes

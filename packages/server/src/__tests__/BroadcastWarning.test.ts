@@ -55,7 +55,7 @@ describe('Broadcast — empty audience warning', () => {
     const commands = getCommCommands(ctx);
     const broadcastCmd = commands.find(c => c.name === 'BROADCAST')!;
 
-    const data = '⟦ BROADCAST {"content": "Hello team!"} ⟧';
+    const data = '⟦⟦ BROADCAST {"content": "Hello team!"} ⟧⟧';
     broadcastCmd.handler(lead as unknown as Agent, data);
 
     expect(lead.sendMessage).toHaveBeenCalledWith(
@@ -79,7 +79,7 @@ describe('Broadcast — empty audience warning', () => {
     const commands = getCommCommands(ctx);
     const broadcastCmd = commands.find(c => c.name === 'BROADCAST')!;
 
-    const data = '⟦ BROADCAST {"content": "Hello team!"} ⟧';
+    const data = '⟦⟦ BROADCAST {"content": "Hello team!"} ⟧⟧';
     broadcastCmd.handler(lead as unknown as Agent, data);
 
     // The lead should NOT have received a warning

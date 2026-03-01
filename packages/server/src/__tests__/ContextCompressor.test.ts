@@ -194,9 +194,9 @@ describe('ContextCompressor.findImportantMessages', () => {
     expect(important).not.toContain(2);
   });
 
-  it('identifies ACP command messages via ⟦ ⟧ pattern', () => {
+  it('identifies ACP command messages via ⟦⟦ ⟧⟧ pattern', () => {
     const msgs: Message[] = [
-      { role: 'user', content: '⟦AGENT_MESSAGE to:lead-1⟧ Hello' },
+      { role: 'user', content: '⟦⟦AGENT_MESSAGE to:lead-1⟧⟧ Hello' },
       { role: 'user', content: 'plain text' },
     ];
     const important = ContextCompressor.findImportantMessages(msgs);
