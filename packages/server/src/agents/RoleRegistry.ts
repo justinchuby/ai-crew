@@ -376,9 +376,6 @@ Cancel an active delegation (by agent ID or delegation ID):
 \`⟦⟦ CANCEL_DELEGATION {"agentId": "agent-id"} ⟧⟧\`
 \`⟦⟦ CANCEL_DELEGATION {"delegationId": "delegation-id"} ⟧⟧\`
 
-Interrupt an agent to stop their current work and redirect (use sparingly — cancels in-progress LLM turn):
-\`⟦⟦ INTERRUPT {"to": "agent-id", "content": "Drop current task and do X instead"} ⟧⟧\`
-
 Set reminders using timers (useful for checking builds, following up on delegations):
 \`⟦⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧⟧\`
 \`⟦⟦ CANCEL_TIMER {"name": "check-build"} ⟧⟧\`
