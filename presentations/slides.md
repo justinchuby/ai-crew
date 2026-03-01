@@ -123,6 +123,88 @@ Each one has its own terminal session with full access to the codebase.
 
 ---
 
+# This isn't "AI writing code." This is something new.
+
+<div class="bg-gray-800 rounded-lg p-4 border border-blue-500 mt-2">
+
+No single agent was told to "build a team" or "review each other's work" or "fix your own bugs." Each agent had **simple rules**: do your job, communicate what you find, ask when you're stuck.
+
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
+
+🐜 Think of an **ant colony**. No ant understands the colony. But simple rules — follow pheromones, carry food, signal danger — produce complex, intelligent behavior. That's what happened here.
+
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-2">
+
+**What emerged:** A secretary that became a QA system. A reviewer that found race conditions. A lead that invented new team processes. Organizational intelligence from simple, specialized agents.
+
+</div>
+
+<!--
+This is the key reframe. Don't think of this as "AI writing code faster."
+Think of it as emergent organizational intelligence. Like an ant colony —
+no individual ant understands the colony, but simple rules produce complex
+behavior. Each agent follows simple rules: do your job, communicate what
+you find, ask when you're stuck. What emerges is a team that catches bugs,
+improves its own processes, and coordinates autonomously. The intelligence
+isn't in any single agent — it's in the interaction patterns between them.
+-->
+
+---
+
+# Your team's deepest frustration, solved
+
+<div class="grid grid-cols-2 gap-4 mt-2">
+<div class="bg-gray-800 rounded-lg p-4 border border-red-500">
+
+### Brooks' Law <span class="text-sm text-gray-500">(1975)</span>
+
+*"Adding people to a late project makes it later."*
+
+Communication cost = **O(n²)**
+
+<div class="mt-2 text-sm text-gray-400">
+9 people = 36 communication channels<br/>
+13 people = 78 communication channels<br/>
+Every new hire makes coordination harder.
+</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-4 border border-green-500">
+
+### AI Crew
+
+Communication cost stays **flat**.
+
+<div class="mt-2 text-sm text-gray-400">
+Structured messaging — no meetings<br/>
+Task DAG — no ambiguous ownership<br/>
+File locking — no merge conflicts<br/>
+Every new agent = pure throughput gain.
+</div>
+
+</div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">This is the first time adding more workers actually makes a software project faster. AI agents don't have ego, politics, or timezone issues.</p>
+
+<!--
+Every engineer in this room has felt Brooks' Law. Adding people to a late
+project makes it later — because communication overhead grows quadratically.
+9 people means 36 communication channels. 13 means 78. But AI agents break
+this law. Communication is structured — no meetings, no Slack threads, no
+miscommunications. Task ownership is explicit via the DAG. File access is
+locked, not shared. So every new agent is pure throughput. 13 agents
+means 13x the work, not 78x the coordination cost. This is genuinely new.
+-->
+Each one has its own terminal session with full access to the codebase.
+-->
+
+---
+
 # Meet the crew
 
 <div class="grid grid-cols-3 gap-3 mt-2">
@@ -675,9 +757,15 @@ whole model.
 
 ---
 
-# What makes this different from just "using Copilot"?
+# This isn't replacing you. It's upgrading you.
 
-<div class="grid grid-cols-2 gap-4 mt-2">
+<div class="bg-gray-800 rounded-lg p-4 border border-blue-500 mb-3">
+
+**You're still the decision maker.** You set the goal. You review the output. You choose what ships. The AI handles the 80% that's execution — the coding, testing, reviewing, coordinating. You handle the 20% that's judgment.
+
+</div>
+
+<div class="grid grid-cols-2 gap-4">
 <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
 
 ### One Copilot agent
@@ -686,7 +774,6 @@ whole model.
 - Context window fills up on big tasks
 - No one checks its work
 - You manage everything manually
-- One perspective on every problem
 
 </div>
 <div class="bg-gray-800 rounded-lg p-4 border border-green-500">
@@ -697,26 +784,18 @@ whole model.
 - Each agent has fresh, focused context
 - Built-in code review on every change
 - The Lead manages the team for you
-- Specialist perspectives catch more bugs
 
 </div>
-</div>
-
-<br/>
-
-<div class="text-center text-gray-400">
-
-It's the difference between a freelancer and a team.
-
 </div>
 
 <!--
-If you're thinking "I already use Copilot" — yes, and this uses the same
-Copilot. Each agent IS a Copilot CLI session. The difference is between
-one freelancer doing everything sequentially, versus a team where specialists
-work in parallel. The freelancer's context window fills up. The team has
-fresh context per agent. Nobody reviews the freelancer's work. The team has
-built-in code review. You manage the freelancer. The team manages itself.
+Let me be clear about what this is. This doesn't replace developers — it
+gives developers superpowers. You're still the one setting direction,
+making judgment calls, deciding what ships. The AI handles execution — the
+80% that's writing code, running tests, checking for bugs. A single
+Copilot is a freelancer. An AI Crew is your personal engineering team.
+The difference is like going from typing your own letters to having an
+executive assistant who manages a department.
 -->
 
 ---
@@ -741,6 +820,10 @@ built-in code review. You manage the freelancer. The team manages itself.
 📢 <strong>The lead adapted to problems</strong> — when commits went wrong, it didn't just fix the one case. It broadcast a new rule to ALL agents and assigned someone to harden the system.
 </div>
 
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+🎤 <strong>Oh, and one more thing</strong> — the presentation you're watching right now? It was written, expanded, and rewritten by the agents we're describing. You're looking at their work product.
+</div>
+
 </div>
 
 <!--
@@ -748,9 +831,11 @@ These behaviors weren't programmed. The secretary wasn't told to find bugs
 — its job is tracking progress. But it noticed the numbers didn't add up
 and spoke up. The lead wasn't told to broadcast process changes — it
 decided that the commit problem was systemic and needed a team-wide fix.
-Agents debated design choices through messages. This is emergent behavior
-from giving specialized agents the ability to communicate and act
-independently.
+Agents debated design choices through messages. And here's the recursive
+part — pause for effect — this presentation? The one you're looking at
+right now? It was written by agent bf1ec2c1, a developer in the crew.
+Revised three times based on review feedback. You're watching a product
+of the system we're describing. Let that sink in.
 -->
 
 ---
