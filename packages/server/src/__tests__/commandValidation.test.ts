@@ -812,11 +812,12 @@ describe('PROGRESS validation', () => {
     );
   });
 
-  it('allows extra fields via passthrough', () => {
+  it('strips unknown extra fields silently', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
     cmd.handler(agent, '⟦ PROGRESS {"custom_field": "value", "summary": "working"} ⟧');
+    // Should not error — unknown keys are silently stripped
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );

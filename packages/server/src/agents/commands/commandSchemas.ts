@@ -126,7 +126,7 @@ export const progressSchema = z.object({
     return num;
   }).pipe(z.number().min(0, 'Percent must be at least 0').max(100, 'Percent must be at most 100')).optional(),
   status: z.string().max(MAX_NAME_LENGTH).optional(),
-}).passthrough();
+});
 
 // ── System Commands ──────────────────────────────────────────────────
 
