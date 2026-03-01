@@ -100,7 +100,7 @@ export class AlertEngine extends EventEmitter {
       // Skip agents with an active LLM call — but only if it started recently (< 30 min)
       if (agent.isPrompting) {
         const promptStart = agent.promptingStartedAt;
-        if (promptStart && (now - promptStart) < MAX_PROMPTING_MS) continue;
+        if (promptStart != null && (now - promptStart!) < MAX_PROMPTING_MS) continue;
       }
       const lastActivity = this.lastActivityByAgent.get(agent.id) ?? agent.createdAt.getTime();
       if (now - lastActivity > STUCK_AGENT_MS) {

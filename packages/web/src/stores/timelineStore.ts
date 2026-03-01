@@ -42,7 +42,6 @@ interface TimelineState {
   setHiddenStatuses: (statuses: Set<TimelineStatus>) => void;
   toggleExpandedAgent: (leadId: string, agentId: string) => void;
   expandMultipleAgents: (leadId: string, agentIds: string[]) => void;
-  setExpandedAgents: (leadId: string, agentIds: Set<string>) => void;
   getExpandedAgents: (leadId: string) => ReadonlySet<string>;
   setSortDirection: (dir: SortDirection) => void;
   setCachedData: (leadId: string, data: TimelineData) => void;
@@ -97,9 +96,6 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     }),
 
   getExpandedAgents: (leadId) => get().expandedAgents[leadId] ?? EMPTY_SET,
-
-  setExpandedAgents: (leadId, agentIds) =>
-    set((s) => ({ expandedAgents: { ...s.expandedAgents, [leadId]: agentIds } })),
 
   setSortDirection: (dir) => set({ sortDirection: dir }),
 
