@@ -159,4 +159,41 @@ describe('Session Resume', () => {
       expect(sessionProject!.name).toBe('Full Lifecycle');
     });
   });
+
+  describe('claimSessionForResume', () => {
+    it('claims a completed session and returns true', () => {
+      const project = registry.create('Claim Test');
+      registry.startSession(project.id, 'lead-claim', 'Work');
+      registry.setSessionId('lead-claim', 'sess-claim');
+      registry.endSession('lead-claim', 'completed');
+
+      const sessions = registry.getResumableSessions();
+      expect(registry.claimSessionForResume(sessions[0].id)).toBe(true);
+
+      // Verify status changed to 'resuming'
+      const updated = registry.getSessionById(sessions[0].id);
+      expect(updated!.status).toBe('resuming');
+    });
+
+    it('rejects claim on active session', () => {
+      const project = registry.create('Active Claim');
+      registry.startSession(project.id, 'lead-active', 'Work');
+
+      const allSessions = registry.getSessions(project.id);
+      expect(registry.claimSessionForResume(allSessions[0].id)).toBe(false);
+    });
+
+    it('rejects double-claim (race condition guard)', () => {
+      const project = registry.create('Race Test');
+      registry.startSession(project.id, 'lead-race', 'Work');
+      registry.setSessionId('lead-race', 'sess-race');
+      registry.endSession('lead-race', 'completed');
+
+      const sessions = registry.getResumableSessions();
+      // First claim succeeds
+      expect(registry.claimSessionForResume(sessions[0].id)).toBe(true);
+      // Second claim fails — already 'resuming'
+      expect(registry.claimSessionForResume(sessions[0].id)).toBe(false);
+    });
+  });
 });

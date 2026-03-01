@@ -267,6 +267,22 @@ export class ProjectRegistry {
       .get() as ProjectSession | undefined;
   }
 
+  /** Atomically claim a session for resume — returns true if this caller won the race */
+  claimSessionForResume(sessionRowId: number): boolean {
+    const result = this.db.drizzle
+      .update(projectSessions)
+      .set({ status: 'resuming' })
+      .where(
+        and(
+          eq(projectSessions.id, sessionRowId),
+          ne(projectSessions.status, 'active'),
+          ne(projectSessions.status, 'resuming'),
+        ),
+      )
+      .run();
+    return result.changes > 0;
+  }
+
   /** Delete a project and all associated sessions */
   delete(id: string): boolean {
     const project = this.get(id);

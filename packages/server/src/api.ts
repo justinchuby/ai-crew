@@ -1314,11 +1314,16 @@ export function apiRouter(
       : projectRegistry.getSessionById(sessionRowId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (!session.sessionId) return res.status(400).json({ error: 'Session has no Copilot session ID — cannot resume' });
-    if (session.status === 'active') return res.status(409).json({ error: 'Session is still active' });
+
+    // Atomic claim prevents race condition: two concurrent resumes both passing status check
+    if (!projectRegistry.claimSessionForResume(session.id)) {
+      return res.status(409).json({ error: 'Session is still active or already being resumed' });
+    }
 
     const project = projectRegistry.get(session.projectId);
     if (!project) return res.status(404).json({ error: 'Associated project not found' });
 
+    // projectSessions only tracks lead sessions — non-lead agents use the conversations table
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
