@@ -308,13 +308,15 @@ ai-crew/
 
 ## 21. Scoped COMMIT Command
 
-**Decision:** The `COMMIT` command stages only files the agent currently has locked, rather than using `git add -A`.
+**Decision:** The `COMMIT` command executes `git add` only on files the agent currently has locked, then runs post-commit verification.
 
 **Rationale:**
 - In multi-agent workflows, several agents may have uncommitted changes in the same repository
 - `git add -A` would stage everyone's changes into one agent's commit
 - Scoped staging ensures each agent's commit contains only the files they were authorized to modify
 - This is enforced server-side by reading the agent's current file locks from `FileLockRegistry`
+- Post-commit verification (`git diff --name-only HEAD~1`) confirms expected files actually landed
+- Activity ledger logs only on verified success (not before commit executes)
 
 **Trade-off:** If an agent edits a file without locking it first, the file won't be staged. This is intentional — it encourages proper lock discipline.
 

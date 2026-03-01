@@ -10,7 +10,33 @@ Multiple AI agents working on the same codebase can:
 - Make contradictory decisions without knowing what others decided
 - Overwhelm the system by spawning too many sub-agents
 
-## Solution: Three-Layer Coordination
+## Solution: Multi-Layer Defense
+
+Agent isolation and conflict prevention is implemented as a layered defense:
+
+| Layer | Mechanism | Status | Description |
+|-------|-----------|--------|-------------|
+| **L1** | Worktree Isolation | ⚠️ In Development | Per-agent git worktrees give each agent its own branch and working directory |
+| **L2** | Scoped COMMIT | ✅ Active | `COMMIT` handler executes `git add` only on locked files + post-commit verification |
+| **L3** | Merge Scope Validation | ✅ Active (depends on L1) | `WorktreeManager.merge()` validates only locked files were modified before merging |
+| **L4** | File Locking | ✅ Active | Pessimistic locks prevent concurrent edits to the same file |
+| **L5** | Activity Ledger | ✅ Active | Shared log of all agent actions for awareness and dedup |
+| **L6** | Context Refresh | ✅ Active | Push crew state to agents on significant events |
+
+### Worktree Isolation (In Development)
+
+> ⚠️ **Status: Implemented in backend, not yet enabled.** The `WorktreeManager` class is fully implemented and wired into the agent lifecycle (`AgentManager.spawn()` → `create()`, `terminate()` → `merge()` + `cleanup()`). However, worktree creation depends on the agent's environment having a proper git setup, which isn't guaranteed in all deployment contexts (e.g., `npm install` may need to run per-worktree). **Agents currently share the repository working directory.**
+
+When enabled, worktree isolation provides:
+
+- **Per-agent branches** — Each agent gets its own git branch (`agent/<agentId>`) and worktree directory
+- **Independent work** — Agents can stage, commit, and modify files without affecting each other
+- **Merge-back** — On agent termination, changes are merged back to the integration branch
+- **Conflict detection** — Merge conflicts are detected and logged (not auto-resolved)
+- **Orphan cleanup** — On server startup, stale worktrees from previous crashes are cleaned up
+- **Fallback** — If worktree creation fails, the agent falls back to the shared working directory
+
+**Implementation:** `packages/server/src/coordination/WorktreeManager.ts`
 
 ### Layer 1: File Locking
 
@@ -54,19 +80,32 @@ POST /api/coordination/locks          — acquire: { agentId, filePath, reason? 
 DELETE /api/coordination/locks/:path  — release: ?agentId=...
 ```
 
-### Layer 1b: Scoped COMMIT
+### Layer 1b: Scoped COMMIT (with Post-Commit Verification)
 
-The `COMMIT` command ensures agents only stage files they've locked, preventing one agent from accidentally committing another agent's uncommitted work.
+The `COMMIT` command **executes** a scoped git commit server-side and verifies the result — it doesn't just suggest a command.
 
 ```
 [[[ COMMIT {"message": "feat: add login endpoint"} ]]]
 ```
 
 **How it works:**
-1. Reads the agent's current and recently released file locks
-2. Runs `git add` only on those specific files
-3. Commits with the provided message
-4. Prevents `git add -A` which could stage other agents' changes
+1. Reads the agent's current file locks from `FileLockRegistry`
+2. Shell-quotes each file path (handles spaces and special characters)
+3. Executes `git add <locked-files> && git commit -m '<message>'` in the agent's cwd (worktree or shared)
+4. **Post-commit verification (A6):** Runs `git diff --name-only HEAD~1` and compares committed files against expected locked files
+5. Warns the agent if expected files are missing from the commit
+6. Logs to ActivityLedger **only** on successful, verified commit — not before
+
+**Verification example:**
+```
+[System] COMMIT succeeded: abc1234 feat: add login endpoint
+[System] Warning: 1 expected file(s) not found in commit: src/utils.ts
+```
+
+**Safety properties:**
+- Prevents `git add -A` which could stage other agents' changes
+- Verification is best-effort — if `git diff` fails, the commit is not blocked
+- Activity ledger only records verified commits (moved from synchronous pre-log to async post-verify)
 
 ### Layer 1c: Task Dedup Detection
 
