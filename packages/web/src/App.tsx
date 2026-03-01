@@ -25,6 +25,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
+import { useLeadStore } from './stores/leadStore';
+import type { AcpTextChunk, Project } from './types';
+
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
@@ -88,6 +91,57 @@ export function App() {
       playCompletionSound();
     }
   }, [agents, soundEnabled]);
+
+  // On app startup: load active leads + persisted projects into leadStore
+  useEffect(() => {
+    // Load active leads and their message history
+    fetch('/api/lead').then((r) => r.json()).then((leads: any[]) => {
+      if (!Array.isArray(leads)) return;
+      const store = useLeadStore.getState();
+      leads.forEach((l) => {
+        store.addProject(l.id);
+        // Pre-load message history
+        fetch(`/api/agents/${l.id}/messages?limit=200`)
+          .then((r) => r.json())
+          .then((data: any) => {
+            if (Array.isArray(data.messages) && data.messages.length > 0) {
+              const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+                type: 'text' as const,
+                text: m.content,
+                sender: m.sender as 'agent' | 'user' | 'system',
+                timestamp: new Date(m.timestamp).getTime(),
+              }));
+              const current = useLeadStore.getState().projects[l.id];
+              if (!current || current.messages.length === 0) {
+                useLeadStore.getState().setMessages(l.id, msgs);
+              }
+            }
+          })
+          .catch(() => {});
+      });
+      // Auto-select first running lead
+      if (!store.selectedLeadId) {
+        const running = leads.find((l) => l.status === 'running');
+        if (running) store.selectLead(running.id);
+      }
+    }).catch(() => {});
+
+    // Load persisted projects and register them in leadStore
+    fetch('/api/projects').then((r) => r.json()).then((projects: Project[]) => {
+      if (!Array.isArray(projects)) return;
+      const store = useLeadStore.getState();
+      for (const proj of projects) {
+        if (proj.status === 'archived') continue;
+        const key = `project:${proj.id}`;
+        store.addProject(key);
+      }
+      // If no lead is selected yet, select the first project
+      if (!store.selectedLeadId && projects.length > 0) {
+        const first = projects.find((p) => p.status !== 'archived');
+        if (first) store.selectLead(`project:${first.id}`);
+      }
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="flex h-screen bg-surface text-th-text-alt">
