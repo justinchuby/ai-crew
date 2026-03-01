@@ -80,12 +80,14 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
 }) {
   return (
     <div
-      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 transition-colors ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
+      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 transition-colors timeline-focusable ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
       style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}` }}
       onClick={onClick}
       role="button"
-      aria-label={`${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
+      tabIndex={0}
+      aria-label={`${ROLE_ICONS[agent.role] ?? ''} ${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
       aria-expanded={isExpanded}
+      aria-roledescription="agent lane toggle"
     >
       <span className="text-sm font-medium text-th-text-alt truncate">
         {ROLE_ICONS[agent.role] ?? '🤖'} {agent.role}
@@ -111,7 +113,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
   const agentLocks = locks.filter(l => l.agentId === agent.id);
 
   return (
-    <g role="row" aria-label={`${agent.role} agent ${agent.shortId} timeline`}>
+    <g role="row" aria-label={`${agent.role} agent ${agent.shortId} timeline`} aria-roledescription="agent timeline lane">
       {/* Lane background */}
       <rect x={0} y={y} width={width} height={height} fill="transparent" stroke="#27272a" strokeWidth={0.5} />
 
@@ -162,7 +164,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
 
 function TimelineLegend() {
   return (
-    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted">
+    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted timeline-legend" role="legend" aria-label="Timeline legend: status colors and communication types">
       {Object.entries(STATUS_COLORS).map(([status, colors]) => (
         <span key={status} className="flex items-center gap-1">
           {status === 'idle' ? (
@@ -448,16 +450,16 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
   if (data.agents.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-th-text-muted text-sm">
+      <div className="flex items-center justify-center h-64 text-th-text-muted text-sm" role="status">
         No agent activity to display.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to pan, +/- to zoom, Tab to navigate lanes, Enter to expand">
+    <div className="flex flex-col h-full timeline-container" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to pan, +/- to zoom, Tab to navigate lanes, Enter to expand" aria-roledescription="interactive timeline">
       {/* Zoom controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-th-border-muted">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-th-border-muted timeline-toolbar" role="toolbar" aria-label="Timeline controls">
         <span className="text-sm text-th-text-muted">
           {sortedAgents.length} agents · {data.communications.length} communications
         </span>
@@ -530,7 +532,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           className="flex-1 overflow-auto"
           onScroll={() => syncScroll('timeline')}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label="Team collaboration timeline showing agent activity over time" style={{ position: 'relative' }}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative' }}>
             {/* Idle hatch pattern */}
             <defs>
               <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

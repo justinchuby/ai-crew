@@ -1,9 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, Filter } from 'lucide-react';
 import { useTimelineData } from './useTimelineData';
 import type { TimelineData, CommType, TimelineStatus } from './useTimelineData';
 import { TimelineContainer } from './TimelineContainer';
+import { StatusBar } from './StatusBar';
+import { ErrorBanner } from './ErrorBanner';
+import type { ErrorEntry } from './ErrorBanner';
+import { EmptyState } from './EmptyState';
+import { useSinceLastVisit } from './useSinceLastVisit';
+import { AccessibilityAnnouncer } from './AccessibilityAnnouncer';
+import { useAccessibilityAnnouncements } from './useAccessibilityAnnouncements';
 import { useAppStore } from '../../stores/appStore';
+import './timeline-a11y.css';
 
 interface Props {
   api: any;
@@ -39,13 +47,14 @@ function ToggleChips<T extends string>({ label, items, selected, labels, onChang
   };
 
   return (
-    <div className="space-y-1">
-      <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium">{label}</span>
-      <div className="flex flex-wrap gap-1.5">
+    <div className="space-y-1" role="group" aria-label={`${label} filter`}>
+      <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium" id={`filter-${label.toLowerCase()}`}>{label}</span>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby={`filter-${label.toLowerCase()}`}>
         {items.map(item => (
           <button
             key={item}
             onClick={() => toggle(item)}
+            aria-pressed={selected.has(item)}
             className={`px-2 py-0.5 text-[11px] rounded border transition-colors ${
               selected.has(item)
                 ? 'bg-th-bg-muted border-th-border text-th-text-alt'
@@ -89,6 +98,9 @@ function applyFilters(
 /** Timeline visualization page — shows agent activity over time using visx. */
 export function TimelinePage({ api, ws }: Props) {
   const storeAgents = useAppStore((s) => s.agents);
+  const announcements = useAccessibilityAnnouncements();
+  const prevErrorRef = useRef<string | null>(null);
+
   // Lead selection
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
@@ -100,6 +112,14 @@ export function TimelinePage({ api, ws }: Props) {
   }, [leads, selectedLead]);
   const { data, loading, error, refetch } = useTimelineData(selectedLead);
   const [liveMode, setLiveMode] = useState(true);
+
+  // Announce errors via assertive live region
+  useEffect(() => {
+    if (error && error !== prevErrorRef.current) {
+      announcements.announceError(error);
+    }
+    prevErrorRef.current = error;
+  }, [error, announcements]);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -117,13 +137,93 @@ export function TimelinePage({ api, ws }: Props) {
     (ALL_COMM_TYPES.length - commFilter.size) +
     hiddenStatuses.size;
 
+  // ── Since-last-visit tracking ────────────────────────────────────────
+  const eventIds = useMemo(() => {
+    if (!data) return [];
+    const events: { id: string; time: string }[] = [];
+    for (const comm of data.communications) {
+      events.push({ id: `comm-${comm.fromAgentId}-${comm.timestamp}`, time: comm.timestamp });
+    }
+    for (const agent of data.agents) {
+      for (const seg of agent.segments) {
+        events.push({ id: `seg-${agent.id}-${seg.startAt}`, time: seg.startAt });
+      }
+    }
+    events.sort((a, b) => a.time.localeCompare(b.time));
+    return events.map(e => e.id);
+  }, [data]);
+
+  const { newEventCount, markAsSeen } = useSinceLastVisit(
+    eventIds,
+    selectedLead ?? 'default',
+  );
+
+  // Mark events as seen when user interacts with the timeline
+  useEffect(() => {
+    if (data && !liveMode) return; // only auto-mark in live mode
+    if (data && liveMode) markAsSeen();
+  }, [data, liveMode, markAsSeen]);
+
+  // ── Error entries for ErrorBanner ────────────────────────────────────
+  const errorEntries: ErrorEntry[] = useMemo(() => {
+    if (!data) return [];
+    return data.agents
+      .filter(a => {
+        const lastSeg = a.segments[a.segments.length - 1];
+        return lastSeg?.status === 'failed';
+      })
+      .map(a => ({
+        id: a.id,
+        agentLabel: `${a.role} (${a.shortId})`,
+        message: a.segments[a.segments.length - 1]?.taskLabel || 'Agent failed',
+      }));
+  }, [data]);
+
+  const timelineMainRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollToError = useCallback((errorId: string) => {
+    // Scroll the timeline container to bring the error agent into view
+    const el = timelineMainRef.current?.querySelector(`[data-agent-id="${errorId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // Fallback: scroll to top of timeline
+      timelineMainRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  const handleStatusBarErrorClick = useCallback(() => {
+    if (errorEntries.length > 0) {
+      handleScrollToError(errorEntries[0].id);
+    }
+  }, [errorEntries, handleScrollToError]);
+
   return (
-    <div className="p-6 space-y-4 h-full flex flex-col">
+    <div className="space-y-0 h-full flex flex-col timeline-container" role="region" aria-label="Team Collaboration Timeline">
+      {/* Skip link for keyboard users */}
+      <a href="#timeline-main" className="timeline-skip-link">
+        Skip to timeline
+      </a>
+
+      {/* ARIA live regions for screen reader announcements */}
+      <AccessibilityAnnouncer announcements={announcements} />
+
+      {/* StatusBar — always shows UNFILTERED crew health */}
+      <StatusBar
+        data={data}
+        newEventCount={newEventCount}
+        onErrorClick={handleStatusBarErrorClick}
+      />
+
+      <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-th-text">Team Collaboration Timeline</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 timeline-toolbar" role="toolbar" aria-label="Timeline page controls">
           <button
             onClick={() => setShowFilters(f => !f)}
+            aria-label={`${showFilters ? 'Hide' : 'Show'} filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+            aria-expanded={showFilters}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
               showFilters || activeFilterCount > 0
                 ? 'bg-indigo-900/40 border border-indigo-500/50 text-indigo-300'
@@ -135,21 +235,24 @@ export function TimelinePage({ api, ws }: Props) {
           </button>
           <button
             onClick={() => setLiveMode(prev => !prev)}
+            aria-label={liveMode ? 'Disable live updates' : 'Enable live updates'}
+            aria-pressed={liveMode}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors ${
               liveMode
                 ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 hover:bg-emerald-900/60'
                 : 'bg-th-bg-alt text-th-text-muted hover:bg-th-bg-muted hover:text-th-text-alt'
             }`}
           >
-            <span className={`inline-block w-2 h-2 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+            <span className={`inline-block w-2 h-2 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse motion-reduce:animate-none' : 'bg-zinc-600'}`} aria-hidden="true" />
             Live
           </button>
           <button
             onClick={refetch}
             disabled={loading}
+            aria-label={loading ? 'Refreshing timeline data' : 'Refresh timeline data'}
             className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-th-bg-alt text-th-text-alt hover:bg-th-bg-muted hover:text-th-text transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
             Refresh
           </button>
         </div>
@@ -157,11 +260,13 @@ export function TimelinePage({ api, ws }: Props) {
 
       {/* Lead / project selector */}
       {leads.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+        <nav className="flex items-center gap-1.5 overflow-x-auto timeline-lead-selector" role="tablist" aria-label="Project selection">
           {leads.map(lead => (
             <button
               key={lead.id}
               onClick={() => setSelectedLead(lead.id)}
+              role="tab"
+              aria-selected={selectedLead === lead.id}
               className={`px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
                 selectedLead === lead.id
                   ? 'bg-accent/20 text-accent font-medium'
@@ -171,17 +276,17 @@ export function TimelinePage({ api, ws }: Props) {
               {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
             </button>
           ))}
-        </div>
+        </nav>
       )}
 
       {/* Filter toolbar */}
       {showFilters && (
-        <div className="bg-th-bg rounded-lg border border-th-border-muted px-4 py-3 flex flex-wrap gap-6 items-start">
+        <div className="bg-th-bg rounded-lg border border-th-border-muted px-4 py-3 flex flex-wrap gap-6 items-start timeline-filters" role="region" aria-label="Timeline filters">
           <ToggleChips label="Roles" items={ALL_ROLES} selected={roleFilter} labels={ROLE_LABELS} onChange={setRoleFilter} />
           <ToggleChips label="Communication" items={ALL_COMM_TYPES} selected={commFilter} labels={COMM_LABELS} onChange={setCommFilter} />
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium">Hide agents</span>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1" role="group" aria-label="Hide agents by status">
+            <span className="text-[10px] uppercase tracking-wider text-th-text-muted font-medium" id="filter-hide-agents">Hide agents</span>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="filter-hide-agents">
               {HIDDEN_STATUSES.map(status => (
                 <button
                   key={status}
@@ -190,6 +295,7 @@ export function TimelinePage({ api, ws }: Props) {
                     if (next.has(status)) next.delete(status); else next.add(status);
                     setHiddenStatuses(next);
                   }}
+                  aria-pressed={hiddenStatuses.has(status)}
                   className={`px-2 py-0.5 text-[11px] rounded border transition-colors ${
                     hiddenStatuses.has(status)
                       ? 'bg-th-bg-muted border-th-border text-th-text-alt'
@@ -217,28 +323,39 @@ export function TimelinePage({ api, ws }: Props) {
       )}
 
       {!selectedLead && !loading && (
-        <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center">
-          <p className="text-sm text-th-text-muted font-mono">No active projects. Start a project to see the timeline.</p>
-        </div>
+        <EmptyState
+          title="No active projects"
+          description="Start a project to see your AI agents collaborate in real time. The timeline will populate as agents are created and begin working."
+        />
       )}
 
       {loading && !data && selectedLead && (
-        <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center">
-          <RefreshCw size={24} className="animate-spin text-th-text-muted" />
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center" role="status" aria-label="Loading timeline data">
+          <RefreshCw size={24} className="animate-spin motion-reduce:animate-none text-th-text-muted" aria-hidden="true" />
+          <span className="sr-only">Loading timeline data…</span>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-900/20 rounded-lg border border-red-800 p-4">
+        <div className="bg-red-900/20 rounded-lg border border-red-800 p-4" role="alert">
           <p className="text-red-400 text-sm">Error: {error}</p>
         </div>
       )}
 
-      {filteredData && (
-        <div className="flex-1 min-h-0">
+      {filteredData && filteredData.agents.length === 0 && !loading && (
+        <EmptyState />
+      )}
+
+      {filteredData && filteredData.agents.length > 0 && (
+        <div className="flex-1 min-h-0 relative" id="timeline-main" ref={timelineMainRef}>
+          <ErrorBanner
+            errors={errorEntries}
+            onScrollToError={handleScrollToError}
+          />
           <TimelineContainer data={filteredData} liveMode={liveMode} onLiveModeChange={setLiveMode} />
         </div>
       )}
+      </div>
     </div>
   );
 }

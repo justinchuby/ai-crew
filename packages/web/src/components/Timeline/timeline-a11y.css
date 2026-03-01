@@ -1,0 +1,138 @@
+/* ── Timeline Accessibility Styles ─────────────────────────────────────
+ *
+ * WCAG AA compliance: focus indicators, reduced motion, high contrast.
+ * Import this CSS in TimelinePage.tsx.
+ */
+
+/* ── Focus Visible ────────────────────────────────────────────────────
+ * 2px solid blue ring on all focusable timeline elements.
+ * Uses :focus-visible so mouse clicks don't trigger rings.
+ */
+
+.timeline-focusable:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.timeline-container:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: -2px;
+}
+
+/* Toolbar buttons */
+.timeline-toolbar button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Filter chips */
+.timeline-filters button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* Lead selector tabs */
+.timeline-lead-selector button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Reduced Motion ───────────────────────────────────────────────────
+ * Disable ALL animations when user prefers reduced motion.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-container *,
+  .timeline-container *::before,
+  .timeline-container *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── High Contrast Mode ───────────────────────────────────────────────
+ * Support Windows High Contrast Mode (forced-colors: active).
+ */
+
+@media (forced-colors: active) {
+  /* Ensure timeline segments have visible borders */
+  .timeline-container svg rect {
+    stroke: CanvasText;
+    stroke-width: 2;
+  }
+
+  /* Communication link paths */
+  .timeline-container svg path {
+    stroke: LinkText;
+  }
+
+  /* Focus rings use system highlight color */
+  .timeline-focusable:focus-visible,
+  .timeline-container:focus-visible {
+    outline-color: Highlight;
+  }
+
+  /* Agent labels get proper text color */
+  .timeline-container [role="button"] {
+    color: ButtonText;
+    border-color: ButtonText;
+  }
+
+  /* Status legend items */
+  .timeline-legend span {
+    forced-color-adjust: none;
+  }
+}
+
+/* ── Screen Reader Only ───────────────────────────────────────────────
+ * Utility class for visually hidden but screen-reader-accessible content.
+ * Only needed if Tailwind's sr-only is not available.
+ */
+
+.timeline-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ── Skip Link ────────────────────────────────────────────────────────
+ * Visible only on focus for keyboard users to skip to main content.
+ */
+
+.timeline-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.timeline-skip-link:focus {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  width: auto;
+  height: auto;
+  padding: 8px 16px;
+  background: #1e1e2e;
+  color: #58a6ff;
+  border: 2px solid #58a6ff;
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 100;
+  clip: auto;
+}
