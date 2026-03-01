@@ -1,6 +1,6 @@
 ---
 theme: default
-title: "AI Crew — What Happens When 13 AI Agents Work Together"
+title: "AI Crew — Building a Multi-Agent AI Development System"
 info: |
   A story about giving one AI a task and watching it hire a team.
 highlighter: shiki
@@ -12,34 +12,30 @@ colorSchema: dark
 fonts:
   sans: Inter
   mono: Fira Code
+
+---
+layout: center
 ---
 
-<div class="text-center">
+<div class="text-center max-w-3xl mx-auto">
 
-# <span class="text-blue-400">13 AI agents.</span> <span class="text-green-400">10 features.</span> <span class="text-yellow-400">30 minutes.</span>
+<div class="text-xl text-gray-300 leading-relaxed">
 
-<br/>
-
-<div class="text-xl text-gray-400">We gave one AI a to-do list.</div>
-<div class="text-xl text-gray-400">It hired 12 specialists and managed them all.</div>
-
-<br/>
-
-<div class="text-lg text-gray-500">This is the story of that session.</div>
+*"Wouldn't it be nice if AIs could work together — define their own goals, collaborate, and run for hours... instead of needing you every 5 minutes?"*
 
 </div>
 
-<style>
-h1 { font-size: 2.0em !important; line-height: 1.3 !important; }
-</style>
+<br/>
+
+<div class="text-lg text-blue-400 font-bold">We built the answer.</div>
+
+</div>
 
 <!--
-Don't start with slides. Start with this: "Yesterday, I gave an AI a to-do list
-with 10 items. Within two minutes, it had hired 12 other AIs — developers,
-reviewers, an architect, a secretary — and started coordinating all of them.
-30 minutes later, 10 features were shipped, 3 bugs were caught in code review,
-and one agent found a security vulnerability in another agent's code. I want
-to tell you the story of what happened."
+Let this question hang for 2-3 seconds. Everyone in the room using
+Copilot CLI has felt this pain — you start a task, the context fills up,
+you lose momentum, you have to re-explain everything. What if the AI
+could just... keep going? With a team? That's what we built.
 -->
 
 ---
@@ -76,6 +72,7 @@ Imagine this scenario. You paste a GitHub issue into a chat — a retro with
 everything is done. Not just coded — reviewed, tested, documented. That's
 not hypothetical. That's what happened.
 -->
+
 
 ---
 
@@ -122,37 +119,6 @@ of it as spinning up an entire engineering team in the time it takes to
 make coffee.
 -->
 
----
-
-# This isn't "AI writing code." This is something new.
-
-<div class="bg-gray-800 rounded-lg p-4 border border-blue-500 mt-2">
-
-No single agent was told to "build a team" or "review each other's work" or "fix your own bugs." Each agent had **simple rules**: do your job, communicate what you find, ask when you're stuck.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
-
-🐜 Think of an **ant colony**. No ant understands the colony. But simple rules — follow pheromones, carry food, signal danger — produce complex, intelligent behavior. That's what happened here.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-2">
-
-**What emerged:** A secretary that became a QA system. A reviewer that found race conditions. A lead that invented new team processes. Organizational intelligence from simple, specialized agents.
-
-</div>
-
-<!--
-This is the key reframe. Don't think of this as "AI writing code faster."
-Think of it as emergent organizational intelligence. Like an ant colony —
-no individual ant understands the colony, but simple rules produce complex
-behavior. Each agent follows simple rules: do your job, communicate what
-you find, ask when you're stuck. What emerges is a team that catches bugs,
-improves its own processes, and coordinates autonomously. The intelligence
-isn't in any single agent — it's in the interaction patterns between them.
--->
 
 ---
 layout: center
@@ -172,6 +138,7 @@ layout: center
 Pause after "With itself." Let it land. Then say: "Let me tell you the
 origin story — because it's the best proof of concept I can give you."
 -->
+
 
 ---
 
@@ -222,53 +189,6 @@ The tool is improving itself. That's not a demo — that's a feedback loop.
 [Transition: "Now let's talk about what this means for engineering teams..."]
 -->
 
----
-
-# Your team's deepest frustration, solved
-
-<div class="grid grid-cols-2 gap-4 mt-2">
-<div class="bg-gray-800 rounded-lg p-4 border border-red-500">
-
-### Brooks' Law <span class="text-sm text-gray-500">(1975)</span>
-
-*"Adding people to a late project makes it later."*
-
-Communication cost = **O(n²)**
-
-<div class="mt-2 text-sm text-gray-400">
-9 people = 36 communication channels<br/>
-13 people = 78 communication channels<br/>
-Every new hire makes coordination harder.
-</div>
-
-</div>
-<div class="bg-gray-800 rounded-lg p-4 border border-green-500">
-
-### AI Crew
-
-Communication cost stays **flat**.
-
-<div class="mt-2 text-sm text-gray-400">
-Structured messaging — no meetings<br/>
-Task DAG — no ambiguous ownership<br/>
-File locking — no merge conflicts<br/>
-Every new agent = pure throughput gain.
-</div>
-
-</div>
-</div>
-
-<p class="text-sm text-gray-500 mt-2">This is the first time adding more workers actually makes a software project faster. AI agents don't have ego, politics, or timezone issues.</p>
-
-<!--
-Every engineer in this room has felt Brooks' Law. Adding people to a late
-project makes it later — because communication overhead grows quadratically.
-9 people means 36 communication channels. 13 means 78. But AI agents break
-this law. Communication is structured — no meetings, no Slack threads, no
-miscommunications. Task ownership is explicit via the DAG. File access is
-locked, not shared. So every new agent is pure throughput. 13 agents
-means 13x the work, not 78x the coordination cost. This is genuinely new.
--->
 
 ---
 
@@ -332,24 +252,376 @@ context switching. Point out that each agent is the exact same Copilot CLI
 the audience already uses — this isn't sci-fi, it's a multiplier.
 -->
 
----
-layout: center
+
 ---
 
+# The Foundation: ACP (Agent Communication Protocol)
+
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-2">
+
+**ACP** is an open protocol for programmatically controlling AI coding agents.
+
+</div>
+
+<div class="bg-gray-900 rounded-lg p-3 mt-3 text-sm font-mono">
+
+<div class="grid grid-cols-2 gap-4">
 <div class="text-center">
 
-# Now let's watch them work
+**AI Crew Server**
+<div class="text-xs text-gray-500">Sends prompts, receives output</div>
 
-<div class="text-xl text-gray-400 mt-4">Real stories from a single 30-minute session</div>
+</div>
+<div class="text-center">
+
+**Copilot CLI (Agent)**
+<div class="text-xs text-gray-500">Thinks, edits, searches, commits</div>
+
+</div>
+</div>
+
+<div class="text-center text-blue-400 my-2">◄═══ ACP (NDJSON / stdio) ═══►</div>
+
+<div class="text-xs text-gray-400 space-y-1">
+<div><code>prompt()</code> → Server sends task to agent</div>
+<div><code>text()</code> ← Agent streams back response (with embedded commands)</div>
+<div><code>tool_call()</code> ← Agent uses bash, file edit, grep, git</div>
+<div><code>usage()</code> ← Token counts flow back for cost tracking</div>
+</div>
+
+</div>
+
+<div class="grid grid-cols-3 gap-2 mt-3 text-sm">
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
+
+**Model-agnostic** — Claude, GPT, Gemini. Same protocol.
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
+
+**Tool-rich** — bash, file edit, grep, git, web search
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
+
+**12 agents = 12 processes** — each a real Copilot CLI session
+
+</div>
+</div>
+
+<!--
+ACP is the key enabler. Without it, each agent would need custom
+integration. With ACP, we spawn a Copilot CLI process per agent
+(copilot-cli --acp --stdio --model claude-sonnet-4), and communicate via
+structured JSON over stdin/stdout. The agent gets the full Copilot CLI
+toolset — bash, file editing, grep, git, web search. 12 agents = 12
+processes, each with their own terminal and context. ACP handles streaming,
+tool execution, permissions, and token tracking.
+-->
+
+---
+
+# Built with
+
+<div class="grid grid-cols-4 gap-2 mt-2 text-sm">
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 text-center">
+
+### 🧠 Agents
+Copilot CLI + ACP
+<div class="text-xs text-gray-500">Full coding agents with tools</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500 text-center">
+
+### 🔧 Server
+Node.js + TypeScript
+<div class="text-xs text-gray-500">Event-driven, type-safe</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500 text-center">
+
+### 💾 Database
+SQLite + Drizzle ORM
+<div class="text-xs text-gray-500">Zero-config, embedded</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-purple-500 text-center">
+
+### ⚡ Real-time
+WebSocket + SSE
+<div class="text-xs text-gray-500">Live dashboard updates</div>
+
+</div>
+</div>
+
+<div class="grid grid-cols-4 gap-2 mt-2 text-sm">
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+
+### 🖥️ Dashboard
+React + Vite
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+
+### 📖 Docs
+VitePress
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+
+### 🎬 This Presentation
+Slidev
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center">
+
+### 🤖 Models
+Claude, GPT, Gemini
+
+</div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">Intentionally simple — no Kubernetes, no microservices. Single Node.js process + N Copilot CLI child processes. SQLite handles everything.</p>
+
+<!--
+Intentionally simple stack. The entire system is one Node.js process plus
+N Copilot CLI child processes. SQLite handles all persistence — agent
+state, task DAG, file locks, group chats, activity logs. One file, zero
+ops. TypeScript end-to-end. This presentation itself is Slidev — built
+by an AI agent in this session. The point: you don't need a complex
+infrastructure to run a team of AI agents.
+-->
+
+---
+
+# How agents interact with the system
+
+<div class="text-sm mt-1">
+
+Agents embed **structured commands** in their natural language output:
+
+</div>
+
+<div class="bg-gray-900 rounded-lg p-3 mt-2 text-xs font-mono space-y-2">
+
+<div><span class="text-blue-400">⟦ DELEGATE</span> {"role": "developer", "task": "Fix the login bug", "model": "claude-sonnet-4.5"} <span class="text-blue-400">⟧</span></div>
+<div><span class="text-green-400">⟦ COMMIT</span> {"message": "Fix null check in auth handler"} <span class="text-green-400">⟧</span></div>
+<div><span class="text-yellow-400">⟦ LOCK_FILE</span> {"filePath": "src/auth.ts"} <span class="text-yellow-400">⟧</span></div>
+<div><span class="text-purple-400">⟦ AGENT_MESSAGE</span> {"to": "b529689d", "content": "Found the bug — race condition in git index"} <span class="text-purple-400">⟧</span></div>
+<div><span class="text-red-400">⟦ COMPLETE_TASK</span> {"taskId": "fix-login", "summary": "Added null check and auth guard"} <span class="text-red-400">⟧</span></div>
+
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
+
+**Real exchange from this session:**
+
+<div class="text-xs space-y-1 mt-1">
+<div><span class="text-blue-400">Lead →</span> <code>⟦ DELEGATE {"role": "developer", "task": "Harden the commit system"} ⟧</code></div>
+<div><span class="text-green-400">Dev 3194c4df →</span> *"Done. Added 4 safety features."* <code>⟦ COMMIT {"message": "scoped commit hardening"} ⟧</code></div>
+<div><span class="text-blue-400">Lead →</span> <code>⟦ DELEGATE {"role": "critical-reviewer", "task": "Review commit de3e414"} ⟧</code></div>
+<div><span class="text-red-400">Reviewer b529689d →</span> *"Found race condition in git index sharing."*</div>
+</div>
+
+</div>
+
+<p class="text-xs text-gray-500 mt-2">50+ commands across 11 modules. Unicode <code>⟦ ⟧</code> delimiters never appear in code — zero false positives. All Zod-validated.</p>
+
+<!--
+The command system is the core primitive. Agents embed structured commands
+in their natural language output using Unicode mathematical brackets —
+these never appear in code or JSON, so there are zero false positives.
+The system scans the agent's stream in real-time and extracts commands as
+they arrive. Show the real exchange: the lead delegated commit hardening,
+the developer built it and committed, the lead sent it for critical
+review, and the reviewer found a race condition. This is the command
+system enabling autonomous coordination.
+-->
+
+---
+
+# Three communication channels
+
+<div class="grid grid-cols-3 gap-3 mt-2 text-sm">
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+
+### 💬 Direct Messages
+
+<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
+⟦ AGENT_MESSAGE<br/>
+&nbsp; {"to": "437a822b",<br/>
+&nbsp;&nbsp; "content": "Architecture<br/>
+&nbsp;&nbsp; spec is ready"} ⟧
+</div>
+
+<div class="text-xs text-gray-400 mt-2">
+
+- Point-to-point, queued
+- Resolves by ID prefix or role
+- Architect → Developer direct
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+
+### 👥 Group Chat
+
+<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
+⟦ GROUP_MESSAGE<br/>
+&nbsp; {"group": "presentation-team",<br/>
+&nbsp;&nbsp; "content": "Slides are<br/>
+&nbsp;&nbsp; ready for review"} ⟧
+</div>
+
+<div class="text-xs text-gray-400 mt-2">
+
+- Persistent, SQLite-backed
+- 5 agents coordinated this deck
+- Auto-suggested by the system
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+
+### 📢 Broadcast
+
+<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
+⟦ BROADCAST<br/>
+&nbsp; {"content": "Never use<br/>
+&nbsp;&nbsp; git add -A — it picks<br/>
+&nbsp;&nbsp; up other agents' work"} ⟧
+</div>
+
+<div class="text-xs text-gray-400 mt-2">
+
+- One-to-all, urgent
+- Lead broadcast git warning
+- All 13 agents received it
+
+</div>
+</div>
+</div>
+
+<p class="text-xs text-gray-500 mt-2">This presentation was coordinated via the group chat channel — 5 agents discussing slide content in real-time. That's meta AND concrete.</p>
+
+<!--
+Three channels, each for a different purpose. Direct messages for
+point-to-point coordination — the architect sends specs to the developer
+who needs them. Group chat for team coordination — our presentation-team
+group had 5 agents (lead, architect, developer, radical thinker, tech
+writer) all collaborating on these slides in real-time. And broadcast
+for urgent announcements — when the lead discovered the git add -A
+problem, it broadcast a warning to all 13 agents simultaneously. The
+agents self-organize: they create groups, message peers directly, and
+escalate through broadcast when needed.
+-->
+
+---
+
+# What agents see: context management
+
+<div class="bg-gray-900 rounded-lg p-3 mt-2 text-xs font-mono">
+
+<span class="text-gray-500">// Injected every 60s or on significant events</span>
+<br/>⟦ CREW_UPDATE
+<br/>== CURRENT CREW STATUS ==
+<br/>- Agent 2cf55f61 (Developer) — Status: running,
+<br/>&nbsp; Working on: Implement auto-DAG creation,
+<br/>&nbsp; Files locked: AgentLifecycle.ts, TaskCommands.ts
+<br/>- Agent 0b85de78 (Developer) — Status: running,
+<br/>&nbsp; Working on: Write auto-DAG tests,
+<br/>&nbsp; Files locked: AutoDAG.integration.test.ts
+<br/>- Agent b529689d (Critical Reviewer) — Status: idle
+<br/>
+<br/>== AGENT BUDGET ==
+<br/>Running: 12 / 20 | Available slots: 8
+<br/>
+<br/>== RECENT ACTIVITY ==
+<br/>[17:41:20] 2cf55f61: lock_acquired — AgentLifecycle.ts
+<br/>[17:41:18] 173808e0: delegated → Developer (3194c4df)
+<br/>CREW_UPDATE ⟧
+
+</div>
+
+<div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
+
+**Content-hashed** — unchanged updates are suppressed, saving 40-60% of context tokens
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
+
+**Lock-visible** — agents see who owns which file before trying to edit
+
+</div>
+</div>
+
+<!--
+This is what keeps agents coordinated. Every 60 seconds (or on significant
+events), each agent receives a CREW_UPDATE showing the full crew status,
+budget, and recent activity. They can see who's working on what, which
+files are locked, and how many agent slots are left. The update is
+content-hashed — if nothing changed, it's not re-sent, saving 40-60% of
+update tokens. Each agent also has a role-specific system prompt that
+defines their personality, capabilities, and instructions.
+-->
+
+---
+
+# Five registries, one source of truth
+
+<div class="grid grid-cols-5 gap-2 mt-2 text-sm">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500 text-center">
+
+### 🤖
+**Agent Manager**
+<div class="text-xs text-gray-400">Lifecycle, status, model, parent</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500 text-center">
+
+### 📋
+**Task DAG**
+<div class="text-xs text-gray-400">Dependencies, states, progress</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-yellow-500 text-center">
+
+### 🔒
+**File Locks**
+<div class="text-xs text-gray-400">Who owns which file</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-purple-500 text-center">
+
+### 💬
+**Chat Groups**
+<div class="text-xs text-gray-400">Members, messages, history</div>
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-red-500 text-center">
+
+### 📊
+**Activity Ledger**
+<div class="text-xs text-gray-400">Every action, logged</div>
+
+</div>
+</div>
+
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
+
+All backed by **SQLite** — state survives restarts, one file, zero ops. The Task DAG **auto-creates** tasks from delegations and **auto-completes** them when agents report done. File locks are the coordination primitive: 8 developers editing different files simultaneously, zero conflicts.
 
 </div>
 
 <!--
-Transition moment. Shift your energy here — you're moving from setup to
-the good stuff. Say: "Enough background. Let me show you what actually
-happened. Not architecture diagrams — real moments. Things that surprised
-us. Things that went wrong. And how the agents handled it." This is where
-the audience should lean forward.
+Five registries track everything. AgentManager handles lifecycle — who's
+running, what model, who's their parent. TaskDAG tracks the dependency
+graph — tasks auto-promote when dependencies complete. FileLockRegistry
+prevents concurrent edits. ChatGroupRegistry manages persistent group
+conversations. ActivityLedger logs every action for the timeline and
+audit trail. Everything is SQLite via Drizzle ORM — survives restarts,
+zero operational overhead.
 -->
 
 ---
@@ -393,45 +665,6 @@ off on anyone else's work. The developer fixed it in minutes. This is why
 you want specialists — a generalist might have missed this.
 -->
 
----
-
-# Story 2: The Mystery of 86%
-
-<div class="bg-gray-800 rounded-lg p-4 border border-yellow-500 mt-2">
-
-The secretary was tracking progress. Something didn't add up.
-
-<div class="bg-gray-900 rounded p-3 mt-2 text-sm">
-
-📊 <span class="text-yellow-400">"The dashboard shows 86% of tasks complete. But I count only 4 of 10 features actually working. Something is wrong with the task tracking."</span>
-
-</div>
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
-
-### The detective work
-
-- Secretary flagged the anomaly to the Lead
-- Architect investigated the matching system
-- Found the bug: when 7 tasks all have the role "developer," the system guessed which one was done — and guessed wrong **7 times**
-- Fix: when uncertain, **say "I don't know"** instead of guessing
-
-</div>
-
-<p class="text-sm text-gray-500 mt-2">The agents debugged their own coordination system — while running on it.</p>
-
-<!--
-This is my favorite story. The secretary — whose job is just tracking
-progress — noticed the numbers didn't add up. 86% complete, but only
-4 features working? It flagged this to the lead. The architect
-investigated and found a subtle bug: when multiple tasks share the same
-role, the system was guessing which task was done — and guessing wrong.
-Seven false completions. The fix was simple but profound: when you're not
-sure, say "I don't know" instead of guessing. The agents literally
-debugged the system that was coordinating them. Meta-debugging.
--->
 
 ---
 
@@ -474,120 +707,6 @@ behaving like a real team — they don't just code, they improve their own
 processes.
 -->
 
----
-
-# Story 4: The File Contention Problem
-
-<div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-2">
-
-Three agents all needed the same file: <code>api.ts</code> — **1,945 lines**.
-
-<div class="mt-3 space-y-1">
-<div class="flex items-center gap-2">
-<span class="w-4 h-4 rounded bg-red-500 inline-block"></span>
-<span>Developer A needs to add an SSE endpoint</span>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-4 h-4 rounded bg-red-500 inline-block"></span>
-<span>Developer B needs to add a new API route</span>
-</div>
-<div class="flex items-center gap-2">
-<span class="w-4 h-4 rounded bg-red-500 inline-block"></span>
-<span>Developer C needs to fix the WebSocket handler</span>
-</div>
-</div>
-
-Only one can lock the file at a time. Two developers are **blocked**.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500 mt-3">
-
-### The architect's solution
-Split `api.ts` into **12 focused modules**. Now agents lock only the routes they need. Zero contention.
-
-<span class="text-sm text-gray-500">Same pattern: 767-line Agent.ts → 3 modules. 662-line AgentCommands.ts → 2 modules.</span>
-
-</div>
-
-<!--
-Here's a problem nobody predicted. Three agents need the same file.
-But only one can lock it at a time. Two are stuck waiting. The architect
-realized this was a systemic problem — monolithic files create bottlenecks
-for parallel work. So the architect designed a decomposition plan, and
-developers split the biggest files into focused modules. api.ts went from
-one 1,945-line file to twelve small route modules. Now agents only lock what
-they need. The system evolved its own codebase to be more parallelizable.
-That's emergent behavior from a multi-agent system.
--->
-
----
-
-# Story 5: The Lead Managing 12 Workers
-
-<div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-2">
-
-<div class="text-sm space-y-2">
-
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:16:16</span>
-<span>Lead delegates presentation review to Code Reviewer</span>
-</div>
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:18:06</span>
-<span>Code Reviewer reports findings → Lead processes</span>
-</div>
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:18:53</span>
-<span>Developer reports UI bug fix → Lead assigns follow-up review</span>
-</div>
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:21:57</span>
-<span><span class="text-yellow-400">Lead broadcasts process warning to ALL 13 agents</span></span>
-</div>
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:22:46</span>
-<span>Developer asks about DAG bug → Lead redirects to Architect</span>
-</div>
-<div class="flex items-start gap-2">
-<span class="text-blue-400 font-mono text-xs w-14 shrink-0">17:23:14</span>
-<span>Lead delegates commit audit to Architect + safety tests to Developer</span>
-</div>
-
-</div>
-
-</div>
-
-<p class="text-sm text-gray-500 mt-2">In a 7-minute window: 6 decisions, 4 delegations, 1 broadcast, 1 redirect. This is what orchestration looks like.</p>
-
-<!--
-Zoom into a 7-minute window of the lead's activity. It's receiving
-completion reports, delegating follow-up work, broadcasting warnings,
-redirecting questions to the right expert — all simultaneously. In 7
-minutes: 6 decisions, 4 delegations, 1 broadcast, 1 redirect. Compare
-this to a human tech lead: "Imagine your best manager, but they can
-context-switch instantly and never lose track of 12 threads." This is
-what autonomous orchestration looks like.
--->
-
----
-layout: center
----
-
-<div class="text-center">
-
-# How did they pull this off?
-
-<div class="text-xl text-gray-400 mt-4">The coordination patterns behind the stories</div>
-
-</div>
-
-<!--
-Transition moment. Say: "You've seen the stories — the bugs caught, the
-contention solved, the lead orchestrating everything. Now let me show you
-the three mechanisms that made this possible: file ownership, layered
-reviews, and peer-to-peer communication."
--->
 
 ---
 
@@ -624,6 +743,7 @@ overwritten work. This is pessimistic locking — the same pattern databases
 use. It's not fancy, but it works perfectly when you have 8 agents writing
 code simultaneously.
 -->
+
 
 ---
 
@@ -676,54 +796,6 @@ change, but it prevents a class of bugs that only exist in multi-agent
 environments. Three passes, three different perspectives, bulletproof result.
 -->
 
----
-
-# Agents Talking to Each Other
-
-<div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-2">
-
-<div class="text-sm space-y-3">
-
-<div class="flex items-start gap-2">
-<span class="text-purple-400">🏗️ 437a822b</span>
-<span>→ writes architecture design → sends to <span class="text-green-400">👷 2cf55f61</span> and <span class="text-green-400">👷 0b85de78</span></span>
-</div>
-
-<div class="flex items-start gap-2">
-<span class="text-green-400">👷 f026d3d1</span>
-<span>→ investigates highlight display bug → sends findings directly to <span class="text-green-400">👷 3811edef</span> who's fixing it</span>
-</div>
-
-<div class="flex items-start gap-2">
-<span class="text-green-400">👷 bf1ec2c1</span>
-<span>→ finishes real-time heatmap → reports to Lead → Lead assigns reviewer</span>
-</div>
-
-<div class="flex items-start gap-2">
-<span class="text-yellow-400">📝 35feec68</span>
-<span>→ tracks all 19 tasks → flags "86% complete" anomaly → triggers investigation</span>
-</div>
-
-</div>
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-3">
-
-💡 **Not everything goes through the Lead.** Agents message each other directly — the architect sends specs to developers, one developer shares findings with another. The lead stays focused on decisions, not message routing. It's like a team on Slack, not a call center.
-
-</div>
-
-<!--
-The communication patterns are key. Not everything flows through the lead —
-that would create a bottleneck, like routing every email through one
-manager. The architect sends design specs directly to the developers who
-need them. One developer investigated a UI bug and sent findings directly
-to the developer assigned to fix it. The secretary tracked progress
-independently. This is organic coordination — agents figuring out who
-needs what and communicating directly. The lead manages decisions, not
-traffic. Mention that this is the same communication pattern successful
-remote teams use.
--->
 
 ---
 
@@ -768,6 +840,7 @@ running code, not by testing, but by reasoning about concurrent execution.
 The fix is one line: pass files directly to git commit, skipping the index.
 This is why you want specialists who think about failure modes for a living.
 -->
+
 
 ---
 layout: center
@@ -834,49 +907,6 @@ product this entire time." This is the mic drop moment.
 
 ---
 
-# "OK, but how does it actually work?"
-
-<div class="mt-2">
-
-Think of it like a company:
-
-</div>
-
-<br/>
-
-```mermaid
-graph LR
-    You["👤 You<br/>(the CEO)"] --> Lead["🎯 Lead<br/>(tech lead)"]
-    Lead --> Plan["📋 Work Plan<br/>(task graph)"]
-    Plan --> D1["👷 Dev 1"] & D2["👷 Dev 2"] & D3["👷 Dev 3"]
-    Plan --> Rev["🔍 Reviewer"]
-    Plan --> Sec["📝 Secretary"]
-    D1 & D2 & D3 --> Rev
-    Rev --> Lead
-```
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
-
-- **You** describe the goal in one sentence — that's your only job
-- **The Lead** reads it, makes a plan, and hires the right specialists
-- **Developers** code in parallel — each with their own files, like separate desks
-- **Reviewers** check everything before it merges — quality is automatic, not optional
-
-</div>
-
-<!--
-If someone asks "how does it work" — simplify it to a company metaphor.
-You're the CEO. You give one sentence to a tech lead. The tech lead breaks
-it down — what needs doing, in what order, who's best for each task. Then
-it hires specialists. Developers each get their own files — like separate
-desks in an office. Nobody bumps elbows. Reviewers check the work. A
-secretary tracks progress. Everything flows through structured channels.
-You watch it all happen in real-time on a dashboard, like mission control.
-That's the whole model. If they get this slide, they get the system.
--->
-
----
-
 # Every engineer gets a crew
 
 <div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mb-3">
@@ -921,141 +951,6 @@ personal engineering team. You go from writing every line yourself to
 directing a team that handles the rest.
 -->
 
----
-
-# The behaviors that surprised us
-
-<div class="space-y-3 mt-2">
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-🤯 <strong>Agents debated design decisions</strong> — the architect and developer disagreed on how to split a file. They worked it out via messages.
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-🔍 <strong>The secretary became a QA system</strong> — it wasn't told to find bugs, but it noticed the progress numbers were wrong and flagged it.
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-🔄 <strong>The system improved itself</strong> — agents identified bottlenecks in their own coordination layer and fixed them, during the session.
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-📢 <strong>The lead adapted to problems</strong> — when commits went wrong, it didn't just fix the one case. It broadcast a new rule to ALL agents and assigned someone to harden the system.
-</div>
-
-
-</div>
-
-<!--
-These behaviors weren't programmed. Nobody told the secretary to find bugs —
-its job was tracking progress. But it noticed the numbers were wrong and
-spoke up. The lead wasn't told to broadcast process changes — it decided on
-its own that the commit problem was systemic and needed a team-wide fix.
-Agents debated design choices through messages — and reached a resolution
-without human intervention. This is emergent behavior. Give specialized
-agents the ability to communicate and act independently, and team dynamics
-just... appear. The next slide is the mic drop — let these behaviors
-sink in before advancing.
--->
-
----
-
-# What it looks like while it's running
-
-<div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-
-### Mission Control — real-time dashboard
-
-<div class="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Health</div>
-<div class="text-gray-500">Completion %, active agents</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Agent Fleet</div>
-<div class="text-gray-500">Who's doing what, live</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Activity Feed</div>
-<div class="text-gray-500">Every action, streamed</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Task Graph</div>
-<div class="text-gray-500">Dependencies, progress</div>
-</div>
-</div>
-
-<div class="grid grid-cols-4 gap-2 mt-2 text-center text-xs">
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Timeline</div>
-<div class="text-gray-500">Swim lanes per agent</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Comm Heatmap</div>
-<div class="text-gray-500">Who's talking to whom</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Token Costs</div>
-<div class="text-gray-500">Per-agent spending</div>
-</div>
-<div class="bg-gray-900 rounded p-2 border border-gray-600">
-<div class="text-blue-400 font-bold">Alerts</div>
-<div class="text-gray-500">Problems, warnings</div>
-</div>
-</div>
-
-</div>
-
-<p class="text-sm text-gray-500 mt-2">Everything updates in real time. You can message any agent, pause the whole system, or just watch.</p>
-
-<!--
-You're not flying blind — this is your mission control. Eight panels,
-all streaming live. You can see who's doing what, how they're communicating,
-what's blocked, and what's costing the most. Think of it like NASA mission
-control: dozens of things happening simultaneously, but you have full
-visibility and can intervene at any point. You can click on any agent and
-message them. Or hit pause and freeze everything to review state. You're
-always in control. This is a good moment to mention the demo coming up.
--->
-
----
-
-# Why this matters
-
-<div class="space-y-4 mt-2">
-
-<div class="bg-gray-800 rounded-lg p-4 border border-blue-500">
-
-### 🚀 For productivity
-10 tasks that would take a day of back-and-forth with a single agent? Done in 30 minutes with parallel specialists.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-4 border border-green-500">
-
-### 🛡️ For quality
-Every change gets reviewed. Security gets checked. Edge cases get tested. Not because you remembered to ask — because it's built into the workflow.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-4 border border-purple-500">
-
-### 🧠 For complex work
-Large refactors, multi-file changes, cross-cutting concerns — the things that are hardest for a single agent are where a team shines.
-
-</div>
-
-</div>
-
-<!--
-Three reasons. Productivity — parallel work is genuinely faster, like
-adding lanes to a highway. Quality — review is baked into the process,
-not an afterthought. You don't need to remember to ask for code review;
-it happens automatically on every change. And complexity — the hardest
-tasks for a single agent (50-file refactors, cross-cutting changes) are
-exactly where a team excels. A single agent drowns. A team with an
-architect splits it up and conquers it.
--->
 
 ---
 
@@ -1113,20 +1008,60 @@ audits and cost analysis produced in the background." Then: "The boring
 parts of your workflow? Handled."
 -->
 
----
-layout: center
+
 ---
 
-# Imagine where this goes next
+# Real-time visibility into everything
 
-<div class="text-xl text-gray-400 mt-2">What's possible when this technology matures</div>
+<div class="grid grid-cols-2 gap-3 mt-2">
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+
+### 📊 Timeline Visualization
+<div class="text-sm text-gray-400">
+
+Swim lanes per agent showing activity over time. Communication links drawn between agents. Zoom, brush select, minimap navigation.
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+
+### 🏢 Org Chart
+<div class="text-sm text-gray-400">
+
+Hierarchical view: Lead → Agents. Shows role, status, model, current task. Real-time WebSocket updates.
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+
+### 🔥 Communication Heatmap
+<div class="text-sm text-gray-400">
+
+Matrix showing message frequency between agent pairs. Hot spots reveal collaboration patterns. SSE-powered real-time updates.
+
+</div>
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-purple-500">
+
+### 🔗 DAG Task Graph
+<div class="text-sm text-gray-400">
+
+Interactive dependency graph. Color-coded: green (done), blue (running), gray (pending). Shows which agent is assigned to each task.
+
+</div>
+</div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">All views update in real-time. You can message any agent, pause the system, or just watch. Like mission control for your AI team.</p>
 
 <!--
-Shift energy again. Say: "We've shown you what works today. Now let me
-show you where this is going. These aren't science fiction — they're
-logical next steps. And honestly? They're closer than you think."
-This is the INSPIRATION part of the emotional arc. The audience should
-feel excited about the future, not anxious.
+You're not flying blind. Eight live panels — timeline, org chart, heatmap,
+DAG graph, activity feed, agent fleet, token costs, and alerts. The
+timeline is powerful for post-mortem: see exactly when agents communicated,
+who was blocked, where bottlenecks formed. The heatmap reveals
+collaboration patterns you didn't design — agents naturally cluster around
+problems. All of this updates via WebSocket push. You'll see it in the
+live demo.
 -->
 
 ---
@@ -1183,58 +1118,6 @@ calls, they execute at machine speed. Don't linger — let the audience
 picture themselves in each scenario.
 -->
 
----
-
-# Where this goes next
-
-<div class="grid grid-cols-3 gap-3 mt-2">
-<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-cyan-500">
-
-### 🔮 Predictive Planning
-<div class="text-sm">
-
-Before writing a single line: *"3 agents, 45 minutes, $2.40."* Planning sprints with **machine-precision estimates.**
-
-</div>
-</div>
-<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-orange-500">
-
-### 🧬 Emergent Specialization
-<div class="text-sm">
-
-After 20 sessions, the system knows: reviewer X catches **3x more bugs** when paired with developer Y. It pairs them automatically.
-
-</div>
-</div>
-<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-pink-500">
-
-### 🌐 Cross-Project Intelligence
-<div class="text-sm">
-
-A caching pattern discovered in your payments service **automatically improves** your notifications service. Organizational learning at machine speed.
-
-</div>
-</div>
-</div>
-
-<br/>
-
-<div class="text-center">
-
-<div class="text-xl text-gray-300">The question isn't whether AI crews will build software.</div>
-<div class="text-xl text-blue-400 font-bold mt-1">It's whether you'll be the one directing them.</div>
-
-</div>
-
-<!--
-These scenarios are closer than you think. Predictive planning: before a
-single line of code, "3 agents, 45 minutes, $2.40." That changes how you
-plan sprints. Emergent specialization: after 20 sessions, the system knows
-which reviewer pairs best with which developer — 3x more bugs caught. It
-optimizes its own team composition. Cross-project intelligence: a caching
-pattern from payments automatically improves notifications. Organizational
-learning at machine speed. End with the closing line — let it land.
--->
 
 ---
 
@@ -1276,6 +1159,7 @@ feature IS a demo in itself. After the demo, take a breath and
 transition into the closing slide.
 -->
 
+
 ---
 layout: center
 ---
@@ -1312,6 +1196,7 @@ questions — architecture, coordination, cost, how to set this up,
 anything you're curious about."
 -->
 
+
 ---
 layout: center
 ---
@@ -1324,6 +1209,7 @@ layout: center
 The following slides are reference material for technical deep-dive
 questions. Skip these during the main presentation.
 -->
+
 
 ---
 
@@ -1380,6 +1266,7 @@ Express backend, SQLite for persistence, WebSocket and SSE for streaming.
 Each agent connects via ACP — the Agent Communication Protocol.
 -->
 
+
 ---
 
 # Appendix: Task DAG & Coordination
@@ -1422,6 +1309,7 @@ locked files. Communication is structured: direct, broadcast, group, and
 periodic CREW_UPDATEs that are content-hashed to skip duplicates.
 -->
 
+
 ---
 
 # Appendix: Token Economics
@@ -1452,6 +1340,7 @@ optimizations: content hashing saves 40-60% on context updates, debounced
 notifications, sliding window caps, and automatic context re-injection
 after compaction.
 -->
+
 
 ---
 
