@@ -66,9 +66,12 @@ interface ActivityFeedProps {
   leadId: string;
 }
 
+const EMPTY_ACTIVITY: ActivityEvent[] = [];
+const EMPTY_COMMS: AgentComm[] = [];
+
 export function ActivityFeed({ leadId }: ActivityFeedProps) {
-  const activity = useLeadStore((s) => s.projects[leadId]?.activity ?? []);
-  const comms = useLeadStore((s) => s.projects[leadId]?.comms ?? []);
+  const activity = useLeadStore((s) => s.projects[leadId]?.activity ?? EMPTY_ACTIVITY);
+  const comms = useLeadStore((s) => s.projects[leadId]?.comms ?? EMPTY_COMMS);
   const feedItems = useMemo(() => buildFeedItems(activity, comms), [activity, comms]);
   const feedRef = useRef<HTMLDivElement>(null);
 

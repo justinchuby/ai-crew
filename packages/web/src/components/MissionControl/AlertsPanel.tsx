@@ -153,9 +153,11 @@ interface AlertsPanelProps {
   leadId: string;
 }
 
+const EMPTY_DECISIONS: Decision[] = [];
+
 export function AlertsPanel({ leadId }: AlertsPanelProps) {
   const agents = useAppStore((s) => s.agents);
-  const decisions = useLeadStore((s) => s.projects[leadId]?.decisions ?? []);
+  const decisions = useLeadStore((s) => s.projects[leadId]?.decisions ?? EMPTY_DECISIONS);
   const dagStatus = useLeadStore((s) => s.projects[leadId]?.dagStatus ?? null);
 
   const teamAgents = useMemo(

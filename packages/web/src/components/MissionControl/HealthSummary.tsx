@@ -35,9 +35,11 @@ interface HealthSummaryProps {
   leadId: string;
 }
 
+const EMPTY_HISTORY: ProgressSnapshot[] = [];
+
 export function HealthSummary({ leadId }: HealthSummaryProps) {
   const progress = useLeadStore((s) => s.projects[leadId]?.progress);
-  const history = useLeadStore((s) => s.projects[leadId]?.progressHistory ?? []);
+  const history = useLeadStore((s) => s.projects[leadId]?.progressHistory ?? EMPTY_HISTORY);
   const dagStatus = useLeadStore((s) => s.projects[leadId]?.dagStatus);
   const agents = useAppStore((s) => s.agents);
 
