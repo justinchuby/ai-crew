@@ -66,30 +66,32 @@ function handleLockRelease(ctx: CommandHandlerContext, agent: Agent, data: strin
     const request = parseCommandPayload(agent, match[1], unlockFileSchema, 'UNLOCK_FILE');
     if (!request) return;
 
-    // Fix 3: Pre-release lock audit — warn if file has uncommitted changes
+    // Pre-release lock audit — if file is dirty, warn and block release
     const cwd = agent.cwd || process.cwd();
     execAsync(`git diff --name-only -- '${request.filePath.replace(/'/g, "'\\''")}'`, { cwd, timeout: 10_000 })
       .then(({ stdout }) => {
         const dirtyFiles = stdout.trim().split('\n').filter(Boolean);
         if (dirtyFiles.length > 0) {
-          agent.sendMessage(`[System] ⚠ Warning: \`${request.filePath}\` has uncommitted changes. Consider running COMMIT before releasing the lock.`);
+          agent.sendMessage(`[System] ⚠ Warning: \`${request.filePath}\` has uncommitted changes. COMMIT first, then retry UNLOCK_FILE.`);
+          return; // Don't release — agent must commit first
         }
+        releaseLock(ctx, agent, request.filePath);
       })
       .catch(() => {
-        // Best-effort — don't block lock release if git check fails
-      })
-      .finally(() => {
-        const released = ctx.lockRegistry.release(agent.id, request.filePath);
-        if (released) {
-          const agentRole = agent.role?.id ?? 'unknown';
-          ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${request.filePath}`, {
-            filePath: request.filePath,
-          });
-          agent.sendMessage(`[System] Lock released on \`${request.filePath}\`.`);
-        }
+        // Git check failed — release anyway (best-effort)
+        releaseLock(ctx, agent, request.filePath);
       });
   } catch (err) {
     logger.debug('command', 'Failed to parse UNLOCK_FILE command', { error: (err as Error).message });
+  }
+}
+
+function releaseLock(ctx: CommandHandlerContext, agent: Agent, filePath: string): void {
+  const released = ctx.lockRegistry.release(agent.id, filePath);
+  if (released) {
+    const agentRole = agent.role?.id ?? 'unknown';
+    ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${filePath}`, { filePath });
+    agent.sendMessage(`[System] Lock released on \`${filePath}\`.`);
   }
 }
 
@@ -223,19 +225,21 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
     const trailer = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
     const commitMsg = `${escapedMsg}\n\n${trailer}`;
 
-    // Execute scoped git add + commit directly (enforced, not suggested)
-    execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}'`, { cwd, timeout: 30_000 })
+    // Atomic commit: pass files directly to git commit to avoid index race condition
+    execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}' -- ${quotedFiles}`, { cwd, timeout: 30_000 })
       .then(async ({ stdout }) => {
         agent.sendMessage(`[System] COMMIT succeeded: ${stdout.trim().split('\n')[0]}`);
 
-        // Fix 1: Post-commit dirty-tree warning — alert agent if working tree still has changes
+        // Post-commit dirty-tree warning — scoped to agent's files only
         try {
           const [{ stdout: modifiedOut }, { stdout: untrackedOut }] = await Promise.all([
-            execAsync('git diff --name-only', { cwd, timeout: 10_000 }),
+            execAsync(`git diff --name-only -- ${quotedFiles}`, { cwd, timeout: 10_000 }),
             execAsync('git ls-files --others --exclude-standard', { cwd, timeout: 10_000 }),
           ]);
           const modified = modifiedOut.trim().split('\n').filter(Boolean);
-          const untracked = untrackedOut.trim().split('\n').filter(Boolean);
+          // Filter untracked to only agent's files
+          const fileSet = new Set(files);
+          const untracked = untrackedOut.trim().split('\n').filter(f => f && fileSet.has(f));
           const dirtyFiles = [...modified, ...untracked];
           if (dirtyFiles.length > 0) {
             const listed = dirtyFiles.slice(0, 10).join(', ');

@@ -42,11 +42,11 @@ function getCommitHandler(ctx: CommandHandlerContext) {
 }
 
 // Helper: make mockExec resolve successfully (commit + post-commit dirty-tree check)
-function mockExecSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', verifyFiles?: string[]) {
+function mockExecSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', dirtyFiles?: string[]) {
   mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
-    if (cmd === 'git diff --name-only') {
-      // Post-commit dirty-tree check: return remaining dirty files (empty = clean tree)
-      cb(null, { stdout: (verifyFiles ?? []).join('\n') + '\n', stderr: '' });
+    if (cmd.startsWith('git diff --name-only')) {
+      // Post-commit dirty-tree check (scoped to agent's files)
+      cb(null, { stdout: (dirtyFiles ?? []).join('\n') + '\n', stderr: '' });
     } else if (cmd.startsWith('git ls-files --others')) {
       cb(null, { stdout: '\n', stderr: '' });
     } else {
@@ -587,11 +587,12 @@ describe('CoordCommands — COMMIT handler', () => {
       commit.handler(agent, '⟦ COMMIT {"message": "verify me"} ⟧');
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalledTimes(3));
-      // First call: git add + commit
+      // First call: git add + commit -- files
       expect(mockExec.mock.calls[0][0]).toContain('git add');
-      // Second + third calls: git diff --name-only and git ls-files (dirty-tree check)
+      expect(mockExec.mock.calls[0][0]).toContain("-- 'src/file.ts'");
+      // Second + third calls: scoped git diff and git ls-files (dirty-tree check)
       const postCommitCmds = [mockExec.mock.calls[1][0], mockExec.mock.calls[2][0]];
-      expect(postCommitCmds).toContain('git diff --name-only');
+      expect(postCommitCmds.some((c: string) => c.includes('git diff --name-only --'))).toBe(true);
       expect(postCommitCmds.some((c: string) => c.includes('git ls-files --others'))).toBe(true);
     });
 
@@ -688,16 +689,17 @@ describe('CoordCommands — COMMIT handler', () => {
 
       await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
       const cmd = mockExec.mock.calls[0][0] as string;
-      // Should only appear once
-      const count = (cmd.match(/src\/shared\.ts/g) ?? []).length;
-      expect(count).toBe(1);
+      // git add has the file once, and git commit -- has it once (2 total in cmd)
+      const addPart = cmd.split('&&')[0];
+      const addCount = (addPart.match(/src\/shared\.ts/g) ?? []).length;
+      expect(addCount).toBe(1);
     });
   });
 
   // ── Fix 3: Pre-release lock audit ─────────────────────────────────────
 
   describe('fix 3: pre-release lock audit', () => {
-    it('warns when releasing lock on file with uncommitted changes', async () => {
+    it('blocks release when file has uncommitted changes', async () => {
       const ctx = makeCtx({
         lockRegistry: {
           release: vi.fn().mockReturnValue(true),
@@ -721,8 +723,8 @@ describe('CoordCommands — COMMIT handler', () => {
       await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('uncommitted changes'),
       ));
-      // Lock should still be released
-      await vi.waitFor(() => expect(ctx.lockRegistry.release).toHaveBeenCalledWith('agent-dev-abc123', 'src/dirty.ts'));
+      // Lock should NOT be released — agent must commit first
+      expect(ctx.lockRegistry.release).not.toHaveBeenCalled();
     });
 
     it('does not warn when releasing lock on clean file', async () => {
