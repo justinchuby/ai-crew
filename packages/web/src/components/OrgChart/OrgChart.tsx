@@ -2,8 +2,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type AgentComm } from '../../stores/leadStore';
 import type { AgentInfo } from '../../types';
-import { Network, MessageSquare, Grid3X3, Users } from 'lucide-react';
+import { Network, MessageSquare, Grid3X3, Users, BarChart3 } from 'lucide-react';
 import { idColor } from '../../utils/markdown';
+import { CommHeatmap } from '../FleetOverview/CommHeatmap';
+import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOverview/CommHeatmap';
 
 // Unified message entry covering both 1:1 comms and group messages
 interface CommEntry {
@@ -298,7 +300,7 @@ export function OrgChart({ api, ws }: Props) {
   const { agents } = useAppStore();
   const projects = useLeadStore((s) => s.projects);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [commView, setCommView] = useState<'list' | 'matrix'>('list');
+  const [commView, setCommView] = useState<'list' | 'matrix' | 'heatmap'>('list');
 
   // Identify leads (role.id === 'lead' with no parent)
   const leads = agents.filter((a) => a.role?.id === 'lead' && !a.parentId);
@@ -358,6 +360,35 @@ export function OrgChart({ api, ws }: Props) {
         return agents.some((p) => p.parentId === selectedLeadId && a.parentId === p.id);
       })
     : agents; // Show all when no lead selected
+
+  // Derive heatmap data from allEntries for the CommHeatmap view
+  const heatmapAgents = useMemo(
+    () => teamAgents.map(a => ({
+      id: a.id,
+      role: a.role?.name ?? 'Unknown',
+      name: `${a.role?.icon ?? ''}${a.id.slice(0, 5)}`,
+    })),
+    [teamAgents],
+  );
+
+  const heatmapMessages: HeatmapMessage[] = useMemo(() => {
+    const result: HeatmapMessage[] = [];
+    for (const entry of allEntries) {
+      if (!entry.fromId) continue;
+      const type: HeatmapCommType | undefined = entry.groupName ? 'group_message' : 'message';
+      if (entry.toId) {
+        result.push({ from: entry.fromId, to: entry.toId, count: 1, type });
+      } else if (entry.groupName) {
+        // Group messages: count as message from sender to all team members
+        for (const a of teamAgents) {
+          if (a.id !== entry.fromId) {
+            result.push({ from: entry.fromId, to: a.id, count: 1, type: 'group_message' });
+          }
+        }
+      }
+    }
+    return result;
+  }, [allEntries, teamAgents]);
 
   return (
     <div className="flex-1 overflow-y-auto space-y-0">
@@ -426,12 +457,23 @@ export function OrgChart({ api, ws }: Props) {
               <Grid3X3 className="w-3 h-3" />
               Matrix
             </button>
+            <button
+              onClick={() => setCommView('heatmap')}
+              className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 transition-colors ${
+                commView === 'heatmap' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'text-th-text-muted hover:text-th-text'
+              }`}
+            >
+              <BarChart3 className="w-3 h-3" />
+              Heatmap
+            </button>
           </div>
         </div>
         {commView === 'list' ? (
           <CommsList entries={allEntries} />
-        ) : (
+        ) : commView === 'matrix' ? (
           <CommsMatrix entries={allEntries} agents={teamAgents} />
+        ) : (
+          <CommHeatmap agents={heatmapAgents} messages={heatmapMessages} />
         )}
       </section>
       </div>

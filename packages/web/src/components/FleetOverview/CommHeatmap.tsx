@@ -3,6 +3,9 @@
  *
  * Cell colour intensity is derived from the percentile rank of the message
  * count relative to the maximum pair count, using `bg-accent/X` opacity steps.
+ *
+ * Supports optional comm-type filtering via toggle chips when messages
+ * include a `type` field.
  */
 import { useMemo, useState } from 'react';
 
@@ -14,9 +17,20 @@ interface HeatmapAgent {
   name: string;
 }
 
+export type CommType = 'delegation' | 'message' | 'group_message' | 'broadcast' | 'report';
+
+export interface HeatmapMessage {
+  from: string;
+  to: string;
+  count: number;
+  type?: CommType;
+}
+
 export interface CommHeatmapProps {
   agents: HeatmapAgent[];
-  messages: Array<{ from: string; to: string; count: number }>;
+  messages: HeatmapMessage[];
+  /** Hide the built-in filter chips (useful when parent provides its own). */
+  hideFilters?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -33,9 +47,43 @@ function intensityClass(count: number, max: number): string {
   return 'bg-accent';
 }
 
+// ── Filter labels ─────────────────────────────────────────────────────────
+
+const COMM_TYPE_LABELS: Record<CommType, string> = {
+  delegation:    'Delegation',
+  message:       'Direct Message',
+  group_message: 'Group Chat',
+  broadcast:     'Broadcast',
+  report:        'Report',
+};
+
+const ALL_COMM_TYPES: CommType[] = Object.keys(COMM_TYPE_LABELS) as CommType[];
+
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function CommHeatmap({ agents, messages }: CommHeatmapProps) {
+export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps) {
+  const [activeTypes, setActiveTypes] = useState<Set<CommType>>(new Set(ALL_COMM_TYPES));
+
+  const toggleType = (type: CommType) => {
+    setActiveTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type); // keep at least one active
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
+
+  // Determine if messages include type info (for showing/hiding filter chips)
+  const hasTypeInfo = useMemo(() => messages.some(m => m.type != null), [messages]);
+
+  // Filter messages by active comm types (pass-through if no type info)
+  const filteredMessages = useMemo(
+    () => hasTypeInfo ? messages.filter(m => !m.type || activeTypes.has(m.type)) : messages,
+    [messages, activeTypes, hasTypeInfo],
+  );
   const [tooltip, setTooltip] = useState<{
     from: string;
     to: string;
@@ -44,12 +92,12 @@ export function CommHeatmap({ agents, messages }: CommHeatmapProps) {
     y: number;
   } | null>(null);
 
-  /** Aggregate counts from the messages array into a map keyed by "from::to". */
+  /** Aggregate counts from the filtered messages into a map keyed by "from::to". */
   const { commMap, maxCount } = useMemo(() => {
     const commMap = new Map<string, number>();
     let maxCount = 0;
 
-    for (const msg of messages) {
+    for (const msg of filteredMessages) {
       const key  = `${msg.from}::${msg.to}`;
       const next = (commMap.get(key) ?? 0) + msg.count;
       commMap.set(key, next);
@@ -57,7 +105,7 @@ export function CommHeatmap({ agents, messages }: CommHeatmapProps) {
     }
 
     return { commMap, maxCount };
-  }, [messages]);
+  }, [filteredMessages]);
 
   if (agents.length === 0) {
     return (
@@ -74,6 +122,26 @@ export function CommHeatmap({ agents, messages }: CommHeatmapProps) {
 
   return (
     <div className="overflow-auto">
+      {/* ── Comm type filter chips ── */}
+      {hasTypeInfo && !hideFilters && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Filter by communication type">
+          {ALL_COMM_TYPES.map(type => (
+            <button
+              key={type}
+              onClick={() => toggleType(type)}
+              aria-pressed={activeTypes.has(type)}
+              className={`px-2.5 py-1 text-[11px] rounded-full transition-colors border ${
+                activeTypes.has(type)
+                  ? 'bg-accent/20 border-accent/40 text-accent'
+                  : 'bg-th-bg-alt/30 border-th-border/30 text-th-text-muted hover:text-th-text'
+              }`}
+            >
+              {COMM_TYPE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'inline-block' }}>
         {/* ── Column headers ── */}
         <div className="flex" style={{ paddingLeft: labelWidth, marginBottom: 4 }}>
