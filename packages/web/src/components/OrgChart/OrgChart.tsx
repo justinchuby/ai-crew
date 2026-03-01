@@ -17,6 +17,7 @@ interface CommEntry {
   content: string;
   timestamp: number;
   groupName?: string; // present for group messages
+  commType?: HeatmapCommType;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +331,7 @@ export function OrgChart({ api, ws }: Props) {
       toRole: c.toRole,
       content: c.content,
       timestamp: c.timestamp,
+      commType: c.type,
     }));
     // Flatten group messages from all groups
     for (const [groupName, msgs] of Object.entries(groupMessages)) {
@@ -375,7 +377,7 @@ export function OrgChart({ api, ws }: Props) {
     const result: HeatmapMessage[] = [];
     for (const entry of allEntries) {
       if (!entry.fromId) continue;
-      const type: HeatmapCommType | undefined = entry.groupName ? 'group_message' : 'message';
+      const type: HeatmapCommType | undefined = entry.commType ?? (entry.groupName ? 'group_message' : 'message');
       if (entry.toId) {
         result.push({ from: entry.fromId, to: entry.toId, count: 1, type });
       } else if (entry.groupName) {

@@ -352,6 +352,18 @@ export function LeadDashboard({ api, ws }: Props) {
           summary: `Delegated to ${msg.delegation?.toRole}: ${msg.delegation?.task?.slice(0, 80) || ''}`,
           timestamp: Date.now(),
         });
+        // Also track as a comm for heatmap
+        const childAgent = agents.find((a) => a.id === msg.childId);
+        store.addComm(msg.parentId, {
+          id: `del-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          fromId: msg.parentId,
+          fromRole: 'Project Lead',
+          toId: msg.childId,
+          toRole: msg.delegation?.toRole || childAgent?.role?.name || 'Agent',
+          content: msg.delegation?.task ?? '',
+          timestamp: Date.now(),
+          type: 'delegation',
+        });
       }
 
       // Track agent completion reports
@@ -363,6 +375,18 @@ export function LeadDashboard({ api, ws }: Props) {
           type: 'completion',
           summary: `Agent ${msg.childId?.slice(0, 8)} ${msg.status}`,
           timestamp: Date.now(),
+        });
+        // Also track as a comm for heatmap
+        const childAgent = agents.find((a) => a.id === msg.childId);
+        store.addComm(msg.parentId, {
+          id: `report-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          fromId: msg.childId,
+          fromRole: childAgent?.role?.name || 'Agent',
+          toId: msg.parentId,
+          toRole: 'Project Lead',
+          content: `Completion: ${msg.status ?? 'done'}`,
+          timestamp: Date.now(),
+          type: 'report',
         });
       }
 
@@ -399,20 +423,22 @@ export function LeadDashboard({ api, ws }: Props) {
         });
       }
 
-      // Track inter-agent messages
+      // Track inter-agent messages (DMs and broadcasts)
       if (msg.type === 'agent:message_sent') {
         const fromAgent = agents.find((a) => a.id === msg.from);
         const toAgent = agents.find((a) => a.id === msg.to);
         const leadId = selectedLeadId;
-        if (leadId && (msg.from === leadId || fromAgent?.parentId === leadId || toAgent?.parentId === leadId)) {
+        const isBroadcast = msg.to === 'all';
+        if (leadId && (msg.from === leadId || fromAgent?.parentId === leadId || toAgent?.parentId === leadId || isBroadcast)) {
           store.addComm(leadId, {
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             fromId: msg.from,
             fromRole: msg.fromRole || fromAgent?.role?.name || 'Unknown',
             toId: msg.to,
-            toRole: msg.toRole || toAgent?.role?.name || 'Unknown',
+            toRole: isBroadcast ? 'Team' : (msg.toRole || toAgent?.role?.name || 'Unknown'),
             content: msg.content ?? '',
             timestamp: Date.now(),
+            type: isBroadcast ? 'broadcast' : 'message',
           });
 
           // Store messages sent TO the lead as agent reports (separate from lead's output)
@@ -437,6 +463,20 @@ export function LeadDashboard({ api, ws }: Props) {
       }
       if (msg.type === 'group:message' && msg.leadId === selectedLeadId) {
         store.addGroupMessage(selectedLeadId!, msg.groupName, msg.message);
+        // Also track as a comm for heatmap (from → all group members)
+        if (msg.message) {
+          const gm = msg.message;
+          store.addComm(selectedLeadId!, {
+            id: `grp-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            fromId: gm.fromAgentId,
+            fromRole: gm.fromRole || 'Agent',
+            toId: '',
+            toRole: msg.groupName || 'Group',
+            content: gm.content ?? '',
+            timestamp: Date.now(),
+            type: 'group_message',
+          });
+        }
       }
 
       // DAG status updates

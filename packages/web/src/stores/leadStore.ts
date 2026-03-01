@@ -12,6 +12,8 @@ export interface ActivityEvent {
   timestamp: number;
 }
 
+export type CommType = 'delegation' | 'message' | 'group_message' | 'broadcast' | 'report';
+
 export interface AgentComm {
   id: string;
   fromId: string;
@@ -20,6 +22,7 @@ export interface AgentComm {
   toRole: string;
   content: string;
   timestamp: number;
+  type?: CommType;
 }
 
 export interface ProgressSnapshot {
