@@ -1,41 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { CommandDispatcher } from '../agents/CommandDispatcher.js';
 
-// ── Legacy bracket backward compatibility ─────────────────────────────
-// scanBuffer converts legacy `[[[`/`]]]` to doubled Unicode brackets (`⟦⟦`/`⟧⟧`)
-// before regex matching. This file tests that conversion and the doubled-bracket
-// command infrastructure (isInsideCommandBlock, buffer tail logic, etc.).
-
-describe('Legacy triple-bracket to doubled-bracket conversion', () => {
-  it('converts [[[ to doubled Unicode open bracket', () => {
-    const input = '[[[ COMMIT {"message": "fix"} ]]]';
-    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    expect(result).toBe('⟦⟦ COMMIT {"message": "fix"} ⟧⟧');
-  });
-
-  it('converts multiple legacy commands in one buffer', () => {
-    const input = '[[[ LOCK_FILE {"filePath": "a.ts"} ]]]\ntext\n[[[ COMMIT {"message": "fix"} ]]]';
-    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    expect(result).toContain('⟦⟦ LOCK_FILE');
-    expect(result).toContain('⟧⟧\ntext\n⟦⟦');
-    expect(result).toContain('COMMIT {"message": "fix"} ⟧⟧');
-  });
-
-  it('does not affect double square brackets', () => {
-    const input = '[[ not a command ]]';
-    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    expect(result).toBe('[[ not a command ]]');
-  });
-
-  it('does not affect single square brackets', () => {
-    const input = '[ not a command ]';
-    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    expect(result).toBe('[ not a command ]');
-  });
-});
-
-// ── Doubled bracket regex matching ────────────────────────────────────
-// Command regexes match doubled Unicode brackets directly.
+// ── Doubled bracket command infrastructure ─────────────────────────────
+// Tests for the doubled Unicode bracket command system:
+// regex matching, isInsideCommandBlock, buffer tail logic, and edge cases.
 
 describe('Doubled bracket regex matching', () => {
   // These regexes mirror the pattern used in handler files (Phase 1)
@@ -80,14 +48,6 @@ describe('Doubled bracket regex matching', () => {
   it('does NOT match single bracket delimiters', () => {
     const input = '⟦ COMMIT {"message": "fix"} ⟧';
     expect(input.match(COMMIT_REGEX)).toBeNull();
-  });
-
-  it('matches legacy triple-bracket after conversion to doubled Unicode', () => {
-    const legacy = '[[[ COMMIT {"message": "fix bug"} ]]]';
-    const converted = legacy.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    const match = converted.match(COMMIT_REGEX);
-    expect(match).toBeTruthy();
-    expect(JSON.parse(match![1]).message).toBe('fix bug');
   });
 
   it('matches multiline JSON payloads', () => {
@@ -212,19 +172,8 @@ describe('Doubled bracket edge cases', () => {
     expect('⟦⟦ QUERY_CREW ⟧⟧'.match(QUERY_REGEX)).toBeTruthy();
   });
 
-  it('legacy [[[/]]] mixed with doubled Unicode brackets', () => {
-    const input = '[[[ COMMIT {"message": "old"} ]]]\n⟦⟦ COMMIT {"message": "new"} ⟧⟧';
-    // After legacy conversion
-    const converted = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    const matches = [...converted.matchAll(new RegExp(COMMIT_REGEX.source, 'gs'))];
-    expect(matches).toHaveLength(2);
-    expect(JSON.parse(matches[0][1]).message).toBe('old');
-    expect(JSON.parse(matches[1][1]).message).toBe('new');
-  });
-
   it('text with no brackets passes through unchanged', () => {
     const input = 'just plain text with no special chars';
-    const converted = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-    expect(converted).toBe(input);
+    expect(input).toBe(input);
   });
 });
