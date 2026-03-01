@@ -176,8 +176,10 @@ export function useWebSocket() {
             if (recipient) {
               const msgs = [...(recipient.messages ?? [])];
               const isFromSystem = msg.from === 'system';
-              const senderLabel = msg.fromRole || msg.from?.slice(0, 8) || 'System';
-              const preview = (msg.content ?? '').slice(0, 500);
+              const senderLabel = msg.fromRole
+                ? `${msg.fromRole} (${(msg.from ?? '').slice(0, 8)})`
+                : msg.from?.slice(0, 8) || 'System';
+              const preview = (msg.content ?? '').slice(0, 2000);
               msgs.push({
                 type: 'text',
                 text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
