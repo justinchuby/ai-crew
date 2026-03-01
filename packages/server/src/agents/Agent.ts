@@ -237,7 +237,7 @@ All team members have access to this directory. Create your subdirectory before 
 11. Log important decisions by outputting:
 \`⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧\`
 12. To defer a non-blocking issue for later:
-\`⟦ DEFER_ISSUE {"title": "issue title", "severity": "low", "context": "details"} ⟧\`
+\`⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧\`
 \`⟦ QUERY_DEFERRED {} ⟧\`
 
 == SKILLS (reusable knowledge for future work) ==

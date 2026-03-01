@@ -369,8 +369,9 @@ Add/remove members from a group:
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
 \`⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ⟧\`
 
-Cancel an active delegation:
-\`⟦ CANCEL_DELEGATION {"id": "delegation-id"} ⟧\`
+Cancel an active delegation (by agent ID or delegation ID):
+\`⟦ CANCEL_DELEGATION {"agentId": "agent-id"} ⟧\`
+\`⟦ CANCEL_DELEGATION {"delegationId": "delegation-id"} ⟧\`
 
 Interrupt an agent to stop their current work and redirect (use sparingly — cancels in-progress LLM turn):
 \`⟦ INTERRUPT {"to": "agent-id", "content": "Drop current task and do X instead"} ⟧\`
@@ -420,9 +421,9 @@ Export a session summary (lead and secretary only):
 \`⟦ EXPORT_SESSION ⟧\`
 
 Defer non-blocking issues for later follow-up:
-\`⟦ DEFER_ISSUE {"title": "Fix flaky test", "severity": "low", "context": "TestX intermittently fails"} ⟧\`
+\`⟦ DEFER_ISSUE {"description": "Fix flaky test in TestX", "severity": "low"} ⟧\`
 \`⟦ QUERY_DEFERRED {} ⟧\` — list all deferred issues
-\`⟦ RESOLVE_DEFERRED {"id": "issue-id"} ⟧\` — mark a deferred issue as resolved
+\`⟦ RESOLVE_DEFERRED {"id": 1} ⟧\` — mark a deferred issue as resolved (id is a number)
 
 == SPECIALIST ROLES (with recommended default models) ==
 {{ROLE_LIST}}
