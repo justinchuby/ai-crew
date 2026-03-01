@@ -256,14 +256,15 @@ export function leadRoutes(ctx: AppContext): Router {
     const timers = registry.getAllTimers().map(t => ({
       id: t.id,
       agentId: t.agentId,
+      agentRole: t.agentRole,
       label: t.label,
       message: t.message,
       fireAt: t.fireAt,
       createdAt: t.createdAt,
-      fired: t.fired,
+      status: t.status,
       repeat: t.repeat,
-      intervalSeconds: t.intervalSeconds,
-      remainingMs: t.fired ? 0 : Math.max(0, t.fireAt - Date.now()),
+      delaySeconds: t.delaySeconds,
+      remainingMs: t.status === 'pending' ? Math.max(0, t.fireAt - Date.now()) : 0,
     }));
     res.json(timers);
   });

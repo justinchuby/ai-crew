@@ -234,13 +234,14 @@ export interface LeadProgress {
 export interface TimerInfo {
   id: string;
   agentId: string;
+  agentRole?: string;
   label: string;
   message: string;
   fireAt: number;
   createdAt: string;
-  fired: boolean;
+  status: 'pending' | 'fired' | 'cancelled';
   repeat: boolean;
-  intervalSeconds: number;
+  delaySeconds: number;
   remainingMs: number;
 }
 

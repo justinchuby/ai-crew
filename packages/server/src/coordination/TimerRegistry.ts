@@ -1,47 +1,57 @@
 import { EventEmitter } from 'events';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../db/schema.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
 export interface Timer {
   id: string;
   agentId: string;
+  agentRole: string;
+  leadId: string | null;
   label: string;
   message: string;
+  delaySeconds: number;
   fireAt: number; // epoch ms
   createdAt: string;
-  fired: boolean;
+  status: 'pending' | 'fired' | 'cancelled';
   repeat: boolean;
-  intervalSeconds: number;
 }
 
 export interface TimerInput {
   label: string;
-  /** Message to send to the agent when the timer fires */
   message: string;
-  /** Delay in seconds from now */
   delaySeconds: number;
-  /** If true, timer repeats at the same interval */
   repeat?: boolean;
 }
 
 // ── TimerRegistry ─────────────────────────────────────────────────
 
 const MAX_TIMERS_PER_AGENT = 20;
-const CHECK_INTERVAL_MS = 5_000; // check every 5s
+const CHECK_INTERVAL_MS = 5_000;
 
 /**
- * Manages named timers for agents. When a timer fires, emits 'timer:fired'
- * with the timer object so the dispatcher can deliver the message.
+ * DB-backed timer registry. Persists timers to SQLite and schedules
+ * them in-memory. On startup, loads pending timers from DB.
  */
 export class TimerRegistry extends EventEmitter {
-  private timers = new Map<string, Timer>();
+  private db: BetterSQLite3Database<typeof schema>;
   private interval: ReturnType<typeof setInterval> | null = null;
+  /** In-memory cache of pending timers for fast tick() checks */
+  private pending = new Map<string, Timer>();
+
+  constructor(db: BetterSQLite3Database<typeof schema>) {
+    super();
+    this.db = db;
+  }
 
   start(): void {
     if (this.interval) return;
+    this.loadPending();
     this.interval = setInterval(() => this.tick(), CHECK_INTERVAL_MS);
-    logger.info('timer', 'TimerRegistry started');
+    logger.info('timer', `TimerRegistry started — ${this.pending.size} pending timers loaded`);
   }
 
   stop(): void {
@@ -51,8 +61,19 @@ export class TimerRegistry extends EventEmitter {
     }
   }
 
-  /** Create a timer for an agent. Returns the timer or null if limit reached or invalid input. */
-  create(agentId: string, input: TimerInput): Timer | null {
+  /** Load all pending timers from DB into memory */
+  private loadPending(): void {
+    const rows = this.db.select().from(schema.timers)
+      .where(eq(schema.timers.status, 'pending'))
+      .all();
+    this.pending.clear();
+    for (const row of rows) {
+      this.pending.set(row.id, this.rowToTimer(row));
+    }
+  }
+
+  /** Create a timer. Returns the timer or null if limit reached. */
+  create(agentId: string, input: TimerInput, agentRole = 'unknown', leadId: string | null = null): Timer | null {
     if (!Number.isFinite(input.delaySeconds) || input.delaySeconds < 0 || input.delaySeconds > 86400) {
       return null;
     }
@@ -62,57 +83,96 @@ export class TimerRegistry extends EventEmitter {
       return null;
     }
 
+    const now = Date.now();
     const timer: Timer = {
-      id: `tmr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `tmr-${now}-${Math.random().toString(36).slice(2, 8)}`,
       agentId,
+      agentRole,
+      leadId,
       label: input.label,
       message: input.message,
-      fireAt: Date.now() + input.delaySeconds * 1000,
+      delaySeconds: input.delaySeconds,
+      fireAt: now + input.delaySeconds * 1000,
       createdAt: new Date().toISOString(),
-      fired: false,
+      status: 'pending',
       repeat: input.repeat ?? false,
-      intervalSeconds: input.delaySeconds,
     };
 
-    this.timers.set(timer.id, timer);
+    // Persist to DB
+    this.db.insert(schema.timers).values({
+      id: timer.id,
+      agentId: timer.agentId,
+      agentRole: timer.agentRole,
+      leadId: timer.leadId,
+      label: timer.label,
+      message: timer.message,
+      delaySeconds: timer.delaySeconds,
+      fireAt: new Date(timer.fireAt).toISOString(),
+      status: 'pending',
+      repeat: timer.repeat ? 1 : 0,
+    }).run();
+
+    this.pending.set(timer.id, timer);
+    this.emit('timer:created', timer);
     logger.info('timer', `Timer "${timer.label}" set for ${agentId.slice(0, 8)} — fires in ${input.delaySeconds}s`);
     return timer;
   }
 
   /** Cancel a timer by ID. Returns true if found and cancelled. */
   cancel(timerId: string, agentId: string): boolean {
-    const timer = this.timers.get(timerId);
+    const timer = this.pending.get(timerId);
     if (!timer || timer.agentId !== agentId) return false;
-    this.timers.delete(timerId);
+
+    this.pending.delete(timerId);
+    this.db.update(schema.timers)
+      .set({ status: 'cancelled' })
+      .where(eq(schema.timers.id, timerId))
+      .run();
+
+    this.emit('timer:cancelled', timer);
     logger.info('timer', `Timer "${timer.label}" cancelled for ${agentId.slice(0, 8)}`);
     return true;
   }
 
-  /** Get all active (unfired) timers for an agent */
+  /** Get all pending timers for an agent */
   getAgentTimers(agentId: string): Timer[] {
-    return Array.from(this.timers.values())
-      .filter(t => t.agentId === agentId && !t.fired);
+    return Array.from(this.pending.values()).filter(t => t.agentId === agentId);
   }
 
-  /** Get all timers (for lead/secretary visibility) */
+  /** Get all timers (pending + fired + cancelled) from DB */
   getAllTimers(): Timer[] {
-    return Array.from(this.timers.values()).filter(t => !t.fired);
+    const rows = this.db.select().from(schema.timers).all();
+    return rows.map(r => this.rowToTimer(r));
+  }
+
+  /** Get only pending timers */
+  getPendingTimers(): Timer[] {
+    return Array.from(this.pending.values());
   }
 
   /** Check for timers that should fire */
   private tick(): void {
     const now = Date.now();
-    for (const timer of this.timers.values()) {
-      if (!timer.fired && timer.fireAt <= now) {
-        timer.fired = true;
+    for (const timer of this.pending.values()) {
+      if (timer.fireAt <= now) {
+        timer.status = 'fired';
         this.emit('timer:fired', timer);
         logger.info('timer', `Timer "${timer.label}" fired for ${timer.agentId.slice(0, 8)}`);
+
         if (timer.repeat) {
-          // Reschedule
-          timer.fired = false;
-          timer.fireAt = now + timer.intervalSeconds * 1000;
+          // Reschedule: update fireAt in DB and memory
+          timer.status = 'pending';
+          timer.fireAt = now + timer.delaySeconds * 1000;
+          this.db.update(schema.timers)
+            .set({ fireAt: new Date(timer.fireAt).toISOString(), status: 'pending' })
+            .where(eq(schema.timers.id, timer.id))
+            .run();
         } else {
-          this.timers.delete(timer.id);
+          this.pending.delete(timer.id);
+          this.db.update(schema.timers)
+            .set({ status: 'fired' })
+            .where(eq(schema.timers.id, timer.id))
+            .run();
         }
       }
     }
@@ -120,13 +180,31 @@ export class TimerRegistry extends EventEmitter {
 
   /** Remove all timers for an agent (cleanup on termination) */
   clearAgent(agentId: string): number {
-    let count = 0;
-    for (const [id, timer] of this.timers) {
-      if (timer.agentId === agentId) {
-        this.timers.delete(id);
-        count++;
-      }
+    const agentTimers = this.getAgentTimers(agentId);
+    for (const timer of agentTimers) {
+      this.pending.delete(timer.id);
     }
-    return count;
+    // Mark as cancelled in DB
+    this.db.update(schema.timers)
+      .set({ status: 'cancelled' })
+      .where(and(eq(schema.timers.agentId, agentId), eq(schema.timers.status, 'pending')))
+      .run();
+    return agentTimers.length;
+  }
+
+  private rowToTimer(row: typeof schema.timers.$inferSelect): Timer {
+    return {
+      id: row.id,
+      agentId: row.agentId,
+      agentRole: row.agentRole,
+      leadId: row.leadId,
+      label: row.label,
+      message: row.message,
+      delaySeconds: row.delaySeconds,
+      fireAt: new Date(row.fireAt).getTime(),
+      createdAt: row.createdAt ?? new Date().toISOString(),
+      status: row.status as Timer['status'],
+      repeat: row.repeat === 1,
+    };
   }
 }
