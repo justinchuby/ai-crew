@@ -112,7 +112,7 @@ The chat UI supports `@mention` autocomplete for targeting messages to specific 
 
 ## Scoped COMMIT Command
 
-The `COMMIT` command provides safe git operations for multi-agent workflows:
+The `COMMIT` command provides safe, server-enforced git operations for multi-agent workflows:
 
 ```
 [[[ COMMIT {"message": "feat: implement login endpoint"} ]]]
@@ -120,9 +120,11 @@ The `COMMIT` command provides safe git operations for multi-agent workflows:
 
 **How it works:**
 1. Collects all files the agent currently holds locks on (via `LOCK_FILE`)
-2. Generates a `git add <file1> <file2> ...` command with only those specific files
-3. Creates a commit with the provided message and co-authorship attribution
-4. This prevents `git add -A` from accidentally staging other agents' uncommitted work
+2. Shell-quotes file paths to handle spaces and special characters
+3. **Executes** `git add <files> && git commit -m '<message>'` server-side in the agent's working directory
+4. **Post-commit verification:** Runs `git diff --name-only HEAD~1` and compares committed files against expected locked files
+5. Warns the agent if expected files are missing from the commit
+6. Logs to ActivityLedger only after verified successful commit
 
 **Why this matters:** In multi-agent workflows, several agents may have uncommitted changes in the same repository. Without scoped commits, `git add -A` would stage *everyone's* changes into one agent's commit.
 

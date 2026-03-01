@@ -46,7 +46,9 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
-- **Scoped COMMIT** — The `COMMIT` command stages only files the agent has locked — prevents `git add -A` from leaking other agents' uncommitted work
+- **Scoped COMMIT** — The `COMMIT` command executes `git add` only on files the agent has locked, then commits and runs post-commit verification (`git diff --name-only HEAD~1`) to confirm the expected files actually landed. Prevents `git add -A` from leaking other agents' uncommitted work.
+- **Merge Scope Validation** — When merging agent branches, `WorktreeManager.merge()` validates that only locked files were modified — defense-in-depth against accidental cross-contamination
+- **Worktree Isolation** — ⚠️ _In development, not yet enabled._ Per-agent git worktrees are implemented in the backend (`WorktreeManager`) but not yet active in production. Agents currently share the repository working directory. See [docs/coordination.md](docs/coordination.md) for details.
 - **Event Pipeline** — Reactive event handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
 - **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
 - **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
@@ -117,10 +119,12 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
 | **RoleRegistry** | Role definitions with system prompts, icons, colors, default models. `receivesStatusUpdates` flag for secretary auto-refresh. |
 | **MessageBus** | Routes inter-agent messages and group chats |
-| **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work |
+| **FileLockRegistry** | Pessimistic file locking with TTL, glob support, expiry notifications. SQLite-backed. |
+| **WorktreeManager** | ⚠️ _In development._ Per-agent git worktrees — create/merge/cleanup lifecycle. Wired into AgentManager but not yet enabled. |
+| **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work. Auto-adds new agents matching group role criteria. |
 | **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
 | **DecisionLog** | Decision tracking with accept/reject/reason workflow |
-| **AlertEngine** | Proactive detection: stuck agents, context pressure, duplicate edits, idle+ready mismatch, stale decisions |
+| **AlertEngine** | Proactive detection: stuck agents (with exemptions for leads, new agents, prompting agents), context pressure, duplicate edits, idle+ready mismatch, stale decisions |
 | **ContextRefresher** | Re-injects crew context with health header after compaction events. Auto-refreshes secretary roles. |
 | **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
@@ -213,7 +217,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 |---------|-------------|
 | `LOCK_FILE {"filePath": "...", "reason": "..."}` | Acquire a file lock. Prevents other agents from editing the same file. |
 | `UNLOCK_FILE {"filePath": "..."}` | Release a file lock. |
-| `COMMIT {"message": "..."}` | Scoped git commit — stages only files the agent has locked, preventing `git add -A` from leaking other agents' work. |
+| `COMMIT {"message": "..."}` | Scoped git commit — executes `git add` only on locked files, commits, then verifies files landed via `git diff --name-only HEAD~1`. Warns if expected files are missing. |
 | `QUERY_CREW` | Get the current roster of agents with IDs, roles, models, and status. |
 | `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
 | `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |

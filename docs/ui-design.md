@@ -129,6 +129,12 @@ In the org chart / team hierarchy view:
 - **Expandable message items** — Messages can be expanded to show the full content, with sender role, timestamp, and delivery status
 - Connection lines in the org chart animate briefly when a message flows between two agents
 - **Group messages in comms feed** — Group chat messages appear alongside 1:1 messages with a distinct visual treatment (group icon + group name)
+- **Project tabs** — Always-visible tab bar for switching between active projects, consistent with Timeline tabs
+- **Communication heatmap tab** — Third tab in the Communication section (alongside List and Matrix) showing a `CommHeatmap` with typed messages derived from the Org Chart's `CommEntry` list
+
+## Agent Identity in Messages
+
+Agent messages and notes now include the agent's short ID alongside the role name — e.g., `[From Developer (9b63ec92)]` instead of just `[From Developer]`. This disambiguates messages when multiple agents share the same role.
 
 ## Timeline Visualization
 
@@ -182,6 +188,16 @@ The Tasks view groups agents and tasks by project:
 - **Task dedup detection** — When delegating, `findSimilarActiveDelegation()` checks for overlapping work using word-overlap similarity (>50% match). The lead receives a warning if a similar delegation is already active.
 - **Project filtering** — Filter tasks by project to focus on one workstream
 
+## DAG Gantt Chart
+
+The DAG Gantt chart (`DagGantt.tsx`) provides a time-based visualization of task execution:
+
+- **Scrollable** — `overflow-auto` container with `max-h-60vh` for large DAGs
+- **Sticky labels** — Task labels stay visible (`sticky left-0`) during horizontal scroll
+- **Zoom controls** — ZoomIn/ZoomOut/Reset buttons with 1×–5× range (0.5× steps). Zoom scales inner content via `minWidth: ${100 * zoom}%`
+- **Local timezone** — `fmtTime()` uses `toLocaleTimeString()` for local timezone display
+- **Title field** — DAG tasks display their title alongside the task ID
+
 ## Sidebar Unread Badges
 
 The sidebar navigation shows unread indicators for group chats:
@@ -205,7 +221,7 @@ The Mission Control page (`/mission-control`) provides a single-screen project o
 | **AlertsPanel** | Proactive alerts derived from store data: context overflow, stuck agents, pending decisions >3min, failures, idle+ready mismatch, blocked tasks. Zero height when no alerts. Color-coded by severity. |
 | **ActivityFeed** | Merged activity + comms feed, last 30 events, live via WebSocket |
 | **DagMinimap** | Stacked horizontal status bar (done=green, running=blue, pending=gray, failed=red), recent completions, running tasks |
-| **CommHeatmap** | Communication frequency heatmap showing inter-agent message volume |
+| **CommHeatmap** | Communication frequency heatmap with **type filter chips** (Delegations, DMs, Groups, Broadcasts, Reports) — each with a colored badge. Filters auto-shown when messages include type info. Also integrated as a tab in the Org Chart communication section. |
 | **Performance** | Agent performance scorecards: throughput, first-pass rate, velocity, cost efficiency |
 
 ### Panel Customization
