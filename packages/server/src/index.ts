@@ -5,6 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getConfig, updateConfig } from './config.js';
+import { originValidation } from './middleware/originValidation.js';
 import { WebSocketServer } from './comms/WebSocketServer.js';
 import { MessageBus } from './comms/MessageBus.js';
 import { AgentManager } from './agents/AgentManager.js';
@@ -62,6 +63,9 @@ app.use(cors({
 
 // Security headers (helmet sets X-Frame-Options, CSP, HSTS, etc.)
 app.use(helmet());
+
+// CSRF protection — reject requests from non-localhost origins
+app.use(originValidation);
 
 app.use(express.json({ limit: '1mb' }));
 
