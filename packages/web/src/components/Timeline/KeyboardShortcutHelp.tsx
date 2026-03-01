@@ -66,8 +66,8 @@ export function KeyboardShortcutHelp({ isOpen, onClose }: KeyboardShortcutHelpPr
         <dl className="space-y-2">
           {SHORTCUTS.map(({ keys, description }) => (
             <div key={description} className="flex items-center justify-between text-xs">
-              <dd className="text-th-text-muted">{description}</dd>
-              <dt className="flex gap-1 ml-4 shrink-0">
+              <dt className="text-th-text-muted">{description}</dt>
+              <dd className="flex gap-1 ml-4 shrink-0">
                 {keys.map((k) => (
                   <kbd
                     key={k}
@@ -76,7 +76,7 @@ export function KeyboardShortcutHelp({ isOpen, onClose }: KeyboardShortcutHelpPr
                     {k}
                   </kbd>
                 ))}
-              </dt>
+              </dd>
             </div>
           ))}
         </dl>
