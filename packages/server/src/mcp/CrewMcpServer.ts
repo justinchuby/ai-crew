@@ -11,6 +11,9 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+// SSE transport kept for backward compat with Copilot CLI versions that don't support Streamable HTTP
+// eslint-disable-next-line deprecation/deprecation
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { Router, type Request, type Response } from 'express';
 import type { Agent } from '../agents/Agent.js';
 import type { CommandEntry, CommandHandlerContext } from '../agents/commands/types.js';
@@ -658,7 +661,7 @@ export interface CrewMcpRouteOptions {
 
 /** Tracks an active MCP session: the transport and its MCP server instance */
 interface McpSession {
-  transport: StreamableHTTPServerTransport;
+  transport: StreamableHTTPServerTransport | SSEServerTransport;
   mcpServer: McpServer;
   agentId: string;
 }
@@ -736,7 +739,7 @@ export function createMcpRoutes(options: CrewMcpRouteOptions): Router {
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
       try {
-        await session.transport.handleRequest(req, res, req.body);
+        await (session.transport as StreamableHTTPServerTransport).handleRequest(req, res, req.body);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error('mcp', `POST error (session ${sessionId.slice(0, 8)}): ${msg}`);
@@ -766,7 +769,7 @@ export function createMcpRoutes(options: CrewMcpRouteOptions): Router {
     }
 
     const session = sessions.get(sessionId)!;
-    session.transport.handleRequest(req, res).catch((err) => {
+    (session.transport as StreamableHTTPServerTransport).handleRequest(req, res).catch((err: Error) => {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('mcp', `GET SSE error (session ${sessionId.slice(0, 8)}): ${msg}`);
     });
@@ -782,9 +785,69 @@ export function createMcpRoutes(options: CrewMcpRouteOptions): Router {
     }
 
     const session = sessions.get(sessionId)!;
-    session.transport.handleRequest(req, res).catch((err) => {
+    (session.transport as StreamableHTTPServerTransport).handleRequest(req, res).catch((err: Error) => {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('mcp', `DELETE error (session ${sessionId.slice(0, 8)}): ${msg}`);
+    });
+  });
+
+  // ── Legacy SSE Transport (for Copilot CLI versions that don't support Streamable HTTP) ──
+
+  // SSE connection endpoint — GET establishes the event stream
+  router.get('/mcp/:agentId/sse', (req: Request, res: Response) => {
+    const agentId = req.params.agentId as string;
+    const agent = options.getAgent(agentId);
+    if (!agent) {
+      res.status(404).json({ error: `Agent not found: ${agentId}` });
+      return;
+    }
+
+    const mcpServer = createCrewMcpServer({
+      ctx: options.ctx,
+      getCallingAgent: () => options.getAgent(agentId),
+    });
+
+    const transport = new SSEServerTransport(`/mcp/${agentId}/message`, res);
+    const sessionId = transport.sessionId;
+
+    sessions.set(sessionId, { transport, mcpServer, agentId });
+    logger.info('mcp', `SSE connected: agent ${agentId.slice(0, 8)} (session ${sessionId.slice(0, 8)})`);
+
+    res.on('close', () => {
+      sessions.delete(sessionId);
+      mcpServer.close().catch(() => {});
+      logger.debug('mcp', `SSE disconnected: agent ${agentId.slice(0, 8)} (session ${sessionId.slice(0, 8)})`);
+    });
+
+    mcpServer.connect(transport).catch((err) => {
+      logger.error('mcp', `SSE connect failed for agent ${agentId.slice(0, 8)}: ${err?.message}`);
+      sessions.delete(sessionId);
+      if (!res.headersSent) res.status(500).json({ error: 'MCP connection failed' });
+    });
+  });
+
+  // SSE message POST endpoint — clients POST JSON-RPC messages here
+  router.post('/mcp/:agentId/message', (req: Request, res: Response) => {
+    const sessionId = req.query.sessionId as string | undefined;
+    if (!sessionId) {
+      res.status(400).json({ error: 'Missing sessionId query parameter' });
+      return;
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: `No active MCP session: ${sessionId}` });
+      return;
+    }
+
+    if (!('handlePostMessage' in session.transport)) {
+      res.status(400).json({ error: 'Session is not using SSE transport' });
+      return;
+    }
+
+    (session.transport as SSEServerTransport).handlePostMessage(req, res, req.body).catch((err) => {
+      logger.error('mcp', `POST message error (session ${sessionId.slice(0, 8)}): ${err?.message}`);
+      if (!res.headersSent) res.status(500).json({ error: 'Failed to process MCP message' });
     });
   });
 

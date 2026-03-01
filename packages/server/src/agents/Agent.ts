@@ -154,8 +154,9 @@ export class Agent {
     ];
 
     // Build MCP server config if a URL was provided by AgentManager
+    // Use SSE transport — Copilot CLI currently requires type: 'sse'
     const mcpServers = this.mcpServerUrl
-      ? [{ type: 'http' as const, name: 'ai-crew', url: this.mcpServerUrl, headers: [] }]
+      ? [{ type: 'sse' as const, name: 'ai-crew', url: `${this.mcpServerUrl}/sse`, headers: [] }]
       : undefined;
 
     this.acpConnection.start({
