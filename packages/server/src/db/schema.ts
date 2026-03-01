@@ -209,6 +209,7 @@ export const projectSessions = sqliteTable('project_sessions', {
   projectId: text('project_id').notNull().references(() => projects.id),
   leadId: text('lead_id').notNull(),
   sessionId: text('session_id'),
+  role: text('role').default('lead'),               // role id used for this session
   task: text('task'),
   status: text('status').default('active'),        // active | completed | crashed
   startedAt: text('started_at').default(sql`(datetime('now'))`),

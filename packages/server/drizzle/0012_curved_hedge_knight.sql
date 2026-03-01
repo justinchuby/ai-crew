@@ -1,0 +1,1 @@
+ALTER TABLE `project_sessions` ADD `role` text DEFAULT 'lead';

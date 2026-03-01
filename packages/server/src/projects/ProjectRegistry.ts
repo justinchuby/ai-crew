@@ -18,6 +18,7 @@ export interface ProjectSession {
   projectId: string;
   leadId: string;
   sessionId: string | null;
+  role: string | null;
   task: string | null;
   status: string;
   startedAt: string;
@@ -73,11 +74,12 @@ export class ProjectRegistry {
   }
 
   /** Record that a lead session started for this project */
-  startSession(projectId: string, leadId: string, task?: string): void {
+  startSession(projectId: string, leadId: string, task?: string, role?: string): void {
     this.db.drizzle.insert(projectSessions).values({
       projectId,
       leadId,
       task: task ?? null,
+      role: role ?? 'lead',
       status: 'active',
     }).run();
 
@@ -219,6 +221,7 @@ export class ProjectRegistry {
         projectId: projectSessions.projectId,
         leadId: projectSessions.leadId,
         sessionId: projectSessions.sessionId,
+        role: projectSessions.role,
         task: projectSessions.task,
         status: projectSessions.status,
         startedAt: projectSessions.startedAt,
@@ -241,6 +244,7 @@ export class ProjectRegistry {
       projectId: r.projectId,
       leadId: r.leadId,
       sessionId: r.sessionId,
+      role: r.role ?? 'lead',
       task: r.task,
       status: r.status ?? 'completed',
       startedAt: r.startedAt ?? new Date().toISOString(),

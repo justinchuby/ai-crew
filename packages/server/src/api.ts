@@ -1323,9 +1323,10 @@ export function apiRouter(
     const project = projectRegistry.get(session.projectId);
     if (!project) return res.status(404).json({ error: 'Associated project not found' });
 
-    // projectSessions only tracks lead sessions — non-lead agents use the conversations table
-    const role = roleRegistry.get('lead');
-    if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+    // Use stored role from session, falling back to 'lead' for backward compatibility
+    const roleId = session.role ?? 'lead';
+    const role = roleRegistry.get(roleId);
+    if (!role) return res.status(500).json({ error: `Role "${roleId}" not found` });
 
     const { task: overrideTask, model } = req.body ?? {};
     const task = overrideTask || session.task || undefined;
@@ -1339,7 +1340,7 @@ export function apiRouter(
         { projectName: project.name, projectId: project.id },
       );
 
-      projectRegistry.startSession(project.id, agent.id, task);
+      projectRegistry.startSession(project.id, agent.id, task, roleId);
 
       // Send briefing once the agent's session is connected
       const briefing = projectRegistry.buildBriefing(project.id);

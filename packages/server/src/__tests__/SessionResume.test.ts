@@ -158,6 +158,30 @@ describe('Session Resume', () => {
       expect(sessionProject).toBeDefined();
       expect(sessionProject!.name).toBe('Full Lifecycle');
     });
+
+    it('preserves role across session resume', () => {
+      const project = registry.create('Role Test');
+      registry.startSession(project.id, 'agent-1', 'Do work', 'developer');
+      registry.setSessionId('agent-1', 'sess-dev');
+      registry.endSession('agent-1', 'completed');
+
+      const sessions = registry.getResumableSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].role).toBe('developer');
+
+      const session = registry.getSessionById(sessions[0].id);
+      expect(session!.role).toBe('developer');
+    });
+
+    it('defaults to lead role when not specified', () => {
+      const project = registry.create('Default Role');
+      registry.startSession(project.id, 'lead-def', 'Lead work');
+      registry.setSessionId('lead-def', 'sess-lead');
+      registry.endSession('lead-def', 'completed');
+
+      const sessions = registry.getResumableSessions();
+      expect(sessions[0].role).toBe('lead');
+    });
   });
 
   describe('claimSessionForResume', () => {
