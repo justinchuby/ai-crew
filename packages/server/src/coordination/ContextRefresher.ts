@@ -127,9 +127,17 @@ export class ContextRefresher {
   }
 
   buildRecentActivity(limit: number = 20): string[] {
-    // Fetch extra entries so the smart filter has enough high/medium priority events
-    const rawEntries = this.activityLedger.getRecent(limit * 3);
-    const filtered = this.activityFilter.filter(rawEntries, limit);
+    // Fetch extra entries so the smart filter has enough high/medium priority events.
+    // If the first pass is exhausted by low-value churn, widen the window adaptively.
+    const initialFetch = limit * 5;
+    let rawEntries = this.activityLedger.getRecent(initialFetch);
+    let filtered = this.activityFilter.filter(rawEntries, limit);
+
+    if (filtered.length < limit && rawEntries.length >= initialFetch) {
+      rawEntries = this.activityLedger.getRecent(initialFetch * 3);
+      filtered = this.activityFilter.filter(rawEntries, limit);
+    }
+
     return filtered.map((entry) => {
       const shortId = entry.agentId.slice(0, 8);
       return `[${entry.timestamp}] Agent ${shortId} (${entry.agentRole}): ${entry.actionType} — ${entry.summary}`;
