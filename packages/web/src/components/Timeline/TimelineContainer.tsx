@@ -23,6 +23,9 @@ import type {
 const LABEL_WIDTH = 180;
 const LANE_HEIGHT = 56;
 const LANE_HEIGHT_EXPANDED = 160;
+
+// Stable empty set — prevents re-renders when no agents are expanded for a lead
+const EMPTY_EXPANDED: ReadonlySet<string> = new Set<string>();
 const LANE_GAP = 2;
 const AXIS_HEIGHT = 32;
 const ZOOM_FACTOR_IN = 0.6;
@@ -217,7 +220,7 @@ interface TimelineContainerProps {
 function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps & { width: number }) {
   // Persisted view state from Zustand store
   const selectedLeadId = useTimelineStore((s) => s.selectedLeadId);
-  const expandedAgents = useTimelineStore((s) => s.getExpandedAgents(selectedLeadId ?? ''));
+  const expandedAgents = useTimelineStore((s) => s.expandedAgents[selectedLeadId ?? ''] ?? EMPTY_EXPANDED);
   const toggleExpandedAgent = useTimelineStore((s) => s.toggleExpandedAgent);
   const sortDirection = useTimelineStore((s) => s.sortDirection);
   const setSortDirection = useTimelineStore((s) => s.setSortDirection);
@@ -397,18 +400,18 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
   // Auto-expand agents with failed segments so errors are visible
   // Skip agents the user has explicitly collapsed
+  // Uses batch method to avoid O(n) cascading re-renders (CR-11)
+  const expandMultipleAgents = useTimelineStore((s) => s.expandMultipleAgents);
   useEffect(() => {
     const leadId = selectedLeadId ?? '';
     const failedIds = data.agents
       .filter(a => a.segments.some(s => s.status === 'failed'))
       .map(a => a.id)
       .filter(id => !userCollapsedRef.current.has(id));
-    for (const id of failedIds) {
-      if (!expandedAgents.has(id)) {
-        toggleExpandedAgent(leadId, id);
-      }
+    if (failedIds.length > 0) {
+      expandMultipleAgents(leadId, failedIds);
     }
-  }, [data.agents, selectedLeadId, expandedAgents, toggleExpandedAgent]);
+  }, [data.agents, selectedLeadId, expandMultipleAgents]);
 
   // Synced vertical scrolling between labels and timeline
   const syncScroll = useCallback((source: 'label' | 'timeline') => {

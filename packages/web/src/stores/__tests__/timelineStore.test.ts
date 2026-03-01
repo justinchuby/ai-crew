@@ -83,6 +83,12 @@ describe('timelineStore', () => {
     expect(expanded.size).toBe(0);
   });
 
+  it('returns stable reference for unknown lead (no spurious re-renders)', () => {
+    const a = useTimelineStore.getState().getExpandedAgents('unknown-1');
+    const b = useTimelineStore.getState().getExpandedAgents('unknown-2');
+    expect(a).toBe(b); // same EMPTY_SET instance
+  });
+
   it('toggles agent expansion per lead', () => {
     useTimelineStore.getState().toggleExpandedAgent('lead-1', 'agent-a');
     expect(useTimelineStore.getState().getExpandedAgents('lead-1').has('agent-a')).toBe(true);
@@ -98,6 +104,39 @@ describe('timelineStore', () => {
     expect(useTimelineStore.getState().getExpandedAgents('lead-1').has('agent-a')).toBe(true);
     expect(useTimelineStore.getState().getExpandedAgents('lead-1').has('agent-b')).toBe(false);
     expect(useTimelineStore.getState().getExpandedAgents('lead-2').has('agent-b')).toBe(true);
+  });
+
+  it('expandMultipleAgents adds all in one update', () => {
+    useTimelineStore.getState().expandMultipleAgents('lead-1', ['a', 'b', 'c']);
+    const expanded = useTimelineStore.getState().getExpandedAgents('lead-1');
+    expect(expanded.size).toBe(3);
+    expect(expanded.has('a')).toBe(true);
+    expect(expanded.has('b')).toBe(true);
+    expect(expanded.has('c')).toBe(true);
+  });
+
+  it('expandMultipleAgents preserves existing expanded agents', () => {
+    useTimelineStore.getState().toggleExpandedAgent('lead-1', 'existing');
+    useTimelineStore.getState().expandMultipleAgents('lead-1', ['new-1', 'new-2']);
+    const expanded = useTimelineStore.getState().getExpandedAgents('lead-1');
+    expect(expanded.has('existing')).toBe(true);
+    expect(expanded.has('new-1')).toBe(true);
+    expect(expanded.size).toBe(3);
+  });
+
+  it('expandMultipleAgents is no-op when all already expanded', () => {
+    useTimelineStore.getState().expandMultipleAgents('lead-1', ['a', 'b']);
+    const before = useTimelineStore.getState().expandedAgents['lead-1'];
+    useTimelineStore.getState().expandMultipleAgents('lead-1', ['a', 'b']);
+    const after = useTimelineStore.getState().expandedAgents['lead-1'];
+    expect(before).toBe(after); // same reference — no unnecessary update
+  });
+
+  it('expandMultipleAgents with empty array is no-op', () => {
+    const before = useTimelineStore.getState().expandedAgents;
+    useTimelineStore.getState().expandMultipleAgents('lead-1', []);
+    const after = useTimelineStore.getState().expandedAgents;
+    expect(before).toBe(after);
   });
 
   // ── Sort direction ───────────────────────────────────────────────
