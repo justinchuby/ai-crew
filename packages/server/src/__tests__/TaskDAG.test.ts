@@ -854,6 +854,22 @@ describe('TaskDAG', () => {
       expect(task).not.toBeNull();
       expect(task!.id).toBe('high-pri');
     });
+
+    it('falls back to priority order when top scores are ambiguously close', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'task-a', role: 'developer', description: 'Implement authentication system', priority: 1 },
+        { id: 'task-b', role: 'developer', description: 'Implement authorization system', priority: 10 },
+      ]);
+      // Both descriptions share "Implement" + "system" with the query,
+      // so scores will be close together — should fall back to priority
+      const task = dag.findReadyTask('lead-1', {
+        role: 'developer',
+        taskDescription: 'Implement notification system',
+      });
+      expect(task).not.toBeNull();
+      // Falls back to priority order since scores are ambiguous
+      expect(task!.id).toBe('task-b');
+    });
   });
 
   describe('getTasks', () => {

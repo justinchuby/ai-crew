@@ -63,6 +63,12 @@ export interface FileConflict {
  */
 const MIN_DESCRIPTION_MATCH_THRESHOLD = 0.2;
 
+/**
+ * Minimum gap between top-2 candidate scores to trust description-based matching.
+ * If the gap is smaller, the match is ambiguous and we fall back to priority order.
+ */
+const MIN_SCORE_GAP = 0.15;
+
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'to', 'of', 'in', 'for', 'on',
   'and', 'or', 'with', 'that', 'this', 'it', 'from', 'by', 'as', 'at',
@@ -598,7 +604,11 @@ export class TaskDAG extends EventEmitter {
       scored.sort((a, b) => b.score - a.score);
 
       if (scored[0].score > MIN_DESCRIPTION_MATCH_THRESHOLD) {
-        return scored[0].task;
+        // Require clear winner — if top-2 scores are too close, fall back to priority
+        const gap = scored.length > 1 ? scored[0].score - scored[1].score : 1;
+        if (gap >= MIN_SCORE_GAP) {
+          return scored[0].task;
+        }
       }
     }
 
