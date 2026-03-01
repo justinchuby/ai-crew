@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Trash2, Plus, Sun, Moon, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
+import type { ThemeMode } from '../../stores/settingsStore';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
 import { DashboardCustomizer } from './DashboardCustomizer';
 
 interface Props {
@@ -53,15 +54,8 @@ export function SettingsPanel({ api }: Props) {
     setRoleIcon('🤖');
   };
 
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    document.documentElement.classList.toggle('light', theme === 'light');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+  const themeMode = useSettingsStore((s) => s.themeMode);
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
   return (
     <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto">
@@ -78,28 +72,24 @@ export function SettingsPanel({ api }: Props) {
             <Sun className="w-3.5 h-3.5" /> Appearance
           </h3>
           <div className="flex gap-2">
-            <button
-              onClick={() => setTheme('light')}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                theme === 'light'
-                  ? 'bg-accent text-black font-medium'
-                  : 'bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-bg-muted'
-              }`}
-            >
-              <Sun size={14} />
-              Light
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                theme === 'dark'
-                  ? 'bg-accent text-black font-medium'
-                  : 'bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-bg-muted'
-              }`}
-            >
-              <Moon size={14} />
-              Dark
-            </button>
+            {([
+              { mode: 'light' as ThemeMode, icon: <Sun size={14} />, label: 'Light' },
+              { mode: 'dark' as ThemeMode, icon: <Moon size={14} />, label: 'Dark' },
+              { mode: 'system' as ThemeMode, icon: <Monitor size={14} />, label: 'System' },
+            ]).map(({ mode, icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => setThemeMode(mode)}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                  themeMode === mode
+                    ? 'bg-accent text-black font-medium'
+                    : 'bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-bg-muted'
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
           </div>
         </section>
 
@@ -115,7 +105,7 @@ export function SettingsPanel({ api }: Props) {
           <input
             type="range"
             min={1}
-            max={20}
+            max={50}
             value={maxAgents}
             onChange={(e) => handleMaxAgentsChange(Number(e.target.value))}
             disabled={!config}
@@ -123,10 +113,11 @@ export function SettingsPanel({ api }: Props) {
           />
           <div className="flex justify-between text-[10px] text-th-text-muted mt-1">
             <span>1</span>
-            <span>5</span>
             <span>10</span>
-            <span>15</span>
             <span>20</span>
+            <span>30</span>
+            <span>40</span>
+            <span>50</span>
           </div>
         </section>
       </div>

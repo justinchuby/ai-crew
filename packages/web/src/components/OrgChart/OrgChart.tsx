@@ -296,7 +296,7 @@ interface Props {
 
 export function OrgChart({ api, ws }: Props) {
   const { agents } = useAppStore();
-  const { projects } = useLeadStore();
+  const projects = useLeadStore((s) => s.projects);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [commView, setCommView] = useState<'list' | 'matrix'>('list');
 

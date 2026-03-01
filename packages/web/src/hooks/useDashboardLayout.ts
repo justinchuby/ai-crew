@@ -30,7 +30,17 @@ export function useDashboardLayout() {
   const [panels, setPanels] = useState<PanelConfig[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as PanelConfig[]) : DEFAULT_PANELS;
+      if (saved) {
+        const parsed = JSON.parse(saved) as PanelConfig[];
+        // Merge with defaults to pick up any new panels added since last save
+        const savedIds = new Set(parsed.map((p) => p.id));
+        const merged = [...parsed];
+        for (const def of DEFAULT_PANELS) {
+          if (!savedIds.has(def.id)) merged.push(def);
+        }
+        return merged;
+      }
+      return DEFAULT_PANELS;
     } catch {
       return DEFAULT_PANELS;
     }
@@ -67,6 +77,23 @@ export function useDashboardLayout() {
     });
   };
 
+  /** Reorder: move `dragId` to the position of `targetId` */
+  const reorderPanels = (dragId: string, targetId: string) => {
+    setPanels((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const dragIdx = sorted.findIndex((p) => p.id === dragId);
+      const targetIdx = sorted.findIndex((p) => p.id === targetId);
+      if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return prev;
+
+      // Remove dragged item and insert at target position
+      const item = sorted.splice(dragIdx, 1)[0];
+      sorted.splice(targetIdx, 0, item);
+
+      // Re-assign sequential order values
+      return sorted.map((p, i) => ({ ...p, order: i }));
+    });
+  };
+
   const reset = () => {
     setPanels(DEFAULT_PANELS);
   };
@@ -78,6 +105,7 @@ export function useDashboardLayout() {
     allPanels: [...panels].sort((a, b) => a.order - b.order),
     togglePanel,
     movePanel,
+    reorderPanels,
     reset,
   };
 }
