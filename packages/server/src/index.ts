@@ -283,7 +283,6 @@ const sessionRetro = new SessionRetro(db, agentManager, activityLedger, decision
 // Session exporter
 import { SessionExporter } from './coordination/SessionExporter.js';
 const sessionExporter = new SessionExporter(agentManager, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
-agentManager.setSessionExporter(sessionExporter);
 
 // Search engine — full-text search across activities and decisions
 import { SearchEngine } from './coordination/SearchEngine.js';

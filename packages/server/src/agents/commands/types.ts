@@ -17,7 +17,6 @@ import type { ChatGroupRegistry } from '../../comms/ChatGroupRegistry.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../../coordination/TimerRegistry.js';
-import type { SessionExporter } from '../../coordination/SessionExporter.js';
 import type { CapabilityInjector } from '../capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../../tasks/TaskDecomposer.js';
@@ -57,7 +56,6 @@ export interface CommandContext {
   taskDAG: TaskDAG;
   deferredIssueRegistry: DeferredIssueRegistry;
   timerRegistry?: TimerRegistry;
-  sessionExporter?: SessionExporter;
   capabilityInjector?: CapabilityInjector;
   taskTemplateRegistry?: TaskTemplateRegistry;
   taskDecomposer?: TaskDecomposer;

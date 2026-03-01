@@ -186,11 +186,6 @@ export class CommandDispatcher {
     return action;
   }
 
-  /** Late-bind sessionExporter (created after AgentManager due to circular dep) */
-  setSessionExporter(exporter: import('../coordination/SessionExporter.js').SessionExporter): void {
-    this.handlerCtx.sessionExporter = exporter;
-  }
-
   // ── Static helpers ─────────────────────────────────────────────────
 
   /**

@@ -13,7 +13,6 @@ import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../coordination/TimerRegistry.js';
-import type { SessionExporter } from '../coordination/SessionExporter.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
@@ -83,8 +82,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private deferredIssueRegistry: DeferredIssueRegistry;
   private timerRegistry: TimerRegistry;
   private capabilityInjector?: CapabilityInjector;
-  private sessionExporter?: SessionExporter;
-
   private db?: Database;
   private conversationStore?: ConversationStore;
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
@@ -160,7 +157,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       capabilityInjector: this.capabilityInjector,
       taskTemplateRegistry,
       taskDecomposer,
-      get sessionExporter() { return self.sessionExporter; },
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
     });
@@ -217,10 +213,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setProjectRegistry(registry: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
     this.projectRegistry = registry;
-  }
-
-  setSessionExporter(exporter: import('../coordination/SessionExporter.js').SessionExporter): void {
-    this.dispatcher.setSessionExporter(exporter);
   }
 
   spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
