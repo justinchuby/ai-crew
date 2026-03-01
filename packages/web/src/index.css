@@ -19,21 +19,21 @@
 
   /* Status colors (agent lifecycle & DAG tasks) */
   --st-creating: #b45309;
-  --st-running: #059669;
+  --st-running: #2563eb;
   --st-idle: #6b7280;
   --st-completed: #2563eb;
   --st-failed: #dc2626;
   --st-terminated: #ea580c;
   --st-pending: #6b7280;
   --st-ready: #10b981;
-  --st-done: #2563eb;
+  --st-done: #059669;
   --st-blocked: #d97706;
   --st-paused: #ca8a04;
   --st-skipped: #6b7280;
 
   /* Status fills (semitransparent, for timeline segments) */
   --st-creating-fill: rgba(180, 83, 9, 0.25);
-  --st-running-fill: rgba(5, 150, 105, 0.25);
+  --st-running-fill: rgba(37, 99, 235, 0.25);
   --st-idle-fill: rgba(107, 114, 128, 0.15);
   --st-completed-fill: rgba(37, 99, 235, 0.25);
   --st-failed-fill: rgba(220, 38, 38, 0.25);
@@ -87,21 +87,21 @@
 
   /* Status colors (agent lifecycle & DAG tasks) */
   --st-creating: #d29922;
-  --st-running: #3fb950;
+  --st-running: #58a6ff;
   --st-idle: #484f58;
   --st-completed: #58a6ff;
   --st-failed: #f85149;
   --st-terminated: #f0883e;
   --st-pending: #6b7280;
   --st-ready: #10b981;
-  --st-done: #3b82f6;
+  --st-done: #3fb950;
   --st-blocked: #f59e0b;
   --st-paused: #eab308;
   --st-skipped: #4b5563;
 
   /* Status fills (semitransparent, for timeline segments) */
   --st-creating-fill: rgba(210, 153, 34, 0.3);
-  --st-running-fill: rgba(63, 185, 80, 0.3);
+  --st-running-fill: rgba(88, 166, 255, 0.3);
   --st-idle-fill: rgba(72, 79, 88, 0.2);
   --st-completed-fill: rgba(88, 166, 255, 0.3);
   --st-failed-fill: rgba(248, 81, 73, 0.3);
