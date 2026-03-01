@@ -94,6 +94,7 @@ export function apiRouter(
   reportGenerator?: ReportGenerator,
   projectTemplateRegistry?: import('./coordination/ProjectTemplates.js').ProjectTemplateRegistry,
   knowledgeTransfer?: import('./coordination/KnowledgeTransfer.js').KnowledgeTransfer,
+  eventPipeline?: import('./coordination/EventPipeline.js').EventPipeline,
 ): Router {
   const router = Router();
 
@@ -353,17 +354,16 @@ export function apiRouter(
     res.json(activityLedger.getSummary());
   });
 
-  router.get('/coordination/timeline', (req, res) => {
-    const since = req.query.since as string | undefined;
-    const leadId = req.query.leadId as string | undefined;
+  // ── Helper: build timeline data from activity events ──────────────────────
+  function buildTimelineData(leadId?: string, since?: string) {
     let events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
 
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
     events = events.filter(e => e.id !== 0);
 
-    // Filter to a specific lead's team if leadId provided
+    // Resolve team membership for leadId filtering
+    const teamAgentIds = new Set<string>();
     if (leadId) {
-      const teamAgentIds = new Set<string>();
       teamAgentIds.add(leadId);
       for (const agent of agentManager.getAll()) {
         if (agent.parentId === leadId || agent.id === leadId) {
@@ -379,7 +379,6 @@ export function apiRouter(
     // Build agent status segments from status_change events
     const agentSegments = new Map<string, { status: string; startAt: string; taskLabel?: string }[]>();
     const agentMeta = new Map<string, { role: string; createdAt: string; endedAt?: string; model?: string }>();
-    // Track current task per agent from delegation events
     const agentCurrentTask = new Map<string, string>();
 
     for (const ev of events) {
@@ -392,7 +391,6 @@ export function apiRouter(
           model: liveAgent?.model || liveAgent?.role?.model,
         });
       }
-      // Track task assignments from delegation events
       if (ev.actionType === 'delegated' && ev.details?.childId) {
         agentCurrentTask.set(ev.details.childId, ev.summary.slice(0, 120));
       }
@@ -400,21 +398,19 @@ export function apiRouter(
         const segments = agentSegments.get(ev.agentId)!;
         const statusMatch = ev.summary.match(/^Status:\s*(.+)$/);
         const status = statusMatch ? statusMatch[1] : ev.summary;
-        // Close previous segment
         if (segments.length > 0) {
           const prev = segments[segments.length - 1] as { status: string; startAt: string; endAt?: string };
           prev.endAt = ev.timestamp;
         }
         const taskLabel = agentCurrentTask.get(ev.agentId);
         segments.push({ status, startAt: ev.timestamp, ...(taskLabel ? { taskLabel } : {}) });
-        // Track terminal states
         if (['completed', 'failed', 'terminated'].includes(status)) {
           agentMeta.get(ev.agentId)!.endedAt = ev.timestamp;
         }
       }
     }
 
-    // Build communication links from delegated, message_sent, and broadcast events
+    // Build communication links
     const communications: { type: string; fromAgentId: string; toAgentId: string | null; summary: string; timestamp: string; groupName?: string }[] = [];
     for (const ev of events) {
       if (ev.actionType === 'delegated' && ev.details?.childId) {
@@ -426,7 +422,6 @@ export function apiRouter(
           timestamp: ev.timestamp,
         });
       } else if (ev.actionType === 'message_sent' && ev.details?.toAgentId) {
-        // Classify: broadcast (toAgentId='all'), or direct message
         const isBroadcast = ev.details.toRole === 'broadcast' || ev.details.toAgentId === 'all';
         communications.push({
           type: isBroadcast ? 'broadcast' : 'message',
@@ -466,7 +461,6 @@ export function apiRouter(
         }
       }
     }
-    // Add still-open locks
     for (const open of openLocks.values()) {
       locks.push(open);
     }
@@ -474,7 +468,6 @@ export function apiRouter(
     // Build agents array
     const agents = [...agentSegments.entries()].map(([id, segs]) => {
       const meta = agentMeta.get(id)!;
-      // Close last open segment with endedAt or now
       const segments = segs.map((s, i) => ({
         status: s.status,
         startAt: s.startAt,
@@ -499,12 +492,115 @@ export function apiRouter(
       end: allTimestamps[allTimestamps.length - 1] ?? new Date().toISOString(),
     };
 
-    // Find project context from the lead agent (prefer leadId from query)
+    // Find project context
     const resolvedLeadId = leadId || agentManager.getAll().find(a => a.role.id === 'lead' && !a.parentId)?.id;
     const leadAgent = resolvedLeadId ? agentManager.get(resolvedLeadId) : undefined;
     const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
 
-    res.json({ agents, communications, locks, timeRange, project, ledgerVersion: activityLedger.version });
+    return { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+  }
+
+  router.get('/coordination/timeline', (req, res) => {
+    const since = req.query.since as string | undefined;
+    const leadId = req.query.leadId as string | undefined;
+    const result = buildTimelineData(leadId, since);
+    const { teamAgentIds: _ignored, ...payload } = result;
+    res.json(payload);
+  });
+
+  // ── SSE: real-time timeline stream ──────────────────────────────────────────
+  router.get('/coordination/timeline/stream', (req, res) => {
+    const leadId = req.query.leadId as string | undefined;
+    if (!leadId) {
+      return res.status(400).json({ error: 'leadId query parameter is required' });
+    }
+
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    let eventSequence = 0;
+
+    function generateEventId(): string {
+      return `${Date.now().toString(36)}-${(eventSequence++).toString(36)}`;
+    }
+
+    function writeSSE(eventType: string, data: any, id?: string): boolean {
+      if (res.writableEnded) return false;
+      const eventId = id ?? generateEventId();
+      try {
+        res.write(`id: ${eventId}\nevent: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    // Handle reconnection: if Last-Event-ID is present, send missed events first
+    const lastEventId = req.headers['last-event-id'] as string | undefined;
+    if (lastEventId) {
+      // Extract timestamp from ID format: "<base36-timestamp>-<sequence>"
+      const dashIndex = lastEventId.indexOf('-');
+      if (dashIndex > 0) {
+        const timestampBase36 = lastEventId.slice(0, dashIndex);
+        const reconnectTimestamp = new Date(parseInt(timestampBase36, 36)).toISOString();
+        const missedData = buildTimelineData(leadId, reconnectTimestamp);
+        const { teamAgentIds: _ignored, ...payload } = missedData;
+        writeSSE('reconnect', payload);
+      }
+    }
+
+    // Send initial full timeline snapshot
+    const initialData = buildTimelineData(leadId);
+    const { teamAgentIds, ...initialPayload } = initialData;
+    writeSSE('init', initialPayload);
+
+    // Stream incremental activity events
+    const onActivity = (entry: any) => {
+      // Filter synthetic id:0 events
+      if (entry.id === 0 && !entry.agentId) return;
+      // Only send events for this lead's team
+      if (teamAgentIds.size > 0 && !teamAgentIds.has(entry.agentId)) {
+        // Check if this is a new agent spawned under the lead
+        const agent = agentManager.get(entry.agentId);
+        if (!agent || (agent.parentId !== leadId && agent.id !== leadId)) return;
+        // New team member — add to tracked set
+        teamAgentIds.add(entry.agentId);
+      }
+      writeSSE('activity', { entry });
+    };
+
+    const onLockAcquired = (data: any) => {
+      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      writeSSE('lock', { type: 'acquired', ...data });
+    };
+
+    const onLockReleased = (data: any) => {
+      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      writeSSE('lock', { type: 'released', ...data });
+    };
+
+    activityLedger.on('activity', onActivity);
+    lockRegistry.on('lock:acquired', onLockAcquired);
+    lockRegistry.on('lock:released', onLockReleased);
+
+    // Keepalive every 30s to prevent proxy/load-balancer timeouts
+    const keepaliveTimer = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(': keepalive\n\n');
+      }
+    }, 30_000);
+
+    // Cleanup on client disconnect
+    req.on('close', () => {
+      activityLedger.off('activity', onActivity);
+      lockRegistry.off('lock:acquired', onLockAcquired);
+      lockRegistry.off('lock:released', onLockReleased);
+      clearInterval(keepaliveTimer);
+    });
   });
 
   // --- Project Lead ---

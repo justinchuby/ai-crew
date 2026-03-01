@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTimelineSSE } from './useTimelineSSE';
+import type { ConnectionHealth } from './useTimelineSSE';
+
+export type { ConnectionHealth };
 
 // --- Data interfaces ---
 
@@ -72,17 +76,17 @@ export function getLocksForAgent(locks: TimelineLock[], agentId: string): Timeli
   return locks.filter(l => l.agentId === agentId);
 }
 
-// --- Hook ---
+// --- Polling fallback hook ---
 
 const POLL_INTERVAL_MS = 5_000;
 
-export function useTimelineData(leadId: string | null) {
+function useTimelinePolling(leadId: string | null, enabled: boolean) {
   const [data, setData] = useState<TimelineData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTimeline = useCallback(async () => {
-    if (!leadId) return;
+    if (!leadId || !enabled) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/coordination/timeline?leadId=${leadId}`);
@@ -98,14 +102,33 @@ export function useTimelineData(leadId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [leadId]);
+  }, [leadId, enabled]);
 
-  // Initial fetch + polling
   useEffect(() => {
+    if (!enabled) return;
     fetchTimeline();
     const interval = setInterval(fetchTimeline, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchTimeline]);
+  }, [fetchTimeline, enabled]);
 
   return { data, loading, error, refetch: fetchTimeline };
+}
+
+// --- Main hook: SSE preferred, polling fallback ---
+
+export function useTimelineData(leadId: string | null) {
+  const sse = useTimelineSSE(leadId);
+  const polling = useTimelinePolling(leadId, sse.sseUnavailable);
+
+  const data = sse.sseUnavailable ? polling.data : sse.data;
+  const loading = sse.sseUnavailable ? polling.loading : sse.loading;
+  const error = sse.sseUnavailable ? polling.error : sse.error;
+
+  const connectionHealth: ConnectionHealth = sse.sseUnavailable
+    ? (polling.error ? 'degraded' : polling.data ? 'connected' : 'connecting')
+    : sse.connectionHealth;
+
+  const refetch = sse.sseUnavailable ? polling.refetch : async () => {};
+
+  return { data, loading, error, refetch, connectionHealth };
 }
