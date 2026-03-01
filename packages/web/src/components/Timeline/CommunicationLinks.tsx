@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import type { ScaleTime } from '@visx/vendor/d3-scale';
+import { formatTimestamp } from './formatTimestamp';
+import type { TimeRange } from './formatTimestamp';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ export interface CommunicationLinksProps {
   visibleTimeRange?: [Date, Date];
   /** Container element for portaling the tooltip outside SVG */
   tooltipContainer?: HTMLElement | null;
+  /** Full timeline range for adaptive date/time formatting */
+  fullRange?: TimeRange;
 }
 
 // ── Style config per comm type ───────────────────────────────────────────
@@ -132,6 +136,7 @@ export function CommunicationLinks({
   laneHeight,
   visibleTimeRange,
   tooltipContainer,
+  fullRange,
 }: CommunicationLinksProps) {
   // Fallback portal target for tooltip (must be outside SVG)
   const fallbackRef = useRef<HTMLDivElement | null>(null);
@@ -291,7 +296,9 @@ export function CommunicationLinks({
                 {getStyle(tooltipData.type).label}
               </span>
               <span className="text-th-text-muted text-[10px]">
-                {new Date(tooltipData.timestamp).toLocaleTimeString()}
+                {fullRange
+                  ? formatTimestamp(new Date(tooltipData.timestamp), fullRange)
+                  : new Date(tooltipData.timestamp).toLocaleTimeString()}
               </span>
             </div>
             <div className="text-[10px] text-th-text-muted">

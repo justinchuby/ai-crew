@@ -284,24 +284,35 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
   const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date }>(fullRange);
 
+  // Track liveMode synchronously via ref to avoid race conditions.
+  // When user zooms/pans, setLiveMode(false) updates the ref immediately,
+  // preventing the live-mode effect from overwriting the zoom before the
+  // parent re-renders with the new liveMode prop.
+  const liveModeRef = useRef(liveMode ?? true);
+  useEffect(() => { liveModeRef.current = liveMode ?? true; }, [liveMode]);
+
+  const setLiveMode = useCallback((live: boolean) => {
+    liveModeRef.current = live;
+    onLiveModeChange?.(live);
+  }, [onLiveModeChange]);
+
   // Live mode: keep visible range pinned to the latest data
   useEffect(() => {
-    if (liveMode) {
-      // Preserve current zoom span but shift to show latest activity
-      setVisibleRange(prev => {
-        const span = prev.end.getTime() - prev.start.getTime();
-        const newEnd = fullRange.end.getTime();
-        const newStart = Math.max(fullRange.start.getTime(), newEnd - span);
-        return { start: new Date(newStart), end: new Date(newEnd) };
-      });
-    }
+    if (!liveModeRef.current) return;
+    // Preserve current zoom span but shift to show latest activity
+    setVisibleRange(prev => {
+      const span = prev.end.getTime() - prev.start.getTime();
+      const newEnd = fullRange.end.getTime();
+      const newStart = Math.max(fullRange.start.getTime(), newEnd - span);
+      return { start: new Date(newStart), end: new Date(newEnd) };
+    });
     // When not live, preserve user's current zoom/pan — don't reset visibleRange
   }, [fullRange, liveMode]);
 
   // Zoom helpers that adjust visibleRange instead of a zoom scalar
   // anchorFraction: 0..1 position within visible range to zoom toward (0.5 = center)
   const zoomBy = useCallback((factor: number, anchorFraction = 0.5) => {
-    onLiveModeChange?.(false);
+    setLiveMode(false);
     setVisibleRange(prev => {
       const start = prev.start.getTime();
       const end = prev.end.getTime();
@@ -323,7 +334,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       newStart = Math.max(newStart, fullRange.start.getTime());
       return { start: new Date(newStart), end: new Date(newEnd) };
     });
-  }, [fullRange, onLiveModeChange]);
+  }, [fullRange, setLiveMode]);
 
   const fitToView = useCallback(() => { setVisibleRange(fullRange); }, [fullRange]);
 
@@ -442,14 +453,14 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     const target = e.target as Element;
     if (target.closest('.cursor-pointer')) return;
     e.preventDefault();
-    onLiveModeChange?.(false);
+    setLiveMode(false);
     dragRef.current = {
       startX: e.clientX,
       startRange: { start: visibleRange.start.getTime(), end: visibleRange.end.getTime() },
       movedBeyondThreshold: false,
     };
     setIsDragging(true);
-  }, [visibleRange, onLiveModeChange]);
+  }, [visibleRange, setLiveMode]);
 
   // Drag-to-pan: window-level mousemove/mouseup while dragging
   useEffect(() => {
