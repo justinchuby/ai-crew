@@ -1,0 +1,35 @@
+name: CI (Windows)
+
+on:
+  push:
+    branches: [main, 'team-work-*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        shell: bash
+
+      - name: Typecheck server
+        run: npx --workspace=packages/server tsc --noEmit
+        shell: bash
+
+      - name: Typecheck web
+        run: npx --workspace=packages/web tsc --noEmit
+        shell: bash
+
+      - name: Unit tests
+        run: npm test --workspace=packages/server
+        shell: bash
