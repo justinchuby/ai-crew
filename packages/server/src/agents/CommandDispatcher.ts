@@ -1,7 +1,7 @@
 /**
  * CommandDispatcher — Thin router for ACP commands.
  *
- * Scans agent text buffers for ⟦ COMMAND {...} ⟧ patterns and dispatches
+ * Scans agent text buffers for ⟦⟦ COMMAND {...} ⟧⟧ patterns and dispatches
  * to handler modules. All command logic lives in ./commands/*.ts.
  *
  * This file owns: buffer management, the dispatch loop, and public API
@@ -99,13 +99,13 @@ export class CommandDispatcher {
     let buf = this.textBuffers.get(agent.id) || '';
     if (!buf) return;
 
-    // Normalize legacy triple-bracket delimiters to Unicode brackets
-    buf = CommandDispatcher.normalizeBrackets(buf);
+    // Normalize legacy triple-bracket delimiters to doubled Unicode brackets
+    buf = buf.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
 
     let found = true;
     while (found) {
       found = false;
-      // Find the leftmost match across ALL patterns to prevent inner ⟦ from
+      // Find the leftmost match across ALL patterns to prevent inner ⟦⟦ from
       // being parsed before the outer command that contains them (issue #26).
       let best: { index: number; end: number; name: string; handler: (a: Agent, d: string) => void; text: string } | null = null;
       for (const { regex, name, handler } of this.patterns) {
@@ -117,7 +117,7 @@ export class CommandDispatcher {
         }
       }
       if (best) {
-        // Skip commands whose ⟦ is nested inside another ⟦ ⟧ block
+        // Skip commands whose ⟦⟦ is nested inside another ⟦⟦ ⟧⟧ block
         if (CommandDispatcher.isInsideCommandBlock(buf, best.index)) {
           logger.debug('agent', `Skipped nested command: ${best.name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
           buf = buf.slice(0, best.index) + buf.slice(best.end);
@@ -141,7 +141,7 @@ export class CommandDispatcher {
     }
 
     // Keep only last 500 chars that might contain an incomplete command
-    const lastOpen = buf.lastIndexOf('⟦');
+    const lastOpen = buf.lastIndexOf('⟦⟦');
     if (lastOpen >= 0) {
       buf = buf.slice(lastOpen);
     } else if (buf.length > 500) {
@@ -194,40 +194,11 @@ export class CommandDispatcher {
   // ── Static helpers ─────────────────────────────────────────────────
 
   /**
-   * Normalize all supported delimiter syntaxes to single Unicode brackets
-   * so downstream regex patterns only need to match one format.
-   *
-   * Supported input syntaxes (all produce single Unicode bracket output):
-   *   - Doubled Unicode brackets: two open-brackets ... two close-brackets (new preferred syntax)
-   *   - Single Unicode brackets: open-bracket ... close-bracket (current syntax)
-   *   - Legacy triple square brackets: `[[[` ... `]]]` (deprecated, backward compat)
-   *
-   * Backslash-escaped brackets produce inert placeholder characters that
-   * will not be matched by command regexes. The placeholders (U+FFFC) are
-   * visually neutral in output text.
-   */
-  static normalizeBrackets(text: string): string {
-    // 1. Replace backslash-escaped brackets with inert placeholders
-    //    so they are never matched as command delimiters
-    let result = text
-      .replace(/\\⟦/g, '\uFFFC')
-      .replace(/\\⟧/g, '\uFFFD');
-
-    // 2. Normalize doubled Unicode brackets to single
-    result = result.replace(/⟦⟦/g, '⟦').replace(/⟧⟧/g, '⟧');
-
-    // 3. Normalize legacy triple square brackets to single Unicode
-    result = result.replace(/\[\[\[/g, '⟦').replace(/\]\]\]/g, '⟧');
-
-    return result;
-  }
-
-  /**
-   * Check if a position in the buffer is nested inside a ⟦ ⟧ command block
+   * Check if a position in the buffer is nested inside a ⟦⟦ ⟧⟧ command block
    * OR inside a JSON string literal. This prevents:
-   * - Command injection via task text containing ⟦ delimiters (#26)
-   * - Parsing ⟦ inside JSON string values (e.g. task descriptions)
-   * - Parsing ⟦ inside quoted examples in agent output
+   * - Command injection via task text containing ⟦⟦ delimiters (#26)
+   * - Parsing ⟦⟦ inside JSON string values (e.g. task descriptions)
+   * - Parsing ⟦⟦ inside quoted examples in agent output
    */
   static isInsideCommandBlock(buf: string, pos: number): boolean {
     let depth = 0;
@@ -254,10 +225,13 @@ export class CommandDispatcher {
 
       if (inString) continue;
 
-      if (buf[i] === '⟦') {
+      // Doubled brackets are the command delimiters
+      if (buf[i] === '⟦' && buf[i + 1] === '⟦') {
         depth++;
-      } else if (buf[i] === '⟧') {
+        i++; // skip the second bracket
+      } else if (buf[i] === '⟧' && buf[i + 1] === '⟧') {
         depth = Math.max(0, depth - 1);
+        i++; // skip the second bracket
       }
     }
     return depth > 0 || inString;

@@ -1,298 +1,230 @@
 import { describe, it, expect } from 'vitest';
 import { CommandDispatcher } from '../agents/CommandDispatcher.js';
 
-const normalize = CommandDispatcher.normalizeBrackets;
+// ── Legacy bracket backward compatibility ─────────────────────────────
+// scanBuffer converts legacy `[[[`/`]]]` to doubled Unicode brackets (`⟦⟦`/`⟧⟧`)
+// before regex matching. This file tests that conversion and the doubled-bracket
+// command infrastructure (isInsideCommandBlock, buffer tail logic, etc.).
 
-// ── normalizeBrackets ─────────────────────────────────────────────────
-
-describe('normalizeBrackets', () => {
-  // ── Legacy triple square brackets ───────────────────────────────────
-
-  describe('legacy triple square brackets', () => {
-    it('converts [[[ to single Unicode open bracket', () => {
-      expect(normalize('[[[ COMMIT {"message": "fix"} ]]]')).toBe(
-        '⟦ COMMIT {"message": "fix"} ⟧',
-      );
-    });
-
-    it('converts multiple legacy commands in one buffer', () => {
-      const input = '[[[ LOCK_FILE {"filePath": "a.ts"} ]]]\ntext\n[[[ COMMIT {"message": "fix"} ]]]';
-      const result = normalize(input);
-      expect(result).toContain('⟦ LOCK_FILE');
-      expect(result).toContain('⟧\ntext\n⟦');
-      expect(result).toContain('COMMIT {"message": "fix"} ⟧');
-    });
-
-    it('does not affect double square brackets', () => {
-      expect(normalize('[[ not a command ]]')).toBe('[[ not a command ]]');
-    });
-
-    it('does not affect single square brackets', () => {
-      expect(normalize('[ not a command ]')).toBe('[ not a command ]');
-    });
+describe('Legacy triple-bracket to doubled-bracket conversion', () => {
+  it('converts [[[ to doubled Unicode open bracket', () => {
+    const input = '[[[ COMMIT {"message": "fix"} ]]]';
+    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    expect(result).toBe('⟦⟦ COMMIT {"message": "fix"} ⟧⟧');
   });
 
-  // ── Doubled Unicode brackets (new preferred syntax) ─────────────────
-
-  describe('doubled Unicode brackets', () => {
-    it('normalizes doubled open/close to single', () => {
-      expect(normalize('⟦⟦ COMMIT {"message": "fix"} ⟧⟧')).toBe(
-        '⟦ COMMIT {"message": "fix"} ⟧',
-      );
-    });
-
-    it('handles multiple doubled commands', () => {
-      const input = '⟦⟦ LOCK_FILE {"filePath": "a.ts"} ⟧⟧\ntext\n⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
-      const result = normalize(input);
-      expect(result).toBe('⟦ LOCK_FILE {"filePath": "a.ts"} ⟧\ntext\n⟦ COMMIT {"message": "fix"} ⟧');
-    });
-
-    it('handles no-payload commands with doubled brackets', () => {
-      expect(normalize('⟦⟦ QUERY_CREW ⟧⟧')).toBe('⟦ QUERY_CREW ⟧');
-    });
+  it('converts multiple legacy commands in one buffer', () => {
+    const input = '[[[ LOCK_FILE {"filePath": "a.ts"} ]]]\ntext\n[[[ COMMIT {"message": "fix"} ]]]';
+    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    expect(result).toContain('⟦⟦ LOCK_FILE');
+    expect(result).toContain('⟧⟧\ntext\n⟦⟦');
+    expect(result).toContain('COMMIT {"message": "fix"} ⟧⟧');
   });
 
-  // ── Single Unicode brackets (current syntax, pass-through) ──────────
-
-  describe('single Unicode brackets (pass-through)', () => {
-    it('leaves single Unicode brackets unchanged', () => {
-      expect(normalize('⟦ COMMIT {"message": "fix"} ⟧')).toBe(
-        '⟦ COMMIT {"message": "fix"} ⟧',
-      );
-    });
-
-    it('leaves no-payload commands unchanged', () => {
-      expect(normalize('⟦ QUERY_CREW ⟧')).toBe('⟦ QUERY_CREW ⟧');
-    });
+  it('does not affect double square brackets', () => {
+    const input = '[[ not a command ]]';
+    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    expect(result).toBe('[[ not a command ]]');
   });
 
-  // ── Backslash escaping ──────────────────────────────────────────────
-
-  describe('backslash escaping', () => {
-    it('replaces backslash-escaped open bracket with inert placeholder', () => {
-      const result = normalize('use \\⟦ COMMIT \\⟧ to commit');
-      // Should NOT contain the actual Unicode brackets (they were escaped)
-      expect(result).not.toContain('⟦');
-      expect(result).not.toContain('⟧');
-    });
-
-    it('escaped brackets do not form a command pattern', () => {
-      const result = normalize('\\⟦ COMMIT {"message": "fix"} \\⟧');
-      // The regex should not match because brackets were replaced with placeholders
-      const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
-      expect(result.match(COMMIT_REGEX)).toBeNull();
-    });
-
-    it('mixes escaped and real brackets correctly', () => {
-      const input = 'Use \\⟦ as example. ⟦ COMMIT {"message": "fix"} ⟧';
-      const result = normalize(input);
-      // Real command should still have its brackets
-      const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
-      expect(result.match(COMMIT_REGEX)).toBeTruthy();
-    });
-  });
-
-  // ── Mixed syntax ────────────────────────────────────────────────────
-
-  describe('mixed syntax in one buffer', () => {
-    it('normalizes all three syntaxes to single Unicode brackets', () => {
-      const input = [
-        '[[[ LOCK_FILE {"filePath": "a.ts"} ]]]',
-        '⟦⟦ AGENT_MESSAGE {"to": "abc", "content": "hi"} ⟧⟧',
-        '⟦ COMMIT {"message": "fix"} ⟧',
-      ].join('\n');
-
-      const result = normalize(input);
-      const lines = result.split('\n');
-
-      // All three should now use single Unicode brackets
-      expect(lines[0]).toBe('⟦ LOCK_FILE {"filePath": "a.ts"} ⟧');
-      expect(lines[1]).toBe('⟦ AGENT_MESSAGE {"to": "abc", "content": "hi"} ⟧');
-      expect(lines[2]).toBe('⟦ COMMIT {"message": "fix"} ⟧');
-    });
-  });
-
-  // ── Edge cases ──────────────────────────────────────────────────────
-
-  describe('edge cases', () => {
-    it('handles empty string', () => {
-      expect(normalize('')).toBe('');
-    });
-
-    it('handles text with no brackets', () => {
-      expect(normalize('just plain text')).toBe('just plain text');
-    });
-
-    it('handles adjacent doubled brackets (quadrupled)', () => {
-      // ⟦⟦⟦⟦ should become ⟦⟦ (two pairs each become one)
-      expect(normalize('⟦⟦⟦⟦')).toBe('⟦⟦');
-    });
-
-    it('handles tripled Unicode brackets', () => {
-      // ⟦⟦⟦ -> first pair becomes ⟦, leftover ⟦ stays = ⟦⟦
-      // But replace is global left-to-right: ⟦⟦ -> ⟦, then ⟦ stays = ⟦⟦
-      const result = normalize('⟦⟦⟦');
-      // JS replace(/⟦⟦/g, '⟦') on '⟦⟦⟦' matches at pos 0, replaces first pair → '⟦⟦'... 
-      // Actually: '⟦⟦⟦'.replace(/⟦⟦/g, '⟦') = '⟦⟦' because after replacing pos 0-1, 
-      // pos 2 is a lone ⟦, so result is ⟦ + ⟦ = '⟦⟦'
-      expect(result).toBe('⟦⟦');
-    });
+  it('does not affect single square brackets', () => {
+    const input = '[ not a command ]';
+    const result = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    expect(result).toBe('[ not a command ]');
   });
 });
 
-// ── Integration: regex matching after normalization ────────────────────
+// ── Doubled bracket regex matching ────────────────────────────────────
+// Command regexes match doubled Unicode brackets directly.
 
-describe('Command regex matching after normalization', () => {
-  const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
-  const QUERY_CREW_REGEX = /⟦\s*QUERY_CREW\s*⟧/s;
-  const AGENT_MSG_REGEX = /⟦\s*AGENT_MESSAGE\s*(\{.*?\})\s*⟧/s;
-  const BROADCAST_REGEX = /⟦\s*BROADCAST\s*(\{.*?\})\s*⟧/s;
-  const DELEGATE_REGEX = /⟦\s*DELEGATE\s*(\{.*?\})\s*⟧/s;
+describe('Doubled bracket regex matching', () => {
+  // These regexes mirror the pattern used in handler files (Phase 1)
+  const COMMIT_REGEX = /⟦⟦\s*COMMIT\s*(\{.*?\})\s*⟧⟧/s;
+  const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
+  const AGENT_MSG_REGEX = /⟦⟦\s*AGENT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
+  const BROADCAST_REGEX = /⟦⟦\s*BROADCAST\s*(\{.*?\})\s*⟧⟧/s;
+  const DELEGATE_REGEX = /⟦⟦\s*DELEGATE\s*(\{.*?\})\s*⟧⟧/s;
 
-  it('legacy triple brackets match COMMIT regex after normalization', () => {
-    const input = normalize('[[[ COMMIT {"message": "fix bug"} ]]]');
+  it('matches COMMIT with doubled brackets', () => {
+    const input = '⟦⟦ COMMIT {"message": "fix bug"} ⟧⟧';
     const match = input.match(COMMIT_REGEX);
     expect(match).toBeTruthy();
     expect(JSON.parse(match![1]).message).toBe('fix bug');
   });
 
-  it('doubled Unicode brackets match COMMIT regex after normalization', () => {
-    const input = normalize('⟦⟦ COMMIT {"message": "fix bug"} ⟧⟧');
-    const match = input.match(COMMIT_REGEX);
-    expect(match).toBeTruthy();
-    expect(JSON.parse(match![1]).message).toBe('fix bug');
+  it('matches QUERY_CREW with doubled brackets (no payload)', () => {
+    expect('⟦⟦ QUERY_CREW ⟧⟧'.match(QUERY_CREW_REGEX)).toBeTruthy();
   });
 
-  it('single Unicode brackets match COMMIT regex (pass-through)', () => {
-    const input = normalize('⟦ COMMIT {"message": "fix bug"} ⟧');
-    const match = input.match(COMMIT_REGEX);
-    expect(match).toBeTruthy();
-    expect(JSON.parse(match![1]).message).toBe('fix bug');
-  });
-
-  it('legacy QUERY_CREW matches after normalization', () => {
-    expect(normalize('[[[ QUERY_CREW ]]]').match(QUERY_CREW_REGEX)).toBeTruthy();
-  });
-
-  it('doubled QUERY_CREW matches after normalization', () => {
-    expect(normalize('⟦⟦ QUERY_CREW ⟧⟧').match(QUERY_CREW_REGEX)).toBeTruthy();
-  });
-
-  it('legacy AGENT_MESSAGE matches after normalization', () => {
-    const input = normalize('[[[ AGENT_MESSAGE {"to": "abc", "content": "hello"} ]]]');
+  it('matches AGENT_MESSAGE with doubled brackets', () => {
+    const input = '⟦⟦ AGENT_MESSAGE {"to": "abc", "content": "hello"} ⟧⟧';
     const match = input.match(AGENT_MSG_REGEX);
     expect(match).toBeTruthy();
     expect(JSON.parse(match![1]).content).toBe('hello');
   });
 
-  it('doubled BROADCAST matches after normalization', () => {
-    const input = normalize('⟦⟦ BROADCAST {"content": "team update"} ⟧⟧');
+  it('matches BROADCAST with doubled brackets', () => {
+    const input = '⟦⟦ BROADCAST {"content": "team update"} ⟧⟧';
     const match = input.match(BROADCAST_REGEX);
     expect(match).toBeTruthy();
     expect(JSON.parse(match![1]).content).toBe('team update');
   });
 
-  it('legacy DELEGATE matches after normalization', () => {
-    const input = normalize('[[[ DELEGATE {"to": "dev", "task": "Fix auth"} ]]]');
+  it('matches DELEGATE with doubled brackets', () => {
+    const input = '⟦⟦ DELEGATE {"to": "dev", "task": "Fix auth"} ⟧⟧';
     const match = input.match(DELEGATE_REGEX);
     expect(match).toBeTruthy();
     expect(JSON.parse(match![1]).to).toBe('dev');
   });
 
-  it('escaped brackets do NOT match any command regex', () => {
-    const input = normalize('\\⟦ COMMIT {"message": "fix"} \\⟧');
+  it('does NOT match single bracket delimiters', () => {
+    const input = '⟦ COMMIT {"message": "fix"} ⟧';
     expect(input.match(COMMIT_REGEX)).toBeNull();
   });
 
-  it('mixed: real command found alongside escaped brackets', () => {
-    const input = normalize(
-      'See \\⟦ COMMIT \\⟧ for examples.\n⟦⟦ BROADCAST {"content": "done"} ⟧⟧'
-    );
-    // Escaped should not match
-    expect(input.match(COMMIT_REGEX)).toBeNull();
-    // Real doubled command should match
-    expect(input.match(BROADCAST_REGEX)).toBeTruthy();
+  it('matches legacy triple-bracket after conversion to doubled Unicode', () => {
+    const legacy = '[[[ COMMIT {"message": "fix bug"} ]]]';
+    const converted = legacy.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    const match = converted.match(COMMIT_REGEX);
+    expect(match).toBeTruthy();
+    expect(JSON.parse(match![1]).message).toBe('fix bug');
+  });
+
+  it('matches multiline JSON payloads', () => {
+    const input = '⟦⟦ COMMIT {"message": "line1\\nline2"} ⟧⟧';
+    const match = input.match(COMMIT_REGEX);
+    expect(match).toBeTruthy();
+  });
+
+  it('matches with extra whitespace around command name', () => {
+    const input = '⟦⟦   COMMIT   {"message": "fix"}   ⟧⟧';
+    const match = input.match(COMMIT_REGEX);
+    expect(match).toBeTruthy();
   });
 });
 
-// ── Ordering safety: normalization prevents partial matching (#b735f62b) ──
+// ── isInsideCommandBlock with doubled brackets ────────────────────────
 
-describe('Doubled brackets cannot be partially consumed by single-bracket regex', () => {
-  const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
-  const LOCK_REGEX = /⟦\s*LOCK_FILE\s*(\{.*?\})\s*⟧/s;
-
-  it('doubled open bracket does not leave a stray single bracket after match', () => {
-    // Concern: if regex ran on raw '⟦⟦ COMMIT ... ⟧⟧', it might match the
-    // inner '⟦ COMMIT ... ⟧' and leave stray ⟦ and ⟧ in the buffer.
-    // normalizeBrackets prevents this by collapsing doubled to single first.
-    const raw = '⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
-    const normalized = normalize(raw);
-
-    // After normalization, exactly one ⟦ and one ⟧ remain
-    expect(normalized).toBe('⟦ COMMIT {"message": "fix"} ⟧');
-    expect((normalized.match(/⟦/g) || []).length).toBe(1);
-    expect((normalized.match(/⟧/g) || []).length).toBe(1);
-
-    // The regex matches cleanly
-    const match = normalized.match(COMMIT_REGEX);
-    expect(match).toBeTruthy();
-
-    // After consuming the match, no stray brackets remain
-    const remainder = normalized.replace(COMMIT_REGEX, '');
-    expect(remainder).not.toContain('⟦');
-    expect(remainder).not.toContain('⟧');
-  });
-
-  it('adjacent doubled commands do not interfere with each other', () => {
-    const raw = '⟦⟦ LOCK_FILE {"filePath": "a.ts"} ⟧⟧ text ⟦⟦ COMMIT {"message": "done"} ⟧⟧';
-    const normalized = normalize(raw);
-
-    // Both commands should be independently matchable
-    expect(normalized.match(LOCK_REGEX)).toBeTruthy();
-    expect(normalized.match(COMMIT_REGEX)).toBeTruthy();
-
-    // Exactly two of each bracket
-    expect((normalized.match(/⟦/g) || []).length).toBe(2);
-    expect((normalized.match(/⟧/g) || []).length).toBe(2);
-  });
-
-  it('mixed doubled and single commands in same buffer are all matchable', () => {
-    const raw = '⟦⟦ LOCK_FILE {"filePath": "a.ts"} ⟧⟧ then ⟦ COMMIT {"message": "done"} ⟧';
-    const normalized = normalize(raw);
-
-    expect(normalized.match(LOCK_REGEX)).toBeTruthy();
-    expect(normalized.match(COMMIT_REGEX)).toBeTruthy();
-  });
-
-  it('doubled brackets inside JSON strings do not leak', () => {
-    // If an agent puts doubled brackets inside a JSON value string,
-    // the normalization converts them but isInsideCommandBlock catches them
-    const raw = '⟦⟦ COMMIT {"message": "use ⟦⟦ LOCK ⟧⟧ syntax"} ⟧⟧';
-    const normalized = normalize(raw);
-
-    // The outer command should match
-    const match = normalized.match(COMMIT_REGEX);
-    expect(match).toBeTruthy();
-    // The JSON value contains normalized brackets but that's handled by isInsideCommandBlock
-  });
-});
-
-// ── isInsideCommandBlock works with normalized content ─────────────────
-
-describe('isInsideCommandBlock after normalization', () => {
+describe('isInsideCommandBlock with doubled brackets', () => {
   const check = CommandDispatcher.isInsideCommandBlock;
 
-  it('works with legacy brackets after normalization', () => {
-    const buf = normalize('[[[ OUTER [[[ INNER ]]] ]]]');
-    // After normalization: ⟦ OUTER ⟦ INNER ⟧ ⟧
-    const innerPos = buf.indexOf('⟦', 2);
-    expect(check(buf, innerPos)).toBe(true);
+  it('returns false for position before any command block', () => {
+    const buf = 'some text ⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
+    expect(check(buf, 0)).toBe(false);
+    expect(check(buf, 5)).toBe(false);
   });
 
-  it('works with doubled brackets after normalization', () => {
-    const buf = normalize('⟦⟦ OUTER ⟦⟦ INNER ⟧⟧ ⟧⟧');
-    // After normalization: ⟦ OUTER ⟦ INNER ⟧ ⟧
-    const innerPos = buf.indexOf('⟦', 2);
-    expect(check(buf, innerPos)).toBe(true);
+  it('returns true for position inside a doubled-bracket command', () => {
+    const buf = '⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
+    // Position after the opening doubled bracket
+    expect(check(buf, 3)).toBe(true);
+    expect(check(buf, 10)).toBe(true);
+  });
+
+  it('returns false for position after a closed command block', () => {
+    const buf = '⟦⟦ COMMIT {"message": "fix"} ⟧⟧ done';
+    const afterClose = buf.indexOf('done');
+    expect(check(buf, afterClose)).toBe(false);
+  });
+
+  it('detects nested doubled brackets', () => {
+    const buf = '⟦⟦ OUTER ⟦⟦ INNER ⟧⟧ ⟧⟧';
+    // Position of the inner ⟦⟦
+    const innerOpen = buf.indexOf('⟦⟦', 2);
+    expect(check(buf, innerOpen)).toBe(true);
+  });
+
+  it('handles nested depth correctly', () => {
+    const buf = '⟦⟦ A ⟦⟦ B ⟧⟧ still-in-A ⟧⟧';
+    const stillInA = buf.indexOf('still-in-A');
+    expect(check(buf, stillInA)).toBe(true);
+  });
+
+  it('treats single brackets as non-delimiters', () => {
+    // A single ⟦ should NOT change depth — only doubled brackets count
+    const buf = '⟦ single bracket ⟧';
+    expect(check(buf, 5)).toBe(false);
+  });
+
+  it('handles JSON string containing bracket chars', () => {
+    const buf = '⟦⟦ COMMIT {"message": "use ⟦⟦ and ⟧⟧ for commands"} ⟧⟧';
+    // The brackets inside the JSON string literal are inside quotes,
+    // so inString tracking prevents them from affecting depth
+    const msgStart = buf.indexOf('"use');
+    expect(check(buf, msgStart)).toBe(true);
+  });
+
+  it('handles empty string', () => {
+    expect(check('', 0)).toBe(false);
+  });
+
+  it('handles position at string boundary', () => {
+    const buf = '⟦⟦ CMD ⟧⟧';
+    expect(check(buf, buf.length)).toBe(false);
+  });
+});
+
+// ── Buffer tail logic for doubled brackets ────────────────────────────
+
+describe('Buffer tail logic', () => {
+  it('lastIndexOf finds doubled open bracket correctly', () => {
+    const buf = 'text ⟦⟦ partial command without close';
+    const lastOpen = buf.lastIndexOf('⟦⟦');
+    expect(lastOpen).toBeGreaterThan(0);
+    expect(buf.slice(lastOpen)).toBe('⟦⟦ partial command without close');
+  });
+
+  it('lastIndexOf does not match single bracket as doubled', () => {
+    const buf = 'text ⟦ single bracket only';
+    const lastOpen = buf.lastIndexOf('⟦⟦');
+    expect(lastOpen).toBe(-1);
+  });
+
+  it('finds the last doubled bracket in multi-command buffer', () => {
+    const buf = '⟦⟦ CMD1 ⟧⟧ text ⟦⟦ CMD2 incomplete';
+    const lastOpen = buf.lastIndexOf('⟦⟦');
+    expect(buf.slice(lastOpen)).toBe('⟦⟦ CMD2 incomplete');
+  });
+});
+
+// ── Edge cases ────────────────────────────────────────────────────────
+
+describe('Doubled bracket edge cases', () => {
+  const COMMIT_REGEX = /⟦⟦\s*COMMIT\s*(\{.*?\})\s*⟧⟧/s;
+
+  it('adjacent doubled commands do not interfere', () => {
+    const buf = '⟦⟦ COMMIT {"message": "a"} ⟧⟧⟦⟦ COMMIT {"message": "b"} ⟧⟧';
+    const matches = [...buf.matchAll(new RegExp(COMMIT_REGEX.source, 'gs'))];
+    expect(matches).toHaveLength(2);
+    expect(JSON.parse(matches[0][1]).message).toBe('a');
+    expect(JSON.parse(matches[1][1]).message).toBe('b');
+  });
+
+  it('quadrupled brackets (⟦⟦⟦⟦) — first two form open, next two form another open', () => {
+    const buf = '⟦⟦⟦⟦';
+    const lastOpen = buf.lastIndexOf('⟦⟦');
+    // Should find at index 2 (the second pair)
+    expect(lastOpen).toBe(2);
+  });
+
+  it('empty payload command with doubled brackets', () => {
+    const QUERY_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
+    expect('⟦⟦ QUERY_CREW ⟧⟧'.match(QUERY_REGEX)).toBeTruthy();
+  });
+
+  it('legacy [[[/]]] mixed with doubled Unicode brackets', () => {
+    const input = '[[[ COMMIT {"message": "old"} ]]]\n⟦⟦ COMMIT {"message": "new"} ⟧⟧';
+    // After legacy conversion
+    const converted = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    const matches = [...converted.matchAll(new RegExp(COMMIT_REGEX.source, 'gs'))];
+    expect(matches).toHaveLength(2);
+    expect(JSON.parse(matches[0][1]).message).toBe('old');
+    expect(JSON.parse(matches[1][1]).message).toBe('new');
+  });
+
+  it('text with no brackets passes through unchanged', () => {
+    const input = 'just plain text with no special chars';
+    const converted = input.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
+    expect(converted).toBe(input);
   });
 });
