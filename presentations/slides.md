@@ -143,32 +143,32 @@ origin story — because it's the best proof of concept I can give you."
 
 # Built by the thing it builds
 
-<div class="space-y-3 mt-2">
+<div class="space-y-2 mt-2">
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700">
 
 ### 🌱 Day 1: One human, one AI
-A single Copilot CLI agent got one prompt: *"Build a system where multiple AI agents can work together."* That one agent wrote the first prototype.
+A single Copilot CLI agent got one prompt: *"Build a system where multiple AI agents can work together."*
 
 </div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500">
 
 ### 🔄 Then it got recursive
-Use **version N** of AI Crew → to build **version N+1**. Each generation is built by the previous generation's team of agents. Each version is better at building the next one.
+Use **version N** of AI Crew → to build **version N+1**. Each generation is built by the previous generation's team.
 
 </div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### ⚡ This session — right now
-The agents you're about to meet? They're building the **next version** of the system they're running on. New features, bug fixes, even this presentation — all produced by the tool itself.
+The agents you're about to meet? They're building the **next version** of the system they're running on.
 
 </div>
 
 </div>
 
-<div class="text-center mt-3">
+<div class="text-center mt-2">
 <span class="text-yellow-400 font-bold">You're not watching a demo. You're watching a system evolving in real time.</span>
 </div>
 
@@ -259,18 +259,16 @@ interact with this system."]
 
 # How you interact with the system
 
-<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-2">
+<div class="bg-gray-800 rounded-lg p-2 border border-blue-500 mt-1 text-sm">
 
 You talk to the **lead agent** through a chat interface — just like chatting with Copilot. The lead reads your request, makes a plan, and delegates to specialists.
 
 </div>
 
-<div class="bg-gray-900 rounded-lg p-3 mt-3 text-xs font-mono">
-
 ```mermaid
 graph LR
-    You["🧑 You"] -->|"Chat message"| Lead["🎯 Lead Agent"]
-    Lead -->|"DELEGATE"| D1["👷 Developer"]
+    You["🧑 You"] -->|"Chat"| Lead["🎯 Lead"]
+    Lead -->|"DELEGATE"| D1["👷 Dev"]
     Lead -->|"DELEGATE"| D2["🔍 Reviewer"]
     Lead -->|"DELEGATE"| D3["🏗️ Architect"]
     D1 -->|"Results"| Lead
@@ -279,17 +277,15 @@ graph LR
     Lead -->|"Summary"| You
 ```
 
-</div>
-
-<div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+<div class="grid grid-cols-2 gap-2 mt-1 text-sm">
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
-**You can interrupt anytime** — send a priority message and the lead stops current work to handle your request
+**Interrupt anytime** — priority messages stop the lead's current work
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
 
-**Full visibility** — watch every agent work in real-time, read their conversations, pause the whole system if needed
+**Full visibility** — watch every agent in real-time, pause the system if needed
 
 </div>
 </div>
@@ -439,7 +435,7 @@ ACP is the key enabler. Without it, each agent would need custom
 integration. With ACP, we spawn a Copilot CLI process per agent
 (copilot-cli --acp --stdio --model claude-sonnet-4), and communicate via
 structured JSON over stdin/stdout. The agent gets the full Copilot CLI
-toolset — bash, file editing, grep, git, web search. 12 agents = 12
+toolset — bash, file editing, grep, git, web search. Each agent is a separate
 processes, each with their own terminal and context. ACP handles streaming,
 tool execution, permissions, and token tracking.
 -->
@@ -547,7 +543,6 @@ system enabling autonomous coordination.
 -->
 
 ---
-
 layout: center
 ---
 
@@ -562,34 +557,27 @@ Here's the incident that created it.
 
 # Story 2: The Commit Catastrophe
 
-<div class="bg-gray-800 rounded-lg p-4 border border-yellow-500 mt-2">
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500 mt-2 text-sm">
 
-All 7 developers are editing files in the same codebase, at the same time.
+Multiple developers editing the same codebase, at the same time. Developer A commits — but the commit includes Developer B's half-finished changes.
 
-Developer A finishes and commits. But the commit includes Developer B's half-finished changes.
+<div class="bg-gray-900 rounded p-2 mt-2">
 
-<div class="bg-gray-900 rounded p-3 mt-2 text-sm">
-
-🔀 <span class="text-yellow-400">"5 files were never committed. 1 commit included another agent's code. The git history is a mess."</span>
+🔀 <span class="text-yellow-400">"5 files never committed. 1 commit included another agent's code."</span>
 
 </div>
 
 </div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
+<div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-2 text-sm">
 
-### How the system responded
-
-1. **Code reviewer** caught the missing files immediately
-2. **Lead** broadcast a warning to all agents: *"Never use git add -A"*
-3. **Architect** audited the commit system and found 4 gaps
-4. **Developer** hardened the commit command — now only stages files you've locked
+**How the system responded:** Code reviewer caught it → Lead broadcast warning → Architect audited and found 4 gaps → Developer hardened the commit command to only stage locked files
 
 </div>
 
-<div class="bg-gray-800 rounded-lg p-2 border border-green-500 mt-2">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500 mt-2 text-sm">
 
-🔒 **The fix: file locking.** Multiple developers, 15+ files, zero conflicts. Each agent claims files before editing — no merge conflicts, no overwrites.
+🔒 **The fix: file locking.** Each agent claims files before editing — no merge conflicts, no overwrites.
 
 </div>
 
@@ -701,7 +689,6 @@ redirect their work immediately.
 -->
 
 ---
-
 layout: center
 ---
 
@@ -1040,7 +1027,6 @@ and progress at a glance.
 -->
 
 ---
-
 layout: center
 ---
 
@@ -1434,6 +1420,52 @@ great for post-mortems. The DAG visualization shows task progress as a
 live graph. The heatmap reveals communication patterns. Cost tracking
 shows token usage per agent. Everything updates in real-time. You can
 pause the entire system with one click if anything looks wrong.
+-->
+
+---
+
+# The timeline: your session history
+
+<div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-2">
+
+**Real-time visualization** of every agent's activity across time — a swim lane diagram that builds itself as agents work.
+
+</div>
+
+<div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+
+### What you see
+- Each agent gets a **horizontal swim lane**
+- Activity blocks show start/end of work periods
+- **Communication arcs** drawn between agents when they message each other
+- Color-coded: delegations, commits, reviews, messages
+
+</div>
+<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+
+### Why it matters
+- Spot **bottlenecks**: agents idle too long waiting for dependencies
+- See **parallel work**: multiple lanes active simultaneously
+- Trace the **delegation chain**: who asked whom to do what
+- **Post-mortem**: understand exactly how a session unfolded
+
+</div>
+</div>
+
+<div class="bg-gray-800 rounded-lg p-2 border border-gray-700 mt-2 text-sm">
+
+**Interactive**: zoom in on any time range, brush-select to filter, minimap for navigation, keyboard accessible. Updates live via SSE as agents work.
+
+</div>
+
+<!--
+The timeline is the most powerful diagnostic tool. It shows you the full
+history of agent activity as swim lanes. You can see parallel work happening,
+idle gaps where agents waited for dependencies, and communication patterns.
+The minimap gives you the big picture while you zoom into details. This is
+how you understand what actually happened in a session — not just the
+results, but the process.
 -->
 
 ---
