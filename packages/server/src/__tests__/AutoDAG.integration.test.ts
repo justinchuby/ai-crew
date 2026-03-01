@@ -51,6 +51,7 @@ function makeAgent(overrides: Partial<Record<string, any>> = {}): Agent {
     sendMessage: vi.fn(),
     getBufferedOutput: vi.fn().mockReturnValue(''),
     getRecentOutput: vi.fn().mockReturnValue('done'),
+    getTaskOutput: vi.fn().mockReturnValue('done'),
     toJSON: vi.fn(),
     ...overrides,
   } as unknown as Agent;

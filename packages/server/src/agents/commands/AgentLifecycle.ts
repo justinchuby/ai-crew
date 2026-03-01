@@ -239,7 +239,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     ctx.delegations.set(delegation.id, delegation);
 
     child.task = req.task;
-    child.taskOutputStartIndex = child.messages.length;
+    child.taskOutputStartIndex = child.messages?.length ?? 0;
 
     // Link to DAG: mark the corresponding DAG task as running
     let dagNote = '';

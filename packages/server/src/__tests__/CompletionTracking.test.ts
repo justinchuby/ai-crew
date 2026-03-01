@@ -23,6 +23,7 @@ function makeAgent(overrides: Record<string, any> = {}): Agent {
     dagTaskId: null,
     childIds: [],
     getRecentOutput: vi.fn().mockReturnValue('done'),
+    getTaskOutput: vi.fn().mockReturnValue('done'),
     sendMessage: vi.fn(),
     ...overrides,
   } as any;

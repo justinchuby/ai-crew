@@ -33,6 +33,7 @@ function makeChildAgent(parentId: string, overrides: Record<string, any> = {}) {
     sendMessage: vi.fn(),
     sessionId: undefined,
     getRecentOutput: vi.fn().mockReturnValue(''),
+    getTaskOutput: vi.fn().mockReturnValue(''),
     clearPendingMessages: vi.fn().mockReturnValue({ count: 0, previews: [] }),
     ...overrides,
   } as any;

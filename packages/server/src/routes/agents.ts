@@ -91,7 +91,7 @@ export function agentsRoutes(ctx: AppContext): Router {
   // Send a message to an agent: mode "queue" (default) waits for idle, "interrupt" cancels current work first
   router.post('/agents/:id/message', messageLimiter, validateBody(sendMessageSchema), async (req, res) => {
     const { text, mode = 'queue' } = req.body;
-    const agent = agentManager.get(req.params.id);
+    const agent = agentManager.get(req.params.id as string);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
     if (agent.role.id === 'lead') {

@@ -1072,6 +1072,7 @@ describe('CommandDispatcher', () => {
     it('auto-completes DAG task when agent exits with code 0', () => {
       const child = makeChildAgent(leadAgent.id, {
         getRecentOutput: vi.fn().mockReturnValue('done'),
+        getTaskOutput: vi.fn().mockReturnValue('done'),
       });
       (ctx.getAgent as any).mockImplementation((id: string) =>
         id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
@@ -1095,6 +1096,7 @@ describe('CommandDispatcher', () => {
     it('auto-fails DAG task when agent exits with non-zero code', () => {
       const child = makeChildAgent(leadAgent.id, {
         getRecentOutput: vi.fn().mockReturnValue('error'),
+        getTaskOutput: vi.fn().mockReturnValue('error'),
       });
       (ctx.getAgent as any).mockImplementation((id: string) =>
         id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
@@ -1113,6 +1115,7 @@ describe('CommandDispatcher', () => {
     it('skips DAG update when no matching DAG task exists', () => {
       const child = makeChildAgent(leadAgent.id, {
         getRecentOutput: vi.fn().mockReturnValue('done'),
+        getTaskOutput: vi.fn().mockReturnValue('done'),
       });
       (ctx.getAgent as any).mockImplementation((id: string) =>
         id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
@@ -1128,6 +1131,7 @@ describe('CommandDispatcher', () => {
     it('auto-completes DAG task via idle notification', () => {
       const child = makeChildAgent(leadAgent.id, {
         getRecentOutput: vi.fn().mockReturnValue('done'),
+        getTaskOutput: vi.fn().mockReturnValue('done'),
       });
       (ctx.getAgent as any).mockImplementation((id: string) =>
         id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
