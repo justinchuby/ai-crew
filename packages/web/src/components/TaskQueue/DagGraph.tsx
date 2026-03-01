@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,6 +13,7 @@ import {
   type Node,
   type Edge,
   type NodeProps,
+  type NodeMouseHandler,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -179,6 +180,202 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
 const nodeTypes = { dagTask: DagTaskNode };
 
 // ---------------------------------------------------------------------------
+// Tooltip status colors (top border accent)
+// ---------------------------------------------------------------------------
+const TOOLTIP_STATUS_COLORS: Record<DagTaskStatus, string> = {
+  pending: '#6b7280',
+  ready:   '#10b981',
+  running: '#22c55e',
+  done:    '#3b82f6',
+  failed:  '#ef4444',
+  blocked: '#f59e0b',
+  paused:  '#eab308',
+  skipped: '#4b5563',
+};
+
+function formatTooltipDuration(ms: number): string {
+  if (ms < 1000) return '<1s';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${secs}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+// ---------------------------------------------------------------------------
+// Tooltip types & component
+// ---------------------------------------------------------------------------
+interface TooltipState {
+  task: DagTask;
+  x: number;
+  y: number;
+}
+
+function DagNodeTooltip({
+  tooltip,
+  pinned,
+  taskMap,
+  allTasks,
+  containerHeight,
+  onClose,
+}: {
+  tooltip: TooltipState;
+  pinned: boolean;
+  taskMap: Map<string, DagTask>;
+  allTasks: DagTask[];
+  containerHeight: number;
+  onClose: () => void;
+}) {
+  const { task, x, y } = tooltip;
+  const statusColor = TOOLTIP_STATUS_COLORS[task.dagStatus];
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  const downstream = useMemo(
+    () => allTasks.filter((t) => t.dependsOn.includes(task.id)),
+    [allTasks, task.id],
+  );
+
+  const duration = useMemo(() => {
+    if (task.completedAt && task.createdAt) {
+      return formatTooltipDuration(
+        new Date(task.completedAt).getTime() - new Date(task.createdAt).getTime(),
+      );
+    }
+    if (task.dagStatus === 'running' && task.createdAt) {
+      return formatTooltipDuration(Date.now() - new Date(task.createdAt).getTime()) + ' (running)';
+    }
+    return null;
+  }, [task]);
+
+  const flipAbove = y + NODE_H + 8 + 200 > containerHeight;
+  const top = flipAbove ? y - 8 : y + NODE_H + 8;
+
+  return (
+    <div
+      ref={tooltipRef}
+      role="tooltip"
+      aria-label={`Details for task ${task.id}`}
+      data-testid="dag-tooltip"
+      style={{
+        position: 'absolute',
+        left: x + NODE_W / 2,
+        top,
+        transform: flipAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+        zIndex: 50,
+        minWidth: 240,
+        maxWidth: 360,
+        borderRadius: 8,
+        borderTop: `4px solid ${statusColor}`,
+        background: '#1f2937',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        color: '#e5e7eb',
+        fontSize: 12,
+        pointerEvents: pinned ? 'auto' : 'none',
+      }}
+    >
+      {/* Header */}
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {task.id}
+          </span>
+          <span
+            data-testid="dag-tooltip-status"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              padding: '1px 6px',
+              borderRadius: 9999,
+              background: statusColor + '33',
+              color: statusColor,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {task.dagStatus}
+          </span>
+        </div>
+        {pinned && (
+          <button
+            aria-label="Close tooltip"
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Agent section */}
+      <div style={{ padding: '6px 12px', borderBottom: '1px solid #374151' }}>
+        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Agent</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span>{task.role}</span>
+          {task.model && <span style={{ color: '#9ca3af' }}>· {task.model}</span>}
+          {task.assignedAgentId && (
+            <span style={{ color: '#60a5fa', fontSize: 11 }}>🤖 {truncate(task.assignedAgentId, 14)}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Dependencies section */}
+      {(task.dependsOn.length > 0 || downstream.length > 0) && (
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid #374151' }}>
+          <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Dependencies</div>
+          {task.dependsOn.length > 0 && (
+            <div style={{ marginBottom: 2 }}>
+              <span style={{ color: '#9ca3af', fontSize: 10 }}>↑ Upstream: </span>
+              {task.dependsOn.map((depId) => {
+                const dep = taskMap.get(depId);
+                return (
+                  <span key={depId} style={{ marginRight: 6, fontSize: 11 }}>
+                    {dep ? truncate(dep.description || dep.id, 24) : depId}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {downstream.length > 0 && (
+            <div>
+              <span style={{ color: '#9ca3af', fontSize: 10 }}>↓ Downstream: </span>
+              {downstream.map((d) => (
+                <span key={d.id} style={{ marginRight: 6, fontSize: 11 }}>
+                  {truncate(d.description || d.id, 24)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Detail section */}
+      <div style={{ padding: '6px 12px', maxHeight: 160, overflowY: 'auto' }}>
+        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Detail</div>
+        {task.description && (
+          <div style={{ marginBottom: 4, lineHeight: 1.4 }}>{task.description}</div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 11, color: '#9ca3af' }}>
+          {task.priority > 0 && <span>Priority: {task.priority}</span>}
+          {duration && <span>Duration: {duration}</span>}
+          {task.createdAt && <span>Created: {new Date(task.createdAt).toLocaleTimeString()}</span>}
+          {task.completedAt && <span>Completed: {new Date(task.completedAt).toLocaleTimeString()}</span>}
+        </div>
+        {task.files.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <span style={{ color: '#9ca3af', fontSize: 10 }}>Files: </span>
+            <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#93c5fd' }}>
+              {task.files.map((f) => truncate(f, 30)).join(', ')}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Layout: layered topological sort → React Flow nodes & edges
 // ---------------------------------------------------------------------------
 function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: Edge[] } {
@@ -330,8 +527,8 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
 // ---------------------------------------------------------------------------
 // Inner component (needs ReactFlowProvider above it to use useReactFlow)
 // ---------------------------------------------------------------------------
-function DagGraphInner({ dagStatus }: { dagStatus: DagStatus }) {
-  const { fitView } = useReactFlow();
+function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; containerRef: React.RefObject<HTMLDivElement | null> }) {
+  const { fitView, flowToScreenPosition } = useReactFlow();
   const prevTaskKeyRef = useRef('');
 
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -342,56 +539,159 @@ function DagGraphInner({ dagStatus }: { dagStatus: DagStatus }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync when data changes — update nodes/edges and fit view
+  // Task lookup map for dependency resolution
+  const taskMap = useMemo(() => {
+    const m = new Map<string, DagTask>();
+    for (const t of dagStatus.tasks) m.set(t.id, t);
+    return m;
+  }, [dagStatus.tasks]);
+
+  // ── Tooltip state ──────────────────────────────────────────────────
+  const [hoverTooltip, setHoverTooltip] = useState<TooltipState | null>(null);
+  const [pinnedTooltip, setPinnedTooltip] = useState<TooltipState | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
+
+  const getTooltipPosition = useCallback(
+    (node: Node<DagTaskNodeData>) => {
+      const screenPos = flowToScreenPosition({ x: node.position.x, y: node.position.y });
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      return {
+        x: screenPos.x - (containerRect?.left ?? 0),
+        y: screenPos.y - (containerRect?.top ?? 0),
+      };
+    },
+    [flowToScreenPosition, containerRef],
+  );
+
+  const onNodeMouseEnter: NodeMouseHandler<Node<DagTaskNodeData>> = useCallback(
+    (_event, node) => {
+      if (pinnedTooltip) return;
+      clearHoverTimer();
+      hoverTimerRef.current = setTimeout(() => {
+        const pos = getTooltipPosition(node);
+        setHoverTooltip({ task: node.data.task, x: pos.x, y: pos.y });
+      }, 200);
+    },
+    [pinnedTooltip, clearHoverTimer, getTooltipPosition],
+  );
+
+  const onNodeMouseLeave: NodeMouseHandler<Node<DagTaskNodeData>> = useCallback(() => {
+    clearHoverTimer();
+    setHoverTooltip(null);
+  }, [clearHoverTimer]);
+
+  const onNodeClick: NodeMouseHandler<Node<DagTaskNodeData>> = useCallback(
+    (_event, node) => {
+      const pos = getTooltipPosition(node);
+      setPinnedTooltip((prev) =>
+        prev && prev.task.id === node.data.task.id ? null : { task: node.data.task, x: pos.x, y: pos.y },
+      );
+      setHoverTooltip(null);
+      clearHoverTimer();
+    },
+    [getTooltipPosition, clearHoverTimer],
+  );
+
+  // Escape to unpin
   useEffect(() => {
-    const taskKey = dagStatus.tasks.map((t) => `${t.id}:${t.dagStatus}`).join('|');
+    if (!pinnedTooltip) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPinnedTooltip(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [pinnedTooltip]);
+
+  // Dismiss hover tooltip on zoom/pan
+  const onMoveStart = useCallback(() => {
+    setHoverTooltip(null);
+    clearHoverTimer();
+  }, [clearHoverTimer]);
+
+  // Sync when data changes
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
 
-    // Fit view on structural changes (new/removed tasks), not just status updates
     const structKey = dagStatus.tasks.map((t) => t.id).sort().join(',');
     const prevStructKey = prevTaskKeyRef.current;
     prevTaskKeyRef.current = structKey;
     if (prevStructKey !== structKey || prevStructKey === '') {
-      // Allow React Flow to process the new nodes before fitting
       requestAnimationFrame(() => {
         fitView({ padding: 0.15, duration: 200 });
       });
     }
   }, [initialNodes, initialEdges, dagStatus.tasks, setNodes, setEdges, fitView]);
 
+  // Update pinned tooltip data when tasks change
+  useEffect(() => {
+    if (!pinnedTooltip) return;
+    const updated = taskMap.get(pinnedTooltip.task.id);
+    if (updated) {
+      setPinnedTooltip((prev) => prev ? { ...prev, task: updated } : null);
+    } else {
+      setPinnedTooltip(null);
+    }
+  }, [dagStatus.tasks, taskMap]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeTooltip = pinnedTooltip ?? hoverTooltip;
+  const containerHeight = containerRef.current?.clientHeight ?? 500;
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      nodeTypes={nodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.15 }}
-      minZoom={0.2}
-      maxZoom={3}
-      proOptions={{ hideAttribution: true }}
-      style={{ background: 'transparent' }}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-    >
-      <Background color="#374151" gap={20} size={1} />
-      <Controls
-        showInteractive={false}
-        style={{ background: '#1f2937', borderColor: '#374151' }}
-      />
-      <MiniMap
-        nodeColor={(node) => {
-          const task = (node.data as DagTaskNodeData).task;
-          return STATUS_STYLES[task.dagStatus].border;
-        }}
-        maskColor="rgba(0, 0, 0, 0.7)"
-        style={{ background: '#111827', borderColor: '#374151' }}
-        position="bottom-right"
-      />
-    </ReactFlow>
+    <>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
+        onNodeClick={onNodeClick}
+        onMoveStart={onMoveStart}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.2}
+        maxZoom={3}
+        proOptions={{ hideAttribution: true }}
+        style={{ background: 'transparent' }}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+      >
+        <Background color="#374151" gap={20} size={1} />
+        <Controls
+          showInteractive={false}
+          style={{ background: '#1f2937', borderColor: '#374151' }}
+        />
+        <MiniMap
+          nodeColor={(node) => {
+            const task = (node.data as DagTaskNodeData).task;
+            return STATUS_STYLES[task.dagStatus].border;
+          }}
+          maskColor="rgba(0, 0, 0, 0.7)"
+          style={{ background: '#111827', borderColor: '#374151' }}
+          position="bottom-right"
+        />
+      </ReactFlow>
+      {activeTooltip && (
+        <DagNodeTooltip
+          tooltip={activeTooltip}
+          pinned={!!pinnedTooltip}
+          taskMap={taskMap}
+          allTasks={dagStatus.tasks}
+          containerHeight={containerHeight}
+          onClose={() => setPinnedTooltip(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -431,6 +731,8 @@ interface DagGraphProps {
 }
 
 export function DagGraph({ dagStatus }: DagGraphProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   if (!dagStatus || dagStatus.tasks.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-th-text-muted text-sm">
@@ -441,12 +743,13 @@ export function DagGraph({ dagStatus }: DagGraphProps) {
 
   return (
     <div
+      ref={containerRef}
       className="dag-flow-container relative w-full overflow-hidden bg-th-bg/50 rounded-lg"
       style={{ height: 500 }}
     >
       <style>{darkStyles}</style>
       <ReactFlowProvider>
-        <DagGraphInner dagStatus={dagStatus} />
+        <DagGraphInner dagStatus={dagStatus} containerRef={containerRef} />
       </ReactFlowProvider>
     </div>
   );
