@@ -242,7 +242,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     // Set MCP server URL so the agent's Copilot CLI connects to crew tools
-    agent.mcpServerUrl = `http://${this.config.host}:${this.config.port}/mcp/${agent.id}/sse`;
+    agent.mcpServerUrl = `http://${this.config.host}:${this.config.port}/mcp/${agent.id}`;
 
     // Track parent-child relationship (deduplicate for restart with same ID)
     if (parentId) {

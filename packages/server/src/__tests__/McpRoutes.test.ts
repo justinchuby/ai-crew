@@ -134,99 +134,42 @@ function makeHandlerContext(overrides: Partial<CommandHandlerContext> = {}): Com
 
 // ── HTTP helper ──────────────────────────────────────────────────────
 
-function request(
+function httpRequest(
   app: Express,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
-  body?: unknown,
+  options?: { body?: unknown; headers?: Record<string, string> },
 ): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
   return new Promise((resolve, reject) => {
-    // Start a temporary server
     const server = app.listen(0, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
-      const options: http.RequestOptions = {
-        hostname: '127.0.0.1',
-        port: addr.port,
-        path,
-        method,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      const reqHeaders: Record<string, string> = {
+        ...(options?.body ? { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' } : {}),
+        ...(options?.headers ?? {}),
       };
 
-      const req = http.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
-          server.close();
-          resolve({ status: res.statusCode!, headers: res.headers, body: data });
-        });
-      });
-      req.on('error', (err) => {
-        server.close();
-        reject(err);
-      });
-      if (body) req.write(JSON.stringify(body));
-      req.end();
-    });
-  });
-}
-
-/**
- * Open an SSE connection, collect the first event, and close.
- * Returns the event data and the response headers.
- */
-function openSse(
-  app: Express,
-  path: string,
-  { timeoutMs = 2000 }: { timeoutMs?: number } = {},
-): Promise<{ status: number; events: string[]; headers: http.IncomingHttpHeaders }> {
-  return new Promise((resolve, reject) => {
-    const server = app.listen(0, '127.0.0.1', () => {
-      const addr = server.address() as { port: number };
-      const options: http.RequestOptions = {
-        hostname: '127.0.0.1',
-        port: addr.port,
-        path,
-        method: 'GET',
-        headers: { Accept: 'text/event-stream' },
-      };
-
-      const events: string[] = [];
-      const req = http.request(options, (res) => {
-        let buffer = '';
-        res.on('data', (chunk) => {
-          buffer += chunk.toString();
-          // Parse SSE events from the buffer
-          const parts = buffer.split('\n\n');
-          for (let i = 0; i < parts.length - 1; i++) {
-            events.push(parts[i]);
-          }
-          buffer = parts[parts.length - 1];
-        });
-        // Resolve after first event or on timeout
-        const timer = setTimeout(() => {
-          req.destroy();
-          server.close();
-          resolve({ status: res.statusCode!, events, headers: res.headers });
-        }, timeoutMs);
-
-        // If we get at least one event, resolve quickly
-        const checkInterval = setInterval(() => {
-          if (events.length > 0) {
-            clearTimeout(timer);
-            clearInterval(checkInterval);
-            req.destroy();
+      const req = http.request(
+        {
+          hostname: '127.0.0.1',
+          port: addr.port,
+          path,
+          method,
+          headers: reqHeaders,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
             server.close();
-            resolve({ status: res.statusCode!, events, headers: res.headers });
-          }
-        }, 50);
-      });
-
+            resolve({ status: res.statusCode!, headers: res.headers, body: data });
+          });
+        },
+      );
       req.on('error', (err) => {
-        // ECONNRESET is expected when we destroy the request
-        if ((err as any).code === 'ECONNRESET') return;
         server.close();
         reject(err);
       });
+      if (options?.body) req.write(JSON.stringify(options.body));
       req.end();
     });
   });
@@ -234,7 +177,7 @@ function openSse(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('createMcpRoutes', () => {
+describe('createMcpRoutes (Streamable HTTP)', () => {
   let app: Express;
   let ctx: CommandHandlerContext;
   let agent: Agent;
@@ -252,107 +195,111 @@ describe('createMcpRoutes', () => {
     app.use(routes);
   });
 
-  describe('GET /mcp/:agentId/sse', () => {
+  describe('POST /mcp/:agentId (initialization)', () => {
     it('returns 404 for unknown agent', async () => {
-      const res = await request(app, 'GET', '/mcp/nonexistent-agent-id/sse');
+      const res = await httpRequest(app, 'POST', '/mcp/nonexistent-agent-id', {
+        body: {
+          jsonrpc: '2.0',
+          method: 'initialize',
+          id: 1,
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '1.0.0' },
+          },
+        },
+      });
       expect(res.status).toBe(404);
       expect(JSON.parse(res.body).error).toContain('Agent not found');
     });
 
-    it('establishes SSE connection for a valid agent', async () => {
-      const res = await openSse(app, `/mcp/${agent.id}/sse`);
+    it('creates a session for a valid agent and returns mcp-session-id', async () => {
+      const res = await httpRequest(app, 'POST', `/mcp/${agent.id}`, {
+        body: {
+          jsonrpc: '2.0',
+          method: 'initialize',
+          id: 1,
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '1.0.0' },
+          },
+        },
+      });
       expect(res.status).toBe(200);
-      expect(res.headers['content-type']).toBe('text/event-stream');
-      expect(res.headers['cache-control']).toContain('no-cache');
+      expect(res.headers['mcp-session-id']).toBeDefined();
+      expect(typeof res.headers['mcp-session-id']).toBe('string');
 
-      // Should receive the endpoint event with sessionId
-      expect(res.events.length).toBeGreaterThanOrEqual(1);
-      const endpointEvent = res.events[0];
-      expect(endpointEvent).toContain('event: endpoint');
-      expect(endpointEvent).toContain(`/mcp/${agent.id}/message`);
-      expect(endpointEvent).toContain('sessionId=');
+      // Streamable HTTP returns SSE stream for init; parse the JSON-RPC result from events
+      const dataMatch = res.body.match(/^data: (.+)$/m);
+      expect(dataMatch).toBeTruthy();
+      const parsed = JSON.parse(dataMatch![1]);
+      expect(parsed.jsonrpc).toBe('2.0');
+      expect(parsed.id).toBe(1);
+      expect(parsed.result).toBeDefined();
+      expect(parsed.result.serverInfo).toBeDefined();
+      expect(parsed.result.serverInfo.name).toBe('ai-crew');
     });
   });
 
-  describe('POST /mcp/:agentId/message', () => {
-    it('returns 400 when sessionId is missing', async () => {
-      const res = await request(app, 'POST', `/mcp/${agent.id}/message`, { jsonrpc: '2.0' });
+  describe('GET /mcp/:agentId (SSE stream)', () => {
+    it('returns 400 without mcp-session-id header', async () => {
+      const res = await httpRequest(app, 'GET', `/mcp/${agent.id}`);
       expect(res.status).toBe(400);
-      expect(JSON.parse(res.body).error).toContain('Missing sessionId');
+      expect(JSON.parse(res.body).error).toContain('Missing or invalid mcp-session-id');
     });
 
-    it('returns 404 for unknown sessionId', async () => {
-      const res = await request(
-        app,
-        'POST',
-        `/mcp/${agent.id}/message?sessionId=nonexistent`,
-        { jsonrpc: '2.0', method: 'ping', id: 1 },
-      );
-      expect(res.status).toBe(404);
-      expect(JSON.parse(res.body).error).toContain('No active MCP session');
+    it('returns error for unknown session ID', async () => {
+      const res = await httpRequest(app, 'GET', `/mcp/${agent.id}`, {
+        headers: { 'mcp-session-id': 'nonexistent-session-id' },
+      });
+      expect(res.status).toBe(400);
     });
   });
 
-  describe('SSE + POST integration', () => {
-    it('accepts POST messages on the endpoint from the SSE event', async () => {
-      // This test verifies the full SSE → extract endpoint → POST flow.
-      // We start an SSE connection, extract the endpoint URL, then POST to it.
+  describe('DELETE /mcp/:agentId', () => {
+    it('returns 404 for unknown session', async () => {
+      const res = await httpRequest(app, 'DELETE', `/mcp/${agent.id}`, {
+        headers: { 'mcp-session-id': 'nonexistent-session-id' },
+      });
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body).error).toContain('Session not found');
+    });
+  });
 
+  describe('POST + subsequent POST (session reuse)', () => {
+    it('routes subsequent requests to the same session', async () => {
       const server = await new Promise<http.Server>((resolve) => {
         const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
       });
       const addr = server.address() as { port: number };
+      const mcpHeaders = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' };
 
       try {
-        // Step 1: Open SSE and get the endpoint URL
-        const sseEndpoint = await new Promise<string>((resolve, reject) => {
+        // Step 1: Initialize and get session ID
+        const initResult = await new Promise<{ status: number; sessionId: string; body: string }>((resolve, reject) => {
           const req = http.request(
             {
               hostname: '127.0.0.1',
               port: addr.port,
-              path: `/mcp/${agent.id}/sse`,
-              method: 'GET',
-              headers: { Accept: 'text/event-stream' },
-            },
-            (res) => {
-              let buffer = '';
-              res.on('data', (chunk) => {
-                buffer += chunk.toString();
-                // Look for "event: endpoint\ndata: <url>"
-                const match = buffer.match(/event: endpoint\ndata: (.+)/);
-                if (match) {
-                  resolve(match[1].trim());
-                }
-              });
-              setTimeout(() => reject(new Error('SSE timeout')), 3000);
-            },
-          );
-          req.on('error', reject);
-          req.end();
-        });
-
-        expect(sseEndpoint).toContain(`/mcp/${agent.id}/message`);
-        expect(sseEndpoint).toContain('sessionId=');
-
-        // Step 2: POST a JSON-RPC message to the extracted endpoint
-        const postResult = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-          const postReq = http.request(
-            {
-              hostname: '127.0.0.1',
-              port: addr.port,
-              path: sseEndpoint,
+              path: `/mcp/${agent.id}`,
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: mcpHeaders,
             },
             (res) => {
               let data = '';
               res.on('data', (chunk) => (data += chunk));
-              res.on('end', () => resolve({ status: res.statusCode!, body: data }));
+              res.on('end', () => {
+                resolve({
+                  status: res.statusCode!,
+                  sessionId: res.headers['mcp-session-id'] as string,
+                  body: data,
+                });
+              });
             },
           );
-          postReq.on('error', reject);
-          // Send a valid JSON-RPC initialize request
-          postReq.write(JSON.stringify({
+          req.on('error', reject);
+          req.write(JSON.stringify({
             jsonrpc: '2.0',
             method: 'initialize',
             id: 1,
@@ -362,11 +309,83 @@ describe('createMcpRoutes', () => {
               clientInfo: { name: 'test', version: '1.0.0' },
             },
           }));
-          postReq.end();
+          req.end();
         });
 
-        // SSE transport responds with 202 Accepted for valid messages
-        expect(postResult.status).toBe(202);
+        expect(initResult.status).toBe(200);
+        expect(initResult.sessionId).toBeDefined();
+
+        // Step 2: Send initialized notification (required by MCP spec before tool calls)
+        const notifyResult = await new Promise<{ status: number }>((resolve, reject) => {
+          const req = http.request(
+            {
+              hostname: '127.0.0.1',
+              port: addr.port,
+              path: `/mcp/${agent.id}`,
+              method: 'POST',
+              headers: {
+                ...mcpHeaders,
+                'mcp-session-id': initResult.sessionId,
+              },
+            },
+            (res) => {
+              let data = '';
+              res.on('data', (chunk) => (data += chunk));
+              res.on('end', () => resolve({ status: res.statusCode! }));
+            },
+          );
+          req.on('error', reject);
+          req.write(JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'notifications/initialized',
+          }));
+          req.end();
+        });
+
+        // Notifications return 202 Accepted (no response body)
+        expect(notifyResult.status).toBe(202);
+
+        // Step 3: List tools using the same session
+        const toolsResult = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+          const req = http.request(
+            {
+              hostname: '127.0.0.1',
+              port: addr.port,
+              path: `/mcp/${agent.id}`,
+              method: 'POST',
+              headers: {
+                ...mcpHeaders,
+                'mcp-session-id': initResult.sessionId,
+              },
+            },
+            (res) => {
+              let data = '';
+              res.on('data', (chunk) => (data += chunk));
+              res.on('end', () => resolve({ status: res.statusCode!, body: data }));
+            },
+          );
+          req.on('error', reject);
+          req.write(JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'tools/list',
+            id: 2,
+          }));
+          req.end();
+        });
+
+        expect(toolsResult.status).toBe(200);
+        // Streamable HTTP returns SSE stream; parse data: line for the JSON-RPC response
+        const toolsDataMatch = toolsResult.body.match(/^data: (.+)$/m);
+        expect(toolsDataMatch).toBeTruthy();
+        const toolsList = JSON.parse(toolsDataMatch![1]);
+        expect(toolsList.result).toBeDefined();
+        expect(toolsList.result.tools).toBeDefined();
+        expect(toolsList.result.tools.length).toBeGreaterThanOrEqual(40);
+        // Verify crew tools are present
+        const toolNames = toolsList.result.tools.map((t: any) => t.name);
+        expect(toolNames).toContain('crew_create_agent');
+        expect(toolNames).toContain('crew_delegate');
+        expect(toolNames).toContain('crew_lock_file');
       } finally {
         server.close();
       }

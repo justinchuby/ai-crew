@@ -8,7 +8,7 @@ export interface AcpConnectionOptions {
   cliArgs?: string[];
   cwd?: string;
   /** MCP servers to connect the Copilot CLI session to */
-  mcpServers?: Array<{ type: 'sse'; name: string; url: string; headers?: Array<{ name: string; value: string }> }>;
+  mcpServers?: Array<{ type: 'sse' | 'http'; name: string; url: string; headers?: Array<{ name: string; value: string }> }>;
 }
 
 export interface ToolCallInfo {

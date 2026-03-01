@@ -155,7 +155,7 @@ export class Agent {
 
     // Build MCP server config if a URL was provided by AgentManager
     const mcpServers = this.mcpServerUrl
-      ? [{ type: 'sse' as const, name: 'ai-crew', url: this.mcpServerUrl, headers: [] }]
+      ? [{ type: 'http' as const, name: 'ai-crew', url: this.mcpServerUrl, headers: [] }]
       : undefined;
 
     this.acpConnection.start({
