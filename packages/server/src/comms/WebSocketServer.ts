@@ -227,6 +227,9 @@ export class WebSocketServer {
     chatGroupRegistry.on('group:member_removed', (data: any) => {
       this.broadcastAll({ type: 'group:member_removed', ...data });
     });
+    chatGroupRegistry.on('group:reaction', (data: any) => {
+      this.broadcastAll({ type: 'group:reaction', ...data });
+    });
   }
 
   private handleMessage(

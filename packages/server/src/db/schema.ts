@@ -136,6 +136,7 @@ export const chatGroupMessages = sqliteTable('chat_group_messages', {
   fromAgentId: text('from_agent_id').notNull(),
   fromRole: text('from_role').notNull(),
   content: text('content').notNull(),
+  reactions: text('reactions').default('{}'),
   timestamp: text('timestamp').default(sql`(datetime('now'))`),
 }, (table) => [
   index('idx_group_messages_group').on(table.groupName, table.leadId),

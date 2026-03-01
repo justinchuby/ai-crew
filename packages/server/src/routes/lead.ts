@@ -203,6 +203,21 @@ export function leadRoutes(ctx: AppContext): Router {
     res.status(201).json(message);
   });
 
+  // --- Reactions ---
+  router.post('/lead/:id/groups/:name/messages/:messageId/reactions', (req, res) => {
+    const { emoji } = req.body;
+    if (!emoji) return res.status(400).json({ error: 'emoji required' });
+    const chatGroups = agentManager.getChatGroupRegistry();
+    const success = chatGroups.addReaction(req.params.messageId, 'human', emoji);
+    res.json({ success });
+  });
+
+  router.delete('/lead/:id/groups/:name/messages/:messageId/reactions/:emoji', (req, res) => {
+    const chatGroups = agentManager.getChatGroupRegistry();
+    const success = chatGroups.removeReaction(req.params.messageId, 'human', decodeURIComponent(req.params.emoji));
+    res.json({ success });
+  });
+
   router.get('/lead/:id/delegations', (req, res) => {
     res.json(agentManager.getDelegations(req.params.id));
   });

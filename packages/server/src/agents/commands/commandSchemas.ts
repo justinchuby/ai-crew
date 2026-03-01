@@ -194,6 +194,14 @@ export const directMessageSchema = z.object({
   content: z.string({ message: 'Missing required field "content"' }).min(1, 'Missing required field "content"').max(MAX_CONTENT_LENGTH, `"content" too long (max ${MAX_CONTENT_LENGTH})`),
 });
 
+// ── Reaction Commands ────────────────────────────────────────────────
+
+export const reactSchema = z.object({
+  group: z.string({ message: 'Missing required field "group"' }).min(1, 'Missing required field "group"').max(MAX_NAME_LENGTH, `"group" too long (max ${MAX_NAME_LENGTH})`),
+  emoji: z.string({ message: 'Missing required field "emoji"' }).min(1, 'Missing required field "emoji"').max(8, '"emoji" too long (max 8 chars)'),
+  messageId: z.string().max(MAX_ID_LENGTH).optional(),
+});
+
 // ── Template Commands ────────────────────────────────────────────────
 
 export const applyTemplateSchema = z.object({

@@ -11,6 +11,7 @@ import {
   addToGroupSchema,
   removeFromGroupSchema,
   groupMessageSchema,
+  reactSchema,
 } from './commandSchemas.js';
 
 // ── Regex patterns ──────────────────────────────────────────────────
@@ -24,6 +25,7 @@ const GROUP_MESSAGE_REGEX = /⟦⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
 const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
 const QUERY_GROUPS_REGEX = /⟦⟦\s*QUERY_GROUPS\s*⟧⟧/s;
 const INTERRUPT_REGEX = /⟦⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧⟧/s;
+const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 
@@ -38,6 +40,7 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
     { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
     { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d) },
+    { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
   ];
 }
 
@@ -466,5 +469,43 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
     ctx.emit('agent:interrupted', { from: agent.id, to: target.id, content: req.content });
   } catch (err) {
     logger.debug('command', 'Failed to parse INTERRUPT command', { error: (err as Error).message });
+  }
+}
+
+// ── REACT handler ───────────────────────────────────────────────────
+
+function handleReact(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  const match = data.match(REACT_REGEX);
+  if (!match) return;
+
+  try {
+    const req = parseCommandPayload(agent, match[1], reactSchema, 'REACT');
+    if (!req) return;
+
+    const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+    if (!leadId) {
+      agent.sendMessage('[System] Cannot react — no team lead found.');
+      return;
+    }
+
+    // Resolve messageId — if omitted, react to the latest message in the group
+    let messageId = req.messageId;
+    if (!messageId) {
+      const messages = ctx.chatGroupRegistry.getMessages(req.group, leadId, 1);
+      if (messages.length === 0) {
+        agent.sendMessage(`[System] Cannot react — no messages in group "${req.group}".`);
+        return;
+      }
+      messageId = messages[0].id;
+    }
+
+    const success = ctx.chatGroupRegistry.addReaction(messageId, agent.id, req.emoji);
+    if (success) {
+      logger.info('groups', `Reaction ${req.emoji} by ${agent.role.name} (${agent.id.slice(0, 8)}) on ${messageId} in "${req.group}"`);
+    } else {
+      agent.sendMessage(`[System] Could not add reaction — message not found or already reacted.`);
+    }
+  } catch (err) {
+    logger.debug('command', 'Failed to parse REACT command', { error: (err as Error).message });
   }
 }
