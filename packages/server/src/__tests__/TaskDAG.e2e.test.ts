@@ -314,6 +314,53 @@ describe('TaskDAG E2E', () => {
     });
   });
 
+  // ── 4b. Force ready ─────────────────────────────────────────────────
+
+  describe('force ready', () => {
+    it('forces a blocked task to ready', () => {
+      batch(dag, LEAD, [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      expect(dag.getTask(LEAD, 'b')!.dagStatus).toBe('pending');
+
+      const task = dag.forceReady(LEAD, 'b');
+      expect(task).not.toBeNull();
+      expect(task!.dagStatus).toBe('ready');
+    });
+
+    it('forces a pending task to ready', () => {
+      batch(dag, LEAD, [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      // b is pending (a is ready but not done)
+      expect(dag.getTask(LEAD, 'b')!.dagStatus).toBe('pending');
+      const task = dag.forceReady(LEAD, 'b');
+      expect(task).not.toBeNull();
+      expect(task!.dagStatus).toBe('ready');
+    });
+
+    it('returns null for already ready task', () => {
+      batch(dag, LEAD, [{ id: 'a', role: 'Dev' }]);
+      expect(dag.getTask(LEAD, 'a')!.dagStatus).toBe('ready');
+      expect(dag.forceReady(LEAD, 'a')).toBeNull();
+    });
+
+    it('returns null for running task', () => {
+      batch(dag, LEAD, [{ id: 'a', role: 'Dev' }]);
+      dag.startTask(LEAD, 'a', 'agent-1');
+      expect(dag.forceReady(LEAD, 'a')).toBeNull();
+    });
+
+    it('returns null for done task', () => {
+      batch(dag, LEAD, [{ id: 'a', role: 'Dev' }]);
+      dag.startTask(LEAD, 'a', 'agent-1');
+      dag.completeTask(LEAD, 'a');
+      expect(dag.forceReady(LEAD, 'a')).toBeNull();
+    });
+  });
+
   // ── 5. Cancel task ────────────────────────────────────────────────
 
   describe('cancel task', () => {

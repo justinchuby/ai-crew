@@ -2,7 +2,7 @@
  * Task DAG command handlers.
  *
  * Commands: DECLARE_TASKS, COMPLETE_TASK, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
- *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG
+ *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY
  */
 import type { Agent } from '../Agent.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
@@ -29,6 +29,7 @@ const CANCEL_TASK_REGEX = /⟦⟦\s*CANCEL_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const COMPLETE_TASK_REGEX = /⟦⟦\s*COMPLETE_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*⟧⟧/s;
 const ADD_DEPENDENCY_REGEX = /⟦⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧⟧/s;
+const FORCE_READY_REGEX = /⟦⟦\s*FORCE_READY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -349,6 +350,24 @@ function handleAddDependency(ctx: CommandHandlerContext, agent: Agent, data: str
   }
 }
 
+function handleForceReady(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can force tasks to ready.'); return; }
+  const match = data.match(FORCE_READY_REGEX);
+  if (!match) return;
+  try {
+    const req = parseCommandPayload(agent, match[1], taskIdSchema, 'FORCE_READY');
+    if (!req) return;
+    const task = ctx.taskDAG.forceReady(agent.id, req.id);
+    if (task) {
+      agent.sendMessage(`[System] Task "${req.id}" forced to ready. Use DELEGATE or CREATE_AGENT to assign it.`);
+    } else {
+      const existing = ctx.taskDAG.getTask(agent.id, req.id);
+      const hint = existing ? ` Current status: "${existing.dagStatus}". Must be pending or blocked.` : ' Task not found.';
+      agent.sendMessage(`[System] Cannot force task "${req.id}" to ready.${hint}`);
+    }
+  } catch { agent.sendMessage('[System] FORCE_READY error: invalid payload.'); }
+}
+
 // ── Module export ─────────────────────────────────────────────────────
 
 export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
@@ -364,5 +383,6 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => handleCancelTask(ctx, a, d) },
     { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d) },
     { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d) },
+    { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d) },
   ];
 }

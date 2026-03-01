@@ -15,6 +15,7 @@ export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
   retry:    ['failed'],
   skip:     ['pending', 'ready', 'running', 'blocked', 'paused', 'failed'],
   cancel:   ['pending', 'ready', 'blocked', 'paused', 'failed', 'skipped'],
+  forceReady: ['pending', 'blocked'],
 };
 
 export interface InvalidTransitionError {
@@ -426,6 +427,19 @@ export class TaskDAG extends EventEmitter {
     }
     this.emit('dag:updated', { leadId });
     return true;
+  }
+
+  /** Force a pending/blocked task to ready state, bypassing dependency checks */
+  forceReady(leadId: string, taskId: string): DagTask | null {
+    const error = this.validateTransition(leadId, taskId, 'forceReady');
+    if (error) return null;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ dagStatus: 'ready' })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return this.getTask(leadId, taskId)!;
   }
 
   /** Skip a task (mark as skipped, unblock dependents with warning).
