@@ -1,0 +1,163 @@
+# Timeline Architecture
+
+How data flows from the server to the timeline visualization, the component hierarchy, and the roadmap for future improvements.
+
+## Data Flow
+
+```
+Server (SQLite + ActivityLedger)
+    │
+    ▼
+GET /api/coordination/timeline?leadId={id}
+    │  (every 5 seconds via polling)
+    ▼
+useTimelineData hook → TimelineData
+    │
+    ▼
+TimelinePage (filters)
+    │
+    ▼
+TimelineContainer (zoom, layout, keyboard nav)
+    ├── BrushTimeSelector (minimap)
+    ├── AgentLane × N (status segments, lock icons)
+    └── CommunicationLinks (SVG overlay)
+```
+
+### Server → Client
+
+The server's `ActivityLedger` stores all agent events in SQLite. The `/coordination/timeline` endpoint processes these events on every request to build:
+
+- **Agent segments** — contiguous status periods (creating → running → idle → completed)
+- **Communications** — inter-agent messages, delegations, broadcasts, group chats
+- **Locks** — file lock acquisitions and releases
+
+> [!IMPORTANT]
+> The current implementation re-fetches the full timeline on every poll (no incremental updates). This works well for typical crew sizes (3–8 agents, 30–100 events per session). SSE-based incremental updates are planned for v2.
+
+### Client State
+
+Timeline state is **local React state**, not a Zustand store. Key state lives in `TimelineContainer`:
+
+| State | Type | Purpose |
+|-------|------|---------|
+| `visibleRange` | `{ start: Date, end: Date }` | Current zoom/pan window |
+| `expandedAgents` | `Set<string>` | Which agent lanes are expanded |
+| `focusedLaneIdx` | `number` | Keyboard-focused lane index |
+
+The `useAppStore` Zustand store provides the agent roster for lead selection, but the timeline does not read from or write to any Zustand store.
+
+## Component Hierarchy
+
+### TimelinePage
+
+**Responsibility:** Page-level orchestration — lead selection, filter state, data fetching.
+
+- Uses `useTimelineData(leadId)` for polling
+- Uses `useAppStore` for the global agent list (lead selector)
+- Applies filters to `TimelineData` before passing to `TimelineContainer`
+- Manages filter UI (role chips, comm type chips, hidden status toggles)
+
+### TimelineContainer
+
+**Responsibility:** Core visualization — SVG rendering, zoom/pan, keyboard navigation.
+
+~610 lines. This is the largest component and contains:
+- Zoom logic (`zoomBy` with anchor fraction)
+- Keyboard event handler (arrow keys, +/-, Home/End, Enter/Space, Tab, Escape)
+- Lane layout calculation (Y positions, heights)
+- Time scale (`@visx/scale` scaleTime)
+- Synced scrolling between label column and SVG area
+- Tooltip management for segment hover
+
+**Key dependency:** `@visx/responsive` `ParentSize` wraps the content to provide width.
+
+### BrushTimeSelector
+
+**Responsibility:** Minimap with time range brush selection.
+
+Uses `@visx/brush` for the draggable selection. Shows mini-colored bars for each agent's segments as background context.
+
+**Bidirectional sync:** When zoom buttons change `visibleRange`, the brush position updates via `brushRef.updateBrush()`. When the user drags the brush, `onRangeChange` fires to update `visibleRange`.
+
+### CommunicationLinks
+
+**Responsibility:** SVG overlay rendering S-curve lines between agent lanes.
+
+Resolves each communication to source/target Y positions, computes cubic bezier paths, and renders with type-specific styles (color, dash pattern, marker). Includes hover hit areas and tooltips.
+
+**Performance:** Caps at 500 visible links. Supports `visibleTimeRange` prop for culling off-screen links.
+
+### AgentLane (standalone)
+
+**Note:** `TimelineContainer` has its own inline `AgentLane` sub-component. The standalone `AgentLane.tsx` export includes additional role icons (tech-writer, qa-tester) and a different visual style. The standalone version is not currently used by `TimelineContainer`.
+
+## Dependencies
+
+| Package | Usage in Timeline |
+|---------|------------------|
+| `@visx/responsive` | `ParentSize` container for responsive width |
+| `@visx/scale` | `scaleTime` for X-axis time mapping |
+| `@visx/axis` | `AxisTop` for time axis labels |
+| `@visx/group` | SVG `<g>` grouping |
+| `@visx/tooltip` | Segment and communication tooltips |
+| `@visx/brush` | Minimap brush selection |
+| `lucide-react` | Filter and RefreshCw icons |
+
+No d3-zoom, no @tanstack/virtual, no SSE/EventSource libraries are used.
+
+## Known Bugs
+
+These bugs are documented in the codebase exploration and are being tracked:
+
+### Minimap Brush Sync
+
+`initialBrushPosition` is memoized with `[]` deps — it only reflects the initial `visibleRange`, not subsequent changes. If `visibleRange` is already zoomed on mount, the brush starts at the wrong position. Additionally, the `updateBrush` call in the render body mutates refs during render, which is a React anti-pattern.
+
+### Group Chat Display
+
+Group messages and broadcasts show a **?** stub because `toAgentId` is null. The `groupName` field exists on the server response and in the `Communication` type, but `TimelineComm` doesn't declare it and the rendering doesn't use it for link resolution.
+
+## v1 → v2 Migration Roadmap
+
+The current architecture supports incremental improvement without a rewrite:
+
+### Step 1: Fix Bugs (Current Architecture)
+
+Fix the 4 known bugs without introducing new patterns. No architectural changes.
+
+### Step 2: Extract Timeline Zustand Store
+
+Move `visibleRange`, `expandedAgents`, `focusedLaneIdx`, and filter state from local React state into a dedicated Zustand store. Pattern already exists in `appStore.ts` and `settingsStore.ts`.
+
+**Why:** Enables the StatusBar and other new components to read timeline state without prop drilling.
+
+### Step 3: Add StatusBar Component
+
+New component that reads from the timeline store. Displays unfiltered crew health. This is the first component addition in v1.
+
+### Step 4: Decompose TimelineContainer
+
+Break the 610-line monolith into focused components:
+- `TimelineToolbar` — zoom controls, live mode toggle
+- `TimelineSVG` — axis, lanes, communication overlay
+- `AgentLabelColumn` — fixed-position agent labels
+
+**Why:** Each component becomes independently testable and documentable.
+
+### Step 5: Replace Polling with SSE
+
+Add SSE subscription for real-time event delivery. Keep polling as a fallback.
+
+**Why:** Eliminates the 5-second delay and reduces server load for large crews.
+
+### Step 6: Add Projections
+
+Introduce projection functions that derive view-specific state from raw events:
+- Chronological projection (Stream View)
+- Agent-lane projection (Lanes View)
+- Causal graph projection (Causality View)
+
+**Why:** Enables the multi-view architecture (Narrative → Stream → Lanes → Raw) designed by the team.
+
+> [!TIP]
+> Each step is independently shippable. You can deploy after any step without breaking what works.

@@ -38,6 +38,14 @@ export default defineConfig({
             { text: 'Settings', link: '/guide/dashboard-settings' },
           ],
         },
+        {
+          text: 'Timeline',
+          items: [
+            { text: 'Timeline UI', link: '/guide/timeline' },
+            { text: 'Accessibility', link: '/guide/timeline-accessibility' },
+            { text: 'Architecture', link: '/guide/timeline-architecture' },
+          ],
+        },
       ],
       '/reference/': [
         {
@@ -45,6 +53,7 @@ export default defineConfig({
           items: [
             { text: 'REST API', link: '/reference/api' },
             { text: 'WebSocket Events', link: '/reference/websocket' },
+            { text: 'Timeline Components', link: '/reference/timeline-api' },
             { text: 'Database Schema', link: '/reference/database' },
             { text: 'Configuration', link: '/reference/configuration' },
           ],
