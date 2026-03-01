@@ -6,12 +6,7 @@ interface KeyboardShortcutHelpProps {
 }
 
 const SHORTCUTS = [
-  { keys: ['←', '→'], description: 'Pan timeline left / right' },
   { keys: ['↑', '↓'], description: 'Navigate between agent lanes' },
-  { keys: ['+', '−'], description: 'Zoom in / out' },
-  { keys: ['Ctrl', 'Scroll'], description: 'Zoom at cursor' },
-  { keys: ['Home'], description: 'Fit entire timeline' },
-  { keys: ['End'], description: 'Jump to latest 20%' },
   { keys: ['Enter', 'Space'], description: 'Expand / collapse focused lane' },
   { keys: ['Tab'], description: 'Next lane' },
   { keys: ['Shift', 'Tab'], description: 'Previous lane' },

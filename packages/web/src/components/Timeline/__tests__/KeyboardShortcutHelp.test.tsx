@@ -22,9 +22,15 @@ describe('KeyboardShortcutHelp', () => {
 
   it('shows expected shortcut descriptions', () => {
     render(<KeyboardShortcutHelp isOpen={true} onClose={onClose} />);
-    expect(screen.getByText('Pan timeline left / right')).toBeTruthy();
-    expect(screen.getByText('Zoom in / out')).toBeTruthy();
+    expect(screen.getByText('Navigate between agent lanes')).toBeTruthy();
     expect(screen.getByText('Toggle this help')).toBeTruthy();
+  });
+
+  it('does not show removed zoom/pan shortcuts', () => {
+    render(<KeyboardShortcutHelp isOpen={true} onClose={onClose} />);
+    expect(screen.queryByText('Pan timeline left / right')).toBeNull();
+    expect(screen.queryByText('Zoom in / out')).toBeNull();
+    expect(screen.queryByText('Zoom at cursor')).toBeNull();
   });
 
   it('calls onClose when Escape is pressed', () => {
