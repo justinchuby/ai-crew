@@ -13,7 +13,7 @@ export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
   pause:    ['pending', 'ready'],
   resume:   ['paused'],
   retry:    ['failed'],
-  skip:     ['pending', 'ready', 'blocked', 'paused', 'failed'],
+  skip:     ['pending', 'ready', 'running', 'blocked', 'paused', 'failed'],
   cancel:   ['pending', 'ready', 'blocked', 'paused', 'failed', 'skipped'],
 };
 
