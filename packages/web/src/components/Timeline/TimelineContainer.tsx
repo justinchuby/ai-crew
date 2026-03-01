@@ -81,8 +81,8 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
 }) {
   return (
     <div
-      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 transition-colors timeline-focusable ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
-      style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}` }}
+      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 timeline-focusable timeline-lane-animate ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
+      style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? '#484f58'}`, transition: 'height 200ms ease-out, background-color 150ms ease' }}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -218,6 +218,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const [sortDirection, setSortDirection] = useState<SortDirection>('oldest-first');
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const userCollapsedRef = useRef<Set<string>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startRange: { start: number; end: number }; movedBeyondThreshold: boolean } | null>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -432,6 +434,57 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     return () => el.removeEventListener('wheel', handler);
   }, [zoomBy]);
 
+  // Drag-to-pan: mousedown on SVG background starts drag
+  const handleDragStart = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as Element;
+    if (target.closest('.cursor-pointer')) return;
+    e.preventDefault();
+    onLiveModeChange?.(false);
+    dragRef.current = {
+      startX: e.clientX,
+      startRange: { start: visibleRange.start.getTime(), end: visibleRange.end.getTime() },
+      movedBeyondThreshold: false,
+    };
+    setIsDragging(true);
+  }, [visibleRange, onLiveModeChange]);
+
+  // Drag-to-pan: window-level mousemove/mouseup while dragging
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const pixelDelta = e.clientX - dragRef.current.startX;
+      if (Math.abs(pixelDelta) >= 5) dragRef.current.movedBeyondThreshold = true;
+      if (!dragRef.current.movedBeyondThreshold) return;
+      const { startRange } = dragRef.current;
+      const span = startRange.end - startRange.start;
+      const timeDelta = -(pixelDelta / chartWidth) * span;
+      let newStart = startRange.start + timeDelta;
+      let newEnd = startRange.end + timeDelta;
+      if (newStart < fullRange.start.getTime()) {
+        newStart = fullRange.start.getTime();
+        newEnd = newStart + span;
+      }
+      if (newEnd > fullRange.end.getTime()) {
+        newEnd = fullRange.end.getTime();
+        newStart = newEnd - span;
+      }
+      newStart = Math.max(newStart, fullRange.start.getTime());
+      setVisibleRange({ start: new Date(newStart), end: new Date(newEnd) });
+    };
+    const handleUp = () => {
+      setIsDragging(false);
+      dragRef.current = null;
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging, chartWidth, fullRange]);
+
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -619,7 +672,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           style={{ position: 'relative' }}
           onScroll={() => { syncScroll('timeline'); hideTooltip(); }}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative' }}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative', cursor: isDragging ? 'grabbing' : 'grab', userSelect: isDragging ? 'none' : undefined }} onMouseDown={handleDragStart}>
             {/* Idle hatch pattern */}
             <defs>
               <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
