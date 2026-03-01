@@ -832,14 +832,24 @@ export function LeadDashboard({ api, ws }: Props) {
               {inactiveProjects.map((proj) => {
                 const isSelected = selectedLeadId === `project:${proj.id}`;
                 return (
-                  <button
+                  <div
                     key={proj.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       const key = `project:${proj.id}`;
                       useLeadStore.getState().addProject(key);
                       useLeadStore.getState().selectLead(key);
                     }}
-                    className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const key = `project:${proj.id}`;
+                        useLeadStore.getState().addProject(key);
+                        useLeadStore.getState().selectLead(key);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group cursor-pointer ${
                       isSelected
                         ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
                         : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
@@ -895,7 +905,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
                       {proj.status} · {proj.updatedAt?.slice(0, 10)}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </>
