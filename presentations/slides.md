@@ -275,17 +275,25 @@ graph LR
     D2 -->|"Findings"| Lead
     D3 -->|"Design"| Lead
     Lead -->|"Summary"| You
+    D1 <-->|"DM"| D2
+    D2 <-->|"Group"| D3
+    D1 <-->|"Group"| D3
 ```
 
-<div class="grid grid-cols-2 gap-2 mt-1 text-sm">
+<div class="grid grid-cols-3 gap-2 mt-1 text-xs">
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
-**Interrupt anytime** — priority messages stop the lead's current work
+**Interrupt anytime** — priority messages redirect the lead
+
+</div>
+<div class="bg-gray-800 rounded-lg p-2 border border-purple-500">
+
+**Agents collaborate** — direct messages & chat groups for lateral coordination
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
 
-**Full visibility** — watch every agent in real-time, pause the system if needed
+**Full visibility** — watch every agent in real-time
 
 </div>
 </div>
@@ -293,10 +301,12 @@ graph LR
 <!--
 The human interaction model is simple: you type a message, just like
 chatting with Copilot. The lead agent reads it, breaks it into tasks,
-and delegates to the right specialists. You can see everything happening
-in real-time. If you want to redirect, just type another message —
-priority messages interrupt the lead immediately. You're always in
-control, but you don't need to micromanage.
+and delegates to the right specialists. But it's not just top-down —
+agents actively collaborate laterally: direct messages for point-to-point
+coordination, chat groups for team discussions (e.g., a presentation-team
+group where dev, writer, and reviewer all sync). The lead can also
+broadcast to everyone. You see all of this in real-time. If you want to
+redirect, priority messages interrupt the lead immediately.
 -->
 
 
