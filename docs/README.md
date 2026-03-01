@@ -7,6 +7,7 @@ This directory contains design documentation for AI Crew. These docs are the sou
 | [agent-communication.md](./agent-communication.md) | How agents communicate — ACP protocol, structured commands, @mentions, content types, WebSocket events |
 | [chat-groups-design.md](./chat-groups-design.md) | Agent chat groups — QUERY_GROUPS, role-based membership, auto-creation, auto-archive lifecycle |
 | [coordination.md](./coordination.md) | How agents avoid conflicts — file locking, scoped COMMIT, activity ledger, context refresh, scheduler |
+| [tide-protocol.md](./tide-protocol.md) | TIDE Protocol — Trust-Informed Dynamic Escalation: adaptive coordination intensity per-task, 5 states, hysteresis, COR metric |
 | [database-design.md](./database-design.md) | Drizzle ORM setup, SQLite pragmas, table reference, migration strategy |
 | [design-decisions.md](./design-decisions.md) | Key architectural choices and their rationale |
 | [ui-design.md](./ui-design.md) | UI layout — lead dashboard, timeline visualization, decision comments, agent controls |
