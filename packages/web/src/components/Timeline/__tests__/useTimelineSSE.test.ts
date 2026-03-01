@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useTimelineSSE } from '../useTimelineSSE';
+import { useTimelineSSE, mergeCommEvent } from '../useTimelineSSE';
 import type { TimelineData } from '../useTimelineData';
 
 // ── Mock EventSource ──────────────────────────────────────────────────
@@ -456,5 +456,236 @@ describe('useTimelineSSE', () => {
 
     // At most 1 new EventSource from the single surviving timer
     expect(MockEventSource.instances.length - instancesBefore).toBeLessThanOrEqual(1);
+  });
+
+  // ── Real-time comm:update events (P2-7) ─────────────────────────
+
+  it('merges comm:update events into communications', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+      es.simulateEvent('init', makeTimelineData(), 'evt-1');
+    });
+
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: {
+          type: 'delegation',
+          fromAgentId: 'agent-1',
+          toAgentId: 'agent-2',
+          summary: 'Delegated task',
+          timestamp: ts(100),
+        },
+      }, 'evt-comm-1');
+    });
+
+    expect(result.current.data!.communications).toHaveLength(1);
+    expect(result.current.data!.communications[0]).toEqual({
+      type: 'delegation',
+      fromAgentId: 'agent-1',
+      toAgentId: 'agent-2',
+      summary: 'Delegated task',
+      timestamp: ts(100),
+    });
+  });
+
+  it('merges comm:update for group messages (null toAgentId)', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+      es.simulateEvent('init', makeTimelineData(), 'evt-1');
+    });
+
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: {
+          type: 'group_message',
+          fromAgentId: 'agent-1',
+          toAgentId: null,
+          groupName: 'design-team',
+          summary: 'Group update',
+          timestamp: ts(200),
+        },
+      }, 'evt-comm-2');
+    });
+
+    expect(result.current.data!.communications).toHaveLength(1);
+    const comm = result.current.data!.communications[0];
+    expect(comm.type).toBe('group_message');
+    expect(comm.groupName).toBe('design-team');
+  });
+
+  it('updates timeRange when comm:update has later timestamp', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+      es.simulateEvent('init', makeTimelineData(), 'evt-1');
+    });
+
+    const laterTimestamp = ts(999);
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: {
+          type: 'message',
+          fromAgentId: 'agent-1',
+          toAgentId: 'agent-2',
+          summary: 'Late message',
+          timestamp: laterTimestamp,
+        },
+      }, 'evt-comm-3');
+    });
+
+    expect(result.current.data!.timeRange.end).toBe(laterTimestamp);
+  });
+
+  it('deduplicates comm:update events by event ID', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+      es.simulateEvent('init', makeTimelineData(), 'evt-1');
+    });
+
+    const commData = {
+      comm: {
+        type: 'message',
+        fromAgentId: 'agent-1',
+        toAgentId: 'agent-2',
+        summary: 'Hello',
+        timestamp: ts(100),
+      },
+    };
+
+    // Send same comm event twice with same ID
+    act(() => { es.simulateEvent('comm:update', commData, 'evt-dup'); });
+    act(() => { es.simulateEvent('comm:update', commData, 'evt-dup'); });
+
+    expect(result.current.data!.communications).toHaveLength(1);
+  });
+
+  it('accumulates multiple comm:update events', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+      es.simulateEvent('init', makeTimelineData(), 'evt-1');
+    });
+
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: { type: 'delegation', fromAgentId: 'a', toAgentId: 'b', summary: 'del', timestamp: ts(10) },
+      }, 'c1');
+    });
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: { type: 'message', fromAgentId: 'b', toAgentId: 'a', summary: 'msg', timestamp: ts(20) },
+      }, 'c2');
+    });
+    act(() => {
+      es.simulateEvent('comm:update', {
+        comm: { type: 'broadcast', fromAgentId: 'a', toAgentId: 'all', summary: 'bcast', timestamp: ts(30) },
+      }, 'c3');
+    });
+
+    expect(result.current.data!.communications).toHaveLength(3);
+    expect(result.current.data!.communications.map(c => c.type)).toEqual([
+      'delegation', 'message', 'broadcast',
+    ]);
+  });
+});
+
+// ── mergeCommEvent unit tests ──────────────────────────────────────
+
+describe('mergeCommEvent', () => {
+  it('appends communication to existing data', () => {
+    const prev = makeTimelineData({ communications: [] });
+    const comm = {
+      type: 'message',
+      fromAgentId: 'a1',
+      toAgentId: 'a2',
+      summary: 'Hello',
+      timestamp: ts(50),
+    };
+
+    const result = mergeCommEvent(prev, comm);
+    expect(result.communications).toHaveLength(1);
+    expect(result.communications[0].fromAgentId).toBe('a1');
+    expect(result.communications[0].toAgentId).toBe('a2');
+  });
+
+  it('preserves existing communications', () => {
+    const existing = {
+      type: 'delegation' as const,
+      fromAgentId: 'x',
+      toAgentId: 'y',
+      summary: 'Old',
+      timestamp: ts(10),
+    };
+    const prev = makeTimelineData({ communications: [existing] });
+    const comm = {
+      type: 'message',
+      fromAgentId: 'a1',
+      toAgentId: 'a2',
+      summary: 'New',
+      timestamp: ts(50),
+    };
+
+    const result = mergeCommEvent(prev, comm);
+    expect(result.communications).toHaveLength(2);
+    expect(result.communications[0].summary).toBe('Old');
+    expect(result.communications[1].summary).toBe('New');
+  });
+
+  it('extends timeRange.end when comm timestamp is later', () => {
+    const prev = makeTimelineData();
+    const comm = {
+      type: 'message',
+      fromAgentId: 'a1',
+      toAgentId: 'a2',
+      summary: 'test',
+      timestamp: ts(9999),
+    };
+
+    const result = mergeCommEvent(prev, comm);
+    expect(result.timeRange.end).toBe(ts(9999));
+    expect(result.timeRange.start).toBe(prev.timeRange.start);
+  });
+
+  it('does not shrink timeRange.end for earlier timestamp', () => {
+    const prev = makeTimelineData();
+    const comm = {
+      type: 'message',
+      fromAgentId: 'a1',
+      toAgentId: 'a2',
+      summary: 'early',
+      timestamp: ts(1),
+    };
+
+    const result = mergeCommEvent(prev, comm);
+    expect(result.timeRange.end).toBe(prev.timeRange.end);
+  });
+
+  it('handles null toAgentId for group messages', () => {
+    const prev = makeTimelineData();
+    const comm = {
+      type: 'group_message',
+      fromAgentId: 'a1',
+      toAgentId: null,
+      groupName: 'devs',
+      summary: 'group msg',
+      timestamp: ts(50),
+    };
+
+    const result = mergeCommEvent(prev, comm);
+    expect(result.communications[0].toAgentId).toBeUndefined();
+    expect(result.communications[0].groupName).toBe('devs');
   });
 });

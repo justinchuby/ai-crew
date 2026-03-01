@@ -15,7 +15,7 @@ export type { ErrorBannerProps, ErrorEntry } from './ErrorBanner';
 export type { EmptyStateProps } from './EmptyState';
 export type { TimelineData, TimelineAgent, TimelineComm, TimelineLock, TimelineSegment, TimelineStatus, CommType } from './useTimelineData';
 export { useTimelineData, getLocksForAgent } from './useTimelineData';
-export { useTimelineSSE } from './useTimelineSSE';
+export { useTimelineSSE, mergeCommEvent } from './useTimelineSSE';
 export type { UseTimelineSSEResult } from './useTimelineSSE';
 export { useSinceLastVisit } from './useSinceLastVisit';
 export type { SinceLastVisitResult } from './useSinceLastVisit';

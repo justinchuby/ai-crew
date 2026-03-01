@@ -144,6 +144,22 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
       }
     });
 
+    eventSource.addEventListener('comm:update', (event: MessageEvent) => {
+      const eventId = (event as any).lastEventId;
+      if (eventId && seenEventIds.current.has(eventId)) return;
+      if (eventId) {
+        trackSeenId(eventId);
+        lastEventId.current = eventId;
+      }
+
+      try {
+        const { comm } = JSON.parse(event.data);
+        setData(prev => prev ? mergeCommEvent(prev, comm) : prev);
+      } catch {
+        // Ignore malformed comm events
+      }
+    });
+
     eventSource.onopen = () => {
       setConnectionHealth('connected');
       setError(null);
@@ -322,4 +338,23 @@ function mergeLockEvent(prev: TimelineData, lockEvent: any): TimelineData {
   }
 
   return { ...prev, locks };
+}
+
+/** Merge an incremental comm:update event into existing timeline data */
+export function mergeCommEvent(prev: TimelineData, comm: any): TimelineData {
+  const communications = [...prev.communications, {
+    type: comm.type,
+    fromAgentId: comm.fromAgentId,
+    toAgentId: comm.toAgentId ?? undefined,
+    groupName: comm.groupName,
+    summary: comm.summary,
+    timestamp: comm.timestamp,
+  }];
+
+  const timeRange = {
+    start: prev.timeRange.start,
+    end: comm.timestamp > prev.timeRange.end ? comm.timestamp : prev.timeRange.end,
+  };
+
+  return { ...prev, communications, timeRange };
 }
