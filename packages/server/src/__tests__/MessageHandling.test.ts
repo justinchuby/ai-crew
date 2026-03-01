@@ -49,9 +49,9 @@ describe('Message Handling — Command Parsing', () => {
       expect(match).toBeTruthy();
     });
 
-    it('does not match inside code fences (regex still matches — scanBuffer strips)', () => {
+    it('does not match inside code fences (regex still matches — handler responsibility)', () => {
       const input = '```\n[[[ CREATE_AGENT {"role": "developer"} ]]]\n```';
-      // The regex itself matches; code-fence stripping is a scanBuffer concern.
+      // The regex itself matches; code-fence awareness is a handler concern.
       const match = input.match(TBL_CREATE_AGENT);
       expect(match).toBeTruthy();
     });

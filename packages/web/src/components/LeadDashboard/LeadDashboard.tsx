@@ -2989,80 +2989,9 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
   return null;
 }
 
-/** Collapsed-by-default [[[ command ]]] block with click to expand */
-function CollapsibleCommandBlock({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/\[\[\[\s*(\w+)/);
-  const label = nameMatch ? nameMatch[1] : 'command';
-  // Extract a preview from the JSON payload
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  let preview = '';
-  if (jsonMatch) {
-    try {
-      const obj = JSON.parse(jsonMatch[0]);
-      const parts: string[] = [];
-      for (const [k, v] of Object.entries(obj)) {
-        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
-      }
-      preview = parts.join(', ');
-    } catch {
-      preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
-    }
-  }
-  return (
-    <div
-      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
-      onClick={() => setExpanded((e) => !e)}
-    >
-      <div className="flex items-center gap-1 min-w-0">
-        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
-      </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
-    </div>
-  );
-}
-
 function AgentTextBlock({ text }: { text: string }) {
-  // Split on [[[ ... ]]] blocks (complete) and also detect unclosed [[[ blocks
-  const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
-  return (
-    <>
-      {segments.map((seg, i) => {
-        // Complete [[[ ]]] block
-        if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
-          return <CollapsibleCommandBlock key={i} text={seg} />;
-        }
-        // Unclosed [[[ block (still streaming or split across messages)
-        if (seg.includes('[[[') && !seg.includes(']]]')) {
-          const idx = seg.indexOf('[[[');
-          const before = seg.slice(0, idx);
-          const cmdBlock = seg.slice(idx);
-          return (
-            <span key={i}>
-              {before.trim() ? <MarkdownWithTables text={before} /> : null}
-              <CollapsibleCommandBlock text={cmdBlock} />
-            </span>
-          );
-        }
-        // Dangling ]]] from a block that started in a previous message
-        if (seg.includes(']]]') && !seg.includes('[[[')) {
-          const idx = seg.indexOf(']]]') + 3;
-          const cmdBlock = seg.slice(0, idx);
-          const after = seg.slice(idx);
-          return (
-            <span key={i}>
-              <CollapsibleCommandBlock text={cmdBlock} />
-              {after.trim() ? <MarkdownWithTables text={after} /> : null}
-            </span>
-          );
-        }
-        if (!seg.trim()) return null;
-        return <MarkdownWithTables key={i} text={seg} />;
-      })}
-    </>
-  );
+  if (!text.trim()) return null;
+  return <MarkdownWithTables text={text} />;
 }
 
 /** Detect markdown tables and render them; pass other text to InlineMarkdown */

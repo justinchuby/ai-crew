@@ -2,7 +2,12 @@
 
 ## Overview
 
-AI Crew supports two communication modes with Copilot CLI: the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging, and **PTY** as a fallback for raw terminal interaction. ACP is the default and recommended mode.
+AI Crew supports two layers of communication with Copilot CLI agents:
+
+1. **Agent Client Protocol (ACP)** — Structured JSON-RPC messaging for agent lifecycle, text streaming, tool calls, plans, and permissions.
+2. **MCP (Model Context Protocol)** — Crew coordination tools (team management, messaging, task DAG, file locks, etc.) exposed as MCP tools that agents call natively.
+
+ACP handles the transport layer; MCP provides the crew command interface.
 
 ## ACP Mode (Default)
 
@@ -18,12 +23,12 @@ Client (AI Crew)              Agent (Copilot CLI)
      │── initialize ───────────────>│
      │<──────────── capabilities ───│
      │                              │
-     │── session/new ──────────────>│
+     │── session/new ──────────────>│  (includes mcpServers config)
      │<──────────── sessionId ──────│
      │                              │
      │── session/prompt ───────────>│  (user or role prompt)
      │<── session/update (text) ────│  (streamed chunks)
-     │<── session/update (tool) ────│  (tool call status)
+     │<── session/update (tool) ────│  (tool call status — includes MCP crew_* tools)
      │<── session/update (plan) ────│  (agent's plan)
      │                              │
      │<── request_permission ───────│  (needs approval)
@@ -34,6 +39,103 @@ Client (AI Crew)              Agent (Copilot CLI)
      │── session/prompt ───────────>│  (next user message)
      └──────────────────────────────┘
 ```
+
+## MCP Crew Tools
+
+All inter-agent commands are exposed as MCP tools with the `crew_` prefix. Agents discover these tools automatically via the MCP server configured in `newSession({ mcpServers })`.
+
+### Architecture
+
+```
+Agent (Copilot CLI)  ──MCP tool call──>  AI Crew MCP Server (SSE)
+                                              │
+                                         CommandHandlers
+                                        (same as before)
+```
+
+- Each agent connects to a per-agent MCP SSE endpoint: `GET /mcp/:agentId/sse`
+- Tool calls arrive as structured JSON-RPC with validated schemas (Zod)
+- The MCP server dispatches to existing command handler modules
+- Tool results are returned as structured text (vs. fire-and-forget with the old `[[[` syntax)
+
+### Available Tools
+
+**Team Management (lead/architect only):**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_create_agent` | Spawn a new agent with a specific role | role, task?, model?, context? |
+| `crew_delegate` | Assign a task to an existing child agent | to, task, context? |
+| `crew_terminate_agent` | Terminate an agent and free its slot | id, reason? |
+| `crew_cancel_delegation` | Cancel an active delegation | agentId?, delegationId? |
+
+**Communication (all agents):**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_agent_message` | Send a direct message to another agent | to, content |
+| `crew_broadcast` | Send a message to all active agents | content |
+| `crew_direct_message` | Peer-to-peer message (no routing via lead) | to, content |
+| `crew_create_group` | Create a named chat group | name, members?, roles? |
+| `crew_group_message` | Send a message to a group | group, content |
+| `crew_add_to_group` | Add agents to a group | group, members |
+| `crew_remove_from_group` | Remove agents from a group | group, members |
+| `crew_query_groups` | List groups the agent belongs to | (none) |
+| `crew_query_peers` | List peer agents | (none) |
+
+**Task & Progress (lead-only unless noted):**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_declare_tasks` | Create a task DAG with dependencies | tasks[] |
+| `crew_progress` | Report progress (auto-reads DAG state) | summary |
+| `crew_complete_task` | Signal task completion *(any agent)* | summary |
+| `crew_decision` | Log an architectural decision | title, rationale, needsConfirmation? |
+| `crew_query_tasks` | Query current task DAG status | (none) |
+| `crew_add_task` | Add a task to existing DAG | id, title, depends_on?, role? |
+| `crew_cancel_task` | Cancel a DAG task | id |
+| `crew_pause_task` | Pause a task | id |
+| `crew_retry_task` | Retry a failed task | id |
+| `crew_skip_task` | Skip a task | id |
+| `crew_reset_dag` | Clear the entire DAG | (none) |
+
+**Coordination (all agents):**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_lock_file` | Acquire a file lock | filePath, reason? |
+| `crew_unlock_file` | Release a file lock | filePath |
+| `crew_commit` | Scoped git commit (locked files only) | message, files? |
+| `crew_query_crew` | Get roster of all active agents | (none) |
+| `crew_defer_issue` | Flag an issue for later | description, severity? |
+| `crew_query_deferred` | List deferred issues | status? |
+| `crew_resolve_deferred` | Resolve a deferred issue | id, dismiss? |
+
+**Timers:**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_set_timer` | Set a countdown timer | delay, label?, message? |
+| `crew_cancel_timer` | Cancel a timer | id?, name? |
+| `crew_list_timers` | List active timers | (none) |
+
+**System:**
+
+| Tool | Description | Key Params |
+|------|-------------|------------|
+| `crew_halt_heartbeat` | Stop heartbeat stall detection | (none) |
+| `crew_request_limit_change` | Request agent concurrency change | limit, reason? |
+| `crew_export_session` | Export session data | (none) |
+
+### Advantages over Text-Embedded Commands
+
+| Aspect | Old (`[[[` regex) | New (MCP tools) |
+|--------|-------------------|-----------------|
+| **Parsing** | Regex-based, edge cases (nested delimiters, incomplete buffers) | Structured JSON-RPC, schema-validated |
+| **Return values** | Fire-and-forget (async ACK via sendMessage) | Synchronous result returned to agent |
+| **Type safety** | Ad-hoc JSON.parse in each handler | Zod schemas validate inputs |
+| **Discovery** | Agents must read documentation in system prompt | Agents discover tools via MCP protocol |
+| **Error handling** | Parse errors silently dropped | Structured error responses |
 
 ### Session Updates
 
@@ -59,7 +161,7 @@ When an ACP agent wants to execute a tool (file write, terminal command, etc.), 
 
 In ACP mode, each user message is sent as a `session/prompt` call. This starts a new prompt turn — the agent processes the message, potentially makes tool calls, and returns a `stopReason` when complete. This is fundamentally different from PTY mode where input is raw keystrokes.
 
-## PTY Mode (Fallback)
+## PTY Mode (Legacy Fallback)
 
 Spawns Copilot CLI in a pseudo-terminal via `node-pty`. Raw terminal I/O — the system writes to stdin and reads from stdout. Used when:
 
@@ -110,16 +212,12 @@ The chat UI supports `@mention` autocomplete for targeting messages to specific 
 4. **Rendering** — Mentions are rendered as clickable badges in the message UI, with role-appropriate colors
 5. **Markdown-aware** — The mention parser is integrated with the markdown renderer to avoid breaking formatting
 
-## Scoped COMMIT Command
+## Scoped COMMIT
 
-The `COMMIT` command provides safe git operations for multi-agent workflows:
-
-```
-[[[ COMMIT {"message": "feat: implement login endpoint"} ]]]
-```
+The `crew_commit` tool provides safe git operations for multi-agent workflows.
 
 **How it works:**
-1. Collects all files the agent currently holds locks on (via `LOCK_FILE`)
+1. Collects all files the agent currently holds locks on (via `crew_lock_file`)
 2. Generates a `git add <file1> <file2> ...` command with only those specific files
 3. Creates a commit with the provided message and co-authorship attribution
 4. This prevents `git add -A` from accidentally staging other agents' uncommitted work
@@ -182,9 +280,8 @@ You are agent def67890 with role "Developer".
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked.
-2. Request locks: `<!-- LOCK_REQUEST {"filePath": "...", "reason": "..."} -->`
-3. Release locks: `<!-- LOCK_RELEASE {"filePath": "..."} -->`
-4. Message agents: `<!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->`
+2. Use crew_lock_file / crew_unlock_file to manage file locks.
+3. Use crew_agent_message to communicate with other agents.
 ...
 [/CREW CONTEXT]
 ```

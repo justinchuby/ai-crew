@@ -17,6 +17,8 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Trade-off:** ACP requires Copilot CLI to support `--acp` flag. Older CLI versions fall back to PTY.
 
+**Update (Wave 21):** Crew coordination commands are now delivered via MCP tools over ACP (see ADR 41), not via regex-detected text patterns. ACP remains the transport layer; MCP provides structured tool calling for crew operations.
+
 **Configuration:** `AGENT_MODE=acp|pty` environment variable, default `acp`.
 
 ## 2. Dual-Mode Agent Architecture
@@ -567,3 +569,23 @@ The `ModelSelector` component can override defaults at task assignment time, con
 - Users can still set lower limits — the slider is just an upper bound
 
 **Trade-off:** More concurrent agents means more API calls, more WebSocket traffic, and more context to track. Users should increase gradually based on their infrastructure capacity.
+
+## 41. MCP for Crew Command Dispatch
+
+**Decision:** Replace the regex-based `[[[` triple-bracket command detection with MCP (Model Context Protocol) tool calls. All 42 crew commands are exposed as `crew_*` MCP tools via per-agent SSE endpoints.
+
+**Rationale:**
+- **Eliminates fragile text scraping** — The regex buffer scanner (`appendToBuffer`/`scanBuffer`) had edge cases with nested delimiters, incomplete chunks, and multi-line JSON payloads. MCP provides structured JSON-RPC with schema validation.
+- **Synchronous return values** — The old system was fire-and-forget: agents emitted commands in text, got async ACKs via `sendMessage()`. MCP tool calls return structured results immediately (e.g., `crew_create_agent` returns `{ agentId }`).
+- **Type safety via Zod schemas** — Every tool parameter is validated at the transport layer. No more ad-hoc `JSON.parse` in each handler.
+- **Tool discovery** — Agents discover available tools via MCP protocol, reducing system prompt size (removed ~65 lines of command syntax docs from the lead prompt).
+- **Ecosystem alignment** — MCP is becoming the standard protocol for AI tool integration. AI Crew can now be used as an MCP server by other systems.
+
+**Architecture:**
+- `CrewMcpServer` (packages/server/src/mcp/) defines 42 tools with Zod schemas
+- Per-agent SSE endpoints: `GET /mcp/:agentId/sse` + `POST /mcp/:agentId/message`
+- ACP `newSession({ mcpServers })` configures agents to connect to their MCP endpoint
+- Bridge pattern: MCP handlers reconstruct `CommandHandlerContext` and call existing command modules
+- Frontend: `CrewCommandBlock` in AcpOutput.tsx detects `crew_*` tool calls and renders them as collapsible command blocks matching the original visual style
+
+**Trade-off:** Adds MCP SDK as a dependency (~50KB). The SSE transport is per-agent (one connection per agent), adding slight overhead. The bridge pattern means command handlers are called through two layers of indirection (MCP → bridge → handler). Justified because the reliability and type safety improvements far outweigh the complexity.

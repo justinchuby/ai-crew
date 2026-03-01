@@ -2,6 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CommandDispatcher, type CommandContext, type Delegation } from '../agents/CommandDispatcher.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
+import type { CommandEntry, CommandHandlerContext } from '../agents/commands/types.js';
+import { getAgentCommands } from '../agents/commands/AgentCommands.js';
+import { getCommCommands } from '../agents/commands/CommCommands.js';
+import { getTaskCommands } from '../agents/commands/TaskCommands.js';
+import { getCoordCommands } from '../agents/commands/CoordCommands.js';
+import { getDeferredCommands } from '../agents/commands/DeferredCommands.js';
+import { getSystemCommands } from '../agents/commands/SystemCommands.js';
+import { getTimerCommands } from '../agents/commands/TimerCommands.js';
+import { getExportCommands } from '../agents/commands/ExportCommands.js';
+import { getCapabilityCommands } from '../agents/commands/CapabilityCommands.js';
+import { getDirectMessageCommands } from '../agents/commands/DirectMessageCommands.js';
 import { MAX_CONCURRENCY_LIMIT } from '../config.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -125,10 +136,34 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
   };
 }
 
-/** Feed text through appendToBuffer + scanBuffer (the real public API) */
+/**
+ * Dispatch a [[[ COMMAND ]]] string directly through command handlers.
+ * This mirrors what CrewMcpServer does: build the handler table from
+ * all command modules, match the text against their regexes, and call
+ * the matching handler. No buffer scanning involved.
+ */
 function dispatch(dispatcher: CommandDispatcher, agent: Agent, text: string): void {
-  dispatcher.appendToBuffer(agent.id, text);
-  dispatcher.scanBuffer(agent);
+  const ctx = dispatcher.getHandlerContext();
+  const allEntries: CommandEntry[] = [
+    ...getAgentCommands(ctx),
+    ...getCommCommands(ctx),
+    ...getTaskCommands(ctx),
+    ...getCoordCommands(ctx),
+    ...getDeferredCommands(ctx),
+    ...getSystemCommands(ctx),
+    ...getTimerCommands(ctx),
+    ...getExportCommands(ctx),
+    ...getCapabilityCommands(ctx),
+    ...getDirectMessageCommands(ctx),
+  ];
+  for (const { regex, handler } of allEntries) {
+    if (regex.test(text)) {
+      handler(agent, text);
+      // Reset lastIndex for global regexes
+      regex.lastIndex = 0;
+    }
+    regex.lastIndex = 0;
+  }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -569,16 +604,9 @@ describe('CommandDispatcher', () => {
   // ── Multiple commands in one text ──────────────────────────────────
 
   describe('multiple commands', () => {
-    it('dispatches both LOCK_FILE and ACTIVITY from one text', () => {
-      const text = [
-        'Some preamble text.',
-        '[[[ LOCK_FILE {"filePath": "src/main.ts", "reason": "editing"} ]]]',
-        'Some middle text.',
-        '[[[ ACTIVITY {"actionType": "file_edit", "summary": "changed main"} ]]]',
-        'Trailing text.',
-      ].join('\n');
-
-      dispatch(dispatcher, leadAgent, text);
+    it('dispatches both LOCK_FILE and ACTIVITY from separate calls', () => {
+      dispatch(dispatcher, leadAgent, '[[[ LOCK_FILE {"filePath": "src/main.ts", "reason": "editing"} ]]]');
+      dispatch(dispatcher, leadAgent, '[[[ ACTIVITY {"actionType": "file_edit", "summary": "changed main"} ]]]');
 
       expect(ctx.lockRegistry.acquire).toHaveBeenCalledWith(
         leadAgent.id,
@@ -640,37 +668,6 @@ describe('CommandDispatcher', () => {
 
       const forOther = dispatcher.getDelegations('nonexistent-id');
       expect(forOther.length).toBe(0);
-    });
-  });
-
-  // ── Buffer management ──────────────────────────────────────────────
-
-  describe('buffer management', () => {
-    it('appendToBuffer accumulates text', () => {
-      dispatcher.appendToBuffer('agent-1', 'hello ');
-      dispatcher.appendToBuffer('agent-1', 'world');
-      // Verify by dispatching a command that spans both appends
-      const agent = makeAgent({ id: 'agent-1' });
-      dispatcher.appendToBuffer('agent-1', ' [[[ QUERY_CREW ]]]');
-      (ctx.getAllAgents as any).mockReturnValue([agent]);
-      (ctx.getRunningCount as any).mockReturnValue(1);
-      dispatcher.scanBuffer(agent);
-
-      expect((agent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('CREW_ROSTER'),
-      );
-    });
-
-    it('clearBuffer removes buffered text', () => {
-      dispatcher.appendToBuffer('agent-1', '[[[ QUERY_CREW ]]]');
-      dispatcher.clearBuffer('agent-1');
-
-      const agent = makeAgent({ id: 'agent-1' });
-      (ctx.getAllAgents as any).mockReturnValue([agent]);
-      dispatcher.scanBuffer(agent);
-
-      // No command should have fired since buffer was cleared
-      expect((agent.sendMessage as any)).not.toHaveBeenCalled();
     });
   });
 

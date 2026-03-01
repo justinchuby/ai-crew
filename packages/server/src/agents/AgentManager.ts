@@ -260,14 +260,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.agentThreads.set(agent.id, thread.id);
     }
 
-    // Listen for data to detect sub-agent spawn requests and coordination commands
+    // Listen for agent text output (display + message buffering)
     agent.onData((data) => {
       this.emit('agent:text', { agentId: agent.id, text: data });
       // Buffer agent output — flush after 2s of silence or on status change
       this.bufferAgentMessage(agent.id, data);
-      // Buffer ACP text and scan for complete command patterns
-      this.dispatcher.appendToBuffer(agent.id, data);
-      this.dispatcher.scanBuffer(agent);
     });
 
     agent.onToolCall((info) => {
@@ -366,7 +363,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.onExit((code) => {
       this.flushAgentMessage(agent.id);
       this.clearHungTimer(agent.id);
-      this.dispatcher.clearBuffer(agent.id);
       logger.info('agent', `Exited ${agent.role.name} (${agent.id.slice(0, 8)}) code=${code}`, {
         role: agent.role.id,
         status: agent.status,
@@ -502,7 +498,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.clearHungTimer(id);
-    this.dispatcher.clearBuffer(id);
 
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);

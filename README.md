@@ -88,12 +88,12 @@ npm run dev
 | `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
 | `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
 
-**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · ReactFlow · WebSocket (ws)
+**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · ReactFlow · WebSocket (ws) · MCP (Model Context Protocol)
 
 ```
 React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
-                              │
-                         AgentManager (TypedEmitter)
+                              │                         ↕
+                         AgentManager          MCP SSE (crew_* tools)
                         ┌─────┴──────┐
                    MessageBus    ActivityLedger (batched writes)
                    DecisionLog   FileLockRegistry
@@ -102,6 +102,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
                    CommandDispatcher  TimelineStore
                    DeferredIssueRegistry  EventPipeline
                    AlertEngine  TimerRegistry
+                   CrewMcpServer (42 tools)
 ```
 
 ### Key Components
@@ -162,52 +163,52 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 
 Custom roles can be created via the Settings UI with your own system prompts, colors, and icons.
 
-## ACP Command Reference
+## MCP Command Reference
 
-Agents communicate via structured triple-bracket commands detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
+Agents communicate via **MCP (Model Context Protocol) tool calls** with the `crew_` prefix. Each agent discovers available tools automatically through the MCP server connected during session initialization. Tools are schema-validated and return structured results.
 
 ### Team Management (Lead + Architect)
 
-| Command | Description |
-|---------|-------------|
-| `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
-| `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
-| `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
+| Tool | Description |
+|------|-------------|
+| `crew_create_agent` | Spawn a new agent with a specific role. Params: `role`, `task?`, `model?`, `context?` |
+| `crew_delegate` | Assign a task to an existing agent. Params: `to`, `task`, `context?` |
+| `crew_terminate_agent` | Terminate an agent and free its slot. Params: `id`, `reason?` |
 
 ### Communication (All agents)
 
-| Command | Description |
-|---------|-------------|
-| `AGENT_MESSAGE {"to": "agent-id", "content": "..."}` | Send a direct message to another agent by ID. |
-| `BROADCAST {"content": "..."}` | Send a message to all active agents. |
-| `CREATE_GROUP {"name": "...", "members": ["id1"], "roles": ["developer"]}` | Create a named chat group. Specify members by ID, by role, or both. Lead is auto-included. |
-| `GROUP_MESSAGE {"group": "...", "content": "..."}` | Send a message to all members of a group. Sender must be a member. |
-| `ADD_TO_GROUP {"group": "...", "members": ["id"]}` | Add agents to an existing group. New members receive recent message history. |
-| `REMOVE_FROM_GROUP {"group": "...", "members": ["id"]}` | Remove agents from a group. The lead cannot be removed. |
-| `QUERY_GROUPS` | List all groups the agent belongs to, with member counts and last message preview. |
+| Tool | Description |
+|------|-------------|
+| `crew_agent_message` | Send a direct message to another agent. Params: `to`, `content` |
+| `crew_broadcast` | Send a message to all active agents. Params: `content` |
+| `crew_create_group` | Create a chat group. Params: `name`, `members?`, `roles?` |
+| `crew_group_message` | Send a message to a group. Params: `group`, `content` |
+| `crew_add_to_group` | Add agents to a group. Params: `group`, `members` |
+| `crew_remove_from_group` | Remove agents from a group. Params: `group`, `members` |
+| `crew_query_groups` | List groups the agent belongs to. |
 
 ### Task & Progress (Lead-only unless noted)
 
-| Command | Description |
-|---------|-------------|
-| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `title`, `depends_on`. |
-| `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
-| `COMPLETE_TASK {"summary": "..."}` | Signal that the agent has finished its assigned task. *(Any agent)* |
-| `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
-| `QUERY_TASKS` | Query current task DAG status. |
-| `CANCEL_DELEGATION {"delegationId": "...", "reason": "..."}` | Cancel an active delegation. |
+| Tool | Description |
+|------|-------------|
+| `crew_declare_tasks` | Declare a task DAG with dependencies. Params: `tasks[]` (id, title, depends_on) |
+| `crew_progress` | Report progress. Auto-reads DAG state when one exists. Params: `summary` |
+| `crew_complete_task` | Signal task completion. *(Any agent)* Params: `summary` |
+| `crew_decision` | Log a decision for user review. Params: `title`, `rationale`, `needsConfirmation?` |
+| `crew_query_tasks` | Query current task DAG status. |
+| `crew_cancel_delegation` | Cancel an active delegation. Params: `delegationId`, `reason?` |
 
 ### Coordination (All agents)
 
-| Command | Description |
-|---------|-------------|
-| `LOCK_FILE {"filePath": "...", "reason": "..."}` | Acquire a file lock. Prevents other agents from editing the same file. |
-| `UNLOCK_FILE {"filePath": "..."}` | Release a file lock. |
-| `COMMIT {"message": "..."}` | Scoped git commit — stages only files the agent has locked, preventing `git add -A` from leaking other agents' work. |
-| `QUERY_CREW` | Get the current roster of agents with IDs, roles, models, and status. |
-| `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
-| `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
-| `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
+| Tool | Description |
+|------|-------------|
+| `crew_lock_file` | Acquire a file lock. Params: `filePath`, `reason?` |
+| `crew_unlock_file` | Release a file lock. Params: `filePath` |
+| `crew_commit` | Scoped git commit — stages only locked files. Params: `message` |
+| `crew_query_crew` | Get roster of all agents with IDs, roles, models, and status. |
+| `crew_defer_issue` | Flag an issue for later. Params: `description`, `severity?` |
+| `crew_query_deferred` | List deferred issues. Params: `status?` |
+| `crew_resolve_deferred` | Resolve a deferred issue. Params: `id`, `dismiss?` |
 
 ### UI Views
 
@@ -229,7 +230,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Database**: SQLite (WAL mode, Drizzle ORM) with tuned pragmas (`busy_timeout`, `foreign_keys`, `synchronous=NORMAL`)
 - **Security**: Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
 - **Validation**: Zod schemas on all API routes
-- **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
+- **Agent Protocol**: MCP (Model Context Protocol) with 42 crew_* tools over SSE transport, ACP (Agent Client Protocol) for agent lifecycle
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
 - **Testing**: Vitest with v8 coverage, Codecov integration (1,180+ tests including 30 Task DAG E2E + 40 Timeline E2E)
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload

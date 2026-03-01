@@ -425,77 +425,21 @@ export function AcpOutput({ agentId }: Props) {
   );
 }
 
-/** Collapsed-by-default [[[ command ]]] block with click to expand */
-function CollapsibleCommandBlockSimple({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/\[\[\[\s*(\w+)/);
-  const label = nameMatch ? nameMatch[1] : 'command';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  let preview = '';
-  if (jsonMatch) {
-    try {
-      const obj = JSON.parse(jsonMatch[0]);
-      const parts: string[] = [];
-      for (const [k, v] of Object.entries(obj)) {
-        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
-      }
-      preview = parts.join(', ');
-    } catch {
-      preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
-    }
-  }
-  return (
-    <div
-      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
-      onClick={() => setExpanded((e) => !e)}
-    >
-      <div className="flex items-center gap-1 min-w-0">
-        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
-      </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
-    </div>
-  );
-}
-
-/** Render agent text with [[[ ]]] blocks separated and inline markdown + tables */
+/** Render agent text with inline markdown + tables (no [[[ ]]] parsing — commands come via MCP now) */
 function AgentTextBlockSimple({ text }: { text: string }) {
-  const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
+  if (!text.trim()) return null;
+  // Check for tables
+  const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
+  const parts = text.split(TABLE_RE);
   return (
     <>
-      {segments.map((seg, i) => {
-        if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
-          return <CollapsibleCommandBlockSimple key={i} text={seg} />;
+      {parts.map((part, j) => {
+        const trimmed = part.trim();
+        if (trimmed.startsWith('|') && trimmed.includes('\n')) {
+          return <SimpleTable key={j} raw={trimmed} />;
         }
-        // Unclosed [[[ block
-        if (seg.includes('[[[') && !seg.includes(']]]')) {
-          const idx = seg.indexOf('[[[');
-          const before = seg.slice(0, idx);
-          const cmdBlock = seg.slice(idx);
-          return (
-            <span key={i}>
-              {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
-              <CollapsibleCommandBlockSimple text={cmdBlock} />
-            </span>
-          );
-        }
-        if (!seg.trim()) return null;
-        // Check for tables
-        const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
-        const parts = seg.split(TABLE_RE);
-        return (
-          <span key={i}>
-            {parts.map((part, j) => {
-              const trimmed = part.trim();
-              if (trimmed.startsWith('|') && trimmed.includes('\n')) {
-                return <SimpleTable key={j} raw={trimmed} />;
-              }
-              if (!trimmed) return null;
-              return <InlineMarkdownSimple key={j} text={part} />;
-            })}
-          </span>
-        );
+        if (!trimmed) return null;
+        return <InlineMarkdownSimple key={j} text={part} />;
       })}
     </>
   );
