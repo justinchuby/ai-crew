@@ -358,6 +358,9 @@ export function apiRouter(
     const leadId = req.query.leadId as string | undefined;
     let events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
 
+    // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
+    events = events.filter(e => e.id !== 0);
+
     // Filter to a specific lead's team if leadId provided
     if (leadId) {
       const teamAgentIds = new Set<string>();
@@ -501,7 +504,7 @@ export function apiRouter(
     const leadAgent = resolvedLeadId ? agentManager.get(resolvedLeadId) : undefined;
     const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
 
-    res.json({ agents, communications, locks, timeRange, project });
+    res.json({ agents, communications, locks, timeRange, project, ledgerVersion: activityLedger.version });
   });
 
   // --- Project Lead ---

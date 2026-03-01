@@ -101,6 +101,19 @@ describe('ActivityLedger', () => {
     expect(remaining[0].summary).toBe('Entry 9');
   });
 
+  it('version starts at 0 and increments on prune', () => {
+    expect(ledger.version).toBe(0);
+
+    ledger.log('agent-1', 'developer', 'file_edit', 'Entry 1');
+    expect(ledger.version).toBe(0); // append does not increment
+
+    ledger.prune(100);
+    expect(ledger.version).toBe(1);
+
+    ledger.prune(50);
+    expect(ledger.version).toBe(2);
+  });
+
   it('details are stored as JSON and parsed back correctly', () => {
     const details = { file: 'src/app.ts', lines: [1, 2, 3], nested: { key: 'value' } };
     const entry = ledger.log('agent-1', 'developer', 'file_edit', 'Complex edit', details);

@@ -41,11 +41,18 @@ export class ActivityLedger extends EventEmitter {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private readonly FLUSH_INTERVAL_MS = 250;
   private readonly FLUSH_BATCH_SIZE = 64;
+  /** Increments on any non-append mutation (prune, reorder, clear) for cache invalidation */
+  private _version = 0;
 
   constructor(db: Database) {
     super();
     this.db = db;
     this.flushTimer = setInterval(() => this.flush(), this.FLUSH_INTERVAL_MS);
+  }
+
+  /** Current generation version — changes on prune/reorder/clear, not on append */
+  get version(): number {
+    return this._version;
   }
 
   log(
@@ -206,6 +213,7 @@ export class ActivityLedger extends EventEmitter {
       'DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT ?)',
       [keepCount],
     );
+    this._version++;
   }
 
   private _mapRow(row: any): ActivityEntry {

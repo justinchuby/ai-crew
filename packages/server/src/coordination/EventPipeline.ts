@@ -22,10 +22,27 @@ export interface EventHandler {
 
 const MAX_QUEUE_SIZE = 10_000;
 
+export interface EventPipelineOptions {
+  /** Called whenever an event is dropped due to queue overflow */
+  onEventDropped?: (droppedEvent: PipelineEvent) => void;
+}
+
 export class EventPipeline {
   private handlers: EventHandler[] = [];
   private processing = false;
   private queue: PipelineEvent[] = [];
+  private seenEventIds = new Set<string>();
+  private _dropCount = 0;
+  private onEventDropped?: (droppedEvent: PipelineEvent) => void;
+
+  constructor(options?: EventPipelineOptions) {
+    this.onEventDropped = options?.onEventDropped;
+  }
+
+  /** Number of events dropped due to queue overflow */
+  get dropCount(): number {
+    return this._dropCount;
+  }
 
   register(handler: EventHandler): void {
     this.handlers.push(handler);
@@ -36,9 +53,18 @@ export class EventPipeline {
 
   /** Enqueue an event from ActivityLedger. Processes async without blocking the caller. */
   emit(entry: ActivityEntry): void {
+    // ULID dedup guard: skip events already seen (e.g. SSE reconnect replay)
+    const eventKey = `${entry.agentId}:${entry.actionType}:${entry.timestamp}`;
+    if (entry.id !== 0 && this.seenEventIds.has(eventKey)) {
+      return;
+    }
+    this.seenEventIds.add(eventKey);
+
     if (this.queue.length >= MAX_QUEUE_SIZE) {
-      this.queue.shift();
-      logger.warn('pipeline', `Queue full (${MAX_QUEUE_SIZE}) — dropping oldest event`);
+      const dropped: PipelineEvent = { entry: this.queue.shift()!.entry, meta: {} };
+      this._dropCount++;
+      logger.warn('pipeline', `Queue full (${MAX_QUEUE_SIZE}) — dropping oldest event (total drops: ${this._dropCount})`);
+      this.onEventDropped?.(dropped);
     }
     this.queue.push({ entry, meta: {} });
     if (!this.processing) {

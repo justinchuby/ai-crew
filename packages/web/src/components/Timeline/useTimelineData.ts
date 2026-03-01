@@ -5,6 +5,23 @@ import { useState, useEffect, useCallback } from 'react';
 export type TimelineStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
 export type CommType = 'delegation' | 'message' | 'group_message' | 'broadcast';
 
+export type AgentRole =
+  | 'architect'
+  | 'developer'
+  | 'code-reviewer'
+  | 'critical-reviewer'
+  | 'product-manager'
+  | 'technical-writer'
+  | 'tech-writer'
+  | 'designer'
+  | 'generalist'
+  | 'secretary'
+  | 'qa-tester'
+  | 'radical-thinker'
+  | 'project-lead'
+  | 'agent'
+  | string;
+
 export interface TimelineSegment {
   status: TimelineStatus;
   startAt: string;
@@ -17,6 +34,7 @@ export interface TimelineAgent {
   shortId: string;
   role: string;
   model?: string;
+  sessionId?: string;
   createdAt: string;
   endedAt?: string;
   segments: TimelineSegment[];
@@ -43,6 +61,9 @@ export interface TimelineData {
   communications: TimelineComm[];
   locks: TimelineLock[];
   timeRange: { start: string; end: string };
+  sessionId?: string;
+  /** Ledger version — increments on prune/reorder/clear; use for cache invalidation */
+  ledgerVersion?: number;
 }
 
 // --- Helpers ---

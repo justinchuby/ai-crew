@@ -111,4 +111,71 @@ describe('EventPipeline', () => {
 
     expect(order).toEqual(['delegated', 'task_completed', 'file_edit']);
   });
+
+  it('invokes onEventDropped callback and increments dropCount on queue overflow', async () => {
+    const droppedEvents: PipelineEvent[] = [];
+    const pipeline = new EventPipeline({
+      onEventDropped: (ev) => droppedEvents.push(ev),
+    });
+    // Slow handler to keep queue from draining
+    pipeline.register({
+      eventTypes: '*',
+      name: 'slow',
+      handle: async () => { await new Promise(r => setTimeout(r, 5000)); },
+    });
+
+    // Emit enough to fill the queue — the first event starts processing so the queue
+    // holds MAX_QUEUE_SIZE-1 before overflowing. We fill the queue and push one more.
+    // For a smaller test, we just verify the mechanism with a tight loop.
+    // Emit the first event (it enters processing immediately)
+    pipeline.emit(makeEntry({ actionType: 'task_started', agentId: 'first', timestamp: '2000-01-01T00:00:00Z' }));
+    await new Promise(r => setTimeout(r, 5)); // let it start processing
+
+    // Now the handler is blocking on the slow promise. Queue is empty.
+    // Fill the queue to MAX_QUEUE_SIZE
+    for (let i = 0; i < 10_000; i++) {
+      pipeline.emit(makeEntry({ actionType: 'file_edit', agentId: `fill-${i}`, timestamp: `2001-01-01T00:00:${String(i).padStart(5, '0')}Z` }));
+    }
+
+    // Next emit should cause a drop
+    pipeline.emit(makeEntry({ actionType: 'error', agentId: 'overflow', timestamp: '2099-01-01T00:00:00Z' }));
+
+    expect(pipeline.dropCount).toBeGreaterThanOrEqual(1);
+    expect(droppedEvents.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('deduplicates events with same agentId+actionType+timestamp', async () => {
+    const pipeline = new EventPipeline();
+    const received: PipelineEvent[] = [];
+    pipeline.register({
+      eventTypes: '*',
+      name: 'collector',
+      handle: (e) => { received.push(e); },
+    });
+
+    const entry = makeEntry({ id: 1, actionType: 'task_completed', agentId: 'agent-dup', timestamp: '2025-01-01T00:00:00Z' });
+    pipeline.emit(entry);
+    pipeline.emit(entry); // duplicate
+    pipeline.emit(entry); // duplicate
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(received).toHaveLength(1);
+  });
+
+  it('allows synthetic id:0 events through (not deduped against each other by id)', async () => {
+    const pipeline = new EventPipeline();
+    const received: PipelineEvent[] = [];
+    pipeline.register({
+      eventTypes: '*',
+      name: 'collector',
+      handle: (e) => { received.push(e); },
+    });
+
+    // Two different id:0 events with different timestamps should both pass
+    pipeline.emit(makeEntry({ id: 0, actionType: 'file_edit', timestamp: '2025-01-01T00:00:01Z' }));
+    pipeline.emit(makeEntry({ id: 0, actionType: 'file_read', timestamp: '2025-01-01T00:00:02Z' }));
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(received).toHaveLength(2);
+  });
 });
