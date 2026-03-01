@@ -10,17 +10,12 @@
  */
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
+import { posix } from 'path';
 import { existsSync, rmSync } from 'fs';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 
 const execAsync = promisify(exec);
-
-/** Normalize path separators to forward slashes (cross-platform). */
-function normPath(p: string): string {
-  return p.replace(/\\/g, '/');
-}
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -53,7 +48,7 @@ export class WorktreeManager extends EventEmitter {
 
   constructor(repoRoot: string, lockChecker?: LockChecker) {
     super();
-    this.repoRoot = repoRoot;
+    this.repoRoot = repoRoot.replace(/\\/g, '/');
     this.lockChecker = lockChecker ?? null;
   }
 
@@ -61,7 +56,7 @@ export class WorktreeManager extends EventEmitter {
   async create(agentId: string): Promise<string> {
     const shortId = agentId.slice(0, 8);
     const branch = `agent-wt-${shortId}`;
-    const worktreePath = normPath(join(this.repoRoot, '.worktrees', shortId));
+    const worktreePath = posix.join(this.repoRoot, '.worktrees', shortId);
 
     // Clean up stale worktree if one already exists at this path
     if (existsSync(worktreePath)) {
@@ -75,8 +70,8 @@ export class WorktreeManager extends EventEmitter {
       );
 
       // Symlink shared workspace so agents can communicate via .ai-crew/
-      const sharedDir = normPath(join(this.repoRoot, '.ai-crew'));
-      const targetShared = normPath(join(worktreePath, '.ai-crew'));
+      const sharedDir = posix.join(this.repoRoot, '.ai-crew');
+      const targetShared = posix.join(worktreePath, '.ai-crew');
       if (existsSync(sharedDir) && !existsSync(targetShared)) {
         await execAsync(`ln -s "${sharedDir}" "${targetShared}"`, { timeout: 5_000 });
       }
@@ -142,7 +137,7 @@ export class WorktreeManager extends EventEmitter {
     const info = this.worktrees.get(agentId);
     const shortId = agentId.slice(0, 8);
     const branch = info?.branch ?? `agent-wt-${shortId}`;
-    const worktreePath = info?.path ?? normPath(join(this.repoRoot, '.worktrees', shortId));
+    const worktreePath = info?.path ?? posix.join(this.repoRoot, '.worktrees', shortId);
 
     try {
       if (existsSync(worktreePath)) {
@@ -176,14 +171,14 @@ export class WorktreeManager extends EventEmitter {
 
   /** Remove orphaned worktrees left by previous crashes. */
   async cleanupOrphans(): Promise<number> {
-    const worktreeDir = normPath(join(this.repoRoot, '.worktrees'));
+    const worktreeDir = posix.join(this.repoRoot, '.worktrees');
     if (!existsSync(worktreeDir)) return 0;
 
     const { stdout } = await execAsync('git worktree list --porcelain', { cwd: this.repoRoot });
     const orphanPaths = stdout
       .split('\n')
       .filter(line => line.startsWith('worktree '))
-      .map(line => normPath(line.replace('worktree ', '')))
+      .map(line => line.replace('worktree ', '').replace(/\\/g, '/'))
       .filter(p => p.startsWith(worktreeDir));
 
     let cleaned = 0;
