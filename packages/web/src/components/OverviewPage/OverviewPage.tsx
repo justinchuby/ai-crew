@@ -442,11 +442,14 @@ export function OverviewPage({ api, ws }: Props) {
   // Build lead agents list
   const leadAgents = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
 
-  // Build a map of agentId → projectName for the timeline
+  // Build a map of agentId/projectId → projectName for the timeline
   const agentProjectMap = new Map<string, string>();
   for (const agent of agents) {
     if (agent.projectName) {
       agentProjectMap.set(agent.id, agent.projectName);
+      if (agent.projectId) {
+        agentProjectMap.set(agent.projectId, agent.projectName);
+      }
       // Also map children to parent's projectName
       for (const childId of agent.childIds) {
         agentProjectMap.set(childId, agent.projectName);
@@ -454,10 +457,16 @@ export function OverviewPage({ api, ws }: Props) {
     }
   }
 
-  // Build projectId → projectName from lead agents (projectId = lead's agentId)
+  // Build projectId → projectName from lead agents
+  // Map both lead.id (agent UUID) and lead.projectId (project registry UUID)
+  // so resolveProjectName works regardless of which ID the decision carries
   const projectNameMap = new Map<string, string>();
   for (const lead of leadAgents) {
-    projectNameMap.set(lead.id, lead.projectName || `Project ${lead.id.slice(0, 8)}`);
+    const name = lead.projectName || `Project ${lead.id.slice(0, 8)}`;
+    projectNameMap.set(lead.id, name);
+    if (lead.projectId) {
+      projectNameMap.set(lead.projectId, name);
+    }
   }
 
   const resolveProjectName = (d: Decision) => {
