@@ -175,6 +175,10 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
     const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
     logger.info('message', `Broadcast from ${fromLabel} to ${recipients.length} agents: ${msg.content.slice(0, 80)}`);
 
+    if (recipients.length === 0) {
+      agent.sendMessage('[System] Warning: Broadcast sent to 0 agents — no other agents exist yet.');
+    }
+
     for (const recipient of recipients) {
       recipient.sendMessage(`[Broadcast from ${fromLabel}]: ${msg.content}`);
     }

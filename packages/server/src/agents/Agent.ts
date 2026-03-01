@@ -543,6 +543,11 @@ CREW_UPDATE ]]]`;
     return this.pendingMessages.length;
   }
 
+  /** Whether this agent has an active/in-progress LLM call */
+  get isPrompting(): boolean {
+    return this.acpConnection?.isPrompting ?? false;
+  }
+
   /** Drain one pending message if idle — called when system resumes */
   drainPendingMessages(): void {
     if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
