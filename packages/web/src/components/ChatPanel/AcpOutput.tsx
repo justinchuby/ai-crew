@@ -101,6 +101,65 @@ function stringifyContent(content: any): string {
   return String(content).slice(0, 500);
 }
 
+/** Get an emoji for a crew_* tool call by name (lightweight version for AcpOutput) */
+function getCrewCommandEmojiSimple(toolName: string): string {
+  if (toolName.includes('create_agent')) return '🤖';
+  if (toolName.includes('delegate')) return '📋';
+  if (toolName.includes('terminate')) return '🛑';
+  if (toolName.includes('message') || toolName.includes('broadcast')) return '💬';
+  if (toolName.includes('group')) return '👥';
+  if (toolName.includes('decision')) return '🔨';
+  if (toolName.includes('progress')) return '📊';
+  if (toolName.includes('lock') || toolName.includes('unlock')) return '🔒';
+  if (toolName.includes('commit')) return '📝';
+  if (toolName.includes('task') || toolName.includes('dag')) return '📋';
+  if (toolName.includes('timer')) return '⏱️';
+  if (toolName.includes('crew') || toolName.includes('peer')) return '👀';
+  return '⚡';
+}
+
+/** Collapsible block for crew_* MCP tool calls — matches the style of [[[ ]]] command blocks */
+function CrewCommandBlock({ tc }: { tc: AcpToolCall }) {
+  const [expanded, setExpanded] = useState(false);
+  const label = (tc.title || tc.kind || '').replace(/^crew_/, '').toUpperCase();
+  const emoji = getCrewCommandEmojiSimple(tc.title || tc.kind || '');
+  const params = tc.content ? stringifyContent(tc.content) : '';
+
+  let preview = '';
+  if (params) {
+    try {
+      const obj = JSON.parse(params);
+      const parts: string[] = [];
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
+      }
+      preview = parts.join(', ');
+    } catch {
+      preview = params.replace(/[\n\r]+/g, ' ').slice(0, 80);
+    }
+  }
+
+  return (
+    <div
+      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
+      onClick={() => setExpanded((e) => !e)}
+    >
+      <div className="flex items-center gap-1 min-w-0">
+        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+        <span className="shrink-0">{emoji}</span>
+        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
+        {tc.status && (
+          <span className={`px-1 py-0.5 rounded text-[9px] ${tc.status === 'completed' ? 'bg-green-900/30 text-green-400' : tc.status === 'in_progress' ? 'bg-blue-900/30 text-blue-400' : 'bg-th-bg-muted text-th-text-muted'}`}>
+            {tc.status}
+          </span>
+        )}
+        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
+      </div>
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{params}</pre>}
+    </div>
+  );
+}
+
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
@@ -192,7 +251,12 @@ export function AcpOutput({ agentId }: Props) {
       {/* Tool Calls Section */}
       {toolCalls.length > 0 && (
         <div className="space-y-1.5">
-          {toolCalls.map((tc) => (
+          {toolCalls.map((tc) => {
+            const isCrewCommand = tc.title?.startsWith?.('crew_') || tc.kind?.startsWith?.('crew_');
+            if (isCrewCommand) {
+              return <CrewCommandBlock key={tc.toolCallId} tc={tc} />;
+            }
+            return (
             <div key={tc.toolCallId} className="border border-th-border rounded-lg bg-surface-raised p-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -209,7 +273,8 @@ export function AcpOutput({ agentId }: Props) {
                 </pre>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -224,7 +289,7 @@ export function AcpOutput({ agentId }: Props) {
                 <div key={`act-${evt.id}`} className="flex items-center gap-2 py-0.5 px-1">
                   <span className="text-[10px] text-th-text-muted">{time}</span>
                   <span className="text-[10px] text-th-text-muted italic">
-                    {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
+                    {evt.type === 'crew_command' ? getCrewCommandEmojiSimple(evt.commandName || '') : evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
                     {' '}{evt.summary}
                   </span>
                 </div>

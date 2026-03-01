@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.14.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.1",

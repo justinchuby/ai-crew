@@ -13,6 +13,41 @@ import { FolderPicker } from '../FolderPicker/FolderPicker';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
+/** Build a human-readable summary for a crew_* MCP tool call */
+function formatCrewCommandSummary(toolName: string, content: any): string {
+  const label = toolName.replace(/^crew_/, '').replace(/_/g, ' ');
+  if (!content) return label;
+  try {
+    const obj = typeof content === 'string' ? JSON.parse(content) : content;
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === 'string' && v.length > 0) {
+        parts.push(`${k}: ${v.length > 50 ? v.slice(0, 47) + '...' : v}`);
+      }
+    }
+    return parts.length > 0 ? `${label} — ${parts.join(', ')}` : label;
+  } catch {
+    return label;
+  }
+}
+
+/** Get an emoji for a crew_* tool call by name */
+function getCrewCommandEmoji(toolName: string): string {
+  if (toolName.includes('create_agent')) return '🤖';
+  if (toolName.includes('delegate')) return '📋';
+  if (toolName.includes('terminate')) return '🛑';
+  if (toolName.includes('message') || toolName.includes('broadcast')) return '💬';
+  if (toolName.includes('group')) return '👥';
+  if (toolName.includes('decision')) return '🔨';
+  if (toolName.includes('progress')) return '📊';
+  if (toolName.includes('lock') || toolName.includes('unlock')) return '🔒';
+  if (toolName.includes('commit')) return '📝';
+  if (toolName.includes('task') || toolName.includes('dag')) return '📋';
+  if (toolName.includes('timer')) return '⏱️';
+  if (toolName.includes('crew') || toolName.includes('peer')) return '👀';
+  return '⚡';
+}
+
 interface Props {
   api: any;
   ws: any;
@@ -323,14 +358,19 @@ export function LeadDashboard({ api, ws }: Props) {
           const agent = agents.find((a) => a.id === agentId);
           const roleName = agent?.role?.name ?? 'Agent';
           const uniqueId = `${toolCall.toolCallId}-${toolCall.status || Date.now()}`;
+          const toolTitle = typeof toolCall.title === 'string' ? toolCall.title : toolCall.title?.text ?? JSON.stringify(toolCall.title);
+          const isCrewCommand = typeof toolTitle === 'string' && toolTitle.startsWith('crew_');
           store.addActivity(leadId, {
             id: uniqueId,
             agentId,
             agentRole: roleName,
-            type: 'tool_call',
-            summary: (typeof toolCall.title === 'string' ? toolCall.title : toolCall.title?.text ?? JSON.stringify(toolCall.title)) || (typeof toolCall.kind === 'string' ? toolCall.kind : JSON.stringify(toolCall.kind)) || 'Working...',
+            type: isCrewCommand ? 'crew_command' : 'tool_call',
+            summary: isCrewCommand
+              ? formatCrewCommandSummary(toolTitle, toolCall.content)
+              : (toolTitle || (typeof toolCall.kind === 'string' ? toolCall.kind : JSON.stringify(toolCall.kind)) || 'Working...'),
             status: toolCall.status,
             timestamp: Date.now(),
+            ...(isCrewCommand ? { commandName: toolTitle, commandParams: typeof toolCall.content === 'string' ? toolCall.content : JSON.stringify(toolCall.content) } : {}),
           });
         }
       }
@@ -2654,7 +2694,11 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
 
   const recent = activity.slice(-30);
 
-  const getIcon = (type: string, status?: string) => {
+  const getIcon = (type: string, status?: string, commandName?: string) => {
+    if (type === 'crew_command') {
+      const emoji = getCrewCommandEmoji(commandName || '');
+      return <span className="text-xs shrink-0" title={commandName}>{emoji}</span>;
+    }
     if (type === 'delegation') return <GitBranch className="w-3 h-3 text-yellow-600 dark:text-yellow-400 shrink-0" />;
     if (type === 'completion') return <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />;
     if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
@@ -2675,7 +2719,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
           const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (
             <div key={evt.id} className="px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
-              {getIcon(evt.type, evt.status)}
+              {getIcon(evt.type, evt.status, evt.commandName)}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-mono text-th-text-muted">{label}</span>

@@ -5,11 +5,15 @@ export interface ActivityEvent {
   id: string;
   agentId: string;
   agentRole: string;
-  type: 'tool_call' | 'delegation' | 'completion' | 'message_sent' | 'progress';
+  type: 'tool_call' | 'crew_command' | 'delegation' | 'completion' | 'message_sent' | 'progress';
   summary: string;
   detail?: string;
   status?: string;
   timestamp: number;
+  /** For crew_command events: the raw tool name (e.g. "crew_delegate") */
+  commandName?: string;
+  /** For crew_command events: stringified JSON params */
+  commandParams?: string;
 }
 
 export interface AgentComm {
