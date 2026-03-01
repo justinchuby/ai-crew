@@ -2,7 +2,7 @@ name: CI (Windows)
 
 on:
   push:
-    branches: [main, 'team-work-*']
+    branches: [main]
   pull_request:
     branches: [main]
 
