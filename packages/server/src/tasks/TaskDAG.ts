@@ -437,6 +437,21 @@ export class TaskDAG extends EventEmitter {
     return (row?.count ?? 0) > 0;
   }
 
+  /** Lightweight check: does this lead have active (non-terminal) tasks? */
+  hasActiveTasks(leadId: string): boolean {
+    const row = this.db.drizzle
+      .select({ count: sql<number>`count(*)` })
+      .from(dagTasks)
+      .where(and(
+        eq(dagTasks.leadId, leadId),
+        ne(dagTasks.dagStatus, 'done'),
+        ne(dagTasks.dagStatus, 'skipped'),
+        ne(dagTasks.dagStatus, 'failed'),
+      ))
+      .get();
+    return (row?.count ?? 0) > 0;
+  }
+
   /** Get full DAG status (for TASK_STATUS command) */
   getStatus(leadId: string): {
     tasks: DagTask[];

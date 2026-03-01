@@ -263,8 +263,10 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
             dagNote = ` [DAG: "${dagTask.id}" → running]`;
             logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
           }
+        } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
+          dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
         } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
-          dagNote = `\n⚠️ This delegation is not tracked in your task DAG. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
+          dagNote = `\n💡 Your previous plan is complete. Consider using DECLARE_TASKS to plan this new phase of work.`;
         }
       }
 
@@ -390,8 +392,10 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
           dagNote = ` [DAG: "${dagTask.id}" → running]`;
           logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
         }
+      } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
+        dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
       } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
-        dagNote = `\n⚠️ This delegation is not tracked in your task DAG. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
+        dagNote = `\n💡 Your previous plan is complete. Consider using DECLARE_TASKS to plan this new phase of work.`;
       }
     }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
