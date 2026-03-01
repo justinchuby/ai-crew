@@ -189,8 +189,8 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
           const committedFiles = diffOut.trim().split('\n').filter(Boolean);
           const missing = files.filter(f => !committedFiles.includes(f));
           if (missing.length > 0) {
-            agent.sendMessage(`[System] Warning: ${missing.length} expected file(s) not found in commit: ${missing.join(', ')}`);
-            logger.warn('commit', `Post-commit verification: ${missing.length} files missing for ${agent.id.slice(0, 8)}: ${missing.join(', ')}`);
+            // Locked-but-unmodified files are expected; only log at debug level
+            logger.debug('commit', `Post-commit verification: ${missing.length} locked file(s) not in commit for ${agent.id.slice(0, 8)}: ${missing.join(', ')}`);
           }
         } catch {
           // Verification is best-effort — don't fail the commit if diff fails

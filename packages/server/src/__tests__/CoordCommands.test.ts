@@ -306,8 +306,8 @@ describe('CoordCommands — COMMIT handler', () => {
     expect(warnings).toHaveLength(0);
   });
 
-  it('warns when expected files are missing from the commit', async () => {
-    // Verification diff only returns 1 of 2 expected files
+  it('does not warn agent when locked files are not in commit (expected behavior)', async () => {
+    // Verification diff only returns 1 of 2 locked files — the other wasn't modified
     mockExecSuccess(undefined, ['src/auth.ts']);
     const ctx = makeCtx({
       lockRegistry: {
@@ -322,12 +322,16 @@ describe('CoordCommands — COMMIT handler', () => {
 
     commit.handler(agent, '[[[ COMMIT {"message": "partial commit"} ]]]');
 
+    // Should get success message but NOT a warning about missing files
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Warning: 1 expected file(s) not found in commit: src/utils.ts'),
+      expect.stringContaining('COMMIT succeeded'),
     ));
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('Warning'),
+    );
   });
 
-  it('warns with multiple missing files', async () => {
+  it('does not warn agent when no locked files appear in commit diff', async () => {
     mockExecSuccess(undefined, []);
     const ctx = makeCtx({
       lockRegistry: {
@@ -344,8 +348,11 @@ describe('CoordCommands — COMMIT handler', () => {
     commit.handler(agent, '[[[ COMMIT {"message": "empty commit"} ]]]');
 
     await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Warning: 3 expected file(s) not found in commit: a.ts, b.ts, c.ts'),
+      expect.stringContaining('COMMIT succeeded'),
     ));
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('Warning'),
+    );
   });
 
   it('gracefully handles verification diff failure (best-effort)', async () => {
