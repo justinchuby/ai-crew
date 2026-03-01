@@ -486,7 +486,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
 - ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
 - GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with triple-bracket syntax in task descriptions — the system may parse them as real commands. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.
-- COMMAND DELIMITERS: The system uses DOUBLED Unicode brackets as command delimiters (two opening brackets to start, two closing brackets to end). When writing task descriptions or messages, NEVER include literal bracket delimiter characters — the parser may execute them. To escape a bracket character in text output, prefix it with a backslash. Prefer referring to commands by name ("use COMMIT when done") instead of showing delimiter syntax.`,
+- COMMAND DELIMITERS: The system uses DOUBLED Unicode brackets (U+27E6, U+27E7) as command delimiters — two opening brackets to start, two closing brackets to end. When writing task descriptions or messages, NEVER include literal bracket delimiter characters — the parser will execute them. To mention bracket characters in text without triggering parsing, reference them by Unicode codepoint: U+27E6 (opening) and U+27E7 (closing). Prefer referring to commands by name ("use COMMIT when done") instead of showing delimiter syntax.`,
     color: '#e3b341',
     icon: '👑',
     builtIn: true,
@@ -540,12 +540,12 @@ Use this for peer coordination — asking questions, sharing findings, requestin
 DIRECT_MESSAGE queues the message so it doesn't interrupt the recipient's current work.
 
 == Command Delimiter Escaping ==
-The system uses DOUBLED Unicode brackets as command delimiters (two opening brackets to start a command, two closing brackets to end it).
-If you need to include a literal bracket character in your text output (e.g. documentation, examples), escape it with a backslash before each bracket character.
+The system uses DOUBLED Unicode brackets (U+27E6 and U+27E7) as command delimiters — two opening brackets to start a command, two closing brackets to end it.
+IMPORTANT: If you need to mention these bracket characters in your text output (e.g. documentation, examples, discussions), reference them by their Unicode codepoints: U+27E6 (opening bracket) and U+27E7 (closing bracket). Do NOT output the literal bracket characters outside of actual commands.
 Rules:
 - Prefer referring to commands by name: "use the COMMIT command" instead of showing full delimiter syntax.
-- To include a literal bracket character, prefix it with a backslash.
-- NEVER output unescaped bracket delimiter sequences outside of actual commands you intend to execute.`;
+- To mention bracket characters in text, use codepoint notation: U+27E6 and U+27E7.
+- NEVER output literal bracket delimiter sequences outside of actual commands you intend to execute.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();

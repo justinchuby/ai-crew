@@ -159,7 +159,7 @@ export class ContextCompressor {
         content.includes('PROGRESS') ||
         content.includes('build failed') ||
         content.includes('test failed') ||
-        /⟦.*?⟧/.test(content) // Any ACP command
+        /⟦⟦.*?⟧⟧/.test(content) // Any ACP command
       ) {
         important.push(i);
       }
