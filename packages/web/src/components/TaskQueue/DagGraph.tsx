@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { DagStatus, DagTask } from '../../types';
-import { computeCriticalPath, type CriticalPathTask } from './dagCriticalPath';
+import { computeCriticalPath, formatElapsed, type CriticalPathTask } from './dagCriticalPath';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,19 +70,6 @@ function edgeColor(status: DagTaskStatus): string {
 // Custom node component
 // ---------------------------------------------------------------------------
 type DagTaskNodeData = { task: DagTask; onCriticalPath?: boolean };
-
-function formatNodeElapsed(createdAt: string, completedAt?: string): string {
-  const start = new Date(createdAt).getTime();
-  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
-  const ms = Math.max(0, end - start);
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${secs}s`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
-}
 
 function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
   const task = data.task;
@@ -151,7 +138,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
         </span>
         {(task.dagStatus === 'running' || task.dagStatus === 'done') && (
           <span style={{ color: task.dagStatus === 'running' ? '#60a5fa' : '#6b7280', fontSize: 9, flexShrink: 0, marginLeft: 4 }}>
-            ⏱ {formatNodeElapsed(task.createdAt, task.completedAt)}
+            ⏱ {formatElapsed(task.createdAt, task.completedAt)}
           </span>
         )}
       </div>
