@@ -137,12 +137,17 @@ export class CommandDispatcher {
       agent.humanMessageResponded = true;
     }
 
-    // Keep only last 500 chars that might contain an incomplete command
+    // Keep only last 500 chars that might contain an incomplete command.
+    // Cap buffer at 100KB to prevent unbounded growth when no closing bracket arrives.
+    const MAX_BUFFER = 100_000;
     const lastOpen = buf.lastIndexOf('⟦⟦');
     if (lastOpen >= 0) {
       buf = buf.slice(lastOpen);
     } else if (buf.length > 500) {
       buf = buf.slice(-200);
+    }
+    if (buf.length > MAX_BUFFER) {
+      buf = buf.slice(-MAX_BUFFER);
     }
     this.textBuffers.set(agent.id, buf);
   }
