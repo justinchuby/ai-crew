@@ -613,14 +613,14 @@ export function apiRouter(
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
+    let resolvedProjectId: string | undefined;
+    let resumingProject = false;
     try {
       // Resolve project name and ID BEFORE spawn so both are included in the agent:spawned SSE event.
       // (Previously projectId was set after spawn, so agent:spawned had projectId=undefined,
       //  causing the web client's dedup filter to fail and show duplicate project entries.)
       const projectName = name || `Project ${new Date().toLocaleDateString()}`;
-      let resolvedProjectId: string | undefined;
       let resolvedProjectName = projectName;
-      let resumingProject = false;
 
       if (projectRegistry) {
         let project;
@@ -670,6 +670,10 @@ export function apiRouter(
       }
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
+      // Clean up orphan project row if spawn failed after project creation
+      if (resolvedProjectId && projectRegistry && !resumingProject) {
+        try { projectRegistry.delete(resolvedProjectId); } catch { /* best-effort */ }
+      }
       logger.error('lead', `Failed to start project: ${err.message}`);
       res.status(429).json({ error: err.message });
     }
