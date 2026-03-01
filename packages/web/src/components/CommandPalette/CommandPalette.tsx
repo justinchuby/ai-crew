@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,10 +133,9 @@ export function CommandPalette({ onClose, onOpenSearch }: Props) {
         icon: '🌗',
         category: 'action',
         action: () => {
-          const isDark = document.documentElement.classList.contains('dark');
-          document.documentElement.classList.toggle('dark', !isDark);
-          document.documentElement.classList.toggle('light', isDark);
-          localStorage.setItem('theme', isDark ? 'light' : 'dark');
+          const store = useSettingsStore.getState();
+          const next = store.resolvedTheme === 'dark' ? 'light' : 'dark';
+          store.setThemeMode(next);
           onClose();
         },
       },

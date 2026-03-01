@@ -4,10 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import './index.css';
 import { getAuthToken } from './hooks/useApi';
+import { useSettingsStore } from './stores/settingsStore';
 
 // Apply theme before render to avoid flash
-const savedTheme = localStorage.getItem('theme') || 'dark';
-document.documentElement.classList.add(savedTheme);
+useSettingsStore.getState().initThemeListener();
 
 // Auto-inject auth headers for all /api requests
 const _origFetch = window.fetch;

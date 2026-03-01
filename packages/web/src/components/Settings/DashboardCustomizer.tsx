@@ -1,10 +1,41 @@
-import { LayoutDashboard, RotateCcw, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { LayoutDashboard, RotateCcw, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 
 // ── DashboardCustomizer ───────────────────────────────────────────────
 
 export function DashboardCustomizer() {
-  const { allPanels, togglePanel, movePanel, reset } = useDashboardLayout();
+  const { allPanels, togglePanel, reorderPanels, reset } = useDashboardLayout();
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragRef = useRef<string | null>(null);
+
+  const handleDragStart = (id: string) => {
+    dragRef.current = id;
+    setDragId(id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    if (dragRef.current && dragRef.current !== id) {
+      setDragOverId(id);
+    }
+  };
+
+  const handleDrop = (targetId: string) => {
+    if (dragRef.current && dragRef.current !== targetId) {
+      reorderPanels(dragRef.current, targetId);
+    }
+    dragRef.current = null;
+    setDragId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    dragRef.current = null;
+    setDragId(null);
+    setDragOverId(null);
+  };
 
   return (
     <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
@@ -25,20 +56,32 @@ export function DashboardCustomizer() {
       </div>
 
       <p className="text-xs text-th-text-muted mb-3 leading-relaxed">
-        Toggle panels on/off and reorder them. Changes apply to Mission Control immediately.
+        Drag panels to reorder, toggle visibility. Changes apply to Mission Control immediately.
       </p>
 
       {/* Panel list */}
       <div className="space-y-1.5">
-        {allPanels.map((panel, idx) => (
+        {allPanels.map((panel) => (
           <div
             key={panel.id}
-            className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors ${
-              panel.visible
-                ? 'bg-th-bg-alt border-th-border'
-                : 'bg-th-bg/30 border-th-border-muted opacity-60'
+            draggable
+            onDragStart={() => handleDragStart(panel.id)}
+            onDragOver={(e) => handleDragOver(e, panel.id)}
+            onDrop={() => handleDrop(panel.id)}
+            onDragEnd={handleDragEnd}
+            className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors cursor-grab active:cursor-grabbing ${
+              dragId === panel.id
+                ? 'opacity-40 border-accent'
+                : dragOverId === panel.id
+                  ? 'border-accent bg-accent/10'
+                  : panel.visible
+                    ? 'bg-th-bg-alt border-th-border'
+                    : 'bg-th-bg/30 border-th-border-muted opacity-60'
             }`}
           >
+            {/* Drag handle */}
+            <GripVertical className="w-4 h-4 text-th-text-muted flex-shrink-0" />
+
             {/* Visibility toggle */}
             <button
               onClick={() => togglePanel(panel.id)}
@@ -64,31 +107,6 @@ export function DashboardCustomizer() {
             >
               {panel.label}
             </span>
-
-            {/* Order badge */}
-            <span className="text-[10px] font-mono text-th-text-muted w-5 text-right">
-              {panel.order + 1}
-            </span>
-
-            {/* Move buttons */}
-            <div className="flex flex-col gap-0.5 flex-shrink-0">
-              <button
-                onClick={() => movePanel(panel.id, 'up')}
-                disabled={idx === 0}
-                className="p-0.5 rounded text-th-text-muted hover:text-th-text hover:bg-th-bg-hover transition-colors disabled:opacity-20 disabled:pointer-events-none"
-                aria-label={`Move ${panel.label} up`}
-              >
-                <ChevronUp className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => movePanel(panel.id, 'down')}
-                disabled={idx === allPanels.length - 1}
-                className="p-0.5 rounded text-th-text-muted hover:text-th-text hover:bg-th-bg-hover transition-colors disabled:opacity-20 disabled:pointer-events-none"
-                aria-label={`Move ${panel.label} down`}
-              >
-                <ChevronDown className="w-3 h-3" />
-              </button>
-            </div>
           </div>
         ))}
       </div>

@@ -352,7 +352,7 @@ export function OverviewPage({ api, ws }: Props) {
   const [feedbackDecisionId, setFeedbackDecisionId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const agents = useAppStore((s) => s.agents);
-  const { projects } = useLeadStore();
+  const projects = useLeadStore((s) => s.projects);
 
   // Fetch all decisions on mount + poll every 5s
   const loadDecisions = useCallback(async () => {

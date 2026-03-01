@@ -122,7 +122,7 @@ function tabKey(tab: TabItem): string {
 // ---------------------------------------------------------------------------
 export function TaskQueuePanel({ api }: Props) {
   const { agents } = useAppStore();
-  const { projects: leadProjects } = useLeadStore();
+  const leadProjects = useLeadStore((s) => s.projects);
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
   const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | null>('graph');

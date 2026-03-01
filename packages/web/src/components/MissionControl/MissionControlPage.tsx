@@ -1,23 +1,104 @@
+import { useMemo } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { useAppStore } from '../../stores/appStore';
 import { HealthSummary } from './HealthSummary';
 import { AgentFleet } from './AgentFleet';
 import { DagMinimap } from './DagMinimap';
+import { ActivityFeed } from './ActivityFeed';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { AlertsPanel } from './AlertsPanel';
+import { CommHeatmap } from '../FleetOverview/CommHeatmap';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
+import type { PanelConfig } from '../../hooks/useDashboardLayout';
+
+// ── Panel renderer ────────────────────────────────────────────────────
+
+function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: string; agents: any[] }) {
+  switch (panel.id) {
+    case 'alerts':
+      return <AlertsPanel leadId={leadId} />;
+    case 'health':
+      return <HealthSummary leadId={leadId} />;
+    case 'tokens':
+      return <TokenEconomics />;
+    case 'fleet':
+      return <AgentFleet leadId={leadId} />;
+    case 'dag':
+      return <DagMinimap leadId={leadId} />;
+    case 'activity':
+      return <ActivityFeed leadId={leadId} />;
+    case 'heatmap': {
+      const heatmapAgents = agents.map((a) => ({
+        id: a.id,
+        role: a.role.id,
+        name: `${a.role.icon}${a.id.slice(0, 5)}`,
+      }));
+      const heatmapMessages: Array<{ from: string; to: string; count: number }> = [];
+      for (const agent of agents) {
+        if (!agent.parentId) continue;
+        const inbound = Math.max(1, agent.messages?.filter((m: any) => m.sender === 'external').length ?? 1);
+        const outbound = Math.max(1, agent.messages?.filter((m: any) => m.sender === 'agent').length ?? 1);
+        heatmapMessages.push({ from: agent.parentId, to: agent.id, count: inbound });
+        heatmapMessages.push({ from: agent.id, to: agent.parentId, count: outbound });
+      }
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">🗺️ Comm Heatmap</h3>
+          <CommHeatmap agents={heatmapAgents} messages={heatmapMessages} />
+        </div>
+      );
+    }
+    case 'scorecards': {
+      const team = agents.filter((a) => a.parentId === leadId || a.id === leadId);
+      const running = team.filter((a) => a.status === 'running').length;
+      const idle = team.filter((a) => a.status === 'idle').length;
+      const completed = team.filter((a) => a.status === 'completed').length;
+      const total = team.length;
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">📊 Performance</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center p-2 bg-th-bg-alt rounded-md">
+              <div className="text-2xl font-bold text-th-text">{total}</div>
+              <div className="text-xs text-th-text-muted">Total Agents</div>
+            </div>
+            <div className="text-center p-2 bg-th-bg-alt rounded-md">
+              <div className="text-2xl font-bold text-green-400">{running}</div>
+              <div className="text-xs text-th-text-muted">Running</div>
+            </div>
+            <div className="text-center p-2 bg-th-bg-alt rounded-md">
+              <div className="text-2xl font-bold text-yellow-400">{idle}</div>
+              <div className="text-xs text-th-text-muted">Idle</div>
+            </div>
+            <div className="text-center p-2 bg-th-bg-alt rounded-md">
+              <div className="text-2xl font-bold text-blue-400">{completed}</div>
+              <div className="text-xs text-th-text-muted">Completed</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
 
 // ── MissionControlPage ───────────────────────────────────────────────
 
 export function MissionControlPage() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const projectKeys = useLeadStore((s) => Object.keys(s.projects));
+  const agents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
 
   // Auto-select first lead if none selected
   const leadId = selectedLeadId ?? projectKeys[0] ?? null;
 
-  const isVisible = (id: string) => panels.some((p) => p.id === id);
+  const teamAgents = useMemo(() => {
+    if (!leadId) return [];
+    return agents.filter((a) => a.parentId === leadId || a.id === leadId);
+  }, [agents, leadId]);
 
   if (!leadId) {
     return (
@@ -40,28 +121,12 @@ export function MissionControlPage() {
         <span className="text-xs text-th-text-muted font-mono">Lead: {leadId.slice(0, 8)}</span>
       </div>
 
-      {/* Alerts (full-width when visible) */}
-      {isVisible('alerts') && (
-        <div className="shrink-0">
-          <AlertsPanel leadId={leadId} />
+      {/* Render all visible panels in user-defined order */}
+      {panels.map((panel) => (
+        <div key={panel.id} className="shrink-0">
+          <PanelSlot panel={panel} leadId={leadId} agents={teamAgents} />
         </div>
-      )}
-
-      {/* Top row: Health + Token Economics */}
-      {(isVisible('health') || isVisible('tokens')) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 shrink-0">
-          {isVisible('health') && <HealthSummary leadId={leadId} />}
-          {isVisible('tokens') && <TokenEconomics />}
-        </div>
-      )}
-
-      {/* Middle row: Agent Fleet + DAG Minimap */}
-      {(isVisible('fleet') || isVisible('dag')) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0" style={{ minHeight: '280px' }}>
-          {isVisible('fleet') && <AgentFleet leadId={leadId} />}
-          {isVisible('dag') && <DagMinimap leadId={leadId} />}
-        </div>
-      )}
+      ))}
     </div>
   );
 }

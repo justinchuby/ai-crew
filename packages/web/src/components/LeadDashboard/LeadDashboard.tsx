@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
@@ -18,7 +19,9 @@ interface Props {
 }
 
 export function LeadDashboard({ api, ws }: Props) {
-  const { projects, selectedLeadId, drafts } = useLeadStore();
+  const { projects, selectedLeadId, drafts } = useLeadStore(
+    useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
+  );
   const agents = useAppStore((s) => s.agents);
   const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
   const setInput = useCallback((text: string) => {
@@ -225,9 +228,10 @@ export function LeadDashboard({ api, ws }: Props) {
     }
   }, [currentProject?.messages]);
 
-  // Poll progress for selected lead
+  // Poll progress for selected lead (skip for project: prefixed IDs — those are persisted projects, not running agents)
+  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:');
   useEffect(() => {
-    if (!selectedLeadId) return;
+    if (!isActiveAgent || !selectedLeadId) return;
     const fetchProgress = () => {
       fetch(`/api/lead/${selectedLeadId}/progress`).then((r) => r.json()).then((data) => {
         if (data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
@@ -236,11 +240,11 @@ export function LeadDashboard({ api, ws }: Props) {
     fetchProgress();
     const interval = setInterval(fetchProgress, 5000);
     return () => clearInterval(interval);
-  }, [selectedLeadId]);
+  }, [selectedLeadId, isActiveAgent]);
 
   // Poll decisions for selected lead
   useEffect(() => {
-    if (!selectedLeadId) return;
+    if (!isActiveAgent || !selectedLeadId) return;
     const fetchDecisions = () => {
       fetch(`/api/lead/${selectedLeadId}/decisions`).then((r) => r.json()).then((data) => {
         if (Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
@@ -249,19 +253,19 @@ export function LeadDashboard({ api, ws }: Props) {
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
     return () => clearInterval(interval);
-  }, [selectedLeadId]);
+  }, [selectedLeadId, isActiveAgent]);
 
   // Fetch groups for selected lead
   useEffect(() => {
-    if (!selectedLeadId) return;
+    if (!isActiveAgent || !selectedLeadId) return;
     fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
     }).catch(() => {});
-  }, [selectedLeadId]);
+  }, [selectedLeadId, isActiveAgent]);
 
   // Fetch DAG status for selected lead
   useEffect(() => {
-    if (!selectedLeadId) return;
+    if (!isActiveAgent || !selectedLeadId) return;
     const fetchDag = () => {
       fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
         if (data && data.tasks) useLeadStore.getState().setDagStatus(selectedLeadId, data as DagStatus);
@@ -270,7 +274,7 @@ export function LeadDashboard({ api, ws }: Props) {
     fetchDag();
     const interval = setInterval(fetchDag, 10000);
     return () => clearInterval(interval);
-  }, [selectedLeadId]);
+  }, [selectedLeadId, isActiveAgent]);
 
   // Listen for lead-specific WebSocket events
   useEffect(() => {
