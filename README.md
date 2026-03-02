@@ -1,13 +1,13 @@
-# AI Crew — Multi-Agent Copilot CLI Orchestrator
+# Flightdeck — Multi-Agent Copilot CLI Orchestrator
 
 > [!WARNING]
 > This is purely AI generated code. Use the project with this understanding in mind.
 
 A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. A **Project Lead** agent breaks down your task, assembles a team of developers, architects, reviewers, and more, then coordinates their work while you stay in the loop.
 
-**Why AI Crew?** Instead of one AI agent doing everything sequentially, AI Crew runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
+**Why Flightdeck?** Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
 
-> **Status**: Active development on [branch `team-work-3`](https://github.com/github/ai-crew/tree/team-work-3).
+> **Status**: Active development on [branch `team-work-3`](https://github.com/github/flightdeck/tree/team-work-3).
 
 ## Features
 

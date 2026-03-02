@@ -1,6 +1,6 @@
 # Presentation Recommendations
 
-Tips for presenting AI Crew to your team.
+Tips for presenting Flightdeck to your team.
 
 ## Before the Presentation
 
@@ -95,7 +95,7 @@ A: Depends on agent count and task complexity. A typical 10-agent session uses ~
 A: Agents run real code, so yes — but coordination features (file locks, scoped commits, input validation, code review agents) minimize risk. System pause lets you freeze everything instantly.
 
 **Q: How is this different from ChatGPT/Claude with tools?**
-A: Those are single-agent. AI Crew runs parallel agents with distinct roles, structured communication, dependency resolution, and real-time observability. It's the difference between one person doing everything and an engineering team.
+A: Those are single-agent. Flightdeck runs parallel agents with distinct roles, structured communication, dependency resolution, and real-time observability. It's the difference between one person doing everything and an engineering team.
 
 **Q: Can I add custom roles?**
 A: Yes — the RoleRegistry supports custom role definitions with their own system prompts and model preferences.

@@ -1,6 +1,6 @@
 ---
 theme: default
-title: "AI Crew — Building a Multi-Agent AI Development System"
+title: "Flightdeck — Building a Multi-Agent AI Development System"
 info: |
   How we built a system where AI agents coordinate, review, and ship code together.
 highlighter: shiki
@@ -155,7 +155,7 @@ A single Copilot CLI agent got one prompt: *"Build a system where multiple AI ag
 <div class="bg-gray-800 rounded-lg p-2 border border-blue-500">
 
 ### 🔄 Then it got recursive
-Use **version N** of AI Crew → to build **version N+1**. Each generation is built by the previous generation's team.
+Use **version N** of Flightdeck → to build **version N+1**. Each generation is built by the previous generation's team.
 
 </div>
 
@@ -381,7 +381,7 @@ the lead doesn't context-switch, it holds everything at once.
 <div class="grid grid-cols-2 gap-4">
 <div class="text-center">
 
-**AI Crew Server**
+**Flightdeck Server**
 <div class="text-xs text-gray-500">Sends prompts, receives output</div>
 
 </div>
@@ -996,7 +996,7 @@ The Secretary agent analyzes task descriptions and infers semantic dependencies 
 
 <!--
 Auto-DAG is the magic that makes the system feel intelligent. Most
-multi-agent systems fire-and-forget delegations. AI Crew builds a
+multi-agent systems fire-and-forget delegations. Flightdeck builds a
 dependency graph automatically. Three tiers of inference: explicit
 deps you specify, role-based rules (reviews depend on implementations),
 and LLM-based semantic analysis by the Secretary. Near-duplicate
@@ -1101,7 +1101,7 @@ Crew implements its own fixes — the system literally improves itself
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
 
-**This session is proof.** We started by implementing improvements from our last retrospective ([issue #49](https://github.com/justinchuby/ai-crew/issues/49)). We just filed a new one ([issue #52](https://github.com/justinchuby/ai-crew/issues/52)) for next time. The system that builds software is building *itself*.
+**This session is proof.** We started by implementing improvements from our last retrospective ([issue #49](https://github.com/justinchuby/flightdeck/issues/49)). We just filed a new one ([issue #52](https://github.com/justinchuby/flightdeck/issues/52)) for next time. The system that builds software is building *itself*.
 
 </div>
 
@@ -1257,7 +1257,7 @@ product this entire time." This is the mic drop moment.
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-green-500">
 
-### Your AI Crew
+### Your Flightdeck
 <div class="text-sm">
 
 - Agents in parallel (as many as you need)
@@ -1272,8 +1272,8 @@ product this entire time." This is the mic drop moment.
 <!--
 This is what it means for YOU. Every engineer in this room gets a crew.
 You set the direction — architecture, product decisions, design choices.
-Your AI crew handles the execution: coding, testing, reviewing,
-coordinating. A single Copilot is a contractor. An AI Crew is your
+Your Flightdeck handles the execution: coding, testing, reviewing,
+coordinating. A single Copilot is a contractor. A Flightdeck is your
 personal engineering team. You go from writing every line yourself to
 directing a team that handles the rest.
 -->
@@ -1521,8 +1521,8 @@ picture themselves in each scenario.
 
 ```bash
 # To run it yourself:
-git clone https://github.com/justinchuby/ai-crew.git
-cd ai-crew && npm install && npm run dev
+git clone https://github.com/justinchuby/flightdeck.git
+cd flightdeck && npm install && npm run dev
 ```
 
 </div>
@@ -1559,8 +1559,8 @@ layout: center
 <div class="text-sm text-gray-400">
 
 ```bash
-git clone https://github.com/justinchuby/ai-crew.git
-cd ai-crew && npm install && npm run dev
+git clone https://github.com/justinchuby/flightdeck.git
+cd flightdeck && npm install && npm run dev
 # Requires: Node.js 20+, GitHub Copilot CLI
 ```
 
@@ -1568,7 +1568,7 @@ cd ai-crew && npm install && npm run dev
 
 <br/>
 
-<div class="text-lg text-gray-500">github.com/justinchuby/ai-crew</div>
+<div class="text-lg text-gray-500">github.com/justinchuby/flightdeck</div>
 
 <br/>
 

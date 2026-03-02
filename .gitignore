@@ -30,7 +30,7 @@ coverage/
 .idea/
 
 # Runtime / workspace
-.ai-crew
+.flightdeck
 .worktrees/
 
 # Logs
