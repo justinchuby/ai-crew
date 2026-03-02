@@ -208,15 +208,15 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 | Command | Description |
 |---------|-------------|
-| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `title`, `depends_on`. |
+| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `role`, `depends_on`, and optional `description`. |
 | `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
 | `COMPLETE_TASK {"id": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `id`, `summary`, `status`, `output` fields. *(Any agent)* |
 | `TASK_STATUS` | Query current task DAG status. |
-| `PAUSE_TASK {"taskId": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
-| `RETRY_TASK {"taskId": "..."}` | Retry a failed task. *(Lead-only)* |
-| `SKIP_TASK {"taskId": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
-| `ADD_TASK {"task": {...}}` | Add a new task to an existing DAG. *(Lead-only)* |
-| `CANCEL_TASK {"taskId": "..."}` | Cancel a task. *(Lead-only)* |
+| `PAUSE_TASK {"id": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
+| `RETRY_TASK {"id": "..."}` | Retry a failed task. *(Lead-only)* |
+| `SKIP_TASK {"id": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
+| `ADD_TASK {"id": "...", "role": "...", "description": "...", "depends_on": [...]}` | Add a new task to an existing DAG. *(Lead-only)* |
+| `CANCEL_TASK {"id": "..."}` | Cancel a task. *(Lead-only)* |
 | `RESET_DAG` | Reset the entire DAG (clear all tasks). *(Lead-only)* |
 | `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
 | `QUERY_TASKS` | Query current task DAG status (alias for TASK_STATUS). |
