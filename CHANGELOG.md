@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documentation accuracy improvements (URLs, command syntax, CLI flags)
 
-## [0.1.0] - 2025-01-01
+## [0.1.0] - 2026-03-01
 
 ### Added
 
