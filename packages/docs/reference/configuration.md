@@ -18,7 +18,7 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
-| `HOST` | `127.0.0.1` | Server bind address |
+| `HOST` | `127.0.0.1` | Server bind address. All access is local by default; for remote access, use SSH tunneling to forward the port securely. |
 | `DB_PATH` | `./flightdeck.db` | SQLite database path |
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |
 | `AUTH` | `token` | Auth mode. Set to `none` to disable authentication (not recommended). |
@@ -91,16 +91,6 @@ The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 ```bash
 flightdeck --port=4000
 ```
-
-### Remote access via SSH tunneling
-
-Flightdeck binds to `127.0.0.1` by default — all access is local. For remote access, use SSH tunneling to securely forward the port:
-
-```bash
-ssh -L 3001:localhost:3001 user@remote-host
-```
-
-Then open `http://localhost:3001` on your local machine. The connection is encrypted by SSH — no need to expose Flightdeck to the network.
 
 ### Run headless (no browser)
 
