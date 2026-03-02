@@ -27,7 +27,20 @@ vi.mock('child_process', () => {
       });
     });
   };
-  return { exec: execFn };
+  const execFileFn: any = (file: string, args: string[], opts: any, cb: any) => {
+    const cmd = `${file} ${args.join(' ')}`;
+    return execHandler.fn(cmd, opts, cb);
+  };
+  execFileFn[PROMISIFY_CUSTOM] = (file: string, args: string[], opts: any) => {
+    const cmd = `${file} ${args.join(' ')}`;
+    return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      execHandler.fn(cmd, opts, (err: any, stdout: string, stderr: string) => {
+        if (err) reject(err);
+        else resolve({ stdout: stdout ?? '', stderr: stderr ?? '' });
+      });
+    });
+  };
+  return { exec: execFn, execFile: execFileFn };
 });
 
 // Mock fs.existsSync / rmSync / symlinkSync — default: nothing exists

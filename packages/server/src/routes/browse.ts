@@ -36,9 +36,11 @@ export function browseRoutes(_ctx: AppContext): Router {
 
     const normalized = normalize(targetPath);
 
-    // Block sensitive system paths
+    // Block sensitive system paths (case-insensitive on Windows)
+    const normCheck = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
     for (const blocked of BROWSE_BLOCKED_PATHS) {
-      if (normalized === blocked || normalized.startsWith(blocked + sep)) {
+      const blockedCheck = process.platform === 'win32' ? blocked.toLowerCase() : blocked;
+      if (normCheck === blockedCheck || normCheck.startsWith(blockedCheck + sep)) {
         return { allowed: false, reason: 'Access denied: system directory' };
       }
     }

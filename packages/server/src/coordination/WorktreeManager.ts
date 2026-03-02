@@ -8,7 +8,7 @@
  * On server shutdown, cleanupAll() removes every active worktree.
  * On startup, cleanupOrphans() prunes leftovers from previous crashes.
  */
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { existsSync, rmSync, symlinkSync } from 'fs';
@@ -16,6 +16,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Convert native path to forward slashes for storage/comparison */
 function toForwardSlash(p: string): string {
@@ -158,7 +159,7 @@ export class WorktreeManager extends EventEmitter {
     }
 
     try {
-      await execAsync(`git branch -D "${branch}"`, { cwd: this.repoRoot, timeout: 5_000 });
+      await execFileAsync('git', ['branch', '-D', branch], { cwd: this.repoRoot, timeout: 5_000 });
     } catch {
       // Branch may not exist — that's fine
     }
