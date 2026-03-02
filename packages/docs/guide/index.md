@@ -15,7 +15,7 @@ Flightdeck is a web-based orchestration framework that coordinates multiple [Git
 
 ## Key Capabilities
 
-- **12 specialist roles** — developers, architects, reviewers, designers, and more — each with a different AI model for diverse perspectives
+- **13 specialist roles** — developers, architects, reviewers, designers, and more — each with a different AI model for diverse perspectives
 - **Parallel execution** — multiple agents coding, reviewing, and testing simultaneously
 - **File locking** — agents claim files before editing, so no one overwrites anyone else
 - **Task DAG** — a dependency graph that tracks what's done, what's next, and what's blocked

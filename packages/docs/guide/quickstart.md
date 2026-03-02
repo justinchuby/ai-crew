@@ -1,64 +1,44 @@
 # Quick Start
 
+Get a multi-agent team running in under 2 minutes.
+
 ## Prerequisites
 
 - Node.js 20+
 - npm 10+
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot) installed and authenticated
 
-## Installation
-
-```bash
-git clone https://github.com/justinchuby/flightdeck.git
-cd flightdeck
-npm install
-```
-
-## Running
-
-### Production (recommended)
-
-The `flightdeck` command builds the project and starts the server with the web UI:
+## Launch
 
 ```bash
 npx @flightdeck-ai/flightdeck
 ```
 
-Options:
-- `--port=4000` — Custom port (default: 3001, or `PORT` env var)
-- `--host=0.0.0.0` — Bind address (default: 127.0.0.1, or `HOST` env var)
-- `--no-browser` — Don't auto-open the browser
-- `-v` / `--version` — Print version and exit
-- `-h` / `--help` — Print help and exit
+That's it. The dashboard opens in your browser automatically.
+
+> [!TIP] CLI Options
+> `--port=4000` custom port · `--host=0.0.0.0` bind address · `--no-browser` skip auto-open · `-v` version · `-h` help
 
 The server prints an **auth token** to the console on startup. This token is automatically injected into the web UI — no manual configuration needed.
 
-### Development
+## Create Your First Project
 
-Start both the server and web UI in dev mode with hot reload:
+1. The **Lead Dashboard** opens as the default view
+2. Click **Create Project**
+3. Describe what you want built — for example: *"Build a REST API for a todo app with authentication, tests, and documentation"*
+4. Select a model for the Project Lead (defaults to Claude Opus 4.6)
+5. Click **Start** and watch
 
-```bash
-npm run dev
-```
+### What happens next
 
-Or start them separately:
+Within a minute or two, the lead will:
 
-```bash
-npm run dev:server   # http://localhost:3001
-npm run dev:web      # http://localhost:5173
-```
+- **Analyze** your task and break it into subtasks
+- **Create agents** — you'll see developers, reviewers, and other specialists appear
+- **Delegate work** — each agent gets a focused subtask
+- **Coordinate** — agents message each other, review code, and resolve conflicts
 
-## Creating Your First Project
-
-1. Open the web UI (auto-opens, or visit `http://localhost:3001`)
-2. The **Lead Dashboard** is the default view
-3. Click **Create Project**
-4. Provide a name, task description, and optionally a working directory
-5. Select a model for the Project Lead (defaults to Claude Opus 4.6)
-6. The lead will analyze the task, create agents, and start delegating
-
-> [!TIP] What to expect
-> Within a minute or two, you'll see the lead creating agents (developers, reviewers, etc.) and assigning them work. The dashboard updates in real-time — you can watch agents coding, messaging each other, and reviewing code simultaneously. You don't need to do anything — just watch. Or jump in and message any agent at any time.
+The dashboard updates in real time. You'll see agents writing code, debating approaches in group chats, and filing commits. You don't need to do anything — or you can jump in and message any agent at any time.
 
 ## Interacting with Agents
 
@@ -83,6 +63,24 @@ Select a different AI model from the dropdown in the agents list. The change tak
 ## Persistent Projects
 
 Projects persist across sessions. If a lead agent exits, the project remembers its tasks, decisions, and agent memories. Click **Resume Project** on an inactive project to start a new lead session with full context from prior work.
+
+## Development Setup
+
+For contributing to Flightdeck itself:
+
+```bash
+git clone https://github.com/justinchuby/flightdeck.git
+cd flightdeck
+npm install
+npm run dev          # starts server + web UI with hot reload
+```
+
+Or start them separately:
+
+```bash
+npm run dev:server   # http://localhost:3001
+npm run dev:web      # http://localhost:5173
+```
 
 ## Building for Production
 

@@ -2,6 +2,8 @@
 
 ## Built-in Roles
 
+Flightdeck ships with 13 specialist roles. The Project Lead automatically selects roles based on the task — you don't need to configure them.
+
 | Role | Icon | Focus | Default Model |
 |------|------|-------|---------------|
 | Project Lead | 🎯 | Coordination, delegation, synthesis | Claude Opus 4.6 |
@@ -17,6 +19,21 @@
 | Secretary | 📋 | Plan tracking, progress auditing | GPT-4.1 |
 | QA Tester | 🧪 | Test strategy, edge cases, quality gates | Claude Sonnet 4.6 |
 | Agent | ⚙️ | Neutral general-purpose agent, no role-specific instructions | Claude Sonnet 4.6 |
+
+### When to use each role
+
+- **Developer** — The workhorse. Use for any coding task: implementing features, writing tests, fixing bugs, refactoring.
+- **Architect** — Use early in a project for system design, or when a Developer is stuck on a structural decision. Architects challenge problem framing and propose alternatives.
+- **Code Reviewer** — Automatically assigned after code changes. Focuses on readability and patterns — catches the "this works but is hard to maintain" issues.
+- **Critical Reviewer** — The skeptic. Use for security-sensitive code, performance-critical paths, or when you need someone to find edge cases others missed.
+- **Product Manager** — Use when the team needs to prioritize features or think about user experience. Good for reviewing API designs from a consumer's perspective.
+- **Technical Writer** — Ensures documentation stays accurate. Also reviews API design — if something is hard to document, it's probably too complex.
+- **Designer** — Use for UI/UX work, accessibility reviews, or interaction design. Thinks about the human experience.
+- **QA Tester** — Runs code end-to-end, verifies behavior, catches runtime failures that code review cannot detect.
+- **Generalist** — The Swiss army knife. Use for cross-cutting tasks that don't fit a single specialty: research, build systems, DevOps.
+- **Radical Thinker** — Deliberately challenges conventional approaches. Useful when the team is stuck or when you want fresh perspectives.
+- **Secretary** — Tracks progress, maintains checklists, provides status reports. Created automatically for projects using the task DAG.
+- **Agent** — A blank-slate role with no specialized instructions. Use when you want an agent that just follows the system prompt you provide.
 
 ## Model Diversity
 

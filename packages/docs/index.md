@@ -3,34 +3,37 @@ layout: home
 hero:
   name: Flightdeck
   text: Multi-Agent Copilot CLI Orchestrator
-  tagline: Coordinate teams of AI agents with specialized roles to collaborate on software engineering tasks.
+  tagline: Describe a goal. Watch a team of AI agents build it — coding, reviewing, and coordinating in real time.
   actions:
     - theme: brand
-      text: Get Started
+      text: Quick Start →
       link: /guide/quickstart
     - theme: alt
       text: API Reference
       link: /reference/api
 features:
   - icon: 🚀
-    title: One-Command Install
-    details: "Run npx @flightdeck-ai/flightdeck and you're up. No configuration needed — opens a real-time dashboard instantly."
+    title: One Command to Launch
+    details: "Run npx @flightdeck-ai/flightdeck — no config needed. A real-time dashboard opens instantly where you watch agents work."
   - icon: 🎯
-    title: Project Lead
-    details: An AI coordinator that breaks down tasks, assembles a team, delegates work, and synthesizes results.
+    title: AI Project Lead
+    details: An AI coordinator analyzes your task, picks the right specialists, delegates subtasks, reviews results, and synthesizes the final output.
   - icon: 👥
-    title: Specialized Roles
-    details: 13 purpose-built agent roles — developers, architects, reviewers, designers — each with a different AI model.
+    title: 13 Specialist Roles
+    details: Developers, architects, code reviewers, designers, QA testers, and more — each running a different AI model for diverse perspectives.
   - icon: 💬
-    title: Inter-Agent Communication
-    details: Direct messages, broadcasts, and group chats. Agents debate approaches and challenge ideas collaboratively.
+    title: Agents Talk to Each Other
+    details: Direct messages, broadcasts, and group chats. Agents debate approaches, challenge each other's ideas, and reach better solutions together.
   - icon: 📊
-    title: Task DAG
-    details: Visualize task dependencies as a directed acyclic graph with real-time status updates.
+    title: Task DAG Visualization
+    details: See task dependencies as a live directed acyclic graph. Track what's done, what's running, and what's blocked — all in real time.
   - icon: 🙋
-    title: Human-in-the-Loop
-    details: Message any agent or the lead at any time. Queue messages or interrupt with dedicated buttons.
+    title: Jump In Anytime
+    details: Message any agent at any time. Queue a note for later or interrupt their current work. You're always in control.
   - icon: 🔒
-    title: Coordination
-    details: File locking, activity ledger, decision log, and context re-injection keep agents working together safely.
+    title: Safe Coordination
+    details: File locking prevents conflicts. An activity ledger tracks every action. Decision logs capture the "why" behind every choice.
+  - icon: 🔄
+    title: Persistent Projects
+    details: Projects survive restarts. Resume where you left off with full context — tasks, decisions, and agent memories all preserved.
 ---

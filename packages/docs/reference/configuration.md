@@ -83,3 +83,42 @@ The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 | `--no-browser` | Don't auto-open the browser on startup |
 | `-v` / `--version` | Print version and exit |
 | `-h` / `--help` | Print help and exit |
+
+## Common Configurations
+
+### Run on a custom port
+
+```bash
+npx @flightdeck-ai/flightdeck --port=4000
+```
+
+### Expose to your local network
+
+```bash
+npx @flightdeck-ai/flightdeck --host=0.0.0.0
+```
+
+### Run headless (no browser)
+
+```bash
+npx @flightdeck-ai/flightdeck --no-browser
+```
+
+### Use a fixed auth token
+
+Set `SERVER_SECRET` so the token doesn't change across restarts — useful for scripts or API integrations:
+
+```bash
+SERVER_SECRET=my-stable-token npx @flightdeck-ai/flightdeck
+```
+
+### Increase agent concurrency
+
+For large tasks that benefit from more parallel agents, update via the Settings page or API:
+
+```bash
+curl -X POST http://localhost:3001/api/settings \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"maxConcurrent": 20}'
+```
