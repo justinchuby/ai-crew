@@ -1,6 +1,7 @@
 <template>
-  <div class="install-command">
-    <div class="install-box">
+  <div class="hero-install">
+    <div class="hero-install-header">Install</div>
+    <div class="hero-install-body">
       <code>npm install -g @flightdeck-ai/flightdeck</code>
       <code>flightdeck</code>
     </div>
@@ -8,22 +9,33 @@
 </template>
 
 <style scoped>
-.install-command {
-  max-width: 480px;
-  margin: 0 auto 1rem;
-  text-align: center;
-  padding: 0 24px;
+.hero-install {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-code-bg);
+  max-width: 320px;
+  margin: 0 auto;
 }
-.install-box {
+.hero-install-header {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+.hero-install-body {
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
-.install-box code {
-  font-size: 1.1rem;
-  padding: 0.5rem 1.5rem;
-  background: var(--vp-code-bg);
-  border-radius: 8px;
+.hero-install-body code {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--vp-c-text-1);
+  background: none;
+  padding: 0;
   display: block;
+  white-space: nowrap;
 }
 </style>

@@ -7,7 +7,7 @@ export default {
   extends: DefaultTheme,
   Layout: () => {
     return h(DefaultTheme.Layout, null, {
-      'home-features-before': () => h(HomeInstallCommand)
+      'home-hero-image': () => h(HomeInstallCommand)
     })
   }
 } satisfies Theme
