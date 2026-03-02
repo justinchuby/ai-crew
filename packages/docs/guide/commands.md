@@ -120,7 +120,7 @@ Mark a DAG task as done. Any agent can use this — non-lead agents relay comple
 Declare a batch of tasks in the DAG (directed acyclic graph).
 
 ```
-⟦⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "title": "Build auth", "depends_on": []}, {"id": "api", "title": "Build API", "depends_on": ["auth"]}]} ⟧⟧
+⟦⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "role": "developer", "description": "Build auth module", "depends_on": []}, {"id": "api", "role": "developer", "description": "Build API layer", "depends_on": ["auth"]}]} ⟧⟧
 ```
 
 ### LOCK_FILE / UNLOCK_FILE
@@ -336,6 +336,8 @@ Interrupt another agent's current work by injecting a priority message.
 |-------|----------|-------------|
 | `to` | ✅ | Target agent ID (short ID prefix) |
 | `content` | ✅ | Priority message to inject |
+
+#### Template Commands {#template-commands}
 
 ### LIST_TEMPLATES
 

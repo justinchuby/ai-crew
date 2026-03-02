@@ -16,6 +16,7 @@
 | Radical Thinker | 🚀 | Challenge assumptions, unconventional ideas | Gemini 3 Pro |
 | Secretary | 📋 | Plan tracking, progress auditing | GPT-4.1 |
 | QA Tester | 🧪 | Test strategy, edge cases, quality gates | Claude Sonnet 4.6 |
+| Agent | ⚙️ | Neutral general-purpose agent, no role-specific instructions | Claude Sonnet 4.6 |
 
 ## Model Diversity
 
