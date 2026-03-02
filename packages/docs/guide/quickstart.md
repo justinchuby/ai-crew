@@ -11,7 +11,8 @@ Get a multi-agent team running in under 2 minutes.
 ## Launch
 
 ```bash
-npx @flightdeck-ai/flightdeck
+npm install -g @flightdeck-ai/flightdeck
+flightdeck
 ```
 
 That's it. The dashboard opens in your browser automatically.
@@ -86,7 +87,7 @@ npm run dev:web      # http://localhost:5173
 
 ```bash
 npm run build
-npx @flightdeck-ai/flightdeck
+flightdeck
 ```
 
 Or manually:
