@@ -15,6 +15,7 @@
     "bin/",
     "packages/server/dist/",
     "!packages/server/dist/__tests__/",
+    "!**/*.map",
     "packages/server/drizzle/",
     "packages/web/dist/",
     "README.md",
