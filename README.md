@@ -8,7 +8,8 @@
 Flightdeck orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
 
 ```bash
-npx @flightdeck-ai/flightdeck
+npm install -g @flightdeck-ai/flightdeck
+flightdeck
 ```
 
 Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents at the same time — a developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster delivery, higher quality, and built-in checks and balances.
@@ -18,10 +19,11 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 ## Quick Start
 
 ```bash
-npx @flightdeck-ai/flightdeck
+npm install -g @flightdeck-ai/flightdeck
+flightdeck
 ```
 
-That's it. This downloads Flightdeck, starts the server, and opens the dashboard in your browser.
+That's it. This installs Flightdeck globally and starts the server, opening the dashboard in your browser.
 
 ### What Happens Next
 
