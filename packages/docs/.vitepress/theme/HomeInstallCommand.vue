@@ -16,6 +16,9 @@
   max-width: 400px;
   margin: 0 auto;
   user-select: text;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
 }
 .hero-install-header {
   padding: 8px 20px;
@@ -46,6 +49,22 @@
   .hero-install {
     margin-top: 2rem;
     max-width: 100%;
+  }
+}
+</style>
+
+<!-- Unscoped overrides for VitePress hero layout -->
+<style>
+/* Disable pointer events on the image-bg overlay so install text is clickable */
+.VPHero .image-container .image-bg {
+  pointer-events: none;
+}
+
+/* On mobile, push the image (install box) below the hero text */
+@media (max-width: 959px) {
+  .VPHero .image {
+    order: 3 !important;
+    margin: 0 !important;
   }
 }
 </style>
