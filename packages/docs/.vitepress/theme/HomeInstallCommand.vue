@@ -1,6 +1,23 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const copied = ref(false)
+
+function copyInstall() {
+  navigator.clipboard.writeText('npm install -g @flightdeck-ai/flightdeck\nflightdeck')
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 2000)
+}
+</script>
+
 <template>
   <div class="hero-install">
-    <div class="hero-install-header">Install</div>
+    <div class="hero-install-header">
+      Install
+      <button class="copy-btn" :class="{ copied }" @click="copyInstall">
+        {{ copied ? '✓ Copied' : 'Copy' }}
+      </button>
+    </div>
     <div class="hero-install-body">
       <code>npm install -g @flightdeck-ai/flightdeck</code>
       <code>flightdeck</code>
@@ -26,6 +43,27 @@
   font-weight: 600;
   color: var(--vp-c-text-2);
   border-bottom: 1px solid var(--vp-c-divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.copy-btn {
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.copy-btn:hover {
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-text-3);
+}
+.copy-btn.copied {
+  color: var(--vp-c-green-1);
+  border-color: var(--vp-c-green-1);
 }
 .hero-install-body {
   padding: 16px 20px;
