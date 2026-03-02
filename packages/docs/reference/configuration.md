@@ -89,19 +89,19 @@ The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 ### Run on a custom port
 
 ```bash
-npx @flightdeck-ai/flightdeck --port=4000
+flightdeck --port=4000
 ```
 
 ### Expose to your local network
 
 ```bash
-npx @flightdeck-ai/flightdeck --host=0.0.0.0
+flightdeck --host=0.0.0.0
 ```
 
 ### Run headless (no browser)
 
 ```bash
-npx @flightdeck-ai/flightdeck --no-browser
+flightdeck --no-browser
 ```
 
 ### Use a fixed auth token
@@ -109,7 +109,7 @@ npx @flightdeck-ai/flightdeck --no-browser
 Set `SERVER_SECRET` so the token doesn't change across restarts — useful for scripts or API integrations:
 
 ```bash
-SERVER_SECRET=my-stable-token npx @flightdeck-ai/flightdeck
+SERVER_SECRET=my-stable-token flightdeck
 ```
 
 ### Increase agent concurrency

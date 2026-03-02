@@ -14,7 +14,7 @@ hero:
 features:
   - icon: 🚀
     title: One Command to Launch
-    details: "Run npx @flightdeck-ai/flightdeck — no config needed. A real-time dashboard opens instantly where you watch agents work."
+    details: "Run `npm install -g @flightdeck-ai/flightdeck` once, then launch with `flightdeck` — no config needed. A real-time dashboard opens instantly where you watch agents work."
   - icon: 🎯
     title: AI Project Lead
     details: An AI coordinator analyzes your task, picks the right specialists, delegates subtasks, reviews results, and synthesizes the final output.
@@ -56,7 +56,8 @@ features:
 <div class="install-command">
 
   ```sh
-  npx @flightdeck-ai/flightdeck
+  npm install -g @flightdeck-ai/flightdeck
+  flightdeck
   ```
 
 </div>
