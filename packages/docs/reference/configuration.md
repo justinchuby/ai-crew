@@ -18,7 +18,7 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
-| `HOST` | `localhost` | Server host |
+| `HOST` | `127.0.0.1` | Server bind address |
 | `DB_PATH` | `./flightdeck.db` | SQLite database path |
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |
 | `AUTH` | `token` | Auth mode. Set to `none` to disable authentication (not recommended). |

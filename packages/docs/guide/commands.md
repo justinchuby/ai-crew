@@ -282,12 +282,12 @@ Force a task to "ready" state, overriding dependency checks. Lead-only.
 Assign an existing DAG task to a specific agent. Lead-only.
 
 ```
-⟦⟦ ASSIGN_TASK {"id": "task-id", "agentId": "agent-id-prefix"} ⟧⟧
+⟦⟦ ASSIGN_TASK {"taskId": "task-id", "agentId": "agent-id-prefix"} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | ✅ | DAG task ID |
+| `taskId` | ✅ | DAG task ID |
 | `agentId` | ✅ | Target agent ID (short ID prefix) |
 
 ### REASSIGN_TASK
@@ -295,12 +295,12 @@ Assign an existing DAG task to a specific agent. Lead-only.
 Reassign a running task from one agent to another. Lead-only.
 
 ```
-⟦⟦ REASSIGN_TASK {"id": "task-id", "agentId": "new-agent-id"} ⟧⟧
+⟦⟦ REASSIGN_TASK {"taskId": "task-id", "agentId": "new-agent-id"} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | ✅ | DAG task ID to reassign |
+| `taskId` | ✅ | DAG task ID to reassign |
 | `agentId` | ✅ | New target agent ID (short ID prefix) |
 
 ### HALT_HEARTBEAT
@@ -316,12 +316,12 @@ Stop the heartbeat monitor from nudging the lead. Useful when the lead is perfor
 Agent requests a change to the concurrency limit. Requires user approval via the dashboard.
 
 ```
-⟦⟦ REQUEST_LIMIT_CHANGE {"newLimit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧
+⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `newLimit` | ✅ | Requested new agent concurrency limit |
+| `limit` | ✅ | Requested new agent concurrency limit |
 | `reason` | ❌ | Explanation for the change request |
 
 ### INTERRUPT
@@ -329,13 +329,13 @@ Agent requests a change to the concurrency limit. Requires user approval via the
 Interrupt another agent's current work by injecting a priority message.
 
 ```
-⟦⟦ INTERRUPT {"agentId": "agent-id-prefix", "message": "Stop — requirements changed"} ⟧⟧
+⟦⟦ INTERRUPT {"to": "agent-id-prefix", "content": "Stop — requirements changed"} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `agentId` | ✅ | Target agent ID (short ID prefix) |
-| `message` | ✅ | Priority message to inject |
+| `to` | ✅ | Target agent ID (short ID prefix) |
+| `content` | ✅ | Priority message to inject |
 
 ### Task DAG Management (Lead-only)
 
