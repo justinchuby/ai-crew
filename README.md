@@ -3,59 +3,17 @@
 > [!WARNING]
 > This is purely AI generated code. Use the project with this understanding in mind.
 
-A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. A **Project Lead** agent breaks down your task, assembles a team of developers, architects, reviewers, and more, then coordinates their work while you stay in the loop.
+**One command. A whole engineering team.**
 
-**Why Flightdeck?** Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
+Flightdeck orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
 
-## Features
+```bash
+npx @flightdeck-ai/flightdeck
+```
 
-### 🎯 Team Orchestration
-- **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
-- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
-- **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
-- **Task DAG** — Declarative task scheduling with dependencies; `PROGRESS` auto-reads DAG state when one exists. DAG auto-links to agents via `DELEGATE`/`CREATE_AGENT` — no manual tracking needed.
-- **Human-in-the-Loop** — Message any agent directly; queued messages show with blue bubbles and a spinner. Remove or reorder queued messages before delivery.
-- **System Pause/Resume** — Halt all message delivery system-wide; agents are notified to hold position. Queued messages stay in place until resumed.
+Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents at the same time — a developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster delivery, higher quality, and built-in checks and balances.
 
-### 💬 Communication
-- **Direct Messaging** — Agents send structured messages to each other by ID
-- **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
-- **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
-- **Broadcasts** — Send a message to every active agent at once
-
-### 📈 Visualization & Monitoring
-- **Mission Control** — Single-screen project overview with 8 configurable panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards. Drag-and-drop panel reordering in Settings.
-- **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, hover tooltips showing task details and duration, **project tabs** for multi-project sessions, **Zustand store persistence** (state survives tab switches), **adaptive date display** (time-only for <24h sessions, date+time for multi-day), and **Clear Timeline** button for resetting cached data
-- **Org Chart** — Team hierarchy visualization with **project tabs** for switching between active projects
-- **DAG / Gantt Chart** — Scrollable and zoomable task Gantt chart with local timezone display
-- **Token Economics** — Per-agent token breakdown with context pressure bars (80% yellow, 90% red warning thresholds)
-- **Proactive Alerts** — Automatic detection of context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min). _Note: Stuck agent detection is currently disabled to reduce noise in long-running sessions._
-- **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint), agent reply highlighting via WebSocket
-- **User-Directed Message Highlighting** — Lead marks messages intended for the user with `@user`; these render with accent border + background to stand out from system reactions
-- **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed) with filter toggles
-- **Catch-Up Summary** — After 60s of inactivity, a floating banner summarizes what happened while you were away
-- **Project Health Header** — `CREW_UPDATE` messages include a health summary: completion %, agent fleet status, pending decisions, blocked tasks
-- **Project Grouping** — Group and filter projects in the Tasks view with duplicate task detection
-
-### ✅ Decision & Progress Tracking
-- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
-- **PROGRESS/DAG Consolidation** — A single `PROGRESS` command auto-reads DAG state, eliminating the need for separate queries
-- **Global Search** — Search across messages, tasks, decisions, and activity
-
-### 🔒 Coordination & Safety
-- **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
-- **Scoped COMMIT** — The `COMMIT` command executes `git add` only on files the agent has locked, then commits and runs post-commit verification (`git diff --name-only HEAD~1`) to confirm the expected files actually landed. Prevents `git add -A` from leaking other agents' uncommitted work.
-- **Merge Scope Validation** — When merging agent branches, `WorktreeManager.merge()` validates that only locked files were modified — defense-in-depth against accidental cross-contamination
-- **Worktree Isolation** — ⚠️ _In development, not yet enabled._ Per-agent git worktrees are implemented in the backend (`WorktreeManager`) but not yet active in production. Agents currently share the repository working directory. See the [Coordination guide](packages/docs/guide/coordination.md) for details.
-- **Event Pipeline** — Reactive event handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
-- **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
-- **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
-
-### 💾 Persistence & Recovery
-- **Session Resume** — Resume from a previous Copilot session ID
-- **Persistent Projects** — Projects survive lead sessions; resume with full context briefing. Chat history and project state auto-load on app startup.
-- **Context Re-injection** — Automatic crew context recovery after context window compaction
-- **Theme Persistence** — Light, Dark, and Follow System themes persist across sessions via shared store
+<img width="3164" height="1598" alt="Flightdeck dashboard showing multi-agent coordination" src="https://github.com/user-attachments/assets/bcf9bb15-be17-4f53-9347-d044dbc0871c" />
 
 ## Quick Start
 
@@ -63,11 +21,21 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 npx @flightdeck-ai/flightdeck
 ```
 
-That's it — this downloads and runs Flightdeck, then opens the web UI in your browser.
+That's it. This downloads Flightdeck, starts the server, and opens the dashboard in your browser.
 
-**Options:** `--port=4000`, `--host=0.0.0.0`, `--no-browser`, `-v` / `--version`, `-h` / `--help`
+### What Happens Next
 
-### Local Development
+1. **Create a project** — Click **Create Project**, describe what you want built, and point it at your repo
+2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a team
+3. **Agents get to work** — Developers, reviewers, architects spin up in parallel — each in their own Copilot CLI session
+4. **Stay in the loop** — Message any agent directly, approve decisions, and watch progress in real time
+
+> **Example:** *"Refactor the auth module to use JWT tokens, add tests, and update the docs"* → The lead creates a developer (implementation), a code reviewer (quality), and a tech writer (docs), sets up dependencies so the reviewer waits for the developer, and coordinates the whole flow.
+
+**CLI options:** `--port=4000` · `--host=0.0.0.0` · `--no-browser` · `-v` / `--version` · `-h` / `--help`
+
+<details>
+<summary><strong>Local development setup</strong></summary>
 
 ```bash
 npm install
@@ -84,11 +52,50 @@ npm run dev
 - **Server**: `http://localhost:3001`
 - **Web UI**: `http://localhost:5173` (dev) or `http://localhost:3001` (production)
 
-### Creating a Project
+</details>
 
-1. Open the web UI — the **Lead** page is the default view
-2. Click **Create Project**, provide a name, task, and optionally a working directory
-3. The lead analyzes the task, creates agents, and starts delegating
+## Features
+
+### 🎯 Team Orchestration
+- **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
+- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
+- **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
+- **Task DAG** — Declarative task scheduling with dependencies; auto-links agents via `DELEGATE`/`CREATE_AGENT`
+- **Human-in-the-Loop** — Message any agent directly; queue, reorder, or remove messages before delivery
+- **System Pause/Resume** — Halt all message delivery system-wide; agents hold position until resumed
+
+### 💬 Communication
+- **Direct Messaging** — Agents send structured messages to each other by ID
+- **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
+- **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
+- **Broadcasts** — Send a message to every active agent at once
+
+### 📈 Visualization & Monitoring
+- **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
+- **Timeline** — Swim-lane visualization of agent activity with role/status/comm-type filtering, brush time selector, keyboard navigation, live auto-scroll, and hover tooltips
+- **Org Chart** — Team hierarchy visualization with project tabs
+- **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
+- **Token Economics** — Per-agent token breakdown with context pressure warnings (80% yellow, 90% red)
+- **Proactive Alerts** — Auto-detects context pressure, duplicate file edits, idle agents with ready tasks, and stale decisions
+- **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed)
+- **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
+
+### ✅ Decision & Progress Tracking
+- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
+- **PROGRESS/DAG Consolidation** — A single `PROGRESS` command auto-reads DAG state, eliminating the need for separate queries
+- **Global Search** — Search across messages, tasks, decisions, and activity
+
+### 🔒 Coordination & Safety
+- **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
+- **Scoped COMMIT** — `git add` only on files the agent has locked, then post-commit verification. Prevents `git add -A` from leaking other agents' work.
+- **Event Pipeline** — Reactive handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
+- **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
+- **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
+
+### 💾 Persistence & Recovery
+- **Session Resume** — Resume from a previous Copilot session ID with full context recovery
+- **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
+- **Context Re-injection** — Automatic crew context recovery after context window compaction
 
 ## Architecture
 
@@ -298,16 +305,14 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 ## Screenshots
 
-<img width="3164" height="1598" alt="image" src="https://github.com/user-attachments/assets/bcf9bb15-be17-4f53-9347-d044dbc0871c" />
+<img width="1411" height="782" alt="Lead dashboard with chat and decisions panel" src="https://github.com/user-attachments/assets/2d9762c1-a546-4494-8545-6fd3cc41cbc0" />
 
-<img width="1411" height="782" alt="Image" src="https://github.com/user-attachments/assets/2d9762c1-a546-4494-8545-6fd3cc41cbc0" />
+<img width="1404" height="796" alt="Mission Control overview" src="https://github.com/user-attachments/assets/47b8b71b-ae85-485a-94fc-881c8d616369" />
 
-<img width="1404" height="796" alt="Image" src="https://github.com/user-attachments/assets/47b8b71b-ae85-485a-94fc-881c8d616369" />
+<img width="1404" height="796" alt="Timeline swim-lane visualization" src="https://github.com/user-attachments/assets/9596336c-27f0-43e8-a82f-0cf20af7a149" />
 
-<img width="1404" height="796" alt="Image" src="https://github.com/user-attachments/assets/9596336c-27f0-43e8-a82f-0cf20af7a149" />
+<img width="1413" height="825" alt="Task DAG and Gantt chart" src="https://github.com/user-attachments/assets/83243b55-33fb-46f5-aa63-2f8a68b75118" />
 
-<img width="1413" height="825" alt="Image" src="https://github.com/user-attachments/assets/83243b55-33fb-46f5-aa63-2f8a68b75118" />
+<img width="1412" height="826" alt="Agent fleet and controls" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
 
-<img width="1412" height="826" alt="Image" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
-
-<img width="1406" height="817" alt="Image" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
+<img width="1406" height="817" alt="Settings and custom role editor" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
