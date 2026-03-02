@@ -1,7 +1,6 @@
 {
-  "name": "flightdeck",
+  "name": "@flightdeck-ai/flightdeck",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "bin": {
     "flightdeck": "./bin/flightdeck.mjs"
@@ -11,8 +10,24 @@
     "packages/web",
     "packages/docs"
   ],
+  "files": [
+    "bin/",
+    "packages/server/dist/",
+    "!packages/server/dist/__tests__/",
+    "packages/server/drizzle/",
+    "packages/web/dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "node bin/flightdeck.mjs",
+    "prepublishOnly": "npm run build",
     "dev": "concurrently \"npm run dev --workspace=packages/server\" \"npm run dev --workspace=packages/web\"",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
@@ -22,6 +37,17 @@
     "test": "npm run test --workspace=packages/server",
     "docs:dev": "npm run dev --workspace=packages/docs",
     "docs:build": "npm run build --workspace=packages/docs"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.14.1",
+    "better-sqlite3": "^12.6.2",
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.45.1",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.56.1",
