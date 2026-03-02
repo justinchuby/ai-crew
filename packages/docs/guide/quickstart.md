@@ -9,8 +9,8 @@
 ## Installation
 
 ```bash
-git clone https://github.com/justinchuby/ai-crew.git
-cd ai-crew
+git clone https://github.com/justinchuby/flightdeck.git
+cd flightdeck
 npm install
 ```
 
