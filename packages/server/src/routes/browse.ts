@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { readdirSync, realpathSync } from 'node:fs';
-import { resolve, join, dirname, normalize } from 'node:path';
+import { resolve, join, dirname, normalize, sep } from 'node:path';
 import { homedir } from 'node:os';
 import type { AppContext } from './context.js';
 
@@ -18,10 +18,15 @@ export function browseRoutes(_ctx: AppContext): Router {
   ];
 
   // Sensitive directories that should never be browsable
-  const BROWSE_BLOCKED_PATHS = [
-    '/etc', '/proc', '/sys', '/dev', '/boot', '/sbin',
-    '/var/log', '/var/run', '/private/etc', '/private/var',
-  ];
+  const BROWSE_BLOCKED_PATHS = process.platform === 'win32'
+    ? [
+        'C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)',
+        'C:\\ProgramData', 'C:\\Recovery', 'C:\\System Volume Information',
+      ]
+    : [
+        '/etc', '/proc', '/sys', '/dev', '/boot', '/sbin',
+        '/var/log', '/var/run', '/private/etc', '/private/var',
+      ];
 
   function isPathAllowed(targetPath: string): { allowed: boolean; reason?: string } {
     // Block null bytes (injection vector)
@@ -33,14 +38,14 @@ export function browseRoutes(_ctx: AppContext): Router {
 
     // Block sensitive system paths
     for (const blocked of BROWSE_BLOCKED_PATHS) {
-      if (normalized === blocked || normalized.startsWith(blocked + '/')) {
+      if (normalized === blocked || normalized.startsWith(blocked + sep)) {
         return { allowed: false, reason: 'Access denied: system directory' };
       }
     }
 
     // Must be under an allowed root
     const underAllowedRoot = BROWSE_ALLOWED_ROOTS.some(
-      (root) => normalized === root || normalized.startsWith(root + '/'),
+      (root) => normalized === root || normalized.startsWith(root + sep),
     );
     if (!underAllowedRoot) {
       return { allowed: false, reason: 'Access denied: path outside allowed directories' };

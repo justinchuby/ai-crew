@@ -266,9 +266,11 @@ export class TaskDAG extends EventEmitter {
 
     for (const running of runningTasks) {
       const overlap = files.some(f =>
-        running.files.some(rf =>
-          f === rf || f.startsWith(rf + '/') || rf.startsWith(f + '/'),
-        ),
+        running.files.some(rf => {
+          const nf = f.replace(/\\/g, '/');
+          const nrf = rf.replace(/\\/g, '/');
+          return nf === nrf || nf.startsWith(nrf + '/') || nrf.startsWith(nf + '/');
+        }),
       );
       if (overlap) return false;
     }

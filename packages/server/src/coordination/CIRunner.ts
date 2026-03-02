@@ -94,7 +94,7 @@ export class CIRunner extends EventEmitter {
   dispose(): void {
     if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
     if (this.activeProc) {
-      this.activeProc.kill('SIGTERM');
+      this.activeProc.kill();
       this.activeProc = null;
     }
     this.queue = [];

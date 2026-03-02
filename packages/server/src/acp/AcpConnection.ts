@@ -306,7 +306,7 @@ export class AcpConnection extends EventEmitter {
   terminate(): void {
     if (this.process) {
       this.process.stdin?.end();
-      this.process.kill('SIGTERM');
+      this.process.kill();
       this.process = null;
     }
     this._isConnected = false;
