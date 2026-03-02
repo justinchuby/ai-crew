@@ -41,7 +41,7 @@
   padding: 0;
   display: block;
   white-space: nowrap;
-  user-select: all;
+  user-select: text;
   cursor: text;
 }
 
