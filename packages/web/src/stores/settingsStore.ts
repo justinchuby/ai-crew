@@ -14,7 +14,7 @@ interface SettingsState {
   initThemeListener: () => void;
 }
 
-const SOUND_KEY = 'ai-crew-sound-enabled';
+const SOUND_KEY = 'flightdeck-sound-enabled';
 const THEME_KEY = 'theme';
 
 function loadSoundPreference(): boolean {

@@ -14,7 +14,7 @@ interface OnboardingStep {
 
 const STEPS: OnboardingStep[] = [
   {
-    title: 'Welcome to AI Crew!',
+    title: 'Welcome to Flightdeck!',
     description:
       'A multi-agent AI orchestration system. Your AI team works in parallel, coordinated by a lead agent.',
     icon: '🚀',

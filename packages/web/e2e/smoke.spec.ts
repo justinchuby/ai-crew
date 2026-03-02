@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('AI Crew Smoke Tests', () => {
+test.describe('Flightdeck Smoke Tests', () => {
   test('homepage loads with correct title', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('AI Crew');
+    await expect(page.locator('h1')).toHaveText('Flightdeck');
   });
 
   test('sidebar navigation works', async ({ page }) => {

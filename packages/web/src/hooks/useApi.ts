@@ -9,7 +9,7 @@ export function getAuthToken(): string | null {
   // In production, the server sets an HttpOnly cookie that handles auth automatically
   // (cookie is sent by the browser with every request, no JS access needed).
   const params = new URLSearchParams(window.location.search);
-  return params.get('token') || localStorage.getItem('ai-crew-token');
+  return params.get('token') || localStorage.getItem('flightdeck-token');
 }
 
 function authHeaders(): Record<string, string> {

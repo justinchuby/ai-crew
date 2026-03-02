@@ -54,7 +54,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('ai-crew-sidebar-tabs');
+      const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 4) return parsed.filter((id: string) => id !== 'activity');
@@ -628,7 +628,7 @@ export function LeadDashboard({ api, ws }: Props) {
       const tgtIdx = newOrder.indexOf(targetTabId);
       if (srcIdx === -1 || tgtIdx === -1) return prev;
       [newOrder[srcIdx], newOrder[tgtIdx]] = [newOrder[tgtIdx], newOrder[srcIdx]];
-      localStorage.setItem('ai-crew-sidebar-tabs', JSON.stringify(newOrder));
+      localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder));
       return newOrder;
     });
   }, []);

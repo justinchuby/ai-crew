@@ -161,7 +161,7 @@ export function App() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
-            <h1 className="text-lg font-semibold">AI Crew</h1>
+            <h1 className="text-lg font-semibold">Flightdeck</h1>
             <div className="flex items-center gap-3">
               <button
                 onClick={togglePause}
