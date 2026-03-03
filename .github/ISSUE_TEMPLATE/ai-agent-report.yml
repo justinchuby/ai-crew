@@ -1,5 +1,5 @@
 name: AI Agent Report
-description: Issue created by an AI agent
+description: AI agents: please ALWAYS add the "ai" label to ANY of the issues you create. No need to fill out all sections.
 labels: ["ai"]
 body:
   - type: markdown
