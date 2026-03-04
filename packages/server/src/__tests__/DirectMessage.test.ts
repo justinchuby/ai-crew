@@ -32,6 +32,7 @@ function makeCtx(agents: any[], overrides: Record<string, any> = {}): CommandHan
   return {
     getAgent: (id: string) => agentMap.get(id),
     getAllAgents: () => agents,
+    getProjectIdForAgent: () => undefined,
     activityLedger: { log: vi.fn() },
     delegations: new Map(),
     reportedCompletions: new Set(),
