@@ -56,23 +56,27 @@ export function LeadDashboard({ api, ws }: Props) {
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
+    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 4) {
           let tabs = parsed.filter((id: string) => id !== 'activity');
-          // Migrate: ensure 'models' is in a prominent position (not appended at end)
-          if (!tabs.includes('models')) {
-            const dagIndex = tabs.indexOf('dag');
-            tabs.splice(dagIndex >= 0 ? dagIndex + 1 : 3, 0, 'models');
-            localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(tabs));
+          // Migrate: ensure all supported tabs are present
+          let changed = false;
+          for (const tab of allSupportedTabs) {
+            if (!tabs.includes(tab)) {
+              tabs.push(tab);
+              changed = true;
+            }
           }
+          if (changed) localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(tabs));
           return tabs;
         }
       }
     } catch {}
-    return ['team', 'comms', 'dag', 'models'];
+    return allSupportedTabs;
   });
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
