@@ -103,7 +103,7 @@ describe('AGENT_MESSAGE project isolation', () => {
     });
     const ctx = makeCtx([leadA, sender, target]);
     const commands = getCommCommands(ctx);
-    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MSG')!;
+    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MESSAGE')!;
 
     agentMsgCmd.handler(sender, `⟦⟦ AGENT_MESSAGE {"to": "${target.id}", "content": "Hello!"} ⟧⟧`);
 
@@ -139,7 +139,7 @@ describe('AGENT_MESSAGE project isolation', () => {
 
     const ctx = makeCtx([leadA, leadB, sender, crossProjectTarget]);
     const commands = getCommCommands(ctx);
-    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MSG')!;
+    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MESSAGE')!;
 
     agentMsgCmd.handler(sender, `⟦⟦ AGENT_MESSAGE {"to": "${crossProjectTarget.id}", "content": "Spy message"} ⟧⟧`);
 
@@ -175,7 +175,7 @@ describe('AGENT_MESSAGE project isolation', () => {
 
     const ctx = makeCtx([leadA, leadB, sender, targetInB]);
     const commands = getCommCommands(ctx);
-    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MSG')!;
+    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MESSAGE')!;
 
     agentMsgCmd.handler(sender, `⟦⟦ AGENT_MESSAGE {"to": "Architect", "content": "Cross-project attempt"} ⟧⟧`);
 
@@ -197,7 +197,7 @@ describe('AGENT_MESSAGE project isolation', () => {
 
     const ctx = makeCtx([sender, target]);
     const commands = getCommCommands(ctx);
-    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MSG')!;
+    const agentMsgCmd = commands.find((c) => c.name === 'AGENT_MESSAGE')!;
 
     agentMsgCmd.handler(sender, `⟦⟦ AGENT_MESSAGE {"to": "${target.id}", "content": "Hello"} ⟧⟧`);
 

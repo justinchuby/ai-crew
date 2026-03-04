@@ -127,16 +127,34 @@ export function getTemplateCommands(
       regex:   LIST_TEMPLATES_REGEX,
       name:    'LIST_TEMPLATES',
       handler: (a, _d) => handleListTemplates(ctx, registry, a),
+      help: { description: 'List all available workflow templates', example: 'LIST_TEMPLATES', category: 'Templates' },
     },
     {
       regex:   APPLY_TEMPLATE_REGEX,
       name:    'APPLY_TEMPLATE',
       handler: (a, d) => handleApplyTemplate(ctx, registry, a, d),
+      help: {
+        description: 'Instantiate a workflow template to create tasks',
+        example: 'APPLY_TEMPLATE {"template": "feature"}',
+        category: 'Templates',
+        args: [
+          { name: 'template', type: 'string', required: true, description: 'Template ID to apply' },
+          { name: 'overrides', type: 'object', required: false, description: 'Per-task overrides (title, role)' },
+        ],
+      },
     },
     {
       regex:   DECOMPOSE_TASK_REGEX,
       name:    'DECOMPOSE_TASK',
       handler: (a, d) => handleDecomposeTask(ctx, decomposer, a, d),
+      help: {
+        description: 'Decompose a task description into suggested sub-tasks',
+        example: 'DECOMPOSE_TASK {"task": "implement user auth"}',
+        category: 'Templates',
+        args: [
+          { name: 'task', type: 'string', required: true, description: 'Task description to decompose' },
+        ],
+      },
     },
   ];
 }

@@ -289,11 +289,11 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
 export function getCoordCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
+    { regex: LOCK_REQUEST_REGEX, name: 'LOCK_FILE', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
       { name: 'filePath', type: 'string', required: true, description: 'Path to lock' },
       { name: 'reason', type: 'string', required: false, description: 'Why you need this lock' },
     ] } },
-    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
+    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK_FILE', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
       { name: 'filePath', type: 'string', required: true, description: 'Path to unlock' },
     ] } },
     { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"actionType": "milestone", "summary": "phase 1 complete"}', category: 'Coordination', args: [

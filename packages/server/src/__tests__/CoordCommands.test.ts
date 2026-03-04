@@ -100,7 +100,7 @@ describe('CoordCommands — COMMIT handler', () => {
     const cmds = getCoordCommands(makeCtx());
     expect(cmds).toHaveLength(6);
     expect(cmds.map((c) => c.name)).toEqual([
-      'LOCK', 'UNLOCK', 'ACTIVITY', 'DECISION', 'PROGRESS', 'COMMIT',
+      'LOCK_FILE', 'UNLOCK_FILE', 'ACTIVITY', 'DECISION', 'PROGRESS', 'COMMIT',
     ]);
   });
 
@@ -817,7 +817,7 @@ describe('CoordCommands — COMMIT handler', () => {
       });
 
       const cmds = getCoordCommands(ctx);
-      const unlock = cmds.find((c) => c.name === 'UNLOCK');
+      const unlock = cmds.find((c) => c.name === 'UNLOCK_FILE');
       unlock!.handler(agent, '⟦⟦ UNLOCK_FILE {"filePath": "src/dirty.ts"} ⟧⟧');
 
       await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
@@ -840,7 +840,7 @@ describe('CoordCommands — COMMIT handler', () => {
       });
 
       const cmds = getCoordCommands(ctx);
-      const unlock = cmds.find((c) => c.name === 'UNLOCK');
+      const unlock = cmds.find((c) => c.name === 'UNLOCK_FILE');
       unlock!.handler(agent, '⟦⟦ UNLOCK_FILE {"filePath": "src/clean.ts"} ⟧⟧');
 
       await vi.waitFor(() => expect(ctx.lockRegistry.release).toHaveBeenCalled());

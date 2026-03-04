@@ -183,7 +183,7 @@ describe('CommCommands validation', () => {
   it('AGENT_MESSAGE rejects missing "to"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MESSAGE');
     cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {"content": "hello"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('AGENT_MESSAGE validation error'),
@@ -193,7 +193,7 @@ describe('CommCommands validation', () => {
   it('AGENT_MESSAGE rejects missing "content"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MESSAGE');
     cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {"to": "someone"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
@@ -203,7 +203,7 @@ describe('CommCommands validation', () => {
   it('AGENT_MESSAGE rejects invalid JSON', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MESSAGE');
     cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {broken} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
@@ -243,7 +243,7 @@ describe('CommCommands validation', () => {
   it('GROUP_MESSAGE rejects missing "group"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'GROUP_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'GROUP_MESSAGE');
     cmd.handler(agent, '⟦⟦ GROUP_MESSAGE {"content": "hello"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "group"'),
@@ -253,7 +253,7 @@ describe('CommCommands validation', () => {
   it('GROUP_MESSAGE rejects missing "content"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'GROUP_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'GROUP_MESSAGE');
     cmd.handler(agent, '⟦⟦ GROUP_MESSAGE {"group": "my-group"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
@@ -361,7 +361,7 @@ describe('CoordCommands validation', () => {
   it('LOCK_FILE rejects missing "filePath"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCoordCommands(ctx), 'LOCK');
+    const cmd = findHandler(getCoordCommands(ctx), 'LOCK_FILE');
     cmd.handler(agent, '⟦⟦ LOCK_FILE {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "filePath"'),
@@ -371,7 +371,7 @@ describe('CoordCommands validation', () => {
   it('LOCK_FILE rejects invalid JSON', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCoordCommands(ctx), 'LOCK');
+    const cmd = findHandler(getCoordCommands(ctx), 'LOCK_FILE');
     cmd.handler(agent, '⟦⟦ LOCK_FILE {bad} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
@@ -381,7 +381,7 @@ describe('CoordCommands validation', () => {
   it('UNLOCK_FILE rejects missing "filePath"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCoordCommands(ctx), 'UNLOCK');
+    const cmd = findHandler(getCoordCommands(ctx), 'UNLOCK_FILE');
     cmd.handler(agent, '⟦⟦ UNLOCK_FILE {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "filePath"'),
@@ -664,10 +664,10 @@ describe('TaskCommands validation', () => {
 
   // ── Size-limit enforcement (.max()) ───────────────────────────────
 
-  it('AGENT_MSG rejects oversized content', () => {
+  it('AGENT_MESSAGE rejects oversized content', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
-    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
+    const cmd = findHandler(getCommCommands(ctx), 'AGENT_MESSAGE');
     const bigContent = 'x'.repeat(50_001);
     cmd.handler(agent, `⟦⟦ AGENT_MESSAGE {"to":"lead","content":"${bigContent}"} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(

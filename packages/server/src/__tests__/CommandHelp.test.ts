@@ -46,7 +46,7 @@ describe('CommandHelp', () => {
       const help = buildCommandHelp();
       expect(help).toContain('DELEGATE — Delegate a task to an existing agent');
       expect(help).toContain('CREATE_AGENT — Spawn a new agent with a role and task');
-      expect(help).toContain('AGENT_MSG — Send a message to an agent');
+      expect(help).toContain('AGENT_MESSAGE — Send a message to an agent');
     });
 
     it('includes example syntax for commands', () => {
@@ -69,7 +69,7 @@ describe('CommandHelp', () => {
 
     it('renders required args with angle brackets and optional with square brackets', () => {
       const help = buildCommandHelp();
-      // DELEGATE has required args (to, task) and optional (context, dagTaskId, depends_on)
+      // DELEGATE has required args (to, task) and optional (context, dagTaskId, dependsOn)
       expect(help).toContain('<to: string>');
       expect(help).toContain('[context: string]');
     });

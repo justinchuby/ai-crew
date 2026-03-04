@@ -31,7 +31,7 @@ const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 
 export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MSG', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: [
+    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MESSAGE', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: [
       { name: 'to', type: 'string', required: true, description: 'Agent ID or role name' },
       { name: 'content', type: 'string', required: true, description: 'Message content' },
     ] } },
@@ -51,7 +51,7 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
       { name: 'group', type: 'string', required: true, description: 'Group name' },
       { name: 'members', type: 'string[]', required: true, description: 'Agent IDs to remove' },
     ] } },
-    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: [
+    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MESSAGE', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: [
       { name: 'group', type: 'string', required: true, description: 'Group name' },
       { name: 'content', type: 'string', required: true, description: 'Message content' },
     ] } },
