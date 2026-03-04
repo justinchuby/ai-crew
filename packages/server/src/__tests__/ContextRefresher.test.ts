@@ -619,4 +619,102 @@ describe('ContextRefresher', () => {
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('event triggers', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('agent:spawned triggers debounced refreshAll to status receivers', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // Emit agent:spawned
+      mocks.agentManager.emit('agent:spawned', { id: 'new-agent' });
+
+      // Before debounce fires — no update yet
+      vi.advanceTimersByTime(1999);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // After debounce (2s) — refreshAll fires for status receivers
+      vi.advanceTimersByTime(1);
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Dev does NOT receive update (not a status receiver)
+      expect(dev.injectContextUpdate).not.toHaveBeenCalled();
+    });
+
+    it('agent:context_compacted triggers immediate refreshOne for that agent', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.agentManager.get.mockImplementation((id: string) => {
+        if (id === 's1') return secretary;
+        if (id === 'd1') return dev;
+        return undefined;
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+
+      refresher.start();
+
+      // Emit context_compacted for dev
+      mocks.agentManager.emit('agent:context_compacted', { agentId: 'd1' });
+
+      // refreshOne is synchronous — dev gets update immediately
+      expect(dev.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Secretary is NOT refreshed (only the compacted agent is)
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+    });
+
+    it('agent:spawned debounce deduplicates rapid events', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // Fire 3 rapid agent:spawned events
+      mocks.agentManager.emit('agent:spawned', { id: 'a1' });
+      mocks.agentManager.emit('agent:spawned', { id: 'a2' });
+      mocks.agentManager.emit('agent:spawned', { id: 'a3' });
+
+      // After debounce — only 1 refreshAll (debounced, not 3)
+      vi.advanceTimersByTime(2000);
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
 });
