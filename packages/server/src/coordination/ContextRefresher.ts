@@ -245,10 +245,9 @@ export class ContextRefresher {
     return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
   }
 
-  /** Build actionable alerts: stuck agents, high context usage */
+  /** Build actionable alerts: high context usage */
   private buildAlerts(peers: import('../agents/Agent.js').AgentContextInfo[]): string[] {
     const alerts: string[] = [];
-    const now = Date.now();
 
     for (const p of peers) {
       // Context usage warning at 80%
@@ -256,15 +255,6 @@ export class ContextRefresher {
         const pct = Math.round((p.contextWindowUsed / p.contextWindowSize) * 100);
         if (pct >= 80) {
           alerts.push(`${p.id.slice(0, 8)} near context limit (${pct}%)`);
-        }
-      }
-
-      // Stuck agent: running for >10 minutes
-      if (p.status === 'running' && p.createdAt) {
-        const elapsedMs = now - new Date(p.createdAt).getTime();
-        if (elapsedMs > 10 * 60 * 1000) {
-          const mins = Math.floor(elapsedMs / 60000);
-          alerts.push(`${p.id.slice(0, 8)} running >${mins}m — may be stuck`);
         }
       }
     }
