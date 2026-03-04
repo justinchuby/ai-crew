@@ -378,6 +378,64 @@ describe('WebSocket project scoping', () => {
     });
   });
 
+  describe('P0-5: sub-agent projectId inheritance', () => {
+    /** Mirror of AgentManager.spawn() inheritance logic */
+    function spawnSubAgent(
+      agents: Map<string, MockAgent>,
+      id: string,
+      parentId: string,
+    ): MockAgent {
+      const child: MockAgent = { id, parentId };
+      // Inherit projectId from parent (mirrors AgentManager.spawn fix)
+      const parentProjectId = getProjectIdForAgent(agents, parentId);
+      if (parentProjectId) child.projectId = parentProjectId;
+      agents.set(id, child);
+      return child;
+    }
+
+    it('sub-agent inherits projectId from direct parent', () => {
+      const agents = new Map<string, MockAgent>();
+      agents.set('lead-a', { id: 'lead-a', projectId: 'proj-a' });
+
+      const child = spawnSubAgent(agents, 'dev-a1', 'lead-a');
+      expect(child.projectId).toBe('proj-a');
+    });
+
+    it('sub-agent inherits projectId from grandparent chain', () => {
+      const agents = new Map<string, MockAgent>();
+      agents.set('lead-a', { id: 'lead-a', projectId: 'proj-a' });
+      agents.set('mid-a', { id: 'mid-a', parentId: 'lead-a', projectId: 'proj-a' });
+
+      const grandchild = spawnSubAgent(agents, 'dev-a2', 'mid-a');
+      expect(grandchild.projectId).toBe('proj-a');
+    });
+
+    it('inherited projectId means agent:spawned reaches correct clients', () => {
+      const agents = new Map<string, MockAgent>();
+      agents.set('lead-a', { id: 'lead-a', projectId: 'proj-a' });
+      const child = spawnSubAgent(agents, 'dev-a1', 'lead-a');
+
+      const clientA = createClient({ subscribedProject: 'proj-a' });
+      const clientB = createClient({ subscribedProject: 'proj-b' });
+
+      // With inherited projectId, spawn event is properly scoped
+      broadcastToProject(
+        [clientA, clientB],
+        { type: 'agent:spawned', agent: { id: child.id } },
+        child.projectId,
+      );
+
+      expect(clientA.received).toHaveLength(1);
+      expect(clientB.received).toHaveLength(0);
+    });
+
+    it('sub-agent without parent gets no projectId (backward compat)', () => {
+      const agents = new Map<string, MockAgent>();
+      const orphan = spawnSubAgent(agents, 'orphan-1', 'nonexistent');
+      expect(orphan.projectId).toBeUndefined();
+    });
+  });
+
   describe('edge cases', () => {
     it('empty string projectId treated as no filter', () => {
       // broadcastToProject with empty string eventProjectId

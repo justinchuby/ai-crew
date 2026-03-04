@@ -146,7 +146,12 @@ export class WebSocketServer {
 
     this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       const projectId = this.resolveAgentProjectId(agentId);
-      this.broadcastToProject({ type: 'agent:text', agentId, text }, projectId);
+      this.broadcast(
+        { type: 'agent:text', agentId, text },
+        (c) =>
+          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
+          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
+      );
     });
 
     this.track(agentManager, 'agent:content', (data: any) => {

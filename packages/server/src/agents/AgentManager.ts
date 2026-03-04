@@ -262,6 +262,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (parent && !parent.childIds.includes(agent.id)) {
         parent.childIds.push(agent.id);
       }
+      // Inherit projectId from parent if not explicitly set
+      if (!agent.projectId && parent) {
+        const parentProjectId = this.getProjectIdForAgent(parentId);
+        if (parentProjectId) {
+          agent.projectId = parentProjectId;
+        }
+      }
     }
 
     this.agents.set(agent.id, agent);
