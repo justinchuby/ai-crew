@@ -11,8 +11,12 @@ export function agentsRoutes(ctx: AppContext): Router {
   const router = Router();
 
   // --- Agents ---
-  router.get('/agents', (_req, res) => {
-    res.json(agentManager.getAll().map((a) => a.toJSON()));
+  router.get('/agents', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const agents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
+    res.json(agents.map((a) => a.toJSON()));
   });
 
   router.post('/agents', spawnLimiter, validateBody(spawnAgentSchema), (req, res) => {

@@ -9,9 +9,13 @@ export function coordinationRoutes(ctx: AppContext): Router {
   const router = Router();
 
   // --- Coordination ---
-  router.get('/coordination/status', (_req, res) => {
+  router.get('/coordination/status', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const agents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
     res.json({
-      agents: agentManager.getAll().map((a) => a.toJSON()),
+      agents: agents.map((a) => a.toJSON()),
       locks: lockRegistry.getAll(),
       recentActivity: activityLedger.getRecent(20),
     });
@@ -44,17 +48,25 @@ export function coordinationRoutes(ctx: AppContext): Router {
   });
 
   router.get('/coordination/activity', (req, res) => {
-    const { agentId, type, limit, since } = req.query;
+    const { agentId, type, limit, since, projectId } = req.query;
     const limitNum = limit ? Number(limit) : 50;
+    let activities;
     if (since) {
-      res.json(activityLedger.getSince(since as string));
+      activities = activityLedger.getSince(since as string);
     } else if (agentId) {
-      res.json(activityLedger.getByAgent(agentId as string, limitNum));
+      activities = activityLedger.getByAgent(agentId as string, limitNum);
     } else if (type) {
-      res.json(activityLedger.getByType(type as ActionType, limitNum));
+      activities = activityLedger.getByType(type as ActionType, limitNum);
     } else {
-      res.json(activityLedger.getRecent(limitNum));
+      activities = activityLedger.getRecent(limitNum);
     }
+    if (projectId) {
+      const projectAgentIds = new Set(
+        agentManager.getByProject(projectId as string).map(a => a.id),
+      );
+      activities = activities.filter((e: { agentId: string }) => projectAgentIds.has(e.agentId));
+    }
+    res.json(activities);
   });
 
   router.get('/coordination/summary', (_req, res) => {
