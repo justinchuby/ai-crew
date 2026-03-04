@@ -803,7 +803,7 @@ describe('Auto-DAG integration', () => {
 
       const msg = (secretary.sendMessage as any).mock.calls[0][0];
       expect(msg).toContain('ADD_DEPENDENCY');
-      expect(msg).toContain('"taskId": "new-task"');
+      expect(msg).toContain('"id": "new-task"');
     });
 
     it('does NOT send message when no secretary agent exists', () => {
