@@ -27,7 +27,7 @@ export function getDeferredCommands(ctx: CommandHandlerContext): CommandEntry[] 
     { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues', args: [
       { name: 'status', type: 'string', required: false, description: 'Filter: "open", "resolved", or "dismissed"' },
     ] } },
-    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d), help: { description: 'Resolve a deferred issue', example: 'RESOLVE_DEFERRED {"id": "issue-id"}', category: 'Deferred Issues', args: [
+    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d), help: { description: 'Resolve a deferred issue', example: 'RESOLVE_DEFERRED {"id": 42}', category: 'Deferred Issues', args: [
       { name: 'id', type: 'number', required: true, description: 'Issue ID to resolve' },
       { name: 'dismiss', type: 'boolean', required: false, description: 'Dismiss instead of resolve' },
     ] } },
