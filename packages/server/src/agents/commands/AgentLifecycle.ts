@@ -717,7 +717,7 @@ export function requestSecretaryDependencyAnalysis(
     `Description: ${taskDescription.slice(0, 500)}\n\n` +
     `Active tasks:\n${activeTasks}\n\n` +
     `Does "${newTaskId}" depend on any of these tasks? ` +
-    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
+    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"id": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
     `If no dependencies, ignore this message.`
   );
   logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);

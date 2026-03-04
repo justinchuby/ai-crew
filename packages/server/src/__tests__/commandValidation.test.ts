@@ -334,7 +334,7 @@ describe('AgentCommands validation', () => {
     );
   });
 
-  it('TERMINATE_AGENT rejects missing "id"', () => {
+  it('TERMINATE_AGENT rejects missing "agentId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'TERMINATE_AGENT');
@@ -486,7 +486,7 @@ describe('TimerCommands validation', () => {
     );
   });
 
-  it('CANCEL_TIMER rejects empty payload (no id or name)', () => {
+  it('CANCEL_TIMER rejects empty payload (no id or label)', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'CANCEL_TIMER');

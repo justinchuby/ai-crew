@@ -239,7 +239,7 @@ To assign a task to an agent, use their ID:
 To create a new agent:
 \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} ⟧⟧\`
 To terminate an agent and free a slot:
-\`⟦⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "no longer needed"} ⟧⟧\``
+\`⟦⟦ TERMINATE_AGENT {"agentId": "agent-id", "reason": "no longer needed"} ⟧⟧\``
   );
 
   return sections.join('\n\n');
