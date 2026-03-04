@@ -84,7 +84,7 @@ export function MentionText({ text, agents, onClickAgent }: {
         parts.push(
           <AgentMentionTooltip key={`m-${match.index}`} agent={agent}>
             <span
-              className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded cursor-pointer transition-colors bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:bg-blue-500/30"
+              className="inline align-middle font-mono text-[10px] px-1 py-0.5 rounded cursor-pointer transition-colors bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:bg-blue-500/30"
               style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
               tabIndex={0}
               onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}

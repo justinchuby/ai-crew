@@ -65,7 +65,7 @@ export function AgentMentionTooltip({
   return (
     <span
       ref={containerRef}
-      className="relative inline-flex"
+      className="relative inline"
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
