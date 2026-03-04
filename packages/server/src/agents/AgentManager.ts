@@ -371,7 +371,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
-      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`);
+      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
       // Flush buffered messages on turn boundaries
       if (status === 'idle' || isTerminalStatus(status)) {
         this.flushAgentMessage(agent.id);
@@ -448,7 +448,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const crashKey = `${agentRole}:${agent.task ?? ''}`;
 
         logger.error('agent', `Crashed ${agent.role.name} (${agent.id.slice(0, 8)}) exit=${code}`, { crashKey });
-        this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`);
+        this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         this.emit('agent:crashed', { agentId: agent.id, code });
 
         const count = (this.crashCounts.get(crashKey) ?? 0) + 1;
