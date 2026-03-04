@@ -145,6 +145,12 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:tool_call', ...data }, projectId);
     });
 
+    // WebSocket subscription architecture:
+    // - Agent connections subscribe to specific agent IDs (project-scoped participants)
+    // - UI connections subscribe to '*' (all agents) because the dashboard is an observer
+    //   that must render any agent's chat panel when the user clicks on it.
+    // Project-level isolation is enforced server-side via subscribedProject filtering.
+    // Do NOT remove the '*' wildcard support — it is intentional for UI monitoring.
     this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       const projectId = this.resolveAgentProjectId(agentId);
       this.broadcast(

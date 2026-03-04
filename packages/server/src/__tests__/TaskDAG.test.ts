@@ -1038,11 +1038,11 @@ describe('TaskDAG', () => {
       expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('skipped');
     });
 
-    it('completeTask returns null for paused task', () => {
+    it('completeTask succeeds for paused task', () => {
       dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
       dag.pauseTask('lead-1', 'a');
-      expect(dag.completeTask('lead-1', 'a')).toBeNull();
-      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('paused');
+      expect(dag.completeTask('lead-1', 'a')).not.toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
     });
 
     it('completeTask returns null for already done task', () => {
@@ -1093,11 +1093,14 @@ describe('TaskDAG', () => {
 
   describe('getTransitionError', () => {
     it('returns error for invalid transition', () => {
-      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
-      dag.pauseTask('lead-1', 'a');
-      const error = dag.getTransitionError('lead-1', 'a', 'complete');
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      // b is pending — cannot complete a pending task
+      const error = dag.getTransitionError('lead-1', 'b', 'complete');
       expect(error).not.toBeNull();
-      expect(error!.currentStatus).toBe('paused');
+      expect(error!.currentStatus).toBe('pending');
       expect(error!.attemptedAction).toBe('complete');
       expect(error!.validStatuses).toEqual(VALID_TRANSITIONS.complete);
     });
@@ -1198,6 +1201,7 @@ describe('TaskDAG', () => {
         { taskId: 'a', role: 'Dev' },
         { taskId: 'b', role: 'Dev' },
       ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
       dag.completeTask('lead-1', 'a');
       dag.addDependency('lead-1', 'b', 'a');
       const task = dag.getTask('lead-1', 'b');
@@ -1250,6 +1254,244 @@ describe('TaskDAG', () => {
       dag.on('dag:updated', () => { emitted = true; });
       dag.addDependency('lead-1', 'b', 'a');
       expect(emitted).toBe(true);
+    });
+
+    it('does not regress running task to blocked (issue #73)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'b', 'agent-1');
+      // b is running, adding dep on a (which is ready, not done) should NOT block b
+      const result = dag.addDependency('lead-1', 'b', 'a');
+      expect(result).toBe(true);
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('running');
+      expect(task!.dependsOn).toContain('a');
+    });
+
+    it('does not regress done task to blocked', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'b', 'agent-1');
+      dag.completeTask('lead-1', 'b');
+      // b is done, adding dep on a should NOT block b
+      const result = dag.addDependency('lead-1', 'b', 'a');
+      expect(result).toBe(true);
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('done');
+      expect(task!.dependsOn).toContain('a');
+    });
+
+    it('does not regress failed task to blocked', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'b', 'agent-1');
+      dag.failTask('lead-1', 'b');
+      // b is failed (terminal), adding dep on a should NOT block b
+      const result = dag.addDependency('lead-1', 'b', 'a');
+      expect(result).toBe(true);
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('failed');
+      expect(task!.dependsOn).toContain('a');
+    });
+
+    it('still blocks ready/pending tasks when dependency is not done', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      // a is running (not done/skipped), b is ready → should be blocked
+      dag.addDependency('lead-1', 'b', 'a');
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('blocked');
+    });
+  });
+
+  describe('completeTask RUNNING-only guard', () => {
+    it('rejects completing a ready task', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      // a is ready but not running
+      const result = dag.completeTask('lead-1', 'a');
+      expect(result).toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
+    });
+
+    it('allows completing a running task', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      const result = dag.completeTask('lead-1', 'a');
+      expect(result).not.toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
+    });
+
+    it('getTransitionError reports ready as invalid for complete', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      const error = dag.getTransitionError('lead-1', 'a', 'complete');
+      expect(error).not.toBeNull();
+      expect(error!.currentStatus).toBe('ready');
+      expect(error!.validStatuses).toEqual(['running', 'paused']);
+    });
+
+    it('allows completing a paused task (work done outside DAG)', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.pauseTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('paused');
+      const result = dag.completeTask('lead-1', 'a');
+      expect(result).not.toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
+    });
+
+    it('completing paused task promotes dependents', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.pauseTask('lead-1', 'a');
+      const newlyReady = dag.completeTask('lead-1', 'a');
+      expect(newlyReady).not.toBeNull();
+      expect(newlyReady!.map(t => t.id)).toContain('b');
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('ready');
+    });
+  });
+
+  describe('resumeTask', () => {
+    it('resumes paused task to ready when deps satisfied', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.pauseTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('paused');
+      const ok = dag.resumeTask('lead-1', 'a');
+      expect(ok).toBe(true);
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
+    });
+
+    it('resumes paused task to pending when deps not satisfied', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.pauseTask('lead-1', 'b');
+      const ok = dag.resumeTask('lead-1', 'b');
+      expect(ok).toBe(true);
+      // a is not done, so b goes back to pending
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
+    });
+
+    it('returns false for non-paused task', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.resumeTask('lead-1', 'a')).toBe(false);
+    });
+
+    it('returns false for nonexistent task', () => {
+      expect(dag.resumeTask('lead-1', 'nope')).toBe(false);
+    });
+  });
+
+  describe('declareTaskBatch auto-DAG dedup', () => {
+    it('links to existing auto-created task with matching role and description', () => {
+      // Simulate an auto-created task
+      dag.addTask('lead-1', {
+        taskId: 'auto-developer-fix-bugs-abc1',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      });
+      dag.startTask('lead-1', 'auto-developer-fix-bugs-abc1', 'agent-1');
+
+      // Now declare a task with similar description and same role
+      const result = dag.declareTaskBatch('lead-1', [{
+        taskId: 'fix-auth-bugs',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      }]);
+
+      expect(result.linkedAutoTasks.length).toBe(1);
+      expect(result.linkedAutoTasks[0].declaredId).toBe('fix-auth-bugs');
+      expect(result.linkedAutoTasks[0].autoId).toBe('auto-developer-fix-bugs-abc1');
+      // Should have 1 task total, not 2
+      const tasks = dag.getTasks('lead-1');
+      expect(tasks.length).toBe(1);
+      expect(tasks[0].id).toBe('auto-developer-fix-bugs-abc1');
+    });
+
+    it('does not dedup when role does not match', () => {
+      dag.addTask('lead-1', {
+        taskId: 'auto-tester-fix-bugs-abc1',
+        role: 'tester',
+        description: 'Fix critical bugs in the authentication module',
+      });
+
+      const result = dag.declareTaskBatch('lead-1', [{
+        taskId: 'fix-auth-bugs',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      }]);
+
+      expect(result.linkedAutoTasks.length).toBe(0);
+      expect(dag.getTasks('lead-1').length).toBe(2);
+    });
+
+    it('does not dedup with done auto-tasks', () => {
+      dag.addTask('lead-1', {
+        taskId: 'auto-developer-fix-bugs-abc1',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      });
+      dag.startTask('lead-1', 'auto-developer-fix-bugs-abc1', 'agent-1');
+      dag.completeTask('lead-1', 'auto-developer-fix-bugs-abc1');
+
+      const result = dag.declareTaskBatch('lead-1', [{
+        taskId: 'fix-auth-bugs',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      }]);
+
+      expect(result.linkedAutoTasks.length).toBe(0);
+      expect(dag.getTasks('lead-1').length).toBe(2);
+    });
+
+    it('does not dedup non-auto tasks', () => {
+      dag.declareTaskBatch('lead-1', [{
+        taskId: 'existing-dev-task',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      }]);
+
+      // Different task ID, same description — should NOT dedup since existing is not auto-
+      expect(() => dag.declareTaskBatch('lead-1', [{
+        taskId: 'fix-auth-bugs',
+        role: 'developer',
+        description: 'Fix critical bugs in the authentication module',
+      }])).not.toThrow();
+
+      expect(dag.getTasks('lead-1').length).toBe(2);
+    });
+
+    it('dedup updates metadata on the auto task', () => {
+      dag.addTask('lead-1', {
+        taskId: 'auto-developer-old-abc1',
+        role: 'developer',
+        description: 'Implement user authentication system',
+      });
+      dag.startTask('lead-1', 'auto-developer-old-abc1', 'agent-1');
+
+      dag.declareTaskBatch('lead-1', [{
+        taskId: 'auth-system',
+        role: 'developer',
+        title: 'Auth System Implementation',
+        description: 'Implement user authentication system',
+        files: ['src/auth.ts'],
+        priority: 5,
+      }]);
+
+      const task = dag.getTask('lead-1', 'auto-developer-old-abc1')!;
+      expect(task.title).toBe('Auth System Implementation');
+      expect(task.files).toContain('src/auth.ts');
+      expect(task.priority).toBe(5);
     });
   });
 });

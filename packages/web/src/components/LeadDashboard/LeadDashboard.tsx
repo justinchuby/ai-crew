@@ -18,6 +18,7 @@ import { agentStatusText } from '../../utils/statusColors';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { PromptNav, hasUserMention } from '../PromptNav';
+import { useFileDrop } from '../../hooks/useFileDrop';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -36,6 +37,12 @@ export function LeadDashboard({ api, ws }: Props) {
   const setInput = useCallback((text: string) => {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
   }, [selectedLeadId]);
+  const handleLeadFileInsert = useCallback((text: string) => {
+    setInput(input ? input + ' ' + text : text);
+  }, [input, setInput]);
+  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
+    onInsertText: handleLeadFileInsert,
+  });
   const [starting, setStarting] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -46,7 +53,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
-  const [showModelConfig, setShowModelConfig] = useState(true);
+  const [showModelConfig, setShowModelConfig] = useState(false);
   const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -487,6 +494,36 @@ export function LeadDashboard({ api, ws }: Props) {
               timestamp: Date.now(),
             });
           }
+
+          // Surface DMs and broadcasts in the lead chat panel
+          const preview = (msg.content ?? '').slice(0, 2000);
+          const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
+          const senderId = (msg.from ?? '').slice(0, 8);
+          if (msg.from === 'system') {
+            store.addMessage(leadId, {
+              type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (isBroadcast) {
+            store.addMessage(leadId, {
+              type: 'text', text: `📢 [${senderRole} ${senderId} → All] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (msg.to === leadId) {
+            store.addMessage(leadId, {
+              type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (msg.from === leadId) {
+            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
+            const recipientId = (msg.to ?? '').slice(0, 8);
+            store.addMessage(leadId, {
+              type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else {
+            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
+            const recipientId = (msg.to ?? '').slice(0, 8);
+            store.addMessage(leadId, {
+              type: 'text', text: `💬 [${senderRole} ${senderId} → ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          }
         }
       }
 
@@ -510,6 +547,17 @@ export function LeadDashboard({ api, ws }: Props) {
             content: gm.content ?? '',
             timestamp: Date.now(),
             type: 'group_message',
+          });
+          // Surface group messages in the lead chat panel
+          const senderRole = gm.fromRole || 'Agent';
+          const senderId = (gm.fromAgentId ?? '').slice(0, 8);
+          const groupName = msg.groupName || 'Group';
+          const preview = (gm.content ?? '').slice(0, 2000);
+          store.addMessage(selectedLeadId!, {
+            type: 'text',
+            text: `🗣️ [${groupName}: ${senderRole} ${senderId}] ${preview}`,
+            sender: 'system' as any,
+            timestamp: Date.now(),
           });
         }
       }
@@ -736,7 +784,17 @@ export function LeadDashboard({ api, ws }: Props) {
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
-    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
+    const store = useLeadStore.getState();
+    // For interrupts, insert a separator so post-interrupt response appears as a new bubble
+    if (mode === 'interrupt') {
+      const proj = store.projects[selectedLeadId];
+      const msgs = proj?.messages ?? [];
+      const last = msgs[msgs.length - 1];
+      if (last?.sender === 'agent') {
+        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      }
+    }
+    store.addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1088,7 +1146,7 @@ export function LeadDashboard({ api, ws }: Props) {
               <Crown className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
               <h2 className="text-base font-semibold text-th-text">New Project</h2>
             </div>
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               <div>
                 <label className="block text-xs text-th-text-muted mb-1 font-medium">Project Name</label>
                 <input
@@ -1597,7 +1655,17 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Input */}
             <div className="border-t border-th-border p-3">
-              <div className="flex gap-2 items-end">
+              <div
+                className={`flex gap-2 items-end relative rounded transition-all ${leadDropZoneClassName}`}
+                onDragOver={leadDragOver}
+                onDragLeave={leadDragLeave}
+                onDrop={leadDrop}
+              >
+                {isLeadDragOver && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-accent/10 border-2 border-dashed border-accent rounded z-10 pointer-events-none">
+                    <span className="text-xs font-medium text-accent">Drop file to mention or attach</span>
+                  </div>
+                )}
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -1615,7 +1683,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       }
                     }
                   }}
-                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt)' : 'Project Lead is not active'}
+                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt, @ to mention files)' : 'Project Lead is not active'}
                   disabled={!isActive}
                   rows={1}
                   onInput={(e) => {
@@ -1772,7 +1840,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       {showTabConfig && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowTabConfig(false)} />
-                          <div className="absolute right-0 top-full mt-1 z-50 bg-th-bg-panel border border-th-border rounded-md shadow-lg py-1 min-w-[140px]">
+                          <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
                             {(['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'] as const).map((tabId) => (
                               <button
                                 key={tabId}
@@ -2331,7 +2399,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   </div>
                 )}
                 {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center justify-end gap-1.5 mt-0.5">
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}

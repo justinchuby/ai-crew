@@ -74,7 +74,7 @@ process.env.PORT = port;
 console.log(`\n🚀 Starting Flightdeck on http://${formatHost(host)}:${port}\n`);
 
 const server = spawn('node', [serverDist], {
-  cwd: root,
+  cwd: process.cwd(),
   stdio: 'inherit',
   env: { ...process.env, PORT: port, HOST: host },
 });
@@ -86,9 +86,14 @@ if (!noBrowser) {
     const url = `http://${browserHost}:${port}`;
     const platform = process.platform;
     try {
-      if (platform === 'darwin') spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
-      else if (platform === 'win32') spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true }).unref();
-      else spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
+      let child;
+      if (platform === 'darwin') child = spawn('open', [url], { stdio: 'ignore', detached: true });
+      else if (platform === 'win32') child = spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true });
+      else child = spawn('xdg-open', [url], { stdio: 'ignore', detached: true });
+      child.on('error', () => {
+        console.log(`🌐 Open ${url} in your browser`);
+      });
+      child.unref();
     } catch {
       console.log(`🌐 Open ${url} in your browser`);
     }
@@ -98,6 +103,11 @@ if (!noBrowser) {
 // Forward signals for graceful shutdown
 process.on('SIGINT', () => server.kill('SIGINT'));
 process.on('SIGTERM', () => server.kill('SIGTERM'));
+
+server.on('error', (err) => {
+  console.error(`❌ Failed to start server: ${err.message}`);
+  process.exit(1);
+});
 
 server.on('exit', (code) => {
   process.exit(code ?? 0);

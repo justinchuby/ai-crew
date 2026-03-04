@@ -31,7 +31,13 @@ export function useWebSocket() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => setConnected(true);
+    ws.onopen = () => {
+      setConnected(true);
+      // Subscribe to ALL agent events ('*') — the UI is a monitoring dashboard that
+      // needs visibility into every agent's output for panel rendering. Project-scoping
+      // is handled server-side (subscribedProject filter), not via agent-level subscriptions.
+      ws.send(JSON.stringify({ type: 'subscribe', agentId: '*' }));
+    };
     ws.onclose = () => {
       setConnected(false);
       if (shouldReconnectRef.current) {
@@ -97,14 +103,29 @@ export function useWebSocket() {
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
-          const last = msgs[msgs.length - 1];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-          // If the last message has an unclosed ⟦ block, always append to keep commands intact
-          const lastText = last?.text ?? '';
-          const hasUnclosedCommand = lastText.lastIndexOf('⟦') > lastText.lastIndexOf('⟧');
-          if (last && (last.sender ?? 'agent') === 'agent' && (!needsNewline || hasUnclosedCommand)) {
-            msgs[msgs.length - 1] = { ...last, text: lastText + rawText, timestamp: last.timestamp || Date.now() };
+
+          // Find the last agent message, skipping over interleaved DM/group notifications.
+          // This prevents system notifications (📨, 📤, 🗣️) from fragmenting a streaming response.
+          let appendIdx = -1;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            const m = msgs[i];
+            const sender = m.sender ?? 'agent';
+            if (sender === 'agent') {
+              appendIdx = i;
+              break;
+            }
+            // User messages, separators, and thinking blocks break the append chain
+            if (sender === 'user' || sender === 'thinking' || m.text === '---') break;
+            // System messages that are DM/group notifications are transparent — keep searching
+          }
+
+          const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;
+          const appendText = appendTarget?.text ?? '';
+          const hasUnclosedCommand = appendText.lastIndexOf('⟦') > appendText.lastIndexOf('⟧');
+          if (appendTarget && (!needsNewline || hasUnclosedCommand)) {
+            msgs[appendIdx] = { ...appendTarget, text: appendText + rawText, timestamp: appendTarget.timestamp || Date.now() };
           } else {
             msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
           }
@@ -171,16 +192,19 @@ export function useWebSocket() {
         case 'agent:message_sent': {
           // Show incoming messages in the recipient agent's chat panel
           const toId = msg.to;
+          const fromId = msg.from;
+          const isFromSystem = fromId === 'system';
+          const senderLabel = msg.fromRole
+            ? `${msg.fromRole} (${(fromId ?? '').slice(0, 8)})`
+            : fromId?.slice(0, 8) || 'System';
+          const preview = (msg.content ?? '').slice(0, 2000);
+
+          // Show in recipient's panel
           if (toId && toId !== 'system') {
             const state = useAppStore.getState();
             const recipient = state.agents.find((a) => a.id === toId);
             if (recipient) {
               const msgs = [...(recipient.messages ?? [])];
-              const isFromSystem = msg.from === 'system';
-              const senderLabel = msg.fromRole
-                ? `${msg.fromRole} (${(msg.from ?? '').slice(0, 8)})`
-                : msg.from?.slice(0, 8) || 'System';
-              const preview = (msg.content ?? '').slice(0, 2000);
               msgs.push({
                 type: 'text',
                 text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
@@ -188,6 +212,31 @@ export function useWebSocket() {
                 timestamp: Date.now(),
               });
               updateAgent(toId, { messages: msgs });
+            }
+          }
+
+          // Also show in sender's panel so both sides see the DM
+          if (fromId && fromId !== 'system' && toId !== fromId) {
+            const state = useAppStore.getState();
+            const sender = state.agents.find((a) => a.id === fromId);
+            if (sender) {
+              const isBroadcast = toId === 'all';
+              const recipientLabel = isBroadcast
+                ? 'All'
+                : (() => {
+                    const toAgent = state.agents.find((a) => a.id === toId);
+                    return toAgent?.role?.name
+                      ? `${toAgent.role.name} (${(toId ?? '').slice(0, 8)})`
+                      : (toId ?? '').slice(0, 8);
+                  })();
+              const msgs = [...(sender.messages ?? [])];
+              msgs.push({
+                type: 'text',
+                text: `📤 [To ${recipientLabel}] ${preview}`,
+                sender: 'system' as any,
+                timestamp: Date.now(),
+              });
+              updateAgent(fromId, { messages: msgs });
             }
           }
           break;

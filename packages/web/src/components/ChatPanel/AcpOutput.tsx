@@ -114,6 +114,29 @@ export function AcpOutput({ agentId }: Props) {
   const toolCalls = agent?.toolCalls ?? [];
   const messages = agent?.messages ?? [];
 
+  // Fetch message history when agent panel opens and no messages are loaded yet
+  useEffect(() => {
+    if (!agentId || messages.length > 0) return;
+    fetch(`/api/agents/${agentId}/messages?limit=200`)
+      .then((r) => r.json())
+      .then((data: any) => {
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
+          // Only load if still no messages (avoid overwriting live data)
+          if (!existing?.messages?.length) {
+            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+              type: 'text' as const,
+              text: m.content,
+              sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',
+              timestamp: new Date(m.timestamp).getTime(),
+            }));
+            useAppStore.getState().updateAgent(agentId, { messages: msgs });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Get activity events for this agent from leadStore
   const allProjects = useLeadStore((s) => s.projects);
   const agentActivity: ActivityEvent[] = [];

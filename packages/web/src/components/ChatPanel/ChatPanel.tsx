@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
@@ -6,6 +6,7 @@ import { useToastStore } from '../Toast';
 import { X, Send, Maximize2, Minimize2, Megaphone, Zap } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
 import { AgentIdBadge } from '../../utils/markdown';
+import { useFileDrop } from '../../hooks/useFileDrop';
 
 interface Props {
   agentId: string;
@@ -27,6 +28,14 @@ export function ChatPanel({ agentId, ws }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { agents, setSelectedAgent } = useAppStore();
   const agent = agents.find((a) => a.id === agentId);
+
+  const handleFileInsert = useCallback((text: string) => {
+    setInputText((prev) => (prev ? prev + ' ' + text : text));
+    inputRef.current?.focus();
+  }, []);
+  const { isDragOver, handleDragOver, handleDragLeave, handleDrop, dropZoneClassName } = useFileDrop({
+    onInsertText: handleFileInsert,
+  });
 
   const activeAgents = useMemo(
     () => agents.filter((a) => a.status === 'running' || a.status === 'idle'),
@@ -90,6 +99,13 @@ export function ChatPanel({ agentId, ws }: Props) {
     const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
     const isAgentBusy = existing?.status === 'running';
     const msgs = [...(existing?.messages ?? [])];
+    // For interrupts, insert a separator so the post-interrupt response appears as a new bubble
+    if (mode === 'interrupt' && isAgentBusy) {
+      const last = msgs[msgs.length - 1];
+      if (last?.sender === 'agent') {
+        msgs.push({ type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      }
+    }
     msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
@@ -159,7 +175,17 @@ export function ChatPanel({ agentId, ws }: Props) {
             Broadcasting to {runningAgents.length} agents
           </div>
         )}
-        <div className="flex gap-2 items-end">
+        <div
+          className={`flex gap-2 items-end relative rounded-lg transition-all ${dropZoneClassName}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragOver && (
+            <div className="absolute inset-0 flex items-center justify-center bg-accent/10 border-2 border-dashed border-accent rounded-lg z-10 pointer-events-none">
+              <span className="text-xs font-medium text-accent">Drop file to mention or attach</span>
+            </div>
+          )}
           <textarea
             ref={inputRef}
             value={inputText}

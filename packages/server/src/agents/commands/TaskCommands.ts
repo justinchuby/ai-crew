@@ -25,6 +25,7 @@ const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*(\{.*?\})\s*⟧⟧/s;
 const TASK_STATUS_REGEX = /⟦⟦\s*TASK_STATUS\s*⟧⟧/s;
 const QUERY_TASKS_REGEX = /⟦⟦\s*QUERY_TASKS\s*⟧⟧/s;
 const PAUSE_TASK_REGEX = /⟦⟦\s*PAUSE_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const RESUME_TASK_REGEX = /⟦⟦\s*RESUME_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const RETRY_TASK_REGEX = /⟦⟦\s*RETRY_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const SKIP_TASK_REGEX = /⟦⟦\s*SKIP_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const ADD_TASK_REGEX = /⟦⟦\s*ADD_TASK\s*(\{.*?\})\s*⟧⟧/s;
@@ -48,8 +49,14 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
   try {
     const req = parseCommandPayload(agent, match[1], declareTasksSchema, 'DECLARE_TASKS');
     if (!req) return;
-    const { tasks, conflicts } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
+    const { tasks, conflicts, linkedAutoTasks } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
     let msg = `[System] Task DAG declared: ${tasks.length} tasks added.`;
+    if (linkedAutoTasks.length > 0) {
+      msg += `\n🔗 Linked ${linkedAutoTasks.length} declared task(s) to existing auto-created tasks:`;
+      for (const link of linkedAutoTasks) {
+        msg += `\n  - "${link.declaredId}" → existing "${link.autoId}"`;
+      }
+    }
     const readyCount = tasks.filter(t => t.dagStatus === 'ready').length;
     const pendingCount = tasks.filter(t => t.dagStatus === 'pending').length;
     msg += `\n  Ready: ${readyCount}, Pending (waiting on deps): ${pendingCount}`;
@@ -117,6 +124,23 @@ function handlePauseTask(ctx: CommandHandlerContext, agent: Agent, data: string)
     const ok = ctx.taskDAG.pauseTask(agent.id, req.taskId);
     agent.sendMessage(ok ? `[System] Task "${req.taskId}" paused.` : `[System] Cannot pause task "${req.taskId}" (must be pending or ready).`);
   } catch { agent.sendMessage('[System] PAUSE_TASK error: invalid payload.'); }
+}
+
+function handleResumeTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can resume tasks.'); return; }
+  const match = data.match(RESUME_TASK_REGEX);
+  if (!match) return;
+  try {
+    const req = parseCommandPayload(agent, match[1], taskIdSchema, 'RESUME_TASK');
+    if (!req) return;
+    const ok = ctx.taskDAG.resumeTask(agent.id, req.taskId);
+    if (ok) {
+      const task = ctx.taskDAG.getTask(agent.id, req.taskId);
+      agent.sendMessage(`[System] Task "${req.taskId}" resumed → ${task?.dagStatus || 'ready'}. Use DELEGATE or CREATE_AGENT to assign it.`);
+    } else {
+      agent.sendMessage(`[System] Cannot resume task "${req.taskId}" (must be paused).`);
+    }
+  } catch { agent.sendMessage('[System] RESUME_TASK error: invalid payload.'); }
 }
 
 function handleRetryTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -529,6 +553,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => handleTaskStatus(ctx, a, _d), help: { description: 'View the task DAG status', example: 'TASK_STATUS {}', category: 'Task DAG' } },
     { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => handleTaskStatus(ctx, a, _d) },
     { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d), help: { description: 'Pause a task', example: 'PAUSE_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: RESUME_TASK_REGEX, name: 'RESUME_TASK', handler: (a, d) => handleResumeTask(ctx, a, d), help: { description: 'Resume a paused task', example: 'RESUME_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => handleRetryTask(ctx, a, d), help: { description: 'Retry a failed task', example: 'RETRY_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => handleSkipTask(ctx, a, d), help: { description: 'Skip a task', example: 'SKIP_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => handleAddTask(ctx, a, d), help: { description: 'Add a single task to the DAG', example: 'ADD_TASK {"taskId": "task-2", "role": "developer", "description": "..."}', category: 'Task DAG', args: deriveArgs(addTaskSchema) } },
