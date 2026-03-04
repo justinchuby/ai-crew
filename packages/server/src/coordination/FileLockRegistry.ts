@@ -81,6 +81,10 @@ export class FileLockRegistry extends EventEmitter {
     }
   }
 
+  // Lock conflict detection is intentionally global (not per-project).
+  // Two projects working in the same repo MUST see each other's locks to
+  // prevent concurrent edits to the same file. Do NOT scope acquire() by
+  // projectId — the projectId column is for UI filtering only.
   acquire(
     agentId: string,
     agentRole: string,

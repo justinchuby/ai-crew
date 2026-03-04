@@ -16,20 +16,22 @@ export function coordinationRoutes(ctx: AppContext): Router {
       : agentManager.getAll();
     res.json({
       agents: agents.map((a) => a.toJSON()),
-      locks: lockRegistry.getAll(),
-      recentActivity: activityLedger.getRecent(20),
+      locks: projectId ? lockRegistry.getByProject(projectId) : lockRegistry.getAll(),
+      recentActivity: activityLedger.getRecent(20, projectId),
     });
   });
 
-  router.get('/coordination/locks', (_req, res) => {
-    res.json(lockRegistry.getAll());
+  router.get('/coordination/locks', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    res.json(projectId ? lockRegistry.getByProject(projectId) : lockRegistry.getAll());
   });
 
   router.post('/coordination/locks', validateBody(acquireLockSchema), (req, res) => {
     const { agentId, filePath, reason } = req.body;
     const agent = agentManager.get(agentId);
     const agentRole = agent?.role?.id ?? 'unknown';
-    const result = lockRegistry.acquire(agentId, agentRole, filePath, reason);
+    const projectId = agent ? agentManager.getProjectIdForAgent(agentId) ?? '' : '';
+    const result = lockRegistry.acquire(agentId, agentRole, filePath, reason, 300, projectId);
     if (result.ok) {
       res.status(201).json({ ok: true });
     } else {
@@ -69,8 +71,30 @@ export function coordinationRoutes(ctx: AppContext): Router {
     res.json(activities);
   });
 
-  router.get('/coordination/summary', (_req, res) => {
-    res.json(activityLedger.getSummary());
+  router.get('/coordination/summary', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    if (projectId) {
+      const projectAgentIds = new Set(
+        agentManager.getByProject(projectId).map(a => a.id),
+      );
+      const full = activityLedger.getSummary();
+      // Filter summary entries to only include project agents
+      const filtered: Record<string, any> = {};
+      for (const [key, value] of Object.entries(full)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const scoped: Record<string, any> = {};
+          for (const [agentId, data] of Object.entries(value as Record<string, any>)) {
+            if (projectAgentIds.has(agentId)) scoped[agentId] = data;
+          }
+          filtered[key] = scoped;
+        } else {
+          filtered[key] = value;
+        }
+      }
+      res.json(filtered);
+    } else {
+      res.json(activityLedger.getSummary());
+    }
   });
 
   // ── Helper: build timeline data from activity events ──────────────────────

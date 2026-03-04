@@ -75,12 +75,12 @@ export class WebSocketServer {
       // Flush any buffered agent messages so the new client gets complete data
       agentManager.flushAllMessages();
 
-      // Send current state on connect
+      // Send minimal init on connect — full data is sent after subscribe-project
       ws.send(
         JSON.stringify({
           type: 'init',
-          agents: agentManager.getAll().map((a) => a.toJSON()),
-          locks: lockRegistry.getAll(),
+          agents: [],
+          locks: [],
           systemPaused: agentManager.isSystemPaused,
         }),
       );
@@ -100,16 +100,6 @@ export class WebSocketServer {
   }
 
   private wireAgentEvents(agentManager: AgentManager): void {
-    this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
-      const projectId = this.resolveAgentProjectId(agentId);
-      this.broadcast(
-        { type: 'agent:data', agentId, data: text },
-        (c) =>
-          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
-          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
-      );
-    });
-
     this.track(agentManager, 'agent:spawned', (agentJson: any) => {
       this.broadcastToProject({ type: 'agent:spawned', agent: agentJson }, agentJson.projectId);
     });
@@ -319,7 +309,7 @@ export class WebSocketServer {
               JSON.stringify({
                 type: 'init',
                 agents: agents.map((a) => a.toJSON()),
-                locks: this.lockRegistry.getAll(),
+                locks: this.lockRegistry.getByProject(client.subscribedProject),
                 systemPaused: this.agentManager.isSystemPaused,
               }),
             );

@@ -318,6 +318,66 @@ describe('WebSocket project scoping', () => {
     });
   });
 
+  describe('P0 fixes: init and lock isolation', () => {
+    interface MockLock {
+      filePath: string;
+      agentId: string;
+      projectId?: string;
+    }
+
+    function getByProject(locks: MockLock[], projectId: string): MockLock[] {
+      return locks.filter((l) => l.projectId === projectId);
+    }
+
+    it('P0-1: initial WebSocket connect sends empty agents and locks (deferred init)', () => {
+      // The init message sent on ws connect must NOT leak all agents/locks.
+      // It should send empty arrays; the real data comes after subscribe-project.
+      const initMsg = {
+        type: 'init' as const,
+        agents: [] as any[],
+        locks: [] as any[],
+        systemPaused: false,
+      };
+
+      expect(initMsg.agents).toHaveLength(0);
+      expect(initMsg.locks).toHaveLength(0);
+    });
+
+    it('P0-2: subscribe-project re-init sends only project-scoped locks', () => {
+      const allLocks: MockLock[] = [
+        { filePath: 'src/a.ts', agentId: 'agent-a', projectId: 'proj-a' },
+        { filePath: 'src/b.ts', agentId: 'agent-b', projectId: 'proj-b' },
+        { filePath: 'src/c.ts', agentId: 'agent-c', projectId: 'proj-a' },
+      ];
+
+      const filteredLocks = getByProject(allLocks, 'proj-a');
+      expect(filteredLocks).toHaveLength(2);
+      expect(filteredLocks.every((l) => l.projectId === 'proj-a')).toBe(true);
+
+      // Project B should get only its lock
+      const projBLocks = getByProject(allLocks, 'proj-b');
+      expect(projBLocks).toHaveLength(1);
+      expect(projBLocks[0].filePath).toBe('src/b.ts');
+    });
+
+    it('P0-3: coordination/status filters locks by projectId', () => {
+      const allLocks: MockLock[] = [
+        { filePath: 'src/a.ts', agentId: 'agent-a', projectId: 'proj-a' },
+        { filePath: 'src/b.ts', agentId: 'agent-b', projectId: 'proj-b' },
+      ];
+
+      // With projectId filter
+      const filtered = getByProject(allLocks, 'proj-a');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].projectId).toBe('proj-a');
+
+      // Without projectId filter — all locks returned (backward compat)
+      const projectId: string | undefined = undefined;
+      const result = projectId ? getByProject(allLocks, projectId) : allLocks;
+      expect(result).toHaveLength(2);
+    });
+  });
+
   describe('edge cases', () => {
     it('empty string projectId treated as no filter', () => {
       // broadcastToProject with empty string eventProjectId

@@ -155,11 +155,14 @@ const mockDb = {
   setSetting: vi.fn(),
 } as any;
 
+const allLocks = [
+  { agentId: 'lead-aaa', filePath: 'src/a.ts', reason: 'editing', projectId: 'proj-a' },
+  { agentId: 'dev-b1', filePath: 'src/b.ts', reason: 'editing', projectId: 'proj-b' },
+];
+
 const mockLockRegistry = {
-  getAll: vi.fn().mockReturnValue([
-    { agentId: 'lead-aaa', filePath: 'src/a.ts', reason: 'editing' },
-    { agentId: 'dev-b1', filePath: 'src/b.ts', reason: 'editing' },
-  ]),
+  getAll: vi.fn().mockReturnValue(allLocks),
+  getByProject: vi.fn((projectId: string) => allLocks.filter((l) => l.projectId === projectId)),
   acquire: vi.fn().mockReturnValue({ ok: true }),
   release: vi.fn().mockReturnValue(true),
 };
@@ -224,10 +227,8 @@ beforeEach(() => {
     allAgents.filter(a => getProjectIdForAgent(a.id) === projectId),
   );
   mockAgentManager.getProjectIdForAgent.mockImplementation((agentId: string) => getProjectIdForAgent(agentId));
-  mockLockRegistry.getAll.mockReturnValue([
-    { agentId: 'lead-aaa', filePath: 'src/a.ts', reason: 'editing' },
-    { agentId: 'dev-b1', filePath: 'src/b.ts', reason: 'editing' },
-  ]);
+  mockLockRegistry.getAll.mockReturnValue(allLocks);
+  mockLockRegistry.getByProject.mockImplementation((projectId: string) => allLocks.filter((l) => l.projectId === projectId));
   mockActivityLedger.getRecent.mockReturnValue([
     { id: 1, agentId: 'lead-aaa', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:00:00Z' },
     { id: 2, agentId: 'dev-a1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:01:00Z' },
@@ -307,11 +308,11 @@ describe('API Route Isolation (Issue #69 Step 3)', () => {
       expect(mockAgentManager.getByProject).toHaveBeenCalledWith('proj-a');
     });
 
-    it('still returns all locks regardless of projectId (locks are intentionally global)', async () => {
+    it('returns only project-scoped locks when projectId filter is provided', async () => {
       const res = await fetch(`${baseUrl}/api/coordination/status?projectId=proj-a`);
       const data = await res.json();
-      // Locks remain global — two projects can conflict on the same file
-      expect(data.locks).toHaveLength(2);
+      expect(data.locks).toHaveLength(1);
+      expect(data.locks[0].projectId).toBe('proj-a');
     });
   });
 

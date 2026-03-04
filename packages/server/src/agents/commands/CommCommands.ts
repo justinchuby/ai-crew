@@ -143,12 +143,14 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     const targetAgent = ctx.getAgent(targetId);
     if (!targetAgent) {
       logger.warn('message', `Cannot resolve target "${msg.to}" for message from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
       return;
     }
 
     // Enforce project boundary — reject cross-project messages
     if (senderProjectId && ctx.getProjectIdForAgent(targetId) !== senderProjectId) {
       logger.warn('message', `Cross-project message blocked: ${agent.id.slice(0, 8)} → ${targetId.slice(0, 8)}`);
+      agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
       return;
     }
 
@@ -171,7 +173,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     });
     ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
       toAgentId: targetId, toRole: targetAgent.role.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
     logger.debug('command', 'Failed to parse AGENT_MESSAGE command', { error: (err as Error).message });
   }
@@ -217,7 +219,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
     });
     ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Broadcast to ${recipients.length} agents: ${msg.content.slice(0, 120)}`, {
       toAgentId: 'all', toRole: 'broadcast', recipientCount: recipients.length,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
     logger.debug('command', 'Failed to parse BROADCAST command', { error: (err as Error).message });
   }
@@ -385,7 +387,7 @@ function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     ctx.emit('group:message', { message, groupName: req.group, leadId });
     ctx.activityLedger.log(agent.id, agent.role.id, 'group_message', `Group "${req.group}": ${req.content.slice(0, 120)}`, {
       groupName: req.group, recipientCount: delivered,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
     logger.info('groups', `Group message in "${req.group}": ${agent.role.name} (${agent.id.slice(0, 8)}) → ${delivered} recipients`);
   } catch (err) { logger.debug('command', 'Failed to parse GROUP_MESSAGE command', { error: (err as Error).message }); }
 }
@@ -478,7 +480,8 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'agent_interrupted',
       `Interrupted ${target.role.name} (${target.id.slice(0, 8)}): ${req.content.slice(0, 120)}`,
-      { toAgentId: target.id, toRole: target.role.id });
+      { toAgentId: target.id, toRole: target.role.id },
+      ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:interrupted', { from: agent.id, to: target.id, content: req.content });
   } catch (err) {
