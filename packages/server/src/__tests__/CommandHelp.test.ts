@@ -166,7 +166,7 @@ describe('CommandDispatcher error handling', () => {
     expect(errorCall![0]).toContain('Correct format:');
   });
 
-  it('sends escaping hint when a known command is nested inside another', async () => {
+  it('sends escaping hint when a known command is nested inside another block', async () => {
     const { CommandDispatcher } = await import('../agents/CommandDispatcher.js');
 
     const sendMessage = vi.fn();
@@ -201,15 +201,18 @@ describe('CommandDispatcher error handling', () => {
 
     const dispatcher = new CommandDispatcher(mockCtx);
 
-    // Simulate: DELEGATE with a nested COMMIT inside the JSON payload
-    dispatcher.appendToBuffer(agent.id, '⟦⟦ DELEGATE {"to": "dev-1", "task": "do X then ⟦⟦ COMMIT {\\"message\\": \\"done\\"} ⟧⟧"} ⟧⟧');
+    // Scenario: ⟦⟦ OUTER_BLOCK ⟦⟦ QUERY_CREW ⟧⟧ ⟧⟧
+    // QUERY_CREW is the leftmost *known* regex match, but isInsideCommandBlock=true
+    // because the unclosed ⟦⟦ OUTER_BLOCK precedes it.
+    // (OUTER_BLOCK is not a known command, so no regex matches it — but the brackets are there)
+    dispatcher.appendToBuffer(agent.id, '⟦⟦ SOME_TASK_TEXT ⟦⟦ QUERY_CREW ⟧⟧ rest ⟧⟧');
     dispatcher.scanBuffer(agent);
 
     const nestedHint = sendMessage.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('Nested'),
     );
     expect(nestedHint).toBeDefined();
-    expect(nestedHint![0]).toContain('Nested COMMIT was stripped');
+    expect(nestedHint![0]).toContain('Nested QUERY_CREW was stripped');
     expect(nestedHint![0]).toContain('refer to commands by name');
   });
 });
