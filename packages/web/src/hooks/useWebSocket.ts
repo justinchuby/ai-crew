@@ -303,6 +303,13 @@ export function useWebSocket() {
     [send],
   );
 
+  const subscribeProject = useCallback(
+    (projectId: string | null) => {
+      send({ type: 'subscribe-project', projectId });
+    },
+    [send],
+  );
+
   const sendInput = useCallback(
     (agentId: string, text: string) => {
       send({ type: 'input', agentId, text });
@@ -327,7 +334,7 @@ export function useWebSocket() {
   );
 
   return useMemo(
-    () => ({ send, subscribe, unsubscribe, sendInput, resizeAgent, broadcastInput }),
-    [send, subscribe, unsubscribe, sendInput, resizeAgent, broadcastInput],
+    () => ({ send, subscribe, unsubscribe, subscribeProject, sendInput, resizeAgent, broadcastInput }),
+    [send, subscribe, unsubscribe, subscribeProject, sendInput, resizeAgent, broadcastInput],
   );
 }
