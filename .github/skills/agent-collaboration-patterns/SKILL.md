@@ -1,23 +1,40 @@
 ---
 name: agent-collaboration-patterns
-description: Proven collaboration patterns for multi-agent crews tackling parallel development tasks. Covers architect-first mapping, dual review, file lock coordination, and DAG management. Use when planning any crew session with 3+ agents.
+description: Proven collaboration patterns for flightdeck-based multi-agent crews. Covers architect-first mapping, dual review, file lock coordination, context pressure, and DAG management. Use when planning any crew session with 3+ agents.
 ---
 
 # Agent Collaboration Patterns
 
 Extracted from a 10-agent session that resolved 8 sub-issues across 6 GitHub issues in ~15 minutes with 966+ tests passing (retrospective #36).
 
+## When This Doesn't Apply
+
+- Solo agent tasks or 2-agent sessions — these patterns add overhead that isn't justified.
+- Sessions under 3 issues or 10 minutes estimated duration — simpler coordination suffices.
+- Fully independent workstreams where agents share no files, types, or interfaces.
+
+## Known System Limitations
+
+Be aware of these constraints when applying the patterns below:
+- **File locking is file-level, not function-level.** Two agents cannot edit different functions in the same file simultaneously.
+- **Reviewer diffs can go stale.** There is no notification when a file changes while a reviewer is reading it.
+- **DAG completion requires manual `COMPLETE_TASK` calls.** Auto-update on agent message-based completion is not yet implemented.
+
 ## Pattern 1: Architect-First Codebase Mapping
 
-**What:** Before any code is written, have the architect explore the entire relevant codebase, read all issues, and produce a detailed map with exact files, methods, line numbers, and proposed fixes.
+**What:** Before any code is written, have the architect explore the codebase scoped to the assigned issues and produce a targeted map with files, methods, line numbers, and proposed fixes.
+
+**Scope guidance:** Limit the architect's exploration to packages/directories that the issues reference. For large codebases (100K+ files), do NOT explore the entire repo — focus on the relevant modules. Budget 5 minutes maximum for the mapping phase.
 
 **Why it works:** 5 minutes of architect analysis saved ~30 minutes of cumulative developer exploration (6 developers × 5 minutes each). The map also ensures consistent approaches — e.g., all developers agreed on `'terminated'` as the status string rather than each choosing their own.
 
 **How to do it:**
-1. Architect reads all issues and explores the codebase.
+1. Architect reads all issues and explores relevant directories.
 2. Architect produces a map file at `.flightdeck/shared/architect-<id>/issue-map.md`.
 3. Every developer's delegation prompt includes: "Read the architect map at [path] before starting."
-4. The map should include: file paths, function/method names, line numbers, and the proposed change.
+4. The map should include: file paths, function/method names, approximate line numbers, and the proposed change.
+
+**Important:** The architect's map is a starting point, not a contract. Developers should verify line numbers and proposed approaches against current code (line numbers shift after other agents commit). If a developer finds the map is wrong, they should message the architect and the lead immediately.
 
 **Example entry from the retro's map:**
 ```
@@ -36,7 +53,7 @@ Extracted from a 10-agent session that resolved 8 sub-issues across 6 GitHub iss
 
 **Why it works:** In the retro, the code reviewer approved both initial implementations. The critical reviewer then found a **P0 blocker** the code reviewer missed: the frontend `AgentStatus` type didn't include `'terminated'`, meaning the server would emit a status the frontend couldn't handle.
 
-**Guideline:** Always assign both reviewer types for changes that cross package boundaries (e.g., server + frontend). Single-package changes can use one reviewer.
+**When to use dual review:** Assign both reviewer types when changes modify both client-facing types AND server-side logic, or when a contract (API, type definition, event schema) is modified. For single-file bug fixes within one package, one reviewer suffices.
 
 ## Pattern 3: Broadcast-Then-Refactor for Cross-Cutting Concerns
 
@@ -69,7 +86,7 @@ Extracted from a 10-agent session that resolved 8 sub-issues across 6 GitHub iss
 
 **Guideline:** When you encounter a hot file (3+ agents need it), consider:
 1. **Sequencing explicitly:** Assign clear order — Agent A → Agent B → Agent C — and have each release locks immediately after committing.
-2. **Batching:** Have one agent make all changes to the hot file based on the architect's map, rather than passing it between 4 agents.
+2. **Batching:** Have one agent make all changes to the hot file based on the architect's map, rather than passing it between 4 agents. Batching works best when the changes are small and well-specified. For complex changes requiring deep understanding, prefer explicit sequencing with prompt lock handoff.
 3. **Long-term:** Flag the file for decomposition in a future session.
 
 ## Anti-Pattern 2: Declaring a DAG But Not Updating It
@@ -78,19 +95,14 @@ Extracted from a 10-agent session that resolved 8 sub-issues across 6 GitHub iss
 
 **Guideline:**
 - When agents report completion via messages, the lead (or secretary) should call `COMPLETE_TASK` for the corresponding DAG task.
-- Use `QUERY_TASKS` periodically (every 3-5 minutes) to verify DAG state matches reality.
-- Better yet: create a secretary agent when using `DECLARE_TASKS` with 3+ tasks. The secretary monitors DAG state and keeps it accurate.
+- Check DAG state after each major milestone: when a workstream completes, when reviews finish, and when transitioning between phases. Also check when an agent reports unexpected state.
+- See the `use-task-dag-for-coordination` skill for detailed DAG management patterns.
 
-## Anti-Pattern 3: Skipping the Secretary on Fast Sessions
+## Anti-Pattern 3: Skipping the Secretary When Coordination Gets Heavy
 
 **Problem:** The lead managed 10 agents, 8 issues, and multiple review rounds entirely in its own context window. By the end, context was heavily loaded and updates were processed in batches with less granular attention.
 
-**Guideline:** Create a secretary agent when:
-- You have 5+ agents running in parallel.
-- You expect 3+ review-fix cycles.
-- The session will last more than 10 minutes.
-
-The secretary overhead (~30 seconds to create) pays for itself by freeing the lead's context for decision-making rather than status tracking.
+**Guideline:** Consider a secretary agent when you expect significant parallel work with frequent status updates. The secretary overhead (~30 seconds to create) is only justified if the lead is struggling to track multiple workstreams. If in doubt, skip the secretary for the first 5 minutes and create one if coordination becomes overwhelming.
 
 ## Anti-Pattern 4: Reviewers Working on Stale Diffs
 
@@ -105,14 +117,20 @@ The secretary overhead (~30 seconds to create) pays for itself by freeing the le
 
 **Problem:** The critical reviewer found 5 P1 issues but only the P0 was addressed. The other 4 P1s existed only in a shared markdown file that would be lost after the session.
 
-**Guideline:** When deferring a finding, use `DEFER_ISSUE` (if available) or file a GitHub issue immediately. Never leave deferred findings only in ephemeral session files. A finding that isn't tracked is a finding that's lost.
+**Guideline:** Use `DEFER_ISSUE` during the session to queue deferred findings. At session end, file GitHub issues as a batch for any deferred findings that weren't resolved. Only file immediately for P0/P1 issues that definitely won't be addressed this session. Never leave deferred findings only in ephemeral session files — a finding that isn't tracked is a finding that's lost.
+
+## Anti-Pattern 6: Context Pressure From Long-Running Agents
+
+**Problem:** Long-running agents accumulated context over multiple review-fix iterations. Later delegations relied on accumulated (potentially stale) context rather than fresh reads.
+
+**Guideline:** Watch for signs of context pressure: inconsistent references to earlier work, repeated questions about things already discussed, or outputs that contradict the agent's own prior actions. These signal it's time to rotate — spin up a fresh agent with a summary of what's been done so far. When re-delegating to an existing agent, include a brief summary rather than assuming they remember accurately.
 
 ## Session Planning Checklist
 
-- [ ] Have the architect map the codebase and all issues before delegating to developers.
+- [ ] Have the architect map relevant code and all issues before delegating to developers.
 - [ ] Map file ownership to identify parallel workstreams and bottleneck files.
-- [ ] Assign a secretary for sessions with 5+ agents or 3+ review cycles.
+- [ ] Consider a secretary if the lead is tracking 5+ parallel agents.
 - [ ] Create a DAG with `DECLARE_TASKS` and assign someone to keep it updated.
 - [ ] Plan explicit sequencing for shared files (who goes first, second, third).
-- [ ] Assign both a code reviewer and a critical reviewer for cross-boundary changes.
-- [ ] File GitHub issues for any deferred findings before the session ends.
+- [ ] Assign dual reviewers for changes that cross package boundaries or modify contracts.
+- [ ] Use `DEFER_ISSUE` for findings that won't be addressed this session; batch-file GitHub issues at session end.

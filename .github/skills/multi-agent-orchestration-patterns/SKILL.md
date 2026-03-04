@@ -1,22 +1,33 @@
 ---
 name: multi-agent-orchestration-patterns
-description: Patterns and pitfalls for orchestrating multi-agent crews (5+ agents). Use when planning or running sessions with parallel workstreams, DAG-based task management, or iterative review cycles.
+description: Patterns for orchestrating multi-agent crews in flightdeck-based sessions. Covers broadcast reliability, shared facts, CI noise management, and review diffing. Use when running sessions with 5+ agents or iterative review cycles.
 ---
 
 # Multi-Agent Orchestration Patterns
 
 Extracted from a 10-agent documentation refresh session with 3 review-fix cycles and ~30 commits (retrospective #64).
 
+For DAG task management patterns, see the `use-task-dag-for-coordination` skill. For parallel execution and file-lock discipline, see the `agent-collaboration-patterns` skill.
+
+## When This Doesn't Apply
+
+These patterns add overhead. Skip them for:
+- Sessions with fewer than 5 agents.
+- Single-issue fixes or quick tasks under 10 minutes.
+- Sessions where all agents work on fully independent files with no shared facts.
+
 ## Pattern 1: Keep a Mutable Facts Store
 
 **Problem:** An architect analyzed the codebase and flagged GitHub URLs as wrong. Mid-session, the repo was renamed — making the analysis incorrect. A developer committed URL changes in the wrong direction before the correction propagated.
 
-**Guideline:** Maintain a shared key-value store (e.g., a file in `.flightdeck/shared/facts.md`) for session-wide facts like repo name, repo URL, version numbers, and important conventions. All agents should check this file before acting on cached analysis. When a fact changes, broadcast the update AND update the facts file.
+**Guideline:** The **lead** creates a shared key-value store at session start (e.g., `.flightdeck/shared/facts.md`) for session-wide facts like repo name, repo URL, version numbers, and important conventions. The lead owns this file — only the lead updates it. Agents read but don't write. If an agent discovers a fact is wrong, they message the lead.
+
+When a fact changes, the lead must both update the facts file AND broadcast the change.
 
 ```
 # Example: .flightdeck/shared/facts.md
-repo-name: ai-crew
-repo-url: https://github.com/justinchuby/ai-crew
+repo-name: <your-repo-name>
+repo-url: <your-repo-url>
 default-branch: main
 ```
 
@@ -28,45 +39,36 @@ default-branch: main
 1. Broadcast the correction immediately.
 2. Identify which agents are actively working on affected files (check file locks).
 3. Send DIRECT_MESSAGE to each affected agent specifically — don't rely on broadcast alone.
-4. If possible, pause affected agents' tasks before the correction propagates.
+4. Include explicit instructions: "Stop current work on [topic]. Wait for updated guidance."
 
-Treat broadcasts as "best-effort notifications," not reliable delivery.
+**Note:** There is no system-level pause command. The workaround is targeted DIRECT_MESSAGE to each affected agent. Treat broadcasts as "best-effort notifications," not reliable delivery.
 
-## Pattern 3: Manage DAG Task Lifecycle Actively
-
-**Problem:** Paused tasks couldn't be completed or retried. Pending tasks didn't auto-transition to ready when dependencies completed. Premature `COMPLETE_TASK` was irreversible.
-
-**Guidelines for leads:**
-- Don't mark tasks complete prematurely — verify the work is actually done first.
-- If a task gets stuck in "paused" or "pending," track it manually and re-delegate rather than fighting the state machine.
-- Use `QUERY_TASKS` periodically to check DAG state — don't rely on memory.
-- When `ADD_TASK` doesn't link properly to `DELEGATE`, skip the stuck task and create a fresh delegation.
-
-## Pattern 4: Suppress Known CI Failures Early
+## Pattern 3: Suppress Known CI Failures Early
 
 **Problem:** A pre-existing `build:server` failure triggered on every commit, creating noise. Agents spent cycles investigating a build failure unrelated to their documentation work.
 
-**Guideline:** At session start, identify pre-existing CI failures and broadcast them:
+**Guideline:** At session start, identify pre-existing CI failures and broadcast them with specifics:
 ```
-BROADCAST: "Known CI failure: `build:server` is broken pre-session. Ignore it. 
-Only investigate NEW failures that appear after your commits."
+BROADCAST: "Known CI failure: `build:server` fails with 'No workspaces found: 
+--workspace=packages/server'. This is pre-existing — ignore it.
+Only investigate NEW failures or failures with DIFFERENT error messages."
 ```
-This prevents agents from wasting time on inherited problems.
+Be specific about the exact error message or test name, not just the build step. A new failure in the same step could be masked otherwise. Periodically re-check whether the "known" failure is still the same failure.
 
-## Pattern 5: Rotate Agents on Long Sessions to Avoid Context Pressure
+## Pattern 4: Incremental Review Diffing
 
-**Problem:** Long-running agents accumulated context over multiple review-fix iterations. Later delegations relied on accumulated (potentially stale) context rather than fresh reads.
+**Problem:** In iterative review cycles (review → fix → review → fix), reviewers re-read the entire file each round even though most of it is unchanged. Later rounds are slower and more tedious despite fewer actual changes.
 
-**Guidelines:**
-- For iterative work (review → fix → review → fix), consider creating a fresh agent after 2-3 cycles rather than re-delegating to the same one.
-- When re-delegating to an existing agent, include a summary of what's been done so far — don't assume they remember accurately.
-- If an agent starts producing inconsistent or confused output, that's a signal of context pressure — spin up a replacement.
+**Guideline:** After the first review round, reviewers should focus on what changed since their last review:
+```bash
+# See only changes since the last review commit
+git diff <last-reviewed-commit>..HEAD -- <file>
+```
+This makes iteration rounds faster and more focused, especially when most of the file is already correct.
 
 ## What Worked Well (Repeat These)
 
-1. **Parallel workstreams with file locking** — 3 implementation tracks (README, docs site, presentation) ran simultaneously with zero merge conflicts.
-2. **Dual reviewer escalation** — Code reviewer and critical reviewer found different classes of issues (field names vs schema accuracy), providing complementary coverage.
-3. **Self-correcting agents** — The architect proactively corrected its own stale analysis and notified affected agents without being asked.
-4. **Proactive agent initiative** — Developers applied review fixes before being explicitly asked, reducing round-trips.
-5. **Shared workspace convention** — `.flightdeck/shared/<role>-<id>/` worked well for sharing analysis reports and review findings across agents.
-6. **Fast iteration cycles** — Each review→fix cycle completed in ~2 minutes, enabling 3 full iterations.
+1. **Self-correcting agents** — The architect proactively corrected its own stale analysis and notified affected agents without being asked. Agents that recognize and fix their own mistakes are more valuable than agents that wait to be corrected.
+2. **Proactive agent initiative** — Developers applied review fixes before being explicitly asked, reducing round-trips between reviewer and developer.
+3. **Shared workspace convention** — `.flightdeck/shared/<role>-<id>/` worked well for sharing analysis reports and review findings across agents.
+4. **Fast iteration cycles** — Each review→fix cycle completed in ~2 minutes, enabling 3 full iterations within a single session.
