@@ -60,12 +60,64 @@ Command help uses a consistent format for argument visibility:
 SET_TIMER <label: string> <delay: number> <message: string> [repeat: boolean = false]
 ```
 
+## Schema-Driven Help (Zod → CommandArg)
+
+Command argument metadata is **derived from Zod schemas**, not maintained separately. This eliminates drift between validation and documentation.
+
+### How It Works
+
+Each Zod schema field uses `.describe()` to annotate its purpose. The `deriveArgs(schema)` function introspects `schema.shape` to auto-generate `CommandArg[]` for help rendering:
+
+```typescript
+// Zod schema — single source of truth
+const setTimerSchema = z.object({
+  label: z.string().describe('Timer name'),
+  delay: z.number().describe('Seconds to wait').pipe(z.number().int().positive()),
+  message: z.string().describe('Message to deliver when timer fires'),
+  repeat: z.boolean().optional().default(false).describe('Fire repeatedly'),
+});
+
+// Help metadata — derived, not hand-maintained
+help: {
+  ...deriveHelp(setTimerSchema, 'Set a reminder timer', 'Timers'),
+  example: 'SET_TIMER {"label": "check-build", "delay": 300, "message": "Check CI"}',
+}
+```
+
+`deriveArgs()` extracts field name, type, required/optional, description, and default value from each schema field. The `deriveHelp()` convenience wraps this with a command description and category.
+
+### Conventions
+
+- **Every Zod schema field must have `.describe('...')`** — drift detection tests catch missing annotations
+- Place `.describe()` as the **last call** in the chain (after `.optional()`, `.default()`, etc.) unless using `.pipe()` — then put `.describe()` before the pipe so it describes the input type
+- Use `deriveHelp(schema, description, category)` and spread into the command's `help` object
+- Keep hand-written `example` strings — auto-generated examples are worse than curated ones
+
+### Overrides
+
+For edge cases (e.g., mutually exclusive fields), pass manual `args` that override the derived ones:
+
+```typescript
+// CANCEL_TIMER accepts timerId OR label (mutually exclusive)
+help: {
+  ...deriveHelp(cancelTimerSchema, 'Cancel a timer', 'Timers'),
+  args: [
+    { name: 'timerId', type: 'string', required: false, description: 'Timer ID to cancel' },
+    { name: 'label', type: 'string', required: false, description: 'Timer label to cancel' },
+  ],
+  example: 'CANCEL_TIMER {"label": "check-build"}',
+}
+```
+
+Manual `args` in the `help` object take precedence over derived args.
+
 ## Adding New Commands
 
 When adding a new command:
 
-1. **Use typed IDs** — never a bare `id` field
-2. **Follow camelCase** — no exceptions
-3. **Reuse standard field names** where they fit (`to`, `content`, `summary`, `reason`, `task`)
-4. **Add help metadata** — description, example, category, and argument definitions with types
-5. **Co-locate help with the command definition** — don't maintain a separate list
+1. **Define a Zod schema** with `.describe('...')` on every field — drift tests enforce this
+2. **Use typed IDs** — never a bare `id` field
+3. **Follow camelCase** — no exceptions
+4. **Reuse standard field names** where they fit (`to`, `content`, `summary`, `reason`, `task`)
+5. **Use `deriveHelp()`** for help metadata — add a hand-written `example`
+6. **Co-locate help with the command definition** — don't maintain a separate list
