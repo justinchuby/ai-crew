@@ -209,7 +209,7 @@ import { AlertEngine } from './coordination/AlertEngine.js';
 const alertEngine = new AlertEngine(agentManager, lockRegistry, decisionLog, activityLedger, taskDAG);
 alertEngine.start();
 alertEngine.on('alert:new', (alert) => {
-  wsServer.broadcastEvent({ type: 'alert:new', alert });
+  wsServer.broadcastEvent({ type: 'alert:new', alert }, alert.projectId);
 });
 
 // Capability registry — tracks which agents have expertise on which files/technologies

@@ -17,6 +17,7 @@ export interface Alert {
   message: string;
   timestamp: string;
   agentId?: string;
+  projectId?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ export class AlertEngine extends EventEmitter {
           type: 'duplicate_file_edit',
           severity: 'warning',
           message: `File "${filePath}" locked by ${agentIds.length} agents: ${names}`,
+          agentId: agentIds[0],
         });
       }
     }
@@ -214,8 +216,13 @@ export class AlertEngine extends EventEmitter {
     );
     if (recent) return;
 
+    // Resolve projectId from agentId if not explicitly provided
+    const projectId = partial.projectId ??
+      (partial.agentId ? this.agentManager.getProjectIdForAgent(partial.agentId) : undefined);
+
     const alert: Alert = {
       ...partial,
+      projectId,
       id: this.nextId++,
       timestamp: new Date().toISOString(),
     };
