@@ -2399,7 +2399,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   </div>
                 )}
                 {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center justify-end gap-1.5 mt-0.5">
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}
