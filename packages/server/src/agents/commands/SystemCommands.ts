@@ -9,6 +9,8 @@ import type { MemoryEntry } from '../AgentMemory.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.js';
+import { formatQueryCrew } from '../../coordination/CrewFormatter.js';
+import type { CrewMember } from '../../coordination/CrewFormatter.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -24,48 +26,52 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
   const allAgents = agentProjectId
     ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === agentProjectId)
     : ctx.getAllAgents();
-  const roster = allAgents
+
+  const lockRegistry = ctx.lockRegistry;
+  const allLocks = lockRegistry.getAll();
+
+  // Build CrewMember list from live agents
+  const members: CrewMember[] = allAgents
     .filter((a) => !isTerminalStatus(a.status))
     .map((a) => ({
-      id: a.id.slice(0, 8),
-      fullId: a.id,
-      role: a.role.name,
-      roleId: a.role.id,
+      id: a.id,
+      role: a.role.id,
+      roleName: a.role.name,
       status: a.status,
-      task: a.task?.slice(0, 80) || null,
-      parentId: a.parentId?.slice(0, 8) || null,
-      fullParentId: a.parentId || null,
-      childCount: a.childIds.length,
+      task: a.task?.slice(0, 80) || undefined,
       model: a.model || a.role.model || 'default',
+      parentId: a.parentId || undefined,
+      isSystemAgent: a.isSystemAgent || undefined,
+      lockedFiles: allLocks.filter(l => l.agentId === a.id).map(l => l.filePath),
+      pendingMessages: a.pendingMessageCount,
+      createdAt: a.createdAt.toISOString(),
+      contextWindowSize: a.contextWindowSize,
+      contextWindowUsed: a.contextWindowUsed,
     }));
 
   const running = ctx.getRunningCount();
-  const budgetLine = agent.role.id === 'lead'
-    ? `\n== AGENT BUDGET ==\nRunning: ${running} / ${ctx.maxConcurrent} | Available slots: ${Math.max(0, ctx.maxConcurrent - running)}${running >= ctx.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}\n`
-    : '';
+  const budget = agent.role.id === 'lead'
+    ? { running, max: ctx.maxConcurrent }
+    : undefined;
 
   // For sub-leads, scope to own children + sibling summary
   const isSubLead = agent.role.id === 'lead' && !!agent.parentId;
-  let rosterLines: string;
-  let siblingSection = '';
+  let siblingSection: string | undefined;
+  let visibleMembers: CrewMember[];
+
   if (isSubLead) {
-    const ownChildren = roster.filter(r => r.fullParentId === agent.id);
-    const siblingLeads = roster.filter(r => r.roleId === 'lead' && r.fullParentId === agent.parentId && r.fullId !== agent.id);
-    rosterLines = ownChildren
-      .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}`)
-      .join('\n') || '(no agents created yet — use CREATE_AGENT to create specialists)';
+    visibleMembers = members.filter(m => m.parentId === agent.id);
+    const siblingLeads = members.filter(m => m.role === 'lead' && m.parentId === agent.parentId && m.id !== agent.id);
     if (siblingLeads.length > 0) {
-      siblingSection = `\n== SIBLING LEADS ==\n${siblingLeads.map(r => `- ${r.id} (${r.role}) — ${r.status}, managing ${r.childCount} agents`).join('\n')}\n`;
+      const lines = siblingLeads.map(r => `- ${r.id.slice(0, 8)} (${r.roleName}) — ${r.status}`);
+      siblingSection = `== SIBLING LEADS ==\n${lines.join('\n')}`;
     }
   } else {
-    const ownAgents = roster.filter(r => r.fullParentId === agent.id || r.fullId === agent.id);
-    rosterLines = ownAgents
-      .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}`)
-      .join('\n') || '(no agents created yet — use CREATE_AGENT to create specialists)';
+    visibleMembers = members.filter(m => m.parentId === agent.id || m.id === agent.id);
   }
 
   // Include memory entries for the lead
-  let memorySection = '';
+  let memorySection: string | undefined;
   if (agent.role.id === 'lead') {
     const memories = ctx.agentMemory.getByLead(agent.id);
     if (memories.length > 0) {
@@ -80,33 +86,31 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
         const facts = entries.map(e => `${e.key}: ${e.value}`).join(', ');
         lines.push(`  - ${agentId.slice(0, 8)}: ${facts}`);
       }
-      memorySection = `\n== AGENT MEMORY ==\nRecorded facts about your agents:\n${lines.join('\n')}\n`;
+      memorySection = `== AGENT MEMORY ==\nRecorded facts about your agents:\n${lines.join('\n')}`;
     }
   }
 
   // Check for unread human messages
-  let humanMsgIndicator = '';
+  let humanMessageAlert: string | undefined;
   if (agent.role.id === 'lead' && !agent.humanMessageResponded && agent.lastHumanMessageAt) {
     const agoMs = Date.now() - agent.lastHumanMessageAt.getTime();
     const agoMin = Math.floor(agoMs / 60000);
     const agoStr = agoMin < 1 ? 'just now' : `${agoMin}m ago`;
-    humanMsgIndicator = `\n⚠️ UNREAD HUMAN MESSAGE (${agoStr}): "${agent.lastHumanMessageText}"\nRespond to this FIRST before continuing other work.\n`;
+    humanMessageAlert = `⚠️ UNREAD HUMAN MESSAGE (${agoStr}): "${agent.lastHumanMessageText}"\nRespond to this FIRST before continuing other work.`;
   }
 
-  const response = `⟦⟦ CREW_ROSTER${humanMsgIndicator}
-== YOUR CREW (you can DELEGATE to these) ==
-${rosterLines}
-${budgetLine}${siblingSection}${memorySection}
-⚠️ You can only DELEGATE to agents you created (your crew). Agents from other projects will return "Agent not found".
-To assign a task to an agent, use their ID:
-\`⟦⟦ DELEGATE {"to": "agent-id", "task": "your task"} ⟧⟧\`
-To create a new agent:
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} ⟧⟧\`
-To terminate an agent and free a slot:
-\`⟦⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "no longer needed"} ⟧⟧\`
-CREW_ROSTER ⟧⟧`;
+  const formatted = formatQueryCrew(visibleMembers, {
+    viewerId: agent.id,
+    viewerRole: agent.role.id,
+    budget,
+    siblingSection,
+    memorySection,
+    humanMessageAlert,
+  });
 
-  logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
+  const response = `⟦⟦ CREW_ROSTER\n${formatted}\nCREW_ROSTER ⟧⟧`;
+
+  logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${visibleMembers.length} agents`);
   agent.sendMessage(response);
 }
 

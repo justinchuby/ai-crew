@@ -69,15 +69,19 @@ describe('ContextRefresher', () => {
       const peers = refresher.buildPeerList();
 
       expect(peers).toHaveLength(2);
-      expect(peers[0]).toEqual({
+      expect(peers[0]).toMatchObject({
         id: 'a1',
         role: 'dev',
         roleName: 'Developer',
         status: 'running',
         task: 't1',
         lockedFiles: [],
+        pendingMessages: 0,
+        contextWindowSize: 0,
+        contextWindowUsed: 0,
       });
-      expect(peers[1]).toEqual({
+      expect(peers[0]!.createdAt).toBeDefined();
+      expect(peers[1]).toMatchObject({
         id: 'a2',
         role: 'qa',
         roleName: 'QA Engineer',

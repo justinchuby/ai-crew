@@ -71,15 +71,15 @@ export class ContextRefresher {
 
   refreshAll(): void {
     const peers = this.buildPeerList();
-    const recentActivity = this.buildRecentActivity();
     const lockSection = this.buildFileLockSection();
+    const alerts = this.buildAlerts(peers);
 
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
       const otherPeers = peers.filter((p) => p.id !== agent.id);
       const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
-      agent.injectContextUpdate(otherPeers, recentActivity, `${healthHeader}\n${lockSection}`);
+      agent.injectContextUpdate(otherPeers, [], `${healthHeader}\n${lockSection}`, alerts);
     }
   }
 
@@ -87,12 +87,13 @@ export class ContextRefresher {
     const agent = this.agentManager.get(agentId);
     if (!agent || agent.status !== 'running') return;
 
-    const peers = this.buildPeerList().filter((p) => p.id !== agentId);
-    const recentActivity = this.buildRecentActivity();
+    const peers = this.buildPeerList();
+    const otherPeers = peers.filter((p) => p.id !== agentId);
+    const alerts = this.buildAlerts(peers);
     const healthHeader = agent.role.receivesStatusUpdates
       ? `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${this.buildFileLockSection()}`
       : undefined;
-    agent.injectContextUpdate(peers, recentActivity, healthHeader);
+    agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
   }
 
   /** Refresh only agents whose role has receivesStatusUpdates */
@@ -103,13 +104,13 @@ export class ContextRefresher {
     if (statusAgents.length === 0) return;
 
     const peers = this.buildPeerList();
-    const recentActivity = this.buildRecentActivity();
     const lockSection = this.buildFileLockSection();
+    const alerts = this.buildAlerts(peers);
 
     for (const agent of statusAgents) {
       const otherPeers = peers.filter((p) => p.id !== agent.id);
       const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}`;
-      agent.injectContextUpdate(otherPeers, recentActivity, healthHeader);
+      agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
     }
   }
 
@@ -129,6 +130,10 @@ export class ContextRefresher {
       lockedFiles: allLocks
         .filter((lock) => lock.agentId === agent.id)
         .map((lock) => lock.filePath),
+      pendingMessages: agent.pendingMessageCount ?? 0,
+      createdAt: agent.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      contextWindowSize: agent.contextWindowSize ?? 0,
+      contextWindowUsed: agent.contextWindowUsed ?? 0,
     }));
   }
 
@@ -231,6 +236,33 @@ export class ContextRefresher {
       return `- ${lock.filePath} \u2192 ${lock.agentId.slice(0, 8)} (${roleName})`;
     });
     return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
+  }
+
+  /** Build actionable alerts: stuck agents, high context usage */
+  private buildAlerts(peers: import('../agents/Agent.js').AgentContextInfo[]): string[] {
+    const alerts: string[] = [];
+    const now = Date.now();
+
+    for (const p of peers) {
+      // Context usage warning at 80%
+      if (p.contextWindowSize && p.contextWindowSize > 0 && p.contextWindowUsed) {
+        const pct = Math.round((p.contextWindowUsed / p.contextWindowSize) * 100);
+        if (pct >= 80) {
+          alerts.push(`${p.id.slice(0, 8)} near context limit (${pct}%)`);
+        }
+      }
+
+      // Stuck agent: running for >10 minutes
+      if (p.status === 'running' && p.createdAt) {
+        const elapsedMs = now - new Date(p.createdAt).getTime();
+        if (elapsedMs > 10 * 60 * 1000) {
+          const mins = Math.floor(elapsedMs / 60000);
+          alerts.push(`${p.id.slice(0, 8)} running >${mins}m — may be stuck`);
+        }
+      }
+    }
+
+    return alerts;
   }
 
   /** Check if crew is fully idle — no worker agents active and DAG complete */
