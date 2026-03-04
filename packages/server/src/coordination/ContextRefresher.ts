@@ -7,7 +7,7 @@ import { SynthesisEngine } from './SynthesisEngine.js';
 import { SmartActivityFilter } from './SmartActivityFilter.js';
 
 /** Interval for periodic status updates during active work (ms) */
-const ACTIVE_UPDATE_INTERVAL_MS = 30_000;
+const ACTIVE_UPDATE_INTERVAL_MS = 60_000;
 
 /** Interval for periodic status updates during idle periods (ms) */
 const IDLE_UPDATE_INTERVAL_MS = 120_000;
@@ -44,8 +44,6 @@ export class ContextRefresher {
     this.agentManager.on('agent:spawned', this.boundRefresh);
     this.agentManager.on('agent:terminated', this.boundRefresh);
     this.agentManager.on('agent:exit', this.boundRefresh);
-    this.lockRegistry.on('lock:acquired', this.boundRefresh);
-    this.lockRegistry.on('lock:released', this.boundRefresh);
 
     // Re-inject crew context immediately after Copilot CLI compacts an agent's context
     this.agentManager.on('agent:context_compacted', this.boundCompacted);
@@ -63,8 +61,6 @@ export class ContextRefresher {
     this.agentManager.off('agent:spawned', this.boundRefresh);
     this.agentManager.off('agent:terminated', this.boundRefresh);
     this.agentManager.off('agent:exit', this.boundRefresh);
-    this.lockRegistry.off('lock:acquired', this.boundRefresh);
-    this.lockRegistry.off('lock:released', this.boundRefresh);
     this.agentManager.off('agent:context_compacted', this.boundCompacted);
 
     if (this.debounceHandle) {
@@ -83,6 +79,7 @@ export class ContextRefresher {
 
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
+      if (!agent.role.receivesStatusUpdates) continue;
       const otherPeers = peers.filter((p) => p.id !== agent.id);
       const healthHeader = agent.role.receivesStatusUpdates
         ? this.buildHealthHeader(agent.id, agent.role.id !== 'lead')
