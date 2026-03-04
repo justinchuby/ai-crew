@@ -57,7 +57,7 @@ function handleCancelTimer(ctx: CommandHandlerContext, agent: Agent, data: strin
   try {
     const req = parseCommandPayload(agent, match[1], cancelTimerSchema, 'CANCEL_TIMER');
     if (!req) return;
-    const timerId = (req.id || req.name)!;
+    const timerId = (req.id || req.label)!;
     // timerId is guaranteed non-empty by the schema's refine check
 
     // Try by ID first, then by label
@@ -113,9 +113,9 @@ export function getTimerCommands(ctx: CommandHandlerContext): CommandEntry[] {
       { name: 'message', type: 'string', required: true, description: 'Message delivered when timer fires' },
       { name: 'repeat', type: 'boolean', required: false, description: 'Repeat after each delay', default: 'false' },
     ] } },
-    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"name": "check-build"}', category: 'Timers', args: [
+    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"label": "check-build"}', category: 'Timers', args: [
       { name: 'id', type: 'string', required: false, description: 'Timer ID' },
-      { name: 'name', type: 'string', required: false, description: 'Timer label (either id or name required)' },
+      { name: 'label', type: 'string', required: false, description: 'Timer label (either id or label required)' },
     ] } },
     { regex: LIST_TIMERS_REGEX, name: 'LIST_TIMERS', handler: (a, d) => handleListTimers(ctx, a, d), help: { description: 'List active timers', example: 'LIST_TIMERS {}', category: 'Timers' } },
   ];

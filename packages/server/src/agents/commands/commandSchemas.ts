@@ -78,7 +78,7 @@ export const delegateSchema = z.object({
 });
 
 export const terminateAgentSchema = z.object({
-  id: z.string({ message: 'Missing required field "id" (agent ID)' }).min(1, 'Missing required field "id" (agent ID)').max(MAX_ID_LENGTH),
+  agentId: z.string({ message: 'Missing required field "agentId"' }).min(1, 'Missing required field "agentId"').max(MAX_ID_LENGTH),
   reason: z.string().max(MAX_CONTENT_LENGTH).optional(),
 });
 
@@ -102,7 +102,6 @@ export const unlockFileSchema = z.object({
 });
 
 export const activitySchema = z.object({
-  action: z.string().max(MAX_NAME_LENGTH).optional(),
   actionType: z.string().max(MAX_NAME_LENGTH).optional(),
   summary: z.string().max(MAX_CONTENT_LENGTH).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
@@ -165,10 +164,10 @@ export const setTimerSchema = z.object({
 
 export const cancelTimerSchema = z.object({
   id: z.string().max(MAX_ID_LENGTH).optional(),
-  name: z.string().max(MAX_NAME_LENGTH).optional(),
+  label: z.string().max(MAX_NAME_LENGTH).optional(),
 }).refine(
-  (data) => data.id || data.name,
-  { message: 'Requires either "id" (timer ID) or "name" (timer label)' },
+  (data) => data.id || data.label,
+  { message: 'Requires either "id" (timer ID) or "label" (timer label)' },
 );
 
 // ── Deferred Commands ────────────────────────────────────────────────
@@ -176,8 +175,7 @@ export const cancelTimerSchema = z.object({
 export const deferIssueSchema = z.object({
   description: z.string({ message: 'Missing required field "description"' }).min(1, 'Missing required field "description"').max(MAX_CONTENT_LENGTH, `"description" too long (max ${MAX_CONTENT_LENGTH})`),
   severity: z.string().max(MAX_NAME_LENGTH).optional(),
-  sourceFile: z.string().max(500).optional(),
-  file: z.string().max(500).optional(),
+  filePath: z.string().max(500).optional(),
 });
 
 export const resolveDeferredSchema = z.object({
@@ -259,7 +257,7 @@ export const completeTaskSchema = z.object({
 });
 
 export const addDependencySchema = z.object({
-  taskId: z.string({ message: 'Missing required field "taskId"' }).min(1, 'Missing required field "taskId"').max(MAX_ID_LENGTH),
+  id: z.string({ message: 'Missing required field "id"' }).min(1, 'Missing required field "id"').max(MAX_ID_LENGTH),
   dependsOn: z.array(z.string().max(MAX_ID_LENGTH)).min(1, '"dependsOn" must have at least one task ID').max(20, '"dependsOn" max 20 entries'),
 });
 

@@ -340,7 +340,7 @@ describe('AgentCommands validation', () => {
     const cmd = findHandler(getAgentCommands(ctx), 'TERMINATE_AGENT');
     cmd.handler(agent, '⟦⟦ TERMINATE_AGENT {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "id"'),
+      expect.stringContaining('Missing required field "agentId"'),
     );
   });
 

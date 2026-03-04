@@ -48,8 +48,8 @@ export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[]
       { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
       { name: 'dependsOn', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
     ] } },
-    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"id": "agent-id"}', category: 'Agent Lifecycle', args: [
-      { name: 'id', type: 'string', required: true, description: 'Agent ID to terminate' },
+    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"agentId": "agent-id"}', category: 'Agent Lifecycle', args: [
+      { name: 'agentId', type: 'string', required: true, description: 'Agent ID to terminate' },
       { name: 'reason', type: 'string', required: false, description: 'Reason for termination' },
     ] } },
     { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle', args: [
@@ -354,12 +354,12 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
 
     const allAgents = ctx.getAllAgents();
     const target = allAgents.find((a) =>
-      (a.id === req.id || a.id.startsWith(req.id)) &&
+      (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
       a.id !== agent.id
     );
 
     if (!target) {
-      agent.sendMessage(`[System] Agent not found: ${req.id}. Use QUERY_CREW to see available agents.`);
+      agent.sendMessage(`[System] Agent not found: ${req.agentId}. Use QUERY_CREW to see available agents.`);
       return;
     }
 

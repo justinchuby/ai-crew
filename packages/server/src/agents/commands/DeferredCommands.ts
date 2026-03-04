@@ -21,8 +21,7 @@ export function getDeferredCommands(ctx: CommandHandlerContext): CommandEntry[] 
     { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"description": "Tech debt: refactor later", "severity": "low"}', category: 'Deferred Issues', args: [
       { name: 'description', type: 'string', required: true, description: 'Issue description' },
       { name: 'severity', type: 'string', required: false, description: 'Severity level (e.g. P1, P2)' },
-      { name: 'sourceFile', type: 'string', required: false, description: 'Related file path' },
-      { name: 'file', type: 'string', required: false, description: 'Related file path (alias for sourceFile)' },
+      { name: 'filePath', type: 'string', required: false, description: 'Related file path' },
     ] } },
     { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues', args: [
       { name: 'status', type: 'string', required: false, description: 'Filter: "open", "resolved", or "dismissed"' },
@@ -53,7 +52,7 @@ function handleDeferIssue(ctx: CommandHandlerContext, agent: Agent, data: string
       agent.role.name,
       req.description,
       req.severity || 'P1',
-      req.sourceFile || req.file || '',
+      req.filePath || '',
     );
     agent.sendMessage(`[System] Deferred issue #${issue.id} recorded (${issue.severity}): ${issue.description.slice(0, 100)}`);
     ctx.activityLedger.log(agent.id, agent.role.name, 'deferred_issue', `Deferred ${issue.severity}: ${issue.description.slice(0, 120)}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');

@@ -465,7 +465,7 @@ describe('CommandDispatcher', () => {
       const child = makeChildAgent(leadAgent.id);
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${child.id}", "reason": "done"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${child.id}", "reason": "done"} ⟧⟧`);
 
       expect(ctx.terminateAgent).toHaveBeenCalledWith(child.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -479,7 +479,7 @@ describe('CommandDispatcher', () => {
         role: makeRole(),
       });
 
-      dispatch(dispatcher, devAgent, '⟦⟦ TERMINATE_AGENT {"id": "agent-123", "reason": "done"} ⟧⟧');
+      dispatch(dispatcher, devAgent, '⟦⟦ TERMINATE_AGENT {"agentId": "agent-123", "reason": "done"} ⟧⟧');
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -498,7 +498,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, subLead, grandchild]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${grandchild.id}", "reason": "cleanup"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${grandchild.id}", "reason": "cleanup"} ⟧⟧`);
 
       expect(ctx.terminateAgent).toHaveBeenCalledWith(grandchild.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -517,7 +517,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, otherLead, otherChild]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${otherChild.id}", "reason": "steal"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${otherChild.id}", "reason": "steal"} ⟧⟧`);
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -533,7 +533,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, otherLead]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${otherLead.id}", "reason": "remove"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${otherLead.id}", "reason": "remove"} ⟧⟧`);
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(

@@ -448,7 +448,7 @@ Add/remove members from a group:
 \`⟦⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧⟧\`
 
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
-\`⟦⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ⟧⟧\`
+\`⟦⟦ TERMINATE_AGENT {"agentId": "agent-id", "reason": "need slot for different role"} ⟧⟧\`
 
 Cancel an active delegation (by agent ID or delegation ID):
 \`⟦⟦ CANCEL_DELEGATION {"agentId": "agent-id"} ⟧⟧\`
@@ -456,7 +456,7 @@ Cancel an active delegation (by agent ID or delegation ID):
 
 Set reminders using timers (useful for checking builds, following up on delegations):
 \`⟦⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧⟧\`
-\`⟦⟦ CANCEL_TIMER {"name": "check-build"} ⟧⟧\`
+\`⟦⟦ CANCEL_TIMER {"label": "check-build"} ⟧⟧\`
 \`⟦⟦ LIST_TIMERS {} ⟧⟧\`
 
 == TASK DAG (Declarative Scheduling) ==
@@ -482,7 +482,7 @@ Management commands:
 - \`⟦⟦ SKIP_TASK {"id": "task-id"} ⟧⟧\` — skip and unblock dependents
 - \`⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "dependsOn": ["existing-task"]} ⟧⟧\` — add to DAG
 - \`⟦⟦ CANCEL_TASK {"id": "task-id"} ⟧⟧\` — remove from DAG
-- \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "dependsOn": ["task-a"]} ⟧⟧\` — add a dependency between tasks
+- \`⟦⟦ ADD_DEPENDENCY {"id": "task-b", "dependsOn": ["task-a"]} ⟧⟧\` — add a dependency between tasks
 - \`⟦⟦ RESET_DAG ⟧⟧\` — clear all tasks and start over
 - \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause heartbeat reminder nudges (e.g. when waiting for user input). Resumes automatically when you start running again. Does NOT stop CREW_UPDATE status messages — those are a separate system.
 - \`⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
@@ -592,7 +592,7 @@ When committing changes, NEVER use \`git add -A\` — it picks up other agents' 
 
 You can set reminders using timers:
 \`⟦⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧⟧\`
-\`⟦⟦ CANCEL_TIMER {"name": "check-build"} ⟧⟧\`
+\`⟦⟦ CANCEL_TIMER {"label": "check-build"} ⟧⟧\`
 \`⟦⟦ LIST_TIMERS {} ⟧⟧\`
 
 == Task Completion ==
@@ -606,7 +606,7 @@ You can also check the task DAG status:
 \`⟦⟦ QUERY_TASKS ⟧⟧\`
 
 Add a dependency between tasks:
-\`⟦⟦ ADD_DEPENDENCY {"taskId": "my-task", "dependsOn": ["other-task"]} ⟧⟧\`
+\`⟦⟦ ADD_DEPENDENCY {"id": "my-task", "dependsOn": ["other-task"]} ⟧⟧\`
 
 == Capability System ==
 You can acquire additional capabilities beyond your role:

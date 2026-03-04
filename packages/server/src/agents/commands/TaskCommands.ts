@@ -330,7 +330,7 @@ function handleAddDependency(ctx: CommandHandlerContext, agent: Agent, data: str
 
     // Authorization: non-lead agents can only add dependencies to tasks assigned to them
     if (agent.role.id !== 'lead' && agent.role.id !== 'secretary') {
-      const task = ctx.taskDAG.getTask(leadId, req.taskId);
+      const task = ctx.taskDAG.getTask(leadId, req.id);
       if (!task || task.assignedAgentId !== agent.id) {
         agent.sendMessage(`[System] ADD_DEPENDENCY denied: you can only add dependencies to tasks assigned to you.`);
         return;
@@ -339,11 +339,11 @@ function handleAddDependency(ctx: CommandHandlerContext, agent: Agent, data: str
 
     const results: string[] = [];
     for (const depId of req.dependsOn) {
-      const added = ctx.taskDAG.addDependency(leadId, req.taskId, depId);
+      const added = ctx.taskDAG.addDependency(leadId, req.id, depId);
       if (added) {
-        results.push(`✓ "${req.taskId}" → depends on "${depId}"`);
+        results.push(`✓ "${req.id}" → depends on "${depId}"`);
       } else {
-        results.push(`⚠️ "${req.taskId}" → "${depId}" (skipped — duplicate or would create cycle)`);
+        results.push(`⚠️ "${req.id}" → "${depId}" (skipped — duplicate or would create cycle)`);
       }
     }
 
@@ -556,8 +556,8 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
       { name: 'id', type: 'string', required: true, description: 'Task ID to cancel' },
     ] } },
     { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d), help: { description: 'Reset the entire task DAG', example: 'RESET_DAG {}', category: 'Task DAG' } },
-    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task that needs the dependency' },
+    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"id": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: [
+      { name: 'id', type: 'string', required: true, description: 'Task that needs the dependency' },
       { name: 'dependsOn', type: 'string[]', required: true, description: 'Task IDs it depends on' },
     ] } },
     { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d), help: { description: 'Force a task to ready status', example: 'FORCE_READY {"id": "task-1"}', category: 'Task DAG', args: [
