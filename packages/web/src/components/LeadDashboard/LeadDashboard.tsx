@@ -6,9 +6,10 @@ import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
-import { MentionText, MarkdownContent } from '../../utils/markdown';
+import { MentionText, MarkdownContent, InlineMarkdownWithMentions } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
+import { ModelConfigPanel } from './ModelConfigPanel';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
@@ -45,6 +46,8 @@ export function LeadDashboard({ api, ws }: Props) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
+  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -658,6 +661,13 @@ export function LeadDashboard({ api, ws }: Props) {
         if (task) {
           useLeadStore.getState().addMessage(data.id, { type: 'text', text: task, sender: 'user' });
         }
+        // Save model config if customized during project creation
+        if (newProjectModelConfig && data.projectId) {
+          apiFetch(`/projects/${data.projectId}/model-config`, {
+            method: 'PUT',
+            body: JSON.stringify({ config: newProjectModelConfig }),
+          }).catch(() => { /* best-effort — project still created */ });
+        }
         setShowNewProject(false);
         setNewProjectName('');
         setNewProjectTask('');
@@ -665,13 +675,15 @@ export function LeadDashboard({ api, ws }: Props) {
         setNewProjectCwd('');
         setResumeSessionId('');
         setSelectedRoles(new Set());
+        setNewProjectModelConfig(null);
+        setShowModelConfig(false);
       }
     } catch {
       // ignore
     } finally {
       setStarting(false);
     }
-  }, []);
+  }, [newProjectModelConfig]);
 
   const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!input.trim() || !selectedLeadId) return;
@@ -1134,6 +1146,24 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 </div>
               )}
+              {/* Model Configuration (collapsible) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowModelConfig(!showModelConfig)}
+                  className="flex items-center gap-1 text-xs text-th-text-muted hover:text-th-text-alt font-medium transition-colors"
+                >
+                  {showModelConfig ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  <Wrench className="w-3 h-3" />
+                  Model Configuration
+                  <span className="text-[10px] text-th-text-muted">(optional)</span>
+                </button>
+                {showModelConfig && (
+                  <div className="mt-2 border border-th-border rounded-md p-2 bg-th-bg">
+                    <ModelConfigPanel value={newProjectModelConfig ?? undefined} onChange={setNewProjectModelConfig} />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
               <button
@@ -1635,6 +1665,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
+                        models: { icon: <Wrench className="w-3 h-3" />, label: 'Models' },
                         tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
                         costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
                         timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
@@ -1679,6 +1710,16 @@ export function LeadDashboard({ api, ws }: Props) {
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
+                    {sidebarTab === 'models' && leadAgent?.projectId && (
+                      <div className="h-full overflow-y-auto p-2">
+                        <ModelConfigPanel projectId={leadAgent.projectId} compact />
+                      </div>
+                    )}
+                    {sidebarTab === 'models' && !leadAgent?.projectId && (
+                      <div className="flex items-center justify-center h-full text-th-text-muted text-xs">
+                        No project selected
+                      </div>
+                    )}
                     {sidebarTab === 'tokens' && <TokenEconomics />}
                     {sidebarTab === 'costs' && <CostBreakdown />}
                     {sidebarTab === 'timers' && <TimerDisplay />}
@@ -2995,27 +3036,8 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
 }
 
 function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={i}>{part.slice(2, -2)}</strong>;
-        }
-        if (part.startsWith('*') && part.endsWith('*')) {
-          return <em key={i}>{part.slice(1, -1)}</em>;
-        }
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return (
-            <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
+  const agents = useAppStore((s) => s.agents);
+  return <InlineMarkdownWithMentions text={text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />;
 }
 
 /** Renders agent text, separating ⟦⟦ command ⟧⟧ blocks from normal markdown */
