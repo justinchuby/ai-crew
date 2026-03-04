@@ -7,7 +7,7 @@ import { SynthesisEngine } from './SynthesisEngine.js';
 import { SmartActivityFilter } from './SmartActivityFilter.js';
 
 /** Interval for periodic status updates during active work (ms) */
-const ACTIVE_UPDATE_INTERVAL_MS = 120_000;
+const ACTIVE_UPDATE_INTERVAL_MS = 300_000;
 
 /** Interval for periodic status updates during idle periods (ms) */
 const IDLE_UPDATE_INTERVAL_MS = 120_000;
@@ -40,11 +40,6 @@ export class ContextRefresher {
     this.boundRefresh = () => this.scheduleRefresh();
     this.boundCompacted = (data) => this.refreshOne(data.agentId);
 
-    // Listen to significant events with debounce
-    this.agentManager.on('agent:spawned', this.boundRefresh);
-    this.agentManager.on('agent:terminated', this.boundRefresh);
-    this.agentManager.on('agent:exit', this.boundRefresh);
-
     // Re-inject crew context immediately after Copilot CLI compacts an agent's context
     this.agentManager.on('agent:context_compacted', this.boundCompacted);
   }
@@ -58,9 +53,6 @@ export class ContextRefresher {
   stop(): void {
     this.running = false;
     // Remove event listeners to prevent leaks
-    this.agentManager.off('agent:spawned', this.boundRefresh);
-    this.agentManager.off('agent:terminated', this.boundRefresh);
-    this.agentManager.off('agent:exit', this.boundRefresh);
     this.agentManager.off('agent:context_compacted', this.boundCompacted);
 
     if (this.debounceHandle) {

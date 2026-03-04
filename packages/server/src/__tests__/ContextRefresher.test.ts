@@ -255,19 +255,27 @@ describe('ContextRefresher', () => {
       expect(a1.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('stop clears any pending debounce', () => {
-      const a1 = makeAgent({ id: 'a1', status: 'running' });
-      mocks.agentManager.getAll.mockReturnValue([a1]);
+    it('stop prevents further periodic refreshes', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
 
       refresher.start();
-      // Trigger debounced refresh via event
-      mocks.agentManager.emit('agent:spawned', {});
       refresher.stop();
-      vi.advanceTimersByTime(10000);
-      // Debounce was cleared — no calls
-      expect(a1.injectContextUpdate).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(300000);
+      // Periodic refresh was cleared — no calls
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
     });
 
     it('start can be called multiple times safely', () => {
@@ -326,8 +334,8 @@ describe('ContextRefresher', () => {
       });
 
       refresher.start();
-      // Active interval is 120s when agents are running
-      vi.advanceTimersByTime(120000);
+      // Active interval is 300s when agents are running
+      vi.advanceTimersByTime(300000);
 
       // Secretary gets periodic update
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
@@ -469,7 +477,7 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('uses 120s interval when agents are active', () => {
+    it('uses 300s interval when agents are active', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
@@ -492,8 +500,12 @@ describe('ContextRefresher', () => {
       vi.advanceTimersByTime(119000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
 
-      // At 120s — first update
+      // At 120s — still no update (active interval is 300s)
       vi.advanceTimersByTime(1000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // At 300s — first update
+      vi.advanceTimersByTime(180000);
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
     });
 
