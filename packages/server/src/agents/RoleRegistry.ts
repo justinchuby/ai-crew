@@ -463,10 +463,10 @@ Set reminders using timers (useful for checking builds, following up on delegati
 Declare tasks with dependencies and the system auto-schedules execution:
 
 \`⟦⟦ DECLARE_TASKS {"tasks": [
-  {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"], "priority": 1},
-  {"id": "dead-fields", "role": "developer", "description": "Remove dead fields", "files": ["src/_configs.py"], "dependsOn": ["rope-config"]},
-  {"id": "review-rope", "role": "code-reviewer", "description": "Review RoPEConfig", "dependsOn": ["rope-config"]},
-  {"id": "rewrite-rules", "role": "developer", "description": "Add fusion rules", "files": ["src/rewrite_rules/"]}
+  {"taskId": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"], "priority": 1},
+  {"taskId": "dead-fields", "role": "developer", "description": "Remove dead fields", "files": ["src/_configs.py"], "dependsOn": ["rope-config"]},
+  {"taskId": "review-rope", "role": "code-reviewer", "description": "Review RoPEConfig", "dependsOn": ["rope-config"]},
+  {"taskId": "rewrite-rules", "role": "developer", "description": "Add fusion rules", "files": ["src/rewrite_rules/"]}
 ]} ⟧⟧\`
 
 The system will:
@@ -476,13 +476,13 @@ The system will:
 - Show status with: \`⟦⟦ TASK_STATUS ⟧⟧\`
 
 Management commands:
-- \`⟦⟦ COMPLETE_TASK {"id": "task-id"} ⟧⟧\` — mark a task as done (also auto-triggers when agent reports completion)
-- \`⟦⟦ PAUSE_TASK {"id": "task-id"} ⟧⟧\` — hold a pending/ready task
-- \`⟦⟦ RETRY_TASK {"id": "task-id"} ⟧⟧\` — retry a failed task
-- \`⟦⟦ SKIP_TASK {"id": "task-id"} ⟧⟧\` — skip and unblock dependents
-- \`⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "dependsOn": ["existing-task"]} ⟧⟧\` — add to DAG
-- \`⟦⟦ CANCEL_TASK {"id": "task-id"} ⟧⟧\` — remove from DAG
-- \`⟦⟦ ADD_DEPENDENCY {"id": "task-b", "dependsOn": ["task-a"]} ⟧⟧\` — add a dependency between tasks
+- \`⟦⟦ COMPLETE_TASK {"taskId": "task-id"} ⟧⟧\` — mark a task as done (also auto-triggers when agent reports completion)
+- \`⟦⟦ PAUSE_TASK {"taskId": "task-id"} ⟧⟧\` — hold a pending/ready task
+- \`⟦⟦ RETRY_TASK {"taskId": "task-id"} ⟧⟧\` — retry a failed task
+- \`⟦⟦ SKIP_TASK {"taskId": "task-id"} ⟧⟧\` — skip and unblock dependents
+- \`⟦⟦ ADD_TASK {"taskId": "new-task", "role": "developer", "dependsOn": ["existing-task"]} ⟧⟧\` — add to DAG
+- \`⟦⟦ CANCEL_TASK {"taskId": "task-id"} ⟧⟧\` — remove from DAG
+- \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "dependsOn": ["task-a"]} ⟧⟧\` — add a dependency between tasks
 - \`⟦⟦ RESET_DAG ⟧⟧\` — clear all tasks and start over
 - \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause heartbeat reminder nudges (e.g. when waiting for user input). Resumes automatically when you start running again. Does NOT stop CREW_UPDATE status messages — those are a separate system.
 - \`⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
@@ -598,15 +598,15 @@ You can set reminders using timers:
 == Task Completion ==
 When you finish a task that's tracked in the DAG, signal completion:
 \`⟦⟦ COMPLETE_TASK {"summary": "what you accomplished"} ⟧⟧\`
-\`⟦⟦ COMPLETE_TASK {"id": "task-id", "summary": "what you accomplished"} ⟧⟧\`
-This notifies the lead and updates the DAG automatically. If your task has a DAG ID, it's used automatically; otherwise specify "id".
+\`⟦⟦ COMPLETE_TASK {"taskId": "task-id", "summary": "what you accomplished"} ⟧⟧\`
+This notifies the lead and updates the DAG automatically. If your task has a DAG ID, it's used automatically; otherwise specify "taskId".
 
 You can also check the task DAG status:
 \`⟦⟦ TASK_STATUS ⟧⟧\`
 \`⟦⟦ QUERY_TASKS ⟧⟧\`
 
 Add a dependency between tasks:
-\`⟦⟦ ADD_DEPENDENCY {"id": "my-task", "dependsOn": ["other-task"]} ⟧⟧\`
+\`⟦⟦ ADD_DEPENDENCY {"taskId": "my-task", "dependsOn": ["other-task"]} ⟧⟧\`
 
 == Capability System ==
 You can acquire additional capabilities beyond your role:

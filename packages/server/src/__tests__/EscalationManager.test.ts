@@ -92,7 +92,7 @@ describe('EscalationManager', () => {
 
   it('escalates a blocked task older than the threshold', () => {
     taskDAG.declareTaskBatch('lead-1', [
-      { id: 'task-1', role: 'developer', description: 'Write tests' },
+      { taskId: 'task-1', role: 'developer', description: 'Write tests' },
     ]);
     // Force the task to be blocked and old enough to trigger escalation
     db.run(`UPDATE dag_tasks SET dag_status = 'blocked', created_at = '2020-01-01T00:00:00.000Z' WHERE id = 'task-1'`);
@@ -109,7 +109,7 @@ describe('EscalationManager', () => {
 
   it('does not escalate non-blocked tasks', () => {
     taskDAG.declareTaskBatch('lead-1', [
-      { id: 'task-ready', role: 'developer', description: 'Ready task' },
+      { taskId: 'task-ready', role: 'developer', description: 'Ready task' },
     ]);
     const rule = manager.getRules().find(r => r.id === 'blocked-task-15m')!;
     rule.thresholdMs = 0;

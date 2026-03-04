@@ -46,7 +46,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       findReadyTask: vi.fn().mockReturnValue(null),
       startTask: vi.fn().mockReturnValue({ id: 'auto-task', dagStatus: 'running' }),
       addTask: vi.fn().mockImplementation((_leadId: string, task: any) => ({
-        id: task.id,
+        id: task.taskId,
         role: task.role,
         title: task.title,
         description: task.description || '',
@@ -519,7 +519,7 @@ describe('Critical review fixes', () => {
         getTasks: vi.fn().mockReturnValue(doneTasks),
         findReadyTask: vi.fn().mockReturnValue(null),
         addTask: vi.fn().mockImplementation((_: string, t: any) => ({
-          id: t.id, role: t.role, title: t.title, description: t.description || '',
+          id: t.taskId, role: t.role, title: t.title, description: t.description || '',
           dagStatus: 'ready', dependsOn: [], files: [], priority: 0,
         })),
         startTask: vi.fn().mockReturnValue({ id: 'started', dagStatus: 'running' }),
@@ -549,7 +549,7 @@ describe('Critical review fixes', () => {
         getTasks: vi.fn().mockReturnValue(tasks),
         findReadyTask: vi.fn().mockReturnValue(null),
         addTask: vi.fn().mockImplementation((_: string, t: any) => ({
-          id: t.id, role: t.role, title: t.title, description: t.description || '',
+          id: t.taskId, role: t.role, title: t.title, description: t.description || '',
           dagStatus: 'ready', dependsOn: [], files: [], priority: 0,
         })),
         startTask: vi.fn().mockReturnValue({ id: 'started', dagStatus: 'running' }),
@@ -581,7 +581,7 @@ describe('Critical review fixes', () => {
         getTasks: vi.fn().mockReturnValue(tasks),
         findReadyTask: vi.fn().mockReturnValue(null),
         addTask: vi.fn().mockImplementation((_: string, t: any) => ({
-          id: t.id, role: t.role, title: t.title, description: t.description || '',
+          id: t.taskId, role: t.role, title: t.title, description: t.description || '',
           dagStatus: 'ready', dependsOn: [], files: [], priority: 0,
         })),
         startTask: vi.fn().mockReturnValue({ id: 'started', dagStatus: 'running' }),
@@ -615,7 +615,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
         getTasks: vi.fn().mockReturnValue(tasks),
         findReadyTask: vi.fn().mockReturnValue(null),
         addTask: vi.fn().mockImplementation((_: string, t: any) => ({
-          id: t.id, role: t.role, title: t.title, description: t.description || '',
+          id: t.taskId, role: t.role, title: t.title, description: t.description || '',
           dagStatus: 'ready', dependsOn: [], files: [], priority: 0,
         })),
         startTask: vi.fn().mockReturnValue({ id: 'started', dagStatus: 'running' }),

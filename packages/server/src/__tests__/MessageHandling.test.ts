@@ -117,7 +117,7 @@ describe('Message Handling — Command Parsing', () => {
   describe('Triple-bracket DAG commands', () => {
     it('DECLARE_TASKS matches', () => {
       const input =
-        '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "t1", "role": "developer"}]} ⟧⟧';
+        '⟦⟦ DECLARE_TASKS {"tasks": [{"taskId": "t1", "role": "developer"}]} ⟧⟧';
       const match = input.match(TBL_DECLARE_TASKS);
       expect(match).toBeTruthy();
     });
@@ -174,7 +174,7 @@ describe('Message Handling — Command Parsing', () => {
   // ─── Triple-bracket TERMINATE_AGENT ──────────────────────────────────────
   describe('Triple-bracket TERMINATE_AGENT', () => {
     it('matches terminate with reason', () => {
-      const input = '⟦⟦ TERMINATE_AGENT {"id": "abc123", "reason": "task complete"} ⟧⟧';
+      const input = '⟦⟦ TERMINATE_AGENT {"agentId": "abc123", "reason": "task complete"} ⟧⟧';
       const match = input.match(TBL_TERMINATE_AGENT);
       expect(match).toBeTruthy();
     });

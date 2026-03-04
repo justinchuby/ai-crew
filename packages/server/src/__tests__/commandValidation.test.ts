@@ -582,7 +582,7 @@ describe('DirectMessageCommands validation', () => {
 // ── TaskCommands validation ──────────────────────────────────────────
 
 describe('TaskCommands validation', () => {
-  it('ADD_TASK rejects missing "id"', () => {
+  it('ADD_TASK rejects missing "taskId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'ADD_TASK');
@@ -596,49 +596,49 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'ADD_TASK');
-    cmd.handler(agent, '⟦⟦ ADD_TASK {"id": "task-1"} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ ADD_TASK {"taskId": "task-1"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "role"'),
     );
   });
 
-  it('PAUSE_TASK rejects missing "id"', () => {
+  it('PAUSE_TASK rejects missing "taskId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'PAUSE_TASK');
     cmd.handler(agent, '⟦⟦ PAUSE_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "id"'),
+      expect.stringContaining('Missing required field "taskId"'),
     );
   });
 
-  it('RETRY_TASK rejects missing "id"', () => {
+  it('RETRY_TASK rejects missing "taskId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'RETRY_TASK');
     cmd.handler(agent, '⟦⟦ RETRY_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "id"'),
+      expect.stringContaining('Missing required field "taskId"'),
     );
   });
 
-  it('SKIP_TASK rejects missing "id"', () => {
+  it('SKIP_TASK rejects missing "taskId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'SKIP_TASK');
     cmd.handler(agent, '⟦⟦ SKIP_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "id"'),
+      expect.stringContaining('Missing required field "taskId"'),
     );
   });
 
-  it('CANCEL_TASK rejects missing "id"', () => {
+  it('CANCEL_TASK rejects missing "taskId"', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'CANCEL_TASK');
     cmd.handler(agent, '⟦⟦ CANCEL_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "id"'),
+      expect.stringContaining('Missing required field "taskId"'),
     );
   });
 

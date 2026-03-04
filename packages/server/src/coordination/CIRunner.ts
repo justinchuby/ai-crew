@@ -301,7 +301,7 @@ export class CIRunner extends EventEmitter {
 
       const taskLabel = `fix-build-${Date.now()}`;
       this.deps.taskDAG.declareTaskBatch(lead.id, [{
-        id: taskLabel,
+        taskId: taskLabel,
         role: 'developer',
         description: `CI failure in ${failedStep.name}: fix the build/test error. Committer: ${committerIds.map(id => id.slice(0, 8)).join(', ')}. Error: ${failedStep.output.slice(-200)}`,
       }]);

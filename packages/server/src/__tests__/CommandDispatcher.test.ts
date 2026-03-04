@@ -1283,7 +1283,7 @@ describe('CommandDispatcher', () => {
       (ctx.taskDAG.getTransitionError as any).mockReturnValue(null);
       (ctx.taskDAG.completeTask as any).mockReturnValue([{ id: 'task-2' }]);
 
-      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"id": "task-1", "summary": "Auth done"} ⟧⟧');
+      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"taskId": "task-1", "summary": "Auth done"} ⟧⟧');
 
       expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -1302,7 +1302,7 @@ describe('CommandDispatcher', () => {
         validStatuses: ['running', 'ready'],
       });
 
-      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"id": "task-999"} ⟧⟧');
+      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"taskId": "task-999"} ⟧⟧');
 
       expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -1315,7 +1315,7 @@ describe('CommandDispatcher', () => {
 
       expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('requires an "id" field'),
+        expect.stringContaining('requires a "taskId" field'),
       );
     });
 

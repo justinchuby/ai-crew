@@ -142,7 +142,7 @@ export class TaskTemplateRegistry {
     const inputs: DagTaskInput[] = template.tasks.map(task => {
       const override = overrides?.[task.ref] ?? {};
       return {
-        id: refToId[task.ref],
+        taskId: refToId[task.ref],
         role: override.role ?? task.role,
         description: override.title ?? task.title,
         dependsOn: (task.dependsOn ?? []).map(depRef => refToId[depRef]),

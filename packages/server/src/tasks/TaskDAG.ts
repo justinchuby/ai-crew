@@ -43,7 +43,7 @@ export interface DagTask {
 }
 
 export interface DagTaskInput {
-  id: string;
+  taskId: string;
   role: string;
   title?: string;
   description?: string;
@@ -142,7 +142,7 @@ export class TaskDAG extends EventEmitter {
   /** Declare a batch of tasks for a lead. Validates deps and detects file conflicts. */
   declareTaskBatch(leadId: string, tasks: DagTaskInput[]): { tasks: DagTask[]; conflicts: FileConflict[] } {
     // Validate: all dependsOn reference tasks in this batch or already existing
-    const taskIds = new Set(tasks.map(t => t.id));
+    const taskIds = new Set(tasks.map(t => t.taskId));
     const existingRows = this.db.drizzle
       .select({ id: dagTasks.id })
       .from(dagTasks)
@@ -154,11 +154,11 @@ export class TaskDAG extends EventEmitter {
     for (const task of tasks) {
       for (const dep of task.dependsOn || []) {
         if (!allIds.has(dep)) {
-          throw new Error(`Task "${task.id}" depends on unknown task "${dep}"`);
+          throw new Error(`Task "${task.taskId}" depends on unknown task "${dep}"`);
         }
       }
-      if (existingIds.has(task.id)) {
-        throw new Error(`Task "${task.id}" already exists for this lead`);
+      if (existingIds.has(task.taskId)) {
+        throw new Error(`Task "${task.taskId}" already exists for this lead`);
       }
     }
 
@@ -170,7 +170,7 @@ export class TaskDAG extends EventEmitter {
     for (const task of tasks) {
       const dagStatus = (task.dependsOn && task.dependsOn.length > 0) ? 'pending' : 'ready';
       this.db.drizzle.insert(dagTasks).values({
-        id: task.id,
+        id: task.taskId,
         leadId,
         role: task.role,
         title: task.title || null,
@@ -181,7 +181,7 @@ export class TaskDAG extends EventEmitter {
         model: task.model || null,
         dagStatus,
       }).run();
-      inserted.push(this.getTask(leadId, task.id)!);
+      inserted.push(this.getTask(leadId, task.taskId)!);
     }
 
     this.emit('dag:updated', { leadId });
@@ -195,7 +195,7 @@ export class TaskDAG extends EventEmitter {
       for (const file of task.files || []) {
         const normalized = file.replace(/\/+$/, '');
         if (!fileToTasks.has(normalized)) fileToTasks.set(normalized, []);
-        fileToTasks.get(normalized)!.push(task.id);
+        fileToTasks.get(normalized)!.push(task.taskId);
       }
     }
 
@@ -204,8 +204,8 @@ export class TaskDAG extends EventEmitter {
       if (ids.length > 1) {
         // Check if all pairs have a dependency relationship
         const hasDep = (a: string, b: string): boolean => {
-          const taskA = tasks.find(t => t.id === a);
-          const taskB = tasks.find(t => t.id === b);
+          const taskA = tasks.find(t => t.taskId === a);
+          const taskB = tasks.find(t => t.taskId === b);
           return (taskA?.dependsOn || []).includes(b) || (taskB?.dependsOn || []).includes(a);
         };
 

@@ -10,6 +10,7 @@ import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   createAgentSchema,
@@ -31,31 +32,10 @@ const CANCEL_DELEGATION_REGEX = /⟦⟦\s*CANCEL_DELEGATION\s*(\{.*?\})\s*⟧⟧
 export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: SPAWN_REQUEST_REGEX, name: 'SPAWN', handler: (a, d) => handleSpawnRequest(ctx, a, d) },
-    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d), help: { description: 'Spawn a new agent with a role and task', example: 'CREATE_AGENT {"role": "developer", "task": "implement feature X"}', category: 'Agent Lifecycle', args: [
-      { name: 'role', type: 'string', required: true, description: 'Agent role (developer, architect, etc.)' },
-      { name: 'task', type: 'string', required: false, description: 'Task description for the agent' },
-      { name: 'model', type: 'string', required: false, description: 'Model override (e.g. claude-opus-4.6)' },
-      { name: 'context', type: 'string', required: false, description: 'Additional context to include' },
-      { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
-      { name: 'dependsOn', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
-      { name: 'name', type: 'string', required: false, description: 'Display name for the agent' },
-      { name: 'sessionId', type: 'string', required: false, description: 'Reuse an existing session' },
-    ] } },
-    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d), help: { description: 'Delegate a task to an existing agent', example: 'DELEGATE {"to": "agent-id", "task": "do something"}', category: 'Agent Lifecycle', args: [
-      { name: 'to', type: 'string', required: true, description: 'Target agent ID' },
-      { name: 'task', type: 'string', required: true, description: 'Task description' },
-      { name: 'context', type: 'string', required: false, description: 'Additional context' },
-      { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
-      { name: 'dependsOn', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
-    ] } },
-    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"agentId": "agent-id"}', category: 'Agent Lifecycle', args: [
-      { name: 'agentId', type: 'string', required: true, description: 'Agent ID to terminate' },
-      { name: 'reason', type: 'string', required: false, description: 'Reason for termination' },
-    ] } },
-    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle', args: [
-      { name: 'agentId', type: 'string', required: false, description: 'Agent ID (either agentId or delegationId required)' },
-      { name: 'delegationId', type: 'string', required: false, description: 'Delegation ID' },
-    ] } },
+    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d), help: { description: 'Spawn a new agent with a role and task', example: 'CREATE_AGENT {"role": "developer", "task": "implement feature X"}', category: 'Agent Lifecycle', args: deriveArgs(createAgentSchema) } },
+    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d), help: { description: 'Delegate a task to an existing agent', example: 'DELEGATE {"to": "agent-id", "task": "do something"}', category: 'Agent Lifecycle', args: deriveArgs(delegateSchema) } },
+    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"agentId": "agent-id"}', category: 'Agent Lifecycle', args: deriveArgs(terminateAgentSchema) } },
+    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle', args: deriveArgs(cancelDelegationSchema) } },
   ];
 }
 
@@ -576,7 +556,7 @@ function autoCreateDagTask(
   let autoTask;
   try {
     autoTask = ctx.taskDAG.addTask(leadId, {
-      id: autoId,
+      taskId: autoId,
       role,
       title: taskText.slice(0, 120),
       description: taskText,
@@ -717,7 +697,7 @@ export function requestSecretaryDependencyAnalysis(
     `Description: ${taskDescription.slice(0, 500)}\n\n` +
     `Active tasks:\n${activeTasks}\n\n` +
     `Does "${newTaskId}" depend on any of these tasks? ` +
-    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"id": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
+    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
     `If no dependencies, ignore this message.`
   );
   logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);
