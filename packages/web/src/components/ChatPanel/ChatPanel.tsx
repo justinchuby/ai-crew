@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
-import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
+import { X, Send, Maximize2, Minimize2, Megaphone, Zap } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
 import { AgentIdBadge } from '../../utils/markdown';
 
@@ -218,6 +218,19 @@ export function ChatPanel({ agentId, ws, api }: Props) {
             title="Broadcast to all running agents"
           >
             <Megaphone size={14} />
+          </button>
+          <button
+            onClick={() => {
+              if (inputText.trim()) {
+                handleSend('interrupt');
+              } else {
+                api.interruptAgent(agentId);
+              }
+            }}
+            className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
+            title="Interrupt agent (Ctrl+Enter)"
+          >
+            <Zap size={14} />
           </button>
           <button
             onClick={() => handleSend()}
