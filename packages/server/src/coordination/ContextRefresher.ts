@@ -72,15 +72,14 @@ export class ContextRefresher {
   refreshAll(): void {
     const peers = this.buildPeerList();
     const recentActivity = this.buildRecentActivity();
+    const lockSection = this.buildFileLockSection();
 
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
       const otherPeers = peers.filter((p) => p.id !== agent.id);
-      const healthHeader = agent.role.receivesStatusUpdates
-        ? this.buildHealthHeader(agent.id, agent.role.id !== 'lead')
-        : undefined;
-      agent.injectContextUpdate(otherPeers, recentActivity, healthHeader);
+      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
+      agent.injectContextUpdate(otherPeers, recentActivity, `${healthHeader}\n${lockSection}`);
     }
   }
 
@@ -91,7 +90,7 @@ export class ContextRefresher {
     const peers = this.buildPeerList().filter((p) => p.id !== agentId);
     const recentActivity = this.buildRecentActivity();
     const healthHeader = agent.role.receivesStatusUpdates
-      ? this.buildHealthHeader(agent.id, agent.role.id !== 'lead')
+      ? `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${this.buildFileLockSection()}`
       : undefined;
     agent.injectContextUpdate(peers, recentActivity, healthHeader);
   }
@@ -105,10 +104,11 @@ export class ContextRefresher {
 
     const peers = this.buildPeerList();
     const recentActivity = this.buildRecentActivity();
+    const lockSection = this.buildFileLockSection();
 
     for (const agent of statusAgents) {
       const otherPeers = peers.filter((p) => p.id !== agent.id);
-      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
+      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}`;
       agent.injectContextUpdate(otherPeers, recentActivity, healthHeader);
     }
   }
@@ -218,6 +218,19 @@ export class ContextRefresher {
     }
 
     return healthLine;
+  }
+
+  /** Build a summary of currently held file locks */
+  private buildFileLockSection(): string {
+    const locks = this.lockRegistry.getAll();
+    if (locks.length === 0) return '== ACTIVE FILE LOCKS ==\nNone';
+
+    const lines = locks.map(lock => {
+      const agent = this.agentManager.get(lock.agentId);
+      const roleName = agent?.role.name ?? 'Unknown';
+      return `- ${lock.filePath} \u2192 ${lock.agentId.slice(0, 8)} (${roleName})`;
+    });
+    return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
   }
 
   /** Check if crew is fully idle — no worker agents active and DAG complete */
