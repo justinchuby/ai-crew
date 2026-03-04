@@ -15,6 +15,7 @@ function makeEntry(agentId: string, actionType: ActivityEntry['actionType'], min
     summary: actionType,
     details: {},
     timestamp: new Date(Date.now() - minsAgo * 60_000).toISOString(),
+    projectId: '',
   };
 }
 

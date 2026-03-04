@@ -11,6 +11,7 @@ function makeEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {
     summary: 'some message',
     details: {},
     timestamp: new Date().toISOString(),
+    projectId: '',
     ...overrides,
   };
 }

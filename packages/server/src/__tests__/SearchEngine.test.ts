@@ -16,6 +16,7 @@ function makeEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {
     summary: 'Edited src/index.ts to fix the authentication bug',
     details: {},
     timestamp: '2024-01-15T10:00:00.000Z',
+    projectId: '',
     ...overrides,
   };
 }

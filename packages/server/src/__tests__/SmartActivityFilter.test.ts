@@ -9,6 +9,7 @@ function makeEntry(overrides: Partial<ActivityEntry> & { id: number; actionType:
     summary: 'test',
     details: {},
     timestamp: new Date().toISOString(),
+    projectId: '',
     ...overrides,
   };
 }

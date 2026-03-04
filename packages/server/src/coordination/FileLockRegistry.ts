@@ -7,6 +7,7 @@ export interface FileLock {
   filePath: string;
   agentId: string;
   agentRole: string;
+  projectId: string;
   reason: string;
   acquiredAt: string;
   expiresAt: string;
@@ -17,6 +18,7 @@ function rowToFileLock(row: typeof fileLocks.$inferSelect): FileLock {
     filePath: row.filePath,
     agentId: row.agentId,
     agentRole: row.agentRole,
+    projectId: row.projectId ?? '',
     reason: row.reason ?? '',
     acquiredAt: row.acquiredAt!,
     expiresAt: row.expiresAt,
@@ -85,6 +87,7 @@ export class FileLockRegistry extends EventEmitter {
     filePath: string,
     reason = '',
     ttlSeconds = 300,
+    projectId = '',
   ): { ok: boolean; holder?: string } {
     this.validatePath(filePath);
     this._cleanExpired();
@@ -101,7 +104,7 @@ export class FileLockRegistry extends EventEmitter {
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
         this.db.drizzle
           .update(fileLocks)
-          .set({ expiresAt, reason })
+          .set({ expiresAt, reason, projectId })
           .where(eq(fileLocks.filePath, filePath))
           .run();
         return { ok: true };
@@ -114,14 +117,14 @@ export class FileLockRegistry extends EventEmitter {
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
     this.db.drizzle
       .insert(fileLocks)
-      .values({ filePath, agentId, agentRole, reason, expiresAt })
+      .values({ filePath, agentId, agentRole, reason, expiresAt, projectId })
       .onConflictDoUpdate({
         target: fileLocks.filePath,
-        set: { agentId, agentRole, reason, expiresAt },
+        set: { agentId, agentRole, reason, expiresAt, projectId },
       })
       .run();
 
-    this.emit('lock:acquired', { filePath, agentId, agentRole, reason });
+    this.emit('lock:acquired', { filePath, agentId, agentRole, reason, projectId });
     return { ok: true };
   }
 
@@ -187,6 +190,17 @@ export class FileLockRegistry extends EventEmitter {
       .select()
       .from(fileLocks)
       .where(and(eq(fileLocks.agentId, agentId), activeFilter))
+      .all();
+    return rows.map(rowToFileLock);
+  }
+
+  /** Return only active locks belonging to a specific project */
+  getByProject(projectId: string): FileLock[] {
+    this._cleanExpired();
+    const rows = this.db.drizzle
+      .select()
+      .from(fileLocks)
+      .where(and(eq(fileLocks.projectId, projectId), activeFilter))
       .all();
     return rows.map(rowToFileLock);
   }
