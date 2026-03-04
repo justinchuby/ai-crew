@@ -31,7 +31,11 @@ export function useWebSocket() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => setConnected(true);
+    ws.onopen = () => {
+      setConnected(true);
+      // Subscribe to all agent text events so child agent messages reach the UI
+      ws.send(JSON.stringify({ type: 'subscribe', agentId: '*' }));
+    };
     ws.onclose = () => {
       setConnected(false);
       if (shouldReconnectRef.current) {
