@@ -228,8 +228,9 @@ const agentMatcher = new AgentMatcher(agentManager, capabilityRegistry, activity
 // Wire timer events — inject reminder messages into agents + broadcast to UI
 timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
   const agent = agentManager.get(timer.agentId);
-  if (agent && agent.status === 'running') {
-    agent.sendMessage(`[System Timer "${timer.label}"] ${timer.message}`);
+  // Deliver to any non-terminal agent — queueMessage handles both idle (immediate) and running (queued)
+  if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
+    agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
   }
   const timerProjectId = agentManager.getProjectIdForAgent(timer.agentId);
   wsServer.broadcastEvent({ type: 'timer:fired', timer }, timerProjectId);
