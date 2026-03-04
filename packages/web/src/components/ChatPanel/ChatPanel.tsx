@@ -195,10 +195,9 @@ export function ChatPanel({ agentId, ws, api }: Props) {
                 handleSend();
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
+                api.interruptAgent(agentId);
                 if (inputText.trim()) {
-                  handleSend('interrupt');
-                } else {
-                  api.interruptAgent(agentId);
+                  handleSend();
                 }
               }
             }}
@@ -221,10 +220,9 @@ export function ChatPanel({ agentId, ws, api }: Props) {
           </button>
           <button
             onClick={() => {
+              api.interruptAgent(agentId);
               if (inputText.trim()) {
-                handleSend('interrupt');
-              } else {
-                api.interruptAgent(agentId);
+                handleSend();
               }
             }}
             className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"

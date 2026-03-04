@@ -5,7 +5,7 @@
  * time-range. Dependency edges are drawn as SVG cubic-bezier curves.
  * The critical path (longest-duration dependency chain) is highlighted.
  */
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { computeCriticalPath, type CriticalPathTask } from './dagCriticalPath';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -54,12 +54,32 @@ export function DagGantt({ tasks }: DagGanttProps) {
   const now = Date.now();
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const [tooltip, setTooltip] = useState<{
     task: GanttTask;
     x: number;
     y: number;
   } | null>(null);
+
+  /** Clamp tooltip position so it stays within the viewport */
+  const clampedTooltipStyle = useCallback(() => {
+    if (!tooltip) return {};
+    const margin = 14;
+    const el = tooltipRef.current;
+    const w = el?.offsetWidth ?? 280;
+    const h = el?.offsetHeight ?? 160;
+    let left = tooltip.x + margin;
+    let top = tooltip.y + margin;
+    // Flip left if overflowing right
+    if (left + w > window.innerWidth - 8) left = tooltip.x - w - margin;
+    // Flip up if overflowing bottom
+    if (top + h > window.innerHeight - 8) top = tooltip.y - h - margin;
+    // Don't go off-screen left/top
+    left = Math.max(8, left);
+    top = Math.max(8, top);
+    return { left, top };
+  }, [tooltip]);
 
   const { minTime, timeRange, criticalPath } = useMemo(() => {
     if (tasks.length === 0) {
@@ -115,7 +135,7 @@ export function DagGantt({ tasks }: DagGanttProps) {
         aria-label="Gantt chart scrollable area"
         tabIndex={0}
       >
-        <div className="flex" style={{ height: totalH }}>
+        <div className="flex" style={{ height: totalH + 40, minWidth: '100%' }}>
           {/* Label column */}
           <div className="shrink-0 relative sticky left-0 z-10 bg-th-bg" style={{ width: LABEL_W }}>
             {tasks.map((task, i) => (
@@ -265,8 +285,9 @@ export function DagGantt({ tasks }: DagGanttProps) {
       {/* ── Tooltip ── */}
       {tooltip && (
         <div
+          ref={tooltipRef}
           className="fixed z-50 pointer-events-none bg-th-bg border border-th-border rounded-lg p-3 shadow-xl max-w-xs text-left"
-          style={{ left: tooltip.x + 14, top: tooltip.y + 14 }}
+          style={clampedTooltipStyle()}
         >
           <div className="text-sm font-semibold text-th-text mb-1.5 truncate">{tooltip.task.title}</div>
           <div className="text-xs text-th-text-muted space-y-0.5">
