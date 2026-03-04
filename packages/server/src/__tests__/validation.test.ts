@@ -67,14 +67,9 @@ describe('sendMessageSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts missing text (for interrupt-only)', () => {
+  it('rejects missing text', () => {
     const result = sendMessageSchema.safeParse({});
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts mode interrupt without text', () => {
-    const result = sendMessageSchema.safeParse({ mode: 'interrupt' });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it('rejects invalid mode', () => {
@@ -97,14 +92,9 @@ describe('leadMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts missing text (for interrupt-only)', () => {
+  it('rejects missing text', () => {
     const result = leadMessageSchema.safeParse({ mode: 'queue' });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts interrupt mode without text', () => {
-    const result = leadMessageSchema.safeParse({ mode: 'interrupt' });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 });
 

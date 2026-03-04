@@ -686,19 +686,14 @@ export function LeadDashboard({ api, ws }: Props) {
   }, [newProjectModelConfig]);
 
   const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
-    if (!selectedLeadId) return;
+    if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
-    if (!text && mode === 'queue') return;
     setInput('');
-    if (text) {
-      useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
-    }
-    const body: Record<string, string> = { mode };
-    if (text) body.text = text;
+    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ text, mode }),
     });
   }, [input, selectedLeadId]);
 
@@ -1594,7 +1589,13 @@ export function LeadDashboard({ api, ws }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => sendMessage('interrupt')}
+                    onClick={() => {
+                      if (input.trim()) {
+                        sendMessage('interrupt');
+                      } else if (selectedLeadId) {
+                        apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
+                      }
+                    }}
                     disabled={!isActive}
                     title="Interrupt current work (Ctrl+Enter)"
                     className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
@@ -2305,7 +2306,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
                 <div className="flex items-center gap-1 mr-2">
                   <button
-                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/message`, { method: 'POST', body: JSON.stringify({ mode: 'interrupt' }) })}
+                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
                     className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
                     title="Interrupt — cancel current work"
                   >

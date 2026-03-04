@@ -69,44 +69,43 @@ export function ChatPanel({ agentId, ws }: Props) {
   const runningAgents = agents.filter((a) => a.status === 'running');
 
   const sendToAgent = (targetId: string, text: string, mode: 'queue' | 'interrupt' = 'queue') => {
-    const body: Record<string, string> = { mode };
-    if (text) body.text = text;
     apiFetch(`/agents/${targetId}/message`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ text, mode }),
     }).catch((err: Error) => {
       useToastStore.getState().add('error', `Failed to send: ${err.message}`);
     });
   };
 
-  const handleSend = (mode: 'queue' | 'interrupt' = 'queue') => {
-    const text = inputText.trim();
-    if (!text && mode === 'queue') return;
+  const interruptAgent = (targetId: string) => {
+    apiFetch(`/agents/${targetId}/interrupt`, { method: 'POST' }).catch((err: Error) => {
+      useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+    });
+  };
 
-    if (text) {
-      // Record user message in store so it appears in chat
-      const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
-      const isAgentBusy = existing?.status === 'running';
-      const msgs = [...(existing?.messages ?? [])];
-      msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
-      useAppStore.getState().updateAgent(agentId, { messages: msgs });
-    }
+  const handleSend = (mode: 'queue' | 'interrupt' = 'queue') => {
+    if (!inputText.trim()) return;
+
+    // Record user message in store so it appears in chat
+    const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
+    const isAgentBusy = existing?.status === 'running';
+    const msgs = [...(existing?.messages ?? [])];
+    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
+    useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
     if (broadcast) {
       const running = useAppStore.getState().agents.filter((a) => a.status === 'running');
-      running.forEach((a) => sendToAgent(a.id, text, mode));
+      running.forEach((a) => sendToAgent(a.id, inputText, mode));
     } else {
-      sendToAgent(agentId, text, mode);
+      sendToAgent(agentId, inputText, mode);
     }
     // Send to @mentioned agents
-    if (text) {
-      const mentionPattern = /@([a-f0-9]{4,8})\b/g;
-      let m;
-      while ((m = mentionPattern.exec(text)) !== null) {
-        const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
-        if (fullId && fullId !== agentId) {
-          sendToAgent(fullId, text, mode);
-        }
+    const mentionPattern = /@([a-f0-9]{4,8})\b/g;
+    let m;
+    while ((m = mentionPattern.exec(inputText)) !== null) {
+      const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
+      if (fullId && fullId !== agentId) {
+        sendToAgent(fullId, inputText, mode);
       }
     }
     setInputText('');
@@ -220,7 +219,13 @@ export function ChatPanel({ agentId, ws }: Props) {
             <Megaphone size={14} />
           </button>
           <button
-            onClick={() => handleSend('interrupt')}
+            onClick={() => {
+              if (inputText.trim()) {
+                handleSend('interrupt');
+              } else {
+                interruptAgent(agentId);
+              }
+            }}
             className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
             title="Interrupt agent (Ctrl+Enter)"
           >
