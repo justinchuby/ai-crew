@@ -26,7 +26,7 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
 const TC_STATUS: Record<AcpToolCall['status'], string> = {
   pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
   in_progress: 'bg-blue-500/20 text-blue-400',
-  completed: 'bg-green-500/20 text-green-400',
+  completed: 'bg-purple-500/20 text-purple-400',
   cancelled: 'bg-gray-500/20 text-th-text-muted',
 };
 

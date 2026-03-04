@@ -1720,7 +1720,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="flex items-center gap-4 text-sm font-mono mb-2">
                     <span className="text-blue-400">{progress.teamSize} agents</span>
                     <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
-                    <span className="text-green-400">{progress.completed} done</span>
+                    <span className="text-purple-400">{progress.completed} done</span>
                     {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
                   </div>
                   <div className="w-full bg-th-bg-muted rounded-full h-2.5 mb-1">
@@ -1759,7 +1759,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <p className="text-sm font-mono text-th-text-alt mb-3">{latest.summary}</p>
                     {latest.completed.length > 0 && (
                       <div className="mb-2">
-                        <p className="text-xs text-green-400 font-semibold mb-1">✓ Completed</p>
+                        <p className="text-xs text-purple-400 font-semibold mb-1">✓ Completed</p>
                         <ul className="space-y-0.5">
                           {latest.completed.map((item, i) => (
                             <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
@@ -1813,7 +1813,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-mono text-th-text-alt">{snap.summary}</p>
                           <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-th-text-muted">
-                            {snap.completed.length > 0 && <span className="text-green-500">✓{snap.completed.length}</span>}
+                            {snap.completed.length > 0 && <span className="text-purple-500">✓{snap.completed.length}</span>}
                             {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
                             {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
                             <span>{new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -1833,7 +1833,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     {progress.delegations.map((d: any, i: number) => (
                       <div key={d.id || i} className="px-2 py-1.5 rounded bg-th-bg-muted/50 text-xs font-mono">
                         <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-green-500/20 text-green-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-purple-500/20 text-purple-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
                             {d.status}
                           </span>
                           <span className="text-th-text-alt">{d.toRole}</span>
@@ -2296,7 +2296,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDelegation.task}</p>
                   {selectedDelegation.status && (
                     <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      selectedDelegation.status === 'completed' ? 'text-green-400 bg-green-900/30' :
+                      selectedDelegation.status === 'completed' ? 'text-purple-400 bg-purple-900/30' :
                       selectedDelegation.status === 'active' ? 'text-blue-400 bg-blue-900/30' :
                       'text-red-400 bg-red-900/30'
                     }`}>{selectedDelegation.status}</span>
@@ -2391,7 +2391,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                           <span className="text-th-text-alt truncate">{evt.summary}</span>
                           {evt.status && (
                             <span className={`ml-auto shrink-0 text-[10px] ${
-                              evt.status === 'completed' ? 'text-green-400' :
+                              evt.status === 'completed' ? 'text-purple-400' :
                               evt.status === 'in_progress' ? 'text-blue-400' : 'text-th-text-muted'
                             }`}>{evt.status}</span>
                           )}
@@ -2841,7 +2841,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
     if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
     if (type === 'progress') return <BarChart3 className="w-3 h-3 text-purple-400 shrink-0" />;
     if (status === 'in_progress') return <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />;
-    if (status === 'completed') return <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />;
+    if (status === 'completed') return <CheckCircle className="w-3 h-3 text-purple-500 shrink-0" />;
     return <Wrench className="w-3 h-3 text-th-text-muted shrink-0" />;
   };
 

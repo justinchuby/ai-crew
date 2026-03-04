@@ -201,7 +201,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                     label = `Task: ${r.id}`;
                     badge = r.status ? (
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        r.status === 'done' ? 'bg-green-900/50 text-green-400' :
+                        r.status === 'done' ? 'bg-purple-900/50 text-purple-400' :
                         r.status === 'running' ? 'bg-blue-900/50 text-blue-400' :
                         r.status === 'failed' ? 'bg-red-900/50 text-red-400' :
                         'bg-th-bg-alt text-th-text-muted'

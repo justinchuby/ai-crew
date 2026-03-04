@@ -46,8 +46,8 @@ describe('agentStatusText', () => {
 });
 
 describe('dagStatusBar', () => {
-  it('returns green for done', () => {
-    expect(dagStatusBar('done')).toContain('bg-green');
+  it('returns purple for done', () => {
+    expect(dagStatusBar('done')).toContain('bg-purple');
   });
 
   it('returns blue for running', () => {
@@ -72,8 +72,8 @@ describe('dagMinimapColor', () => {
     expect(color).not.toContain('red');
   });
 
-  it('returns green for done', () => {
-    expect(dagMinimapColor('done')).toContain('green');
+  it('returns purple for done', () => {
+    expect(dagMinimapColor('done')).toContain('purple');
   });
 
   it('returns blue for running', () => {
@@ -96,8 +96,8 @@ describe('dagTaskText', () => {
     expect(text).not.toContain('orange');
   });
 
-  it('returns emerald for done', () => {
-    expect(dagTaskText('done')).toContain('emerald');
+  it('returns purple for done', () => {
+    expect(dagTaskText('done')).toContain('purple');
   });
 
   it('falls back to muted for unknown', () => {

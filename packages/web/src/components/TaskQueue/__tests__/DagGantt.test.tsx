@@ -58,9 +58,9 @@ describe('DagGantt', () => {
     );
     const { container } = render(<DagGantt tasks={tasks} />);
 
-    // `done` bars should have the green class.
-    const greenBars = container.querySelectorAll('.bg-green-500');
-    expect(greenBars.length).toBeGreaterThanOrEqual(1);
+    // `done` bars should have the purple class.
+    const purpleBars = container.querySelectorAll('.bg-purple-500');
+    expect(purpleBars.length).toBeGreaterThanOrEqual(1);
 
     // `failed` bars should have the red class.
     const redBars = container.querySelectorAll('.bg-red-500');

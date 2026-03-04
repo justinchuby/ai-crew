@@ -7,7 +7,7 @@
  *
  * Canonical colors:
  *   running   = BLUE
- *   done      = GREEN
+ *   done      = PURPLE
  *   idle      = GRAY
  *   blocked   = AMBER
  *   failed    = RED
@@ -63,7 +63,7 @@ export type DagTaskStatus =
   | 'skipped';
 
 const DAG_STATUS_BAR: Record<DagTaskStatus, string> = {
-  done:    'bg-green-500 dark:bg-green-600',
+  done:    'bg-purple-500 dark:bg-purple-600',
   running: 'bg-blue-500 dark:bg-blue-600',
   ready:   'bg-emerald-400',
   pending: 'bg-yellow-500 dark:bg-yellow-600',
@@ -80,7 +80,7 @@ export function dagStatusBar(status: string): string {
 
 /** Status dot colors for DagMinimap segments. */
 const DAG_MINIMAP_COLORS: Record<string, string> = {
-  done:    'bg-green-500',
+  done:    'bg-purple-500',
   running: 'bg-blue-500',
   ready:   'bg-emerald-400',
   blocked: 'bg-amber-500',
@@ -100,7 +100,7 @@ const DAG_TASK_TEXT: Record<DagTaskStatus, string> = {
   pending:  'text-th-text-muted',
   ready:    'text-green-400',
   running:  'text-blue-400',
-  done:     'text-emerald-400',
+  done:     'text-purple-400',
   failed:   'text-red-400',
   blocked:  'text-amber-400',
   paused:   'text-yellow-600 dark:text-yellow-400',
