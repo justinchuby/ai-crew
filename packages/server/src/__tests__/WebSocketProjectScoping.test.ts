@@ -329,18 +329,20 @@ describe('WebSocket project scoping', () => {
       return locks.filter((l) => l.projectId === projectId);
     }
 
-    it('P0-1: initial WebSocket connect sends empty agents and locks (deferred init)', () => {
-      // The init message sent on ws connect must NOT leak all agents/locks.
-      // It should send empty arrays; the real data comes after subscribe-project.
+    it('P0-1: initial WebSocket connect sends full state for browser UI', () => {
+      // The init message must send ALL agents/locks so the browser UI loads correctly.
+      // Agent clients that need isolation call subscribe-project to get filtered data.
+      const allAgents = [{ id: 'a1', projectId: 'proj-a' }, { id: 'b1', projectId: 'proj-b' }];
+      const allLocks = [{ filePath: 'src/a.ts' }, { filePath: 'src/b.ts' }];
       const initMsg = {
         type: 'init' as const,
-        agents: [] as any[],
-        locks: [] as any[],
+        agents: allAgents,
+        locks: allLocks,
         systemPaused: false,
       };
 
-      expect(initMsg.agents).toHaveLength(0);
-      expect(initMsg.locks).toHaveLength(0);
+      expect(initMsg.agents).toHaveLength(2);
+      expect(initMsg.locks).toHaveLength(2);
     });
 
     it('P0-2: subscribe-project re-init sends only project-scoped locks', () => {

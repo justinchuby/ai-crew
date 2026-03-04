@@ -75,12 +75,13 @@ export class WebSocketServer {
       // Flush any buffered agent messages so the new client gets complete data
       agentManager.flushAllMessages();
 
-      // Send minimal init on connect — full data is sent after subscribe-project
+      // Send full state on connect — browser UI needs all data; agent clients
+      // that call subscribe-project will get re-filtered data at that point.
       ws.send(
         JSON.stringify({
           type: 'init',
-          agents: [],
-          locks: [],
+          agents: agentManager.getAll().map((a) => a.toJSON()),
+          locks: lockRegistry.getAll(),
           systemPaused: agentManager.isSystemPaused,
         }),
       );
