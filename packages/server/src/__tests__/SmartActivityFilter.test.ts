@@ -227,4 +227,69 @@ describe('SmartActivityFilter', () => {
       expect(result.length).toBeLessThanOrEqual(10);
     });
   });
+
+  describe('inter-agent noise filtering', () => {
+    it('filters out direct messages between agents', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'message_sent', summary: 'DM to developer (abc12345): hello', details: { type: 'direct_message', targetId: 'dev-1', targetRole: 'developer' } }),
+        makeEntry({ id: 9, actionType: 'file_edit', summary: 'edited foo.ts' }),
+      ];
+      const result = filter.filter(entries);
+      expect(result).toHaveLength(1);
+      expect(result[0].actionType).toBe('file_edit');
+    });
+
+    it('filters out group messages', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'group_message', summary: 'Group "design": discussing API', details: { groupName: 'design', recipientCount: 3 } }),
+        makeEntry({ id: 9, actionType: 'error', summary: 'build failed' }),
+      ];
+      const result = filter.filter(entries);
+      expect(result).toHaveLength(1);
+      expect(result[0].actionType).toBe('error');
+    });
+
+    it('keeps AGENT_MESSAGE (non-DM message_sent) entries', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'message_sent', summary: 'Message → Project Lead (b64095e7)', details: { toAgentId: 'lead-1', toRole: 'lead' } }),
+        makeEntry({ id: 9, actionType: 'message_sent', summary: 'Completion report → Project Lead (b64095e7)', details: { toAgentId: 'lead-1', toRole: 'lead' } }),
+        makeEntry({ id: 8, actionType: 'message_sent', summary: 'Broadcast to 5 agents: starting work', details: { toAgentId: 'all', toRole: 'broadcast', recipientCount: 5 } }),
+      ];
+      const result = filter.filter(entries);
+      expect(result).toHaveLength(3);
+    });
+
+    it('filters DMs with stringified details', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'message_sent', summary: 'DM to architect', details: JSON.stringify({ type: 'direct_message', targetId: 'arch-1', targetRole: 'architect' }) }),
+        makeEntry({ id: 9, actionType: 'file_edit', summary: 'edited bar.ts' }),
+      ];
+      const result = filter.filter(entries);
+      expect(result).toHaveLength(1);
+      expect(result[0].actionType).toBe('file_edit');
+    });
+
+    it('preserves delegation ack message_sent entries', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'message_sent', summary: 'Delegation ack → Project Lead (b64095e7)', details: { toAgentId: 'lead-1', toRole: 'lead' } }),
+      ];
+      const result = filter.filter(entries);
+      expect(result).toHaveLength(1);
+    });
+
+    it('filters both DMs and group messages from a mixed list', () => {
+      const entries = [
+        makeEntry({ id: 10, actionType: 'error', summary: 'crash' }),
+        makeEntry({ id: 9, actionType: 'message_sent', summary: 'DM to developer', details: { type: 'direct_message', targetId: 'dev-1', targetRole: 'developer' } }),
+        makeEntry({ id: 8, actionType: 'group_message', summary: 'Group "timer-team": hello', details: { groupName: 'timer-team' } }),
+        makeEntry({ id: 7, actionType: 'file_edit', summary: 'edited baz.ts' }),
+        makeEntry({ id: 6, actionType: 'message_sent', summary: 'Message → Lead', details: { toAgentId: 'lead-1', toRole: 'lead' } }),
+        makeEntry({ id: 5, actionType: 'lock_acquired', summary: 'locked foo.ts' }),
+      ];
+      const result = filter.filter(entries);
+      // Should keep: error, file_edit, message to lead, lock_acquired (4 entries)
+      expect(result).toHaveLength(4);
+      expect(result.map((e) => e.id)).toEqual([10, 7, 6, 5]);
+    });
+  });
 });
