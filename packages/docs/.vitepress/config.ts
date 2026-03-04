@@ -29,6 +29,8 @@ export default defineConfig({
             { text: 'Agent Commands', link: '/guide/commands' },
             { text: 'Command Syntax', link: '/guide/command-syntax' },
             { text: 'Coordination', link: '/guide/coordination' },
+            { text: 'Multiproject Isolation', link: '/guide/multiproject-isolation' },
+            { text: 'Crew Status & Heartbeat', link: '/guide/crew-status' },
             { text: 'Auto-DAG', link: '/guide/auto-dag' },
             { text: 'TIDE Protocol', link: '/guide/tide-protocol' },
           ],

@@ -11,9 +11,12 @@
 
 ### `GET /agents`
 
-**Description**: Returns all currently active agents.
+**Description**: Returns all currently active agents. Optionally filter by project.
 
-**Parameters**: None
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `projectId` | query | string | no | Filter agents by project. Omit to return all agents (UI default). |
 
 **Response**:
 ```json
@@ -478,12 +481,13 @@
 
 ### `GET /decisions`
 
-**Description**: Returns decisions from the log, optionally filtered to only those awaiting user confirmation.
+**Description**: Returns decisions from the log, optionally filtered by project or confirmation status.
 
 **Parameters**:
 | Name | In | Type | Required | Description |
 |------|----|------|----------|-------------|
 | `needs_confirmation` | query | boolean | no | If `"true"`, returns only pending decisions |
+| `projectId` | query | string | no | Filter decisions by project. Omit to return all. |
 
 **Response**: Array of decision objects
 
@@ -549,9 +553,12 @@
 
 ### `GET /coordination/status`
 
-**Description**: Returns a combined snapshot: all agents, all active file locks, and recent activity.
+**Description**: Returns a combined snapshot: all agents, all active file locks, and recent activity. Optionally scoped to a project.
 
-**Parameters**: None
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `projectId` | query | string | no | Filter to a specific project. Omit to return all. |
 
 **Response**: `{ "agents": [...], "locks": [...], "recentActivity": [...] }`
 
@@ -559,9 +566,12 @@
 
 ### `GET /coordination/locks`
 
-**Description**: Returns all active file locks.
+**Description**: Returns all active file locks. Optionally scoped to a project.
 
-**Parameters**: None
+**Parameters**:
+| Name | In | Type | Required | Description |
+|------|----|------|----------|-------------|
+| `projectId` | query | string | no | Filter locks by project. Omit to return all. |
 
 **Response**: Array of `{ agentId, agentRole, filePath, reason, acquiredAt, expiresAt }`
 
