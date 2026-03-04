@@ -627,6 +627,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return Array.from(this.agents.values());
   }
 
+  /** Return only agents belonging to a specific project */
+  getByProject(projectId: string): Agent[] {
+    return this.getAll().filter(a => this.getProjectIdForAgent(a.id) === projectId);
+  }
+
+  /** Resolve the projectId for a given agent, walking up the parent chain if needed */
+  getProjectIdForAgent(agentId: string): string | undefined {
+    const agent = this.agents.get(agentId);
+    if (!agent) return undefined;
+    if (agent.projectId) return agent.projectId;
+    if (agent.parentId) {
+      return this.getProjectIdForAgent(agent.parentId);
+    }
+    return undefined;
+  }
+
   /** Auto-spawn a Secretary agent as a child of the given lead. Returns the secretary or null. */
   autoSpawnSecretary(leadAgent: Agent): Agent | null {
     // Only for root leads (sub-leads don't get auto-secretary)
