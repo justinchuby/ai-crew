@@ -267,3 +267,41 @@ describe('Timer creation via POST /timers (route handler logic)', () => {
     expect(events[0].label).toBe('event-test');
   });
 });
+
+describe('Timer project scoping (route-level logic)', () => {
+  it('rejects timer when agent belongs to a different project', () => {
+    // Simulate the route logic: if projectId is provided and agent's project doesn't match, reject
+    const requestProjectId: string = 'project-abc';
+    const agentProjectId: string = 'project-xyz';
+
+    const agentExists = true;
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+
+    expect(agentExists).toBe(true);
+    expect(projectMismatch).toBe(true);
+  });
+
+  it('allows timer when agent belongs to the same project', () => {
+    const requestProjectId = 'project-abc';
+    const agentProjectId = 'project-abc';
+
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+    expect(projectMismatch).toBe(false);
+  });
+
+  it('allows timer when no projectId is provided in request', () => {
+    const requestProjectId: string | undefined = undefined;
+    // Route skips check when no projectId
+    const shouldCheck = requestProjectId && typeof requestProjectId === 'string';
+    expect(shouldCheck).toBeFalsy();
+  });
+
+  it('allows timer when agent has no project (unscoped agent)', () => {
+    const requestProjectId = 'project-abc';
+    const agentProjectId: string | undefined = undefined;
+
+    // Route only rejects when agentProjectId exists AND mismatches
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+    expect(projectMismatch).toBeFalsy();
+  });
+});

@@ -42,6 +42,19 @@ describe('ModelConfigDefaults', () => {
       expect(err).toContain('developer');
       expect(err).toContain('non-string');
     });
+
+    it('rejects empty model arrays', () => {
+      const err = validateModelConfigShape({ developer: [] });
+      expect(err).toBe('Each role must have at least one model selected.');
+    });
+
+    it('rejects config where one role has empty array among valid ones', () => {
+      const err = validateModelConfigShape({
+        developer: ['claude-opus-4.6'],
+        architect: [],
+      });
+      expect(err).toBe('Each role must have at least one model selected.');
+    });
   });
 
   describe('validateModelConfig', () => {

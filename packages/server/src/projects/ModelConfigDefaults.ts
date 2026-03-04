@@ -67,6 +67,9 @@ export function validateModelConfigShape(value: unknown): string | null {
     if (!Array.isArray(models)) {
       return `config["${role}"] must be an array of model IDs`;
     }
+    if (models.length === 0) {
+      return 'Each role must have at least one model selected.';
+    }
     for (const m of models) {
       if (typeof m !== 'string') {
         return `config["${role}"] contains a non-string value`;

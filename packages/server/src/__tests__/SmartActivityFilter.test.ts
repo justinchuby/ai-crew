@@ -261,7 +261,7 @@ describe('SmartActivityFilter', () => {
 
     it('filters DMs with stringified details', () => {
       const entries = [
-        makeEntry({ id: 10, actionType: 'message_sent', summary: 'DM to architect', details: JSON.stringify({ type: 'direct_message', targetId: 'arch-1', targetRole: 'architect' }) }),
+        makeEntry({ id: 10, actionType: 'message_sent', summary: 'DM to architect', details: JSON.stringify({ type: 'direct_message', targetId: 'arch-1', targetRole: 'architect' }) as unknown as Record<string, any> }),
         makeEntry({ id: 9, actionType: 'file_edit', summary: 'edited bar.ts' }),
       ];
       const result = filter.filter(entries);

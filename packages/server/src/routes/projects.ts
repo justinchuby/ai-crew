@@ -116,7 +116,11 @@ export function projectsRoutes(ctx: AppContext): Router {
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error('project', `Failed to resume project: ${err.message}`);
-      res.status(429).json({ error: err.message });
+      // Only expose rate-limit messages; sanitize all other errors
+      const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');
+      res.status(isRateLimit ? 429 : 500).json({
+        error: isRateLimit ? err.message : 'Failed to resume project. Please try again.',
+      });
     }
   });
 
