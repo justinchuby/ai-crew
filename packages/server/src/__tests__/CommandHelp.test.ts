@@ -161,13 +161,24 @@ describe('CommandDispatcher error handling', () => {
   });
 });
 
-describe('Lead role QUERY_CREW policy', () => {
-  it('lead system prompt contains QUERY_CREW usage guidance', async () => {
+describe('Lead role system prompt policies', () => {
+  it('contains QUERY_CREW usage guidance', async () => {
     const { RoleRegistry } = await import('../agents/RoleRegistry.js');
     const registry = new RoleRegistry();
     const lead = registry.get('lead');
     expect(lead).toBeDefined();
     expect(lead!.systemPrompt).toContain('Only use QUERY_CREW when crew state is genuinely unknown');
     expect(lead!.systemPrompt).toContain('CREW_UPDATE messages and Agent Reports');
+  });
+
+  it('distinguishes CREW_UPDATE from heartbeat reminders', async () => {
+    const { RoleRegistry } = await import('../agents/RoleRegistry.js');
+    const registry = new RoleRegistry();
+    const lead = registry.get('lead');
+    expect(lead).toBeDefined();
+    expect(lead!.systemPrompt).toContain('CREW_UPDATE');
+    expect(lead!.systemPrompt).toContain('Heartbeat reminder');
+    expect(lead!.systemPrompt).toContain('Cannot be paused');
+    expect(lead!.systemPrompt).toContain('Paused by HALT_HEARTBEAT');
   });
 });

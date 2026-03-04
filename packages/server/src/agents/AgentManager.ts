@@ -180,6 +180,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           return null;
         }
       },
+      getRemainingTasks: (leadId: string) => {
+        try {
+          const { tasks } = this.taskDAG.getStatus(leadId);
+          return tasks
+            .filter(t => ['pending', 'ready', 'blocked', 'paused'].includes(t.dagStatus))
+            .map(t => ({ id: t.id, description: t.description, dagStatus: t.dagStatus }));
+        } catch {
+          return [];
+        }
+      },
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
     });
     this.heartbeat.start();
