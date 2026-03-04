@@ -289,11 +289,11 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
 export function getCoordCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d) },
-    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d) },
-    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d) },
-    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d) },
-    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d) },
-    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d) },
+    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination' } },
+    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination' } },
+    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"type": "milestone", "summary": "phase 1 complete"}', category: 'Coordination' } },
+    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d), help: { description: 'Record an architectural decision', example: 'DECISION {"title": "Use React", "rationale": "team expertise"}', category: 'Coordination' } },
+    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d), help: { description: 'Report progress on current work', example: 'PROGRESS {"summary": "50% complete"}', category: 'Coordination' } },
+    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d), help: { description: 'Commit locked files', example: 'COMMIT {"message": "feat: add new feature"}', category: 'Coordination' } },
   ];
 }

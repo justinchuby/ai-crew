@@ -81,16 +81,19 @@ export function getCapabilityCommands(ctx: CommandHandlerContext): CommandEntry[
       regex: ACQUIRE_REGEX,
       name: 'ACQUIRE_CAPABILITY',
       handler: (a, d) => handleAcquire(ctx, a, d),
+      help: { description: 'Acquire a capability beyond your role', example: 'ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "found bug"}', category: 'Capabilities' },
     },
     {
       regex: LIST_REGEX,
       name: 'LIST_CAPABILITIES',
       handler: (a) => handleList(ctx, a),
+      help: { description: 'List your current capabilities', example: 'LIST_CAPABILITIES {}', category: 'Capabilities' },
     },
     {
       regex: RELEASE_REGEX,
       name: 'RELEASE_CAPABILITY',
       handler: (a, d) => handleRelease(ctx, a, d),
+      help: { description: 'Release an acquired capability', example: 'RELEASE_CAPABILITY {"capability": "code-review"}', category: 'Capabilities' },
     },
   ];
 }

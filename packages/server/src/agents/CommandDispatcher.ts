@@ -10,7 +10,7 @@
 import type { Agent } from './Agent.js';
 import { logger } from '../utils/logger.js';
 import type { CommandEntry, CommandContext, CommandHandlerContext, Delegation } from './commands/types.js';
-import { buildCommandHelp, getCommandExample } from './commands/CommandHelp.js';
+import { buildCommandHelp, getCommandExample, setRegisteredPatterns } from './commands/CommandHelp.js';
 import {
   getAgentCommands,
   notifyParentOfIdle as _notifyParentOfIdle,
@@ -74,6 +74,9 @@ export class CommandDispatcher {
         ? getTemplateCommands(this.handlerCtx, this.handlerCtx.taskTemplateRegistry, this.handlerCtx.taskDecomposer)
         : []),
     ];
+
+    // Register patterns so CommandHelp can build help from live metadata
+    setRegisteredPatterns(this.patterns);
   }
 
   // ── Buffer management ──────────────────────────────────────────────

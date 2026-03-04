@@ -18,9 +18,9 @@ const RESOLVE_DEFERRED_REGEX = /⟦⟦\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*⟧⟧/s
 
 export function getDeferredCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d) },
-    { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d) },
-    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d) },
+    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"title": "Tech debt", "description": "refactor later"}', category: 'Deferred Issues' } },
+    { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues' } },
+    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d), help: { description: 'Resolve a deferred issue', example: 'RESOLVE_DEFERRED {"id": "issue-id"}', category: 'Deferred Issues' } },
   ];
 }
 

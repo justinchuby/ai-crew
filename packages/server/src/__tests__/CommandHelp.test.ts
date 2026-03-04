@@ -1,30 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildCommandHelp, getCommandExample, COMMAND_REFERENCE } from '../agents/commands/CommandHelp.js';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { buildCommandHelp, getCommandExample, setRegisteredPatterns } from '../agents/commands/CommandHelp.js';
+import type { CommandEntry } from '../agents/commands/types.js';
+
+// Register patterns from all command modules before tests run.
+// This mirrors what CommandDispatcher does at construction time.
+beforeAll(async () => {
+  const { CommandDispatcher } = await import('../agents/CommandDispatcher.js');
+  // Creating a dispatcher with a minimal mock ctx triggers setRegisteredPatterns
+  const mockCtx = {
+    getAgent: vi.fn(),
+    getAllAgents: vi.fn().mockReturnValue([]),
+    getProjectIdForAgent: vi.fn(),
+    getRunningCount: vi.fn().mockReturnValue(0),
+    spawnAgent: vi.fn(),
+    terminateAgent: vi.fn(),
+    emit: vi.fn(),
+    roleRegistry: { getRole: vi.fn(), getAllRoles: vi.fn().mockReturnValue([]) },
+    config: { modelId: 'test', maxConcurrent: 10, agentCwd: '/tmp' },
+    lockRegistry: { acquire: vi.fn(), release: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByAgent: vi.fn().mockReturnValue([]) },
+    activityLedger: { log: vi.fn(), getRecent: vi.fn().mockReturnValue([]) },
+    messageBus: { send: vi.fn(), getQueuedCount: vi.fn().mockReturnValue(0) },
+    decisionLog: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByLeadId: vi.fn().mockReturnValue([]) },
+    agentMemory: { get: vi.fn(), set: vi.fn() },
+    chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
+    taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
+    deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+    maxConcurrent: 10,
+    markHumanInterrupt: vi.fn(),
+  } as any;
+  new CommandDispatcher(mockCtx);
+});
 
 describe('CommandHelp', () => {
   describe('buildCommandHelp', () => {
-    it('includes all command categories', () => {
+    it('includes expected command categories', () => {
       const help = buildCommandHelp();
-      for (const category of Object.keys(COMMAND_REFERENCE)) {
-        expect(help).toContain(`== ${category} ==`);
+      const expectedCategories = ['Agent Lifecycle', 'Communication', 'Groups', 'Task DAG', 'Coordination', 'System', 'Capabilities', 'Deferred Issues'];
+      for (const cat of expectedCategories) {
+        expect(help).toContain(`== ${cat} ==`);
       }
     });
 
-    it('includes command names and descriptions', () => {
+    it('includes command names and descriptions from registered patterns', () => {
       const help = buildCommandHelp();
       expect(help).toContain('DELEGATE — Delegate a task to an existing agent');
       expect(help).toContain('CREATE_AGENT — Spawn a new agent with a role and task');
-      expect(help).toContain('AGENT_MESSAGE — Send a message to an agent');
-      expect(help).toContain('SET_TIMER — Set a reminder timer');
+      expect(help).toContain('AGENT_MSG — Send a message to an agent');
     });
 
-    it('includes example syntax for each command', () => {
+    it('includes example syntax for commands', () => {
       const help = buildCommandHelp();
-      for (const commands of Object.values(COMMAND_REFERENCE)) {
-        for (const cmd of commands) {
-          expect(help).toContain(cmd.example);
-        }
-      }
+      expect(help).toContain('DELEGATE {"to": "agent-id", "task": "do something"}');
+      expect(help).toContain('COMMIT {"message": "feat: add new feature"}');
+      expect(help).toContain('QUERY_CREW {}');
     });
 
     it('includes format hint at the end', () => {
@@ -42,17 +70,50 @@ describe('CommandHelp', () => {
       const help = buildCommandHelp();
       expect(help).toMatch(/^\[System\]/);
     });
+
+    it('builds help dynamically from setRegisteredPatterns', () => {
+      // Save current state, set custom patterns, verify, restore
+      const customPatterns: CommandEntry[] = [
+        { regex: /test/, name: 'CUSTOM_CMD', handler: () => {}, help: { description: 'A custom command', example: 'CUSTOM_CMD {"key": "val"}', category: 'Custom' } },
+      ];
+      setRegisteredPatterns(customPatterns);
+      const help = buildCommandHelp();
+      expect(help).toContain('== Custom ==');
+      expect(help).toContain('CUSTOM_CMD — A custom command');
+      // Won't contain old commands since we replaced the patterns
+      expect(help).not.toContain('DELEGATE');
+    });
   });
 
   describe('getCommandExample', () => {
+    beforeEach(async () => {
+      // Re-register real patterns for these tests
+      const { CommandDispatcher } = await import('../agents/CommandDispatcher.js');
+      const mockCtx = {
+        getAgent: vi.fn(), getAllAgents: vi.fn().mockReturnValue([]),
+        getProjectIdForAgent: vi.fn(), getRunningCount: vi.fn().mockReturnValue(0),
+        spawnAgent: vi.fn(), terminateAgent: vi.fn(), emit: vi.fn(),
+        roleRegistry: { getRole: vi.fn(), getAllRoles: vi.fn().mockReturnValue([]) },
+        config: { modelId: 'test', maxConcurrent: 10, agentCwd: '/tmp' },
+        lockRegistry: { acquire: vi.fn(), release: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByAgent: vi.fn().mockReturnValue([]) },
+        activityLedger: { log: vi.fn(), getRecent: vi.fn().mockReturnValue([]) },
+        messageBus: { send: vi.fn(), getQueuedCount: vi.fn().mockReturnValue(0) },
+        decisionLog: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByLeadId: vi.fn().mockReturnValue([]) },
+        agentMemory: { get: vi.fn(), set: vi.fn() },
+        chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
+        taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
+        deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+        maxConcurrent: 10, markHumanInterrupt: vi.fn(),
+      } as any;
+      new CommandDispatcher(mockCtx);
+    });
+
     it('returns example for known command', () => {
       expect(getCommandExample('DELEGATE')).toContain('DELEGATE');
-      expect(getCommandExample('SET_TIMER')).toContain('SET_TIMER');
     });
 
     it('is case-insensitive', () => {
       expect(getCommandExample('delegate')).toContain('DELEGATE');
-      expect(getCommandExample('Set_Timer')).toContain('SET_TIMER');
     });
 
     it('returns undefined for unknown command', () => {

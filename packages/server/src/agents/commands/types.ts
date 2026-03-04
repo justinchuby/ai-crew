@@ -78,4 +78,10 @@ export interface CommandEntry {
   regex: RegExp;
   name: string;
   handler: (agent: Agent, data: string) => void;
+  /** Help metadata — used to auto-generate the command help menu. */
+  help?: {
+    description: string;
+    example: string;
+    category: string;
+  };
 }

@@ -31,15 +31,15 @@ const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 
 export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MSG', handler: (a, d) => handleAgentMessage(ctx, a, d) },
-    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d) },
-    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d) },
-    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d) },
-    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d) },
-    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => handleGroupMessage(ctx, a, d) },
+    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MSG', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication' } },
+    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d), help: { description: 'Send a message to all agents', example: 'BROADCAST {"content": "attention everyone..."}', category: 'Communication' } },
+    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["id1", "id2"]}', category: 'Groups' } },
+    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["id3"]}', category: 'Groups' } },
+    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["id2"]}', category: 'Groups' } },
+    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups' } },
     { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
-    { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
-    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d) },
+    { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS {}', category: 'Groups' } },
+    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication' } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
   ];
 }

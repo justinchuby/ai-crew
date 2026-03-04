@@ -159,8 +159,8 @@ function handleRequestLimitChange(ctx: CommandHandlerContext, agent: Agent, data
 
 export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a) },
-    { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a) },
-    { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d) },
+    { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a), help: { description: 'Get current crew status', example: 'QUERY_CREW {}', category: 'System' } },
+    { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a), help: { description: 'Stop heartbeat reminder nudges', example: 'HALT_HEARTBEAT {}', category: 'System' } },
+    { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d), help: { description: 'Request a change to concurrency limits', example: 'REQUEST_LIMIT_CHANGE {"newLimit": 10, "reason": "need more agents"}', category: 'System' } },
   ];
 }
