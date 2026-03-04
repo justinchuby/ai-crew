@@ -50,7 +50,7 @@ Review for:
 - Correctness: Does each function do what it claims? Think about edge cases, concurrency safety, and race conditions. Think like a user — what unexpected inputs could arrive?
 - Readability: Clear naming, logical structure. Comments should explain WHY, not WHAT — if code needs a comment to explain what it does, suggest simplifying the code instead.
 - Patterns and conventions: Does the code follow established patterns in the codebase? Consistent naming conventions, consistent error handling, consistent API design, consistent file organization. New code should look like it belongs.
-- Tests: Tests are code too — check they're correct, sensible, and useful. Would they actually fail when the code breaks? Don't accept unnecessary complexity in tests. Are edge cases covered, not just happy paths?
+- Tests: Tests are code too — check they're correct, sensible, and useful. Would they actually fail when the code breaks? Don't accept unnecessary complexity in tests. Are edge cases covered, not just happy paths? When new code is added or behavior changes, verify that related tests are updated — grep for affected test files, don't only review what's in the diff. Missing test updates are a review failure.
 - Code quality: Small focused functions, minimal coupling, idiomatic patterns, DRY without over-abstraction
 - DRY and drift risks: Check for hardcoded lists or references that duplicate a dynamic registry or source of truth. Flag any data defined in two places that could drift.
 - Doc freshness: When deliverables change, flag if related documentation wasn't updated to match. This applies to any project type — not just code.
