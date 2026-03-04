@@ -686,14 +686,19 @@ export function LeadDashboard({ api, ws }: Props) {
   }, [newProjectModelConfig]);
 
   const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
-    if (!input.trim() || !selectedLeadId) return;
+    if (!selectedLeadId) return;
     const text = input.trim();
+    if (!text && mode === 'queue') return;
     setInput('');
-    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
+    if (text) {
+      useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
+    }
+    const body: Record<string, string> = { mode };
+    if (text) body.text = text;
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, mode }),
+      body: JSON.stringify(body),
     });
   }, [input, selectedLeadId]);
 
@@ -1590,7 +1595,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <button
                     type="button"
                     onClick={() => sendMessage('interrupt')}
-                    disabled={!isActive || !input.trim()}
+                    disabled={!isActive}
                     title="Interrupt current work (Ctrl+Enter)"
                     className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
                   >
