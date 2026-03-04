@@ -7,6 +7,8 @@ import { logger } from '../utils/logger.js';
 import { AgentEventEmitter } from './AgentEvents.js';
 import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
+import { formatCrewUpdate } from '../coordination/CrewFormatter.js';
+import type { CrewMember } from '../coordination/CrewFormatter.js';
 
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
 
@@ -24,6 +26,10 @@ export interface AgentContextInfo {
   model?: string;
   parentId?: string;
   isSystemAgent?: boolean;
+  pendingMessages?: number;
+  createdAt?: string;
+  contextWindowSize?: number;
+  contextWindowUsed?: number;
 }
 
 export interface AgentJSON {
@@ -307,50 +313,26 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 [/CREW CONTEXT]`;
   }
 
-  injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[], healthHeader?: string): boolean {
-    const isLead = this.role.id === 'lead';
-    const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
-    const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
+  injectContextUpdate(peers: AgentContextInfo[], _recentActivity: string[], healthHeader?: string, alerts?: string[]): boolean {
+    // Convert AgentContextInfo to CrewMember (compatible interfaces)
+    const members: CrewMember[] = peers;
 
-    const childLines = myChildren
-      .map((p) => {
-        const pShort = p.id.slice(0, 8);
-        const modelStr = p.model ? ` [${p.model}]` : '';
-        const systemStr = p.isSystemAgent ? ' (system)' : '';
-        return `- ${pShort} — ${p.roleName}${systemStr}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
-      })
-      .join('\n');
+    const budget = this.budget
+      ? { running: this.budget.runningCount, max: this.budget.maxConcurrent }
+      : undefined;
 
-    const peerLines = otherPeers
-      .map((p) => {
-        const pShort = p.id.slice(0, 8);
-        const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
-        const systemStr = p.isSystemAgent ? ' (system)' : '';
-        return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
-      })
-      .join('\n');
+    const formatted = formatCrewUpdate(members, {
+      viewerId: this.id,
+      viewerRole: this.role.id,
+      healthHeader,
+      budget,
+      alerts,
+    });
 
-    const crewStatus = isLead
-      ? `== YOUR AGENTS ==\n${childLines || '(no agents — use CREATE_AGENT)'}${otherPeers.length > 0 ? `\n== OTHER CREW ==\n${peerLines}` : ''}`
-      : `== CURRENT CREW STATUS ==\n${peerLines || '(no other agents)'}`;
+    const update = `⟦⟦ CREW_UPDATE\n${formatted}\nCREW_UPDATE ⟧⟧`;
 
-    const activityLines = recentActivity.length > 0
-      ? recentActivity.join('\n')
-      : '(no recent activity)';
-
-    const budgetLine = this.budget
-      ? `\n== AGENT BUDGET ==\nRunning: ${this.budget.runningCount} / ${this.budget.maxConcurrent} | Available slots: ${Math.max(0, this.budget.maxConcurrent - this.budget.runningCount)}${this.budget.runningCount >= this.budget.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}`
-      : '';
-
-    const update = `⟦⟦ CREW_UPDATE
-${healthHeader ? healthHeader + '\n' : ''}${crewStatus}${budgetLine}
-== RECENT ACTIVITY ==
-${activityLines}
-CREW_UPDATE ⟧⟧`;
-
-    // Hash only stable parts (crew status, budget, health) — not activity timestamps
-    const stableContent = `${healthHeader || ''}${crewStatus}${budgetLine}`;
-    const hash = createHash('md5').update(stableContent).digest('hex');
+    // Hash to skip duplicate updates
+    const hash = createHash('md5').update(formatted).digest('hex');
     if (hash === this.lastUpdateHash) {
       return false;
     }

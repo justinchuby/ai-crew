@@ -11,8 +11,12 @@ export function agentsRoutes(ctx: AppContext): Router {
   const router = Router();
 
   // --- Agents ---
-  router.get('/agents', (_req, res) => {
-    res.json(agentManager.getAll().map((a) => a.toJSON()));
+  router.get('/agents', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const agents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
+    res.json(agents.map((a) => a.toJSON()));
   });
 
   router.post('/agents', spawnLimiter, validateBody(spawnAgentSchema), (req, res) => {
@@ -101,7 +105,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     }
 
     const prefix = `[USER MESSAGE] The human user says:\n`;
-    const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
+    const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message. Start your response with @user on its own line.`;
 
     if (mode === 'interrupt') {
       logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);

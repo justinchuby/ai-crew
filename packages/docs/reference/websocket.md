@@ -12,6 +12,22 @@ ws.onmessage = (event) => {
 }
 ```
 
+On connection, the server sends an `init` message containing all current agents, locks, and state. This gives the browser dashboard full visibility across all projects.
+
+## Project Filtering
+
+By default, WebSocket clients receive events from **all** projects (designed for the browser UI). Agents can subscribe to a specific project to only receive events from their project:
+
+```javascript
+// Subscribe to a specific project (agent-side filtering)
+ws.send(JSON.stringify({ type: 'subscribe-project', projectId: 'project-123' }))
+```
+
+After subscribing:
+- The client only receives events for agents in that project
+- Unsubscribed clients (browser dashboard) continue to receive everything
+- The subscription persists for the lifetime of the connection
+
 ## Event Types
 
 All events follow the shape `{ type: string, payload: object }`.

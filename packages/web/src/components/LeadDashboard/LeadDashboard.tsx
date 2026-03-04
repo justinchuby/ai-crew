@@ -6,9 +6,10 @@ import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
-import { MentionText, MarkdownContent } from '../../utils/markdown';
+import { MentionText, MarkdownContent, InlineMarkdownWithMentions } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
+import { ModelConfigPanel } from './ModelConfigPanel';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
@@ -45,6 +46,8 @@ export function LeadDashboard({ api, ws }: Props) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
+  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -658,6 +661,13 @@ export function LeadDashboard({ api, ws }: Props) {
         if (task) {
           useLeadStore.getState().addMessage(data.id, { type: 'text', text: task, sender: 'user' });
         }
+        // Save model config if customized during project creation
+        if (newProjectModelConfig && data.projectId) {
+          apiFetch(`/projects/${data.projectId}/model-config`, {
+            method: 'PUT',
+            body: JSON.stringify({ config: newProjectModelConfig }),
+          }).catch(() => { /* best-effort — project still created */ });
+        }
         setShowNewProject(false);
         setNewProjectName('');
         setNewProjectTask('');
@@ -665,13 +675,15 @@ export function LeadDashboard({ api, ws }: Props) {
         setNewProjectCwd('');
         setResumeSessionId('');
         setSelectedRoles(new Set());
+        setNewProjectModelConfig(null);
+        setShowModelConfig(false);
       }
     } catch {
       // ignore
     } finally {
       setStarting(false);
     }
-  }, []);
+  }, [newProjectModelConfig]);
 
   const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!input.trim() || !selectedLeadId) return;
@@ -1134,6 +1146,24 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 </div>
               )}
+              {/* Model Configuration (collapsible) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowModelConfig(!showModelConfig)}
+                  className="flex items-center gap-1 text-xs text-th-text-muted hover:text-th-text-alt font-medium transition-colors"
+                >
+                  {showModelConfig ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  <Wrench className="w-3 h-3" />
+                  Model Configuration
+                  <span className="text-[10px] text-th-text-muted">(optional)</span>
+                </button>
+                {showModelConfig && (
+                  <div className="mt-2 border border-th-border rounded-md p-2 bg-th-bg">
+                    <ModelConfigPanel value={newProjectModelConfig ?? undefined} onChange={setNewProjectModelConfig} />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
               <button
@@ -1532,7 +1562,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       sendMessage('queue');
                     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
-                      sendMessage('interrupt');
+                      if (input.trim()) sendMessage('interrupt');
                     }
                   }}
                   placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt)' : 'Project Lead is not active'}
@@ -1559,8 +1589,14 @@ export function LeadDashboard({ api, ws }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => sendMessage('interrupt')}
-                    disabled={!isActive || !input.trim()}
+                    onClick={() => {
+                      if (input.trim()) {
+                        sendMessage('interrupt');
+                      } else if (selectedLeadId) {
+                        apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
+                      }
+                    }}
+                    disabled={!isActive}
                     title="Interrupt current work (Ctrl+Enter)"
                     className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
                   >
@@ -1635,6 +1671,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
+                        models: { icon: <Wrench className="w-3 h-3" />, label: 'Models' },
                         tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
                         costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
                         timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
@@ -1679,6 +1716,16 @@ export function LeadDashboard({ api, ws }: Props) {
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
+                    {sidebarTab === 'models' && leadAgent?.projectId && (
+                      <div className="h-full overflow-y-auto p-2">
+                        <ModelConfigPanel projectId={leadAgent.projectId} compact />
+                      </div>
+                    )}
+                    {sidebarTab === 'models' && !leadAgent?.projectId && (
+                      <div className="flex items-center justify-center h-full text-th-text-muted text-xs">
+                        No project selected
+                      </div>
+                    )}
                     {sidebarTab === 'tokens' && <TokenEconomics />}
                     {sidebarTab === 'costs' && <CostBreakdown />}
                     {sidebarTab === 'timers' && <TimerDisplay />}
@@ -1720,7 +1767,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="flex items-center gap-4 text-sm font-mono mb-2">
                     <span className="text-blue-400">{progress.teamSize} agents</span>
                     <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
-                    <span className="text-green-400">{progress.completed} done</span>
+                    <span className="text-purple-400">{progress.completed} done</span>
                     {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
                   </div>
                   <div className="w-full bg-th-bg-muted rounded-full h-2.5 mb-1">
@@ -1759,7 +1806,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <p className="text-sm font-mono text-th-text-alt mb-3">{latest.summary}</p>
                     {latest.completed.length > 0 && (
                       <div className="mb-2">
-                        <p className="text-xs text-green-400 font-semibold mb-1">✓ Completed</p>
+                        <p className="text-xs text-purple-400 font-semibold mb-1">✓ Completed</p>
                         <ul className="space-y-0.5">
                           {latest.completed.map((item, i) => (
                             <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
@@ -1813,7 +1860,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-mono text-th-text-alt">{snap.summary}</p>
                           <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-th-text-muted">
-                            {snap.completed.length > 0 && <span className="text-green-500">✓{snap.completed.length}</span>}
+                            {snap.completed.length > 0 && <span className="text-purple-500">✓{snap.completed.length}</span>}
                             {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
                             {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
                             <span>{new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -1833,7 +1880,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     {progress.delegations.map((d: any, i: number) => (
                       <div key={d.id || i} className="px-2 py-1.5 rounded bg-th-bg-muted/50 text-xs font-mono">
                         <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-green-500/20 text-green-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-purple-500/20 text-purple-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
                             {d.status}
                           </span>
                           <span className="text-th-text-alt">{d.toRole}</span>
@@ -2259,7 +2306,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
                 <div className="flex items-center gap-1 mr-2">
                   <button
-                    onClick={() => fetch(`/api/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
+                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
                     className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
                     title="Interrupt — cancel current work"
                   >
@@ -2296,7 +2343,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDelegation.task}</p>
                   {selectedDelegation.status && (
                     <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      selectedDelegation.status === 'completed' ? 'text-green-400 bg-green-900/30' :
+                      selectedDelegation.status === 'completed' ? 'text-purple-400 bg-purple-900/30' :
                       selectedDelegation.status === 'active' ? 'text-blue-400 bg-blue-900/30' :
                       'text-red-400 bg-red-900/30'
                     }`}>{selectedDelegation.status}</span>
@@ -2391,7 +2438,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                           <span className="text-th-text-alt truncate">{evt.summary}</span>
                           {evt.status && (
                             <span className={`ml-auto shrink-0 text-[10px] ${
-                              evt.status === 'completed' ? 'text-green-400' :
+                              evt.status === 'completed' ? 'text-purple-400' :
                               evt.status === 'in_progress' ? 'text-blue-400' : 'text-th-text-muted'
                             }`}>{evt.status}</span>
                           )}
@@ -2841,7 +2888,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
     if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
     if (type === 'progress') return <BarChart3 className="w-3 h-3 text-purple-400 shrink-0" />;
     if (status === 'in_progress') return <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />;
-    if (status === 'completed') return <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />;
+    if (status === 'completed') return <CheckCircle className="w-3 h-3 text-purple-500 shrink-0" />;
     return <Wrench className="w-3 h-3 text-th-text-muted shrink-0" />;
   };
 
@@ -2995,27 +3042,8 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
 }
 
 function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={i}>{part.slice(2, -2)}</strong>;
-        }
-        if (part.startsWith('*') && part.endsWith('*')) {
-          return <em key={i}>{part.slice(1, -1)}</em>;
-        }
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return (
-            <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
+  const agents = useAppStore((s) => s.agents);
+  return <InlineMarkdownWithMentions text={text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />;
 }
 
 /** Renders agent text, separating ⟦⟦ command ⟧⟧ blocks from normal markdown */
@@ -3178,7 +3206,7 @@ function AgentTextBlock({ text }: { text: string }) {
   );
 }
 
-/** Detect markdown tables and render them; pass other text to InlineMarkdown */
+/** Detect markdown tables and code fences, render them; pass other text to InlineMarkdown */
 function MarkdownWithTables({ text }: { text: string }) {
   // Match contiguous lines that look like table rows (start with |)
   const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
@@ -3192,7 +3220,32 @@ function MarkdownWithTables({ text }: { text: string }) {
           return <MarkdownTable key={i} raw={trimmed} />;
         }
         if (!trimmed) return null;
-        return <InlineMarkdown key={i} text={part} />;
+        return <BlockMarkdown key={i} text={part} />;
+      })}
+    </>
+  );
+}
+
+/** Block-level markdown: splits on fenced code blocks, delegates non-code to InlineMarkdown */
+function BlockMarkdown({ text }: { text: string }) {
+  const CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
+  const segments = text.split(CODE_BLOCK_RE);
+  if (segments.length === 1) return <InlineMarkdown text={text} />;
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('```') && seg.endsWith('```')) {
+          const inner = seg.slice(3, -3);
+          const newlineIdx = inner.indexOf('\n');
+          const content = newlineIdx >= 0 ? inner.slice(newlineIdx + 1) : inner;
+          return (
+            <pre key={i} className="bg-th-bg-alt border border-th-border rounded-md px-3 py-2 my-1.5 overflow-x-auto text-xs font-mono text-th-text-alt whitespace-pre">
+              <code>{content}</code>
+            </pre>
+          );
+        }
+        if (!seg.trim()) return null;
+        return <InlineMarkdown key={i} text={seg} />;
       })}
     </>
   );

@@ -2,6 +2,7 @@ import { isTerminalStatus } from '../Agent.js';
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   agentMessageSchema,
@@ -31,15 +32,15 @@ const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 
 export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MSG', handler: (a, d) => handleAgentMessage(ctx, a, d) },
-    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d) },
-    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d) },
-    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d) },
-    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d) },
-    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => handleGroupMessage(ctx, a, d) },
+    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MESSAGE', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: deriveArgs(agentMessageSchema) } },
+    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d), help: { description: 'Send a message to all agents', example: 'BROADCAST {"content": "attention everyone..."}', category: 'Communication', args: deriveArgs(broadcastSchema) } },
+    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["id1", "id2"]}', category: 'Groups', args: deriveArgs(createGroupSchema) } },
+    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["id3"]}', category: 'Groups', args: deriveArgs(addToGroupSchema) } },
+    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["id2"]}', category: 'Groups', args: deriveArgs(removeFromGroupSchema) } },
+    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MESSAGE', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: deriveArgs(groupMessageSchema) } },
     { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
-    { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
-    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d) },
+    { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS {}', category: 'Groups' } },
+    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: deriveArgs(interruptSchema) } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
   ];
 }
@@ -109,8 +110,12 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     if (!msg) return;
 
     // Resolve "to" — could be full UUID, short ID prefix, role ID, or role name
+    // Scope resolution to sender's project to prevent cross-project messaging
     let targetId = msg.to;
-    const allAgents = ctx.getAllAgents();
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const allAgents = senderProjectId
+      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
+      : ctx.getAllAgents();
     if (!ctx.getAgent(targetId)) {
       const byPrefix = allAgents.find((a) => a.id.startsWith(msg.to) && (a.status === 'running' || a.status === 'idle'));
       if (byPrefix) {
@@ -139,6 +144,14 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     const targetAgent = ctx.getAgent(targetId);
     if (!targetAgent) {
       logger.warn('message', `Cannot resolve target "${msg.to}" for message from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
+      return;
+    }
+
+    // Enforce project boundary — reject cross-project messages
+    if (senderProjectId && ctx.getProjectIdForAgent(targetId) !== senderProjectId) {
+      logger.warn('message', `Cross-project message blocked: ${agent.id.slice(0, 8)} → ${targetId.slice(0, 8)}`);
+      agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
       return;
     }
 
@@ -161,7 +174,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     });
     ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
       toAgentId: targetId, toRole: targetAgent.role.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
     logger.debug('command', 'Failed to parse AGENT_MESSAGE command', { error: (err as Error).message });
   }
@@ -207,7 +220,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
     });
     ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Broadcast to ${recipients.length} agents: ${msg.content.slice(0, 120)}`, {
       toAgentId: 'all', toRole: 'broadcast', recipientCount: recipients.length,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
     logger.debug('command', 'Failed to parse BROADCAST command', { error: (err as Error).message });
   }
@@ -375,7 +388,7 @@ function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     ctx.emit('group:message', { message, groupName: req.group, leadId });
     ctx.activityLedger.log(agent.id, agent.role.id, 'group_message', `Group "${req.group}": ${req.content.slice(0, 120)}`, {
       groupName: req.group, recipientCount: delivered,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
     logger.info('groups', `Group message in "${req.group}": ${agent.role.name} (${agent.id.slice(0, 8)}) → ${delivered} recipients`);
   } catch (err) { logger.debug('command', 'Failed to parse GROUP_MESSAGE command', { error: (err as Error).message }); }
 }
@@ -411,8 +424,12 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
     if (!req) return;
 
     // Resolve target agent (same resolution as AGENT_MESSAGE)
+    // Scope to sender's project to prevent cross-project interrupts
     let targetId = req.to;
-    const allAgents = ctx.getAllAgents();
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const allAgents = senderProjectId
+      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
+      : ctx.getAllAgents();
     if (!ctx.getAgent(targetId)) {
       const byPrefix = allAgents.find((a) => a.id.startsWith(req.to) && (a.status === 'running' || a.status === 'idle'));
       if (byPrefix) {
@@ -464,7 +481,8 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'agent_interrupted',
       `Interrupted ${target.role.name} (${target.id.slice(0, 8)}): ${req.content.slice(0, 120)}`,
-      { toAgentId: target.id, toRole: target.role.id });
+      { toAgentId: target.id, toRole: target.role.id },
+      ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:interrupted', { from: agent.id, to: target.id, content: req.content });
   } catch (err) {

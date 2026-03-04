@@ -282,7 +282,7 @@ function ProjectProgressCard({
           <div className="space-y-1">
             {latestSnapshot.completed.length > 0 && (
               <div>
-                <span className="text-[10px] text-green-400 font-semibold">✅ Completed</span>
+                <span className="text-[10px] text-purple-400 font-semibold">✅ Completed</span>
                 <ul className="ml-3">
                   {latestSnapshot.completed.slice(0, 5).map((item, i) => (
                     <li key={i} className="text-[11px] text-th-text-muted truncate">
@@ -697,7 +697,7 @@ export function OverviewPage({ api, ws }: Props) {
                 )}
                 {selectedProject.latestSnapshot.completed.length > 0 && (
                   <div>
-                    <span className="text-[10px] uppercase tracking-wider text-green-400 font-medium">✅ Completed ({selectedProject.latestSnapshot.completed.length})</span>
+                    <span className="text-[10px] uppercase tracking-wider text-purple-400 font-medium">✅ Completed ({selectedProject.latestSnapshot.completed.length})</span>
                     <ul className="mt-1 space-y-0.5">
                       {selectedProject.latestSnapshot.completed.map((item, i) => (
                         <li key={i} className="text-xs text-th-text-alt">• {item}</li>

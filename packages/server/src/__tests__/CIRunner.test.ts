@@ -74,7 +74,7 @@ describe('CIRunner', () => {
       entry: {
         id: 1, agentId: 'dev-001', agentRole: 'developer',
         actionType: 'file_edit', summary: 'some file edit',
-        details: {}, timestamp: new Date().toISOString(),
+        details: {}, timestamp: new Date().toISOString(), projectId: '',
       },
       meta: { shouldRunTests: true },
     });
@@ -90,7 +90,7 @@ describe('CIRunner', () => {
       entry: {
         id: 2, agentId: 'dev-001', agentRole: 'developer',
         actionType: 'file_edit', summary: 'Commit: fix tests',
-        details: { type: 'commit' }, timestamp: new Date().toISOString(),
+        details: { type: 'commit' }, timestamp: new Date().toISOString(), projectId: '',
       },
       meta: {},
     });
@@ -106,7 +106,7 @@ describe('CIRunner', () => {
       entry: {
         id: 3, agentId: 'dev-001', agentRole: 'developer',
         actionType: 'file_edit', summary: 'edited config.ts',
-        details: {}, timestamp: new Date().toISOString(),
+        details: {}, timestamp: new Date().toISOString(), projectId: '',
       },
       meta: {},
     });

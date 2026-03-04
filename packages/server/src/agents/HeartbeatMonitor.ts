@@ -1,5 +1,4 @@
 import type { Agent } from './Agent.js';
-import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { logger } from '../utils/logger.js';
 
@@ -8,10 +7,17 @@ export interface DagSummary {
   failed: number; blocked: number; paused: number; skipped: number;
 }
 
+export interface RemainingTask {
+  id: string;
+  description: string;
+  dagStatus: string;
+}
+
 export interface HeartbeatContext {
   getAllAgents(): Agent[];
   getDelegationsMap(): Map<string, Delegation>;
   getDagSummary(leadId: string): DagSummary | null;
+  getRemainingTasks(leadId: string): RemainingTask[];
   getTaskByAgent(leadId: string, agentId: string): { id: string; dagStatus: string } | null;
   emit(event: string, ...args: any[]): void;
 }
@@ -63,6 +69,16 @@ export class HeartbeatMonitor {
     this.humanInterrupted.add(agentId);
   }
 
+  /**
+   * Backoff: nudges 1-3 fire every cycle, 4-6 every 2nd cycle, 7+ every 3rd cycle.
+   * Returns true if this cycle should be skipped (no nudge sent).
+   */
+  shouldSkipNudge(nudgeCount: number): boolean {
+    if (nudgeCount <= 3) return false;
+    if (nudgeCount <= 6) return nudgeCount % 2 !== 0;
+    return nudgeCount % 3 !== 0;
+  }
+
   /** Periodic heartbeat check: detect stalled teams and nudge the lead */
   private check(): void {
     const leads = this.ctx.getAllAgents().filter((a) => a.role.id === 'lead' && a.status === 'idle');
@@ -104,19 +120,32 @@ export class HeartbeatMonitor {
       // If no active delegations AND no remaining DAG tasks, work is truly done
       if (activeDelegations.length === 0 && remainingDagTasks === 0) continue;
 
-      // All children are idle/completed but there is remaining work — team is stalled
-      const idleChildren = children.filter((a) => a.status === 'idle');
-      const completedChildren = children.filter((a) => isTerminalStatus(a.status));
-
+      // All children are idle/completed but there is remaining work — nudge the lead
       const nudgeCount = (this.leadNudgeCount.get(lead.id) ?? 0) + 1;
       this.leadNudgeCount.set(lead.id, nudgeCount);
 
-      const roster = children.map((c) => `  - ${c.role.name} (${c.id.slice(0, 8)}): ${c.status}`).join('\n');
+      // Escalate after 5+ consecutive check cycles (fires regardless of backoff)
+      if (nudgeCount >= 5) {
+        logger.warn('lead', `Lead ${lead.id.slice(0, 8)} unresponsive after ${nudgeCount} reminders`);
+        this.ctx.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
+      }
 
-      // Build context-aware nudge message
+      // Backoff: skip nudge message based on count to reduce noise
+      if (this.shouldSkipNudge(nudgeCount)) continue;
+
+      // Build actionable nudge message
       const parts: string[] = [];
-      parts.push(`[System Heartbeat] Your team appears stalled — you've been idle for ${Math.floor(idleDuration / 1000)}s.`);
-      parts.push(`${idleChildren.length} agents idle, ${completedChildren.length} completed/failed.`);
+      const totalRemaining = remainingDagTasks + activeDelegations.length;
+      const dagDetails: string[] = [];
+      if (dagSummary) {
+        if (dagSummary.ready > 0) dagDetails.push(`${dagSummary.ready} ready`);
+        if (dagSummary.pending > 0) dagDetails.push(`${dagSummary.pending} pending`);
+        if (dagSummary.blocked > 0) dagDetails.push(`${dagSummary.blocked} blocked`);
+        if (dagSummary.paused > 0) dagDetails.push(`${dagSummary.paused} paused`);
+      }
+      const statusSuffix = dagDetails.length > 0 ? ` (${dagDetails.join(', ')})` : '';
+      parts.push(`[System] Reminder: ${totalRemaining} tasks remaining${statusSuffix}.`);
+
       if (activeDelegations.length > 0) {
         parts.push(`${activeDelegations.length} active delegations still pending.`);
         if (remainingDagTasks > 0) {
@@ -128,19 +157,22 @@ export class HeartbeatMonitor {
           }
         }
       }
-      if (remainingDagTasks > 0 && dagSummary) {
-        const dagDetails: string[] = [];
-        if (dagSummary.ready > 0) dagDetails.push(`${dagSummary.ready} ready`);
-        if (dagSummary.pending > 0) dagDetails.push(`${dagSummary.pending} pending`);
-        if (dagSummary.blocked > 0) dagDetails.push(`${dagSummary.blocked} blocked`);
-        if (dagSummary.paused > 0) dagDetails.push(`${dagSummary.paused} paused`);
-        parts.push(`DAG tasks remaining: ${dagDetails.join(', ')}.`);
-      }
-      parts.push(`\nTeam status:\n${roster}`);
-      parts.push(`\nPlease review agent reports and continue: delegate ready tasks, unblock blocked tasks, or report final results to the user.`);
-      const nudge = parts.join(' ');
 
-      logger.warn('lead', `Heartbeat nudge #${nudgeCount} → ${lead.role.name} (${lead.id.slice(0, 8)}): idle ${Math.floor(idleDuration / 1000)}s, ${children.length} children`);
+      // List remaining tasks (up to 8)
+      const remaining = this.ctx.getRemainingTasks(lead.id);
+      if (remaining.length > 0) {
+        const shown = remaining.slice(0, 8);
+        const taskLines = shown.map(t => `  - ${t.id}: ${t.description.slice(0, 60)}${t.description.length > 60 ? '…' : ''} (${t.dagStatus})`);
+        parts.push('\n' + taskLines.join('\n'));
+        if (remaining.length > 8) {
+          parts.push(`  ... and ${remaining.length - 8} more`);
+        }
+      }
+
+      parts.push('\nUse DELEGATE to assign ready tasks, QUERY_CREW to check agents, or HALT_HEARTBEAT to pause reminders.');
+      const nudge = parts.join('\n');
+
+      logger.info('lead', `Heartbeat reminder #${nudgeCount} → ${lead.role.name} (${lead.id.slice(0, 8)}): idle ${Math.floor(idleDuration / 1000)}s`);
       lead.sendMessage(nudge);
 
       this.ctx.emit('agent:message_sent', {
@@ -150,12 +182,6 @@ export class HeartbeatMonitor {
         toRole: lead.role.name,
         content: nudge,
       });
-
-      // Escalate after 2 consecutive nudges
-      if (nudgeCount >= 2) {
-        logger.error('lead', `Lead ${lead.id.slice(0, 8)} stalled after ${nudgeCount} nudges`);
-        this.ctx.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
-      }
     }
   }
 }

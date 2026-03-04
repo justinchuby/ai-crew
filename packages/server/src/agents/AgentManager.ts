@@ -139,6 +139,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
+      getProjectIdForAgent: (agentId) => this.getProjectIdForAgent(agentId),
       getRunningCount: () => this.getRunningCount(),
       spawnAgent: (role, task, parentId, autopilot, model, cwd, options) => this.spawn(role, task, parentId, autopilot, model, cwd, undefined, undefined, options),
       terminateAgent: (id) => this.terminate(id),
@@ -177,6 +178,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           return this.taskDAG.getTaskByAgent(leadId, agentId);
         } catch {
           return null;
+        }
+      },
+      getRemainingTasks: (leadId: string) => {
+        try {
+          const { tasks } = this.taskDAG.getStatus(leadId);
+          return tasks
+            .filter(t => ['pending', 'ready', 'blocked', 'paused'].includes(t.dagStatus))
+            .map(t => ({ id: t.id, description: t.description, dagStatus: t.dagStatus }));
+        } catch {
+          return [];
         }
       },
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
@@ -260,6 +271,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       const parent = this.agents.get(parentId);
       if (parent && !parent.childIds.includes(agent.id)) {
         parent.childIds.push(agent.id);
+      }
+      // Inherit projectId from parent if not explicitly set
+      if (!agent.projectId && parent) {
+        const parentProjectId = this.getProjectIdForAgent(parentId);
+        if (parentProjectId) {
+          agent.projectId = parentProjectId;
+        }
       }
     }
 
@@ -363,7 +381,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
-      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`);
+      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
       // Flush buffered messages on turn boundaries
       if (status === 'idle' || isTerminalStatus(status)) {
         this.flushAgentMessage(agent.id);
@@ -440,7 +458,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const crashKey = `${agentRole}:${agent.task ?? ''}`;
 
         logger.error('agent', `Crashed ${agent.role.name} (${agent.id.slice(0, 8)}) exit=${code}`, { crashKey });
-        this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`);
+        this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         this.emit('agent:crashed', { agentId: agent.id, code });
 
         const count = (this.crashCounts.get(crashKey) ?? 0) + 1;
@@ -627,6 +645,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return Array.from(this.agents.values());
   }
 
+  /** Return only agents belonging to a specific project */
+  getByProject(projectId: string): Agent[] {
+    return this.getAll().filter(a => this.getProjectIdForAgent(a.id) === projectId);
+  }
+
+  /** Resolve the projectId for a given agent, walking up the parent chain if needed */
+  getProjectIdForAgent(agentId: string): string | undefined {
+    const agent = this.agents.get(agentId);
+    if (!agent) return undefined;
+    if (agent.projectId) return agent.projectId;
+    if (agent.parentId) {
+      return this.getProjectIdForAgent(agent.parentId);
+    }
+    return undefined;
+  }
+
   /** Auto-spawn a Secretary agent as a child of the given lead. Returns the secretary or null. */
   autoSpawnSecretary(leadAgent: Agent): Agent | null {
     // Only for root leads (sub-leads don't get auto-secretary)
@@ -670,6 +704,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /** Count agents that are alive (running, idle, or creating) — used for concurrency limit */
   getRunningCount(): number {
     return this.getAll().filter((a) => a.status === 'running' || a.status === 'creating' || a.status === 'idle').length;
+  }
+
+  /** Count alive agents belonging to a specific project */
+  getRunningCountByProject(projectId: string): number {
+    return this.getByProject(projectId).filter(
+      (a) => a.status === 'running' || a.status === 'creating' || a.status === 'idle',
+    ).length;
   }
 
   restart(id: string): Agent | null {

@@ -416,7 +416,10 @@ export function servicesRoutes(ctx: AppContext): Router {
 
     // Optional leadId filter; defaults to first running lead
     const leadId = req.query.leadId as string | undefined;
-    const allAgents = agentManager.getAll();
+    const projectId = req.query.projectId as string | undefined;
+    const allAgents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
     const lead = leadId
       ? allAgents.find(a => a.id === leadId)
       : allAgents.find(a => a.role?.id === 'lead');

@@ -84,8 +84,12 @@ export function leadRoutes(ctx: AppContext): Router {
     }
   });
 
-  router.get('/lead', (_req, res) => {
-    const leads = agentManager.getAll()
+  router.get('/lead', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const allAgents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
+    const leads = allAgents
       .filter((a) => a.role.id === 'lead' && !a.parentId)
       .map((a) => a.toJSON());
     res.json(leads);
@@ -109,7 +113,7 @@ export function leadRoutes(ctx: AppContext): Router {
     // Persist human message to conversation history
     agentManager.persistHumanMessage(agent.id, text);
 
-    const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`;
+    const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. Start your response with @user on its own line. The user is waiting for your reply.`;
 
     if (mode === 'queue') {
       logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
@@ -267,6 +271,58 @@ export function leadRoutes(ctx: AppContext): Router {
       remainingMs: t.status === 'pending' ? Math.max(0, t.fireAt - Date.now()) : 0,
     }));
     res.json(timers);
+  });
+
+  router.post('/timers', (req, res) => {
+    const registry = agentManager.getTimerRegistry();
+    if (!registry) return res.status(503).json({ error: 'Timer system not available' });
+
+    const { agentId, label, message, delaySeconds, repeat } = req.body;
+    if (!agentId || typeof agentId !== 'string') {
+      return res.status(400).json({ error: 'agentId is required' });
+    }
+    if (!label || typeof label !== 'string') {
+      return res.status(400).json({ error: 'label is required' });
+    }
+    if (typeof delaySeconds !== 'number' || delaySeconds <= 0 || delaySeconds > 86400) {
+      return res.status(400).json({ error: 'delaySeconds must be a number between 1 and 86400' });
+    }
+
+    const agent = agentManager.get(agentId);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+    // Project scoping: if projectId provided, verify agent belongs to that project
+    const { projectId } = req.body;
+    if (projectId && typeof projectId === 'string') {
+      const agentProjectId = agentManager.getProjectIdForAgent(agentId);
+      if (agentProjectId && agentProjectId !== projectId) {
+        return res.status(403).json({ error: 'Agent does not belong to this project' });
+      }
+    }
+
+    const timer = registry.create(
+      agentId,
+      { label, message: message || '', delaySeconds, repeat: !!repeat },
+      agent.role.id,
+      agent.parentId ?? null,
+    );
+    if (!timer) {
+      return res.status(429).json({ error: 'Timer limit reached for this agent (max 20)' });
+    }
+
+    res.status(201).json({
+      id: timer.id,
+      agentId: timer.agentId,
+      agentRole: timer.agentRole,
+      label: timer.label,
+      message: timer.message,
+      fireAt: timer.fireAt,
+      createdAt: timer.createdAt,
+      status: timer.status,
+      repeat: timer.repeat,
+      delaySeconds: timer.delaySeconds,
+      remainingMs: Math.max(0, timer.fireAt - Date.now()),
+    });
   });
 
   router.delete('/timers/:timerId', (req, res) => {

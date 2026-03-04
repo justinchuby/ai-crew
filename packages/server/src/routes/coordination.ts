@@ -9,23 +9,29 @@ export function coordinationRoutes(ctx: AppContext): Router {
   const router = Router();
 
   // --- Coordination ---
-  router.get('/coordination/status', (_req, res) => {
+  router.get('/coordination/status', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const agents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
     res.json({
-      agents: agentManager.getAll().map((a) => a.toJSON()),
-      locks: lockRegistry.getAll(),
-      recentActivity: activityLedger.getRecent(20),
+      agents: agents.map((a) => a.toJSON()),
+      locks: projectId ? lockRegistry.getByProject(projectId) : lockRegistry.getAll(),
+      recentActivity: activityLedger.getRecent(20, projectId),
     });
   });
 
-  router.get('/coordination/locks', (_req, res) => {
-    res.json(lockRegistry.getAll());
+  router.get('/coordination/locks', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    res.json(projectId ? lockRegistry.getByProject(projectId) : lockRegistry.getAll());
   });
 
   router.post('/coordination/locks', validateBody(acquireLockSchema), (req, res) => {
     const { agentId, filePath, reason } = req.body;
     const agent = agentManager.get(agentId);
     const agentRole = agent?.role?.id ?? 'unknown';
-    const result = lockRegistry.acquire(agentId, agentRole, filePath, reason);
+    const projectId = agent ? agentManager.getProjectIdForAgent(agentId) ?? '' : '';
+    const result = lockRegistry.acquire(agentId, agentRole, filePath, reason, 300, projectId);
     if (result.ok) {
       res.status(201).json({ ok: true });
     } else {
@@ -44,21 +50,46 @@ export function coordinationRoutes(ctx: AppContext): Router {
   });
 
   router.get('/coordination/activity', (req, res) => {
-    const { agentId, type, limit, since } = req.query;
+    const { agentId, type, limit, since, projectId } = req.query;
     const limitNum = limit ? Number(limit) : 50;
+    const pid = projectId as string | undefined;
+    let activities;
     if (since) {
-      res.json(activityLedger.getSince(since as string));
+      activities = activityLedger.getSince(since as string, pid);
     } else if (agentId) {
-      res.json(activityLedger.getByAgent(agentId as string, limitNum));
+      activities = activityLedger.getByAgent(agentId as string, limitNum, pid);
     } else if (type) {
-      res.json(activityLedger.getByType(type as ActionType, limitNum));
+      activities = activityLedger.getByType(type as ActionType, limitNum, pid);
     } else {
-      res.json(activityLedger.getRecent(limitNum));
+      activities = activityLedger.getRecent(limitNum, pid);
     }
+    res.json(activities);
   });
 
-  router.get('/coordination/summary', (_req, res) => {
-    res.json(activityLedger.getSummary());
+  router.get('/coordination/summary', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    if (projectId) {
+      const projectAgentIds = new Set(
+        agentManager.getByProject(projectId).map(a => a.id),
+      );
+      const full = activityLedger.getSummary();
+      // Filter summary entries to only include project agents
+      const filtered: Record<string, any> = {};
+      for (const [key, value] of Object.entries(full)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const scoped: Record<string, any> = {};
+          for (const [agentId, data] of Object.entries(value as Record<string, any>)) {
+            if (projectAgentIds.has(agentId)) scoped[agentId] = data;
+          }
+          filtered[key] = scoped;
+        } else {
+          filtered[key] = value;
+        }
+      }
+      res.json(filtered);
+    } else {
+      res.json(activityLedger.getSummary());
+    }
   });
 
   // ── Helper: build timeline data from activity events ──────────────────────

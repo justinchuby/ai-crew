@@ -18,6 +18,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
   return {
     getAgent: vi.fn(),
     getAllAgents: vi.fn().mockReturnValue([]),
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
     emit: vi.fn(),
     activityLedger: { log: vi.fn() },
     messageBus: { send: vi.fn() },
@@ -58,6 +59,7 @@ describe('INTERRUPT command', () => {
       'lead-001', 'lead', 'agent_interrupted',
       expect.stringContaining('Switch to task X'),
       expect.objectContaining({ toAgentId: 'child-001' }),
+      expect.any(String),
     );
     expect(ctx.emit).toHaveBeenCalledWith('agent:interrupted', expect.objectContaining({
       from: 'lead-001', to: 'child-001',

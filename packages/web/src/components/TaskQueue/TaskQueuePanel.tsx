@@ -325,7 +325,7 @@ export function TaskQueuePanel({ api }: Props) {
                     {currentTab.project.sessions.slice(0, 5).map(s => (
                       <div key={s.id} className="flex items-center gap-2 text-xs text-th-text-muted">
                         <span className={`w-1.5 h-1.5 rounded-full ${
-                          s.status === 'completed' ? 'bg-green-500' :
+                          s.status === 'completed' ? 'bg-purple-500' :
                           s.status === 'crashed' ? 'bg-red-500' : 'bg-gray-500'
                         }`} />
                         <span>{s.task?.slice(0, 60) || 'No task'}</span>

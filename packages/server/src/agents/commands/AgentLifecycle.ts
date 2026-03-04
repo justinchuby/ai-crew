@@ -10,6 +10,7 @@ import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   createAgentSchema,
@@ -31,10 +32,10 @@ const CANCEL_DELEGATION_REGEX = /⟦⟦\s*CANCEL_DELEGATION\s*(\{.*?\})\s*⟧⟧
 export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: SPAWN_REQUEST_REGEX, name: 'SPAWN', handler: (a, d) => handleSpawnRequest(ctx, a, d) },
-    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d) },
-    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d) },
-    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d) },
-    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d) },
+    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d), help: { description: 'Spawn a new agent with a role and task', example: 'CREATE_AGENT {"role": "developer", "task": "implement feature X"}', category: 'Agent Lifecycle', args: deriveArgs(createAgentSchema) } },
+    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d), help: { description: 'Delegate a task to an existing agent', example: 'DELEGATE {"to": "agent-id", "task": "do something"}', category: 'Agent Lifecycle', args: deriveArgs(delegateSchema) } },
+    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"agentId": "agent-id"}', category: 'Agent Lifecycle', args: deriveArgs(terminateAgentSchema) } },
+    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle', args: deriveArgs(cancelDelegationSchema) } },
   ];
 }
 
@@ -116,7 +117,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
           dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
         } else {
           // Auto-create DAG task for untracked delegation
-          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id, req.depends_on);
+          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id, req.dependsOn);
           if (autoResult.linked) {
             dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]`;
             child.dagTaskId = autoResult.taskId;
@@ -147,12 +148,12 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       });
       ctx.activityLedger.log(child.id, role.id, 'message_sent', `Created & delegated ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
       ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
       ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
         toAgentId: child.id, toRole: role.id, childId: child.id, childRole: role.id, delegationId: delegation.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
     } else {
       const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''} — ready for tasks.`;
       agent.sendMessage(ackMsg);
@@ -163,7 +164,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       });
       ctx.activityLedger.log(child.id, role.id, 'message_sent', `Agent created ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
     }
 
     ctx.agentMemory.store(agent.id, child.id, 'role', role.name);
@@ -264,7 +265,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
         dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
       } else {
         // Auto-create DAG task for untracked delegation
-        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id, req.depends_on);
+        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id, req.dependsOn);
         if (autoResult.linked) {
           dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]`;
           child.dagTaskId = autoResult.taskId;
@@ -303,11 +304,11 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     });
     ctx.activityLedger.log(child.id, child.role.id, 'message_sent', `Delegation ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
       toAgentId: agent.id, toRole: agent.role.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 100)}`, {
       toAgentId: child.id, toRole: child.role.id, childId: child.id, childRole: child.role.id, delegationId: delegation.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
@@ -333,12 +334,12 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
 
     const allAgents = ctx.getAllAgents();
     const target = allAgents.find((a) =>
-      (a.id === req.id || a.id.startsWith(req.id)) &&
+      (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
       a.id !== agent.id
     );
 
     if (!target) {
-      agent.sendMessage(`[System] Agent not found: ${req.id}. Use QUERY_CREW to see available agents.`);
+      agent.sendMessage(`[System] Agent not found: ${req.agentId}. Use QUERY_CREW to see available agents.`);
       return;
     }
 
@@ -361,7 +362,7 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
       terminatedAgentId: target.id,
       terminatedRole: target.role.id,
       sessionId: sessionId || null,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     logger.info('agent', `Lead ${agent.id.slice(0, 8)} terminated ${roleName} (${shortId})${req.reason ? ': ' + req.reason : ''}`);
   } catch (err) {
@@ -415,7 +416,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         targetAgentId: targetId,
         cancelledDelegations: cancelledCount,
         clearedMessages: cleared.count,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
       logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}), cleared ${cleared.count} queued message(s)`);
 
@@ -447,7 +448,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         delegationId: req.delegationId,
         targetAgentId: del.toAgentId,
         clearedMessages: cleared.count,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
       logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled delegation ${req.delegationId} to ${del.toRole} (${del.toAgentId.slice(0, 8)})`);
 
@@ -514,7 +515,7 @@ interface AutoCreateResult {
 /**
  * Auto-create a DAG task for an untracked delegation.
  * Applies 3-tier dependency inference:
- *   Tier 1: Explicit depends_on from payload
+ *   Tier 1: Explicit dependsOn from payload
  *   Tier 2: Review role inference (code-reviewer, critical-reviewer)
  *   Tier 3: Natural language parsing ("after X finishes", "once Y reports")
  */
@@ -555,7 +556,7 @@ function autoCreateDagTask(
   let autoTask;
   try {
     autoTask = ctx.taskDAG.addTask(leadId, {
-      id: autoId,
+      taskId: autoId,
       role,
       title: taskText.slice(0, 120),
       description: taskText,
@@ -571,7 +572,7 @@ function autoCreateDagTask(
   }
 
   // ── Dependency inference (Tier 1 + Tier 2, synchronous) ──
-  // Tier 1: Explicit depends_on from payload
+  // Tier 1: Explicit dependsOn from payload
   const tier1 = explicitDeps || [];
 
   // Tier 2: Review role inference
@@ -696,7 +697,7 @@ export function requestSecretaryDependencyAnalysis(
     `Description: ${taskDescription.slice(0, 500)}\n\n` +
     `Active tasks:\n${activeTasks}\n\n` +
     `Does "${newTaskId}" depend on any of these tasks? ` +
-    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "depends_on": ["task-id-here"]} ⟧⟧. ` +
+    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
     `If no dependencies, ignore this message.`
   );
   logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);

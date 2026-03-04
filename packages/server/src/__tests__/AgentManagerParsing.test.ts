@@ -215,29 +215,29 @@ describe('AgentManager output parsing regexes', () => {
 
   describe('DECLARE_TASKS_REGEX', () => {
     it('matches a single-line DECLARE_TASKS command', () => {
-      const input = '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "a", "role": "developer"}]} ⟧⟧';
+      const input = '⟦⟦ DECLARE_TASKS {"tasks": [{"taskId": "a", "role": "developer"}]} ⟧⟧';
       const match = input.match(DECLARE_TASKS_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
       expect(parsed.tasks).toHaveLength(1);
-      expect(parsed.tasks[0].id).toBe('a');
+      expect(parsed.tasks[0].taskId).toBe('a');
     });
 
     it('matches a multi-line DECLARE_TASKS with nested task objects', () => {
       const input = `⟦⟦ DECLARE_TASKS {"tasks": [
-  {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"]},
-  {"id": "dead-fields", "role": "developer", "depends_on": ["rope-config"]}
+  {"taskId": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"]},
+  {"taskId": "dead-fields", "role": "developer", "dependsOn": ["rope-config"]}
 ]} ⟧⟧`;
       const match = input.match(DECLARE_TASKS_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
       expect(parsed.tasks).toHaveLength(2);
       expect(parsed.tasks[0].files).toEqual(['src/_configs.py']);
-      expect(parsed.tasks[1].depends_on).toEqual(['rope-config']);
+      expect(parsed.tasks[1].dependsOn).toEqual(['rope-config']);
     });
 
     it('does not match without closing ⟧⟧', () => {
-      const input = '⟦⟦ DECLARE_TASKS {"tasks": [{"id": "a", "role": "dev"}]}';
+      const input = '⟦⟦ DECLARE_TASKS {"tasks": [{"taskId": "a", "role": "dev"}]}';
       expect(input.match(DECLARE_TASKS_REGEX)).toBeNull();
     });
 
@@ -265,49 +265,49 @@ describe('AgentManager output parsing regexes', () => {
 
   describe('PAUSE_TASK_REGEX', () => {
     it('matches a valid PAUSE_TASK command', () => {
-      const input = '⟦⟦ PAUSE_TASK {"id": "rope-config"} ⟧⟧';
+      const input = '⟦⟦ PAUSE_TASK {"taskId": "rope-config"} ⟧⟧';
       const match = input.match(PAUSE_TASK_REGEX);
       expect(match).not.toBeNull();
-      expect(JSON.parse(match![1]).id).toBe('rope-config');
+      expect(JSON.parse(match![1]).taskId).toBe('rope-config');
     });
   });
 
   describe('RETRY_TASK_REGEX', () => {
     it('matches a valid RETRY_TASK command', () => {
-      const input = '⟦⟦ RETRY_TASK {"id": "failed-task"} ⟧⟧';
+      const input = '⟦⟦ RETRY_TASK {"taskId": "failed-task"} ⟧⟧';
       const match = input.match(RETRY_TASK_REGEX);
       expect(match).not.toBeNull();
-      expect(JSON.parse(match![1]).id).toBe('failed-task');
+      expect(JSON.parse(match![1]).taskId).toBe('failed-task');
     });
   });
 
   describe('SKIP_TASK_REGEX', () => {
     it('matches a valid SKIP_TASK command', () => {
-      const input = '⟦⟦ SKIP_TASK {"id": "optional-task"} ⟧⟧';
+      const input = '⟦⟦ SKIP_TASK {"taskId": "optional-task"} ⟧⟧';
       const match = input.match(SKIP_TASK_REGEX);
       expect(match).not.toBeNull();
-      expect(JSON.parse(match![1]).id).toBe('optional-task');
+      expect(JSON.parse(match![1]).taskId).toBe('optional-task');
     });
   });
 
   describe('ADD_TASK_REGEX', () => {
     it('matches a valid ADD_TASK command', () => {
-      const input = '⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing"]} ⟧⟧';
+      const input = '⟦⟦ ADD_TASK {"taskId": "new-task", "role": "developer", "dependsOn": ["existing"]} ⟧⟧';
       const match = input.match(ADD_TASK_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
-      expect(parsed.id).toBe('new-task');
+      expect(parsed.taskId).toBe('new-task');
       expect(parsed.role).toBe('developer');
-      expect(parsed.depends_on).toEqual(['existing']);
+      expect(parsed.dependsOn).toEqual(['existing']);
     });
   });
 
   describe('CANCEL_TASK_REGEX', () => {
     it('matches a valid CANCEL_TASK command', () => {
-      const input = '⟦⟦ CANCEL_TASK {"id": "unwanted-task"} ⟧⟧';
+      const input = '⟦⟦ CANCEL_TASK {"taskId": "unwanted-task"} ⟧⟧';
       const match = input.match(CANCEL_TASK_REGEX);
       expect(match).not.toBeNull();
-      expect(JSON.parse(match![1]).id).toBe('unwanted-task');
+      expect(JSON.parse(match![1]).taskId).toBe('unwanted-task');
     });
   });
 
@@ -315,11 +315,11 @@ describe('AgentManager output parsing regexes', () => {
     it('each DAG regex only matches its own command', () => {
       const declare = '⟦⟦ DECLARE_TASKS {"tasks": []} ⟧⟧';
       const status = '⟦⟦ TASK_STATUS ⟧⟧';
-      const pause = '⟦⟦ PAUSE_TASK {"id": "a"} ⟧⟧';
-      const retry = '⟦⟦ RETRY_TASK {"id": "a"} ⟧⟧';
-      const skip = '⟦⟦ SKIP_TASK {"id": "a"} ⟧⟧';
-      const add = '⟦⟦ ADD_TASK {"id": "a", "role": "dev"} ⟧⟧';
-      const cancel = '⟦⟦ CANCEL_TASK {"id": "a"} ⟧⟧';
+      const pause = '⟦⟦ PAUSE_TASK {"taskId": "a"} ⟧⟧';
+      const retry = '⟦⟦ RETRY_TASK {"taskId": "a"} ⟧⟧';
+      const skip = '⟦⟦ SKIP_TASK {"taskId": "a"} ⟧⟧';
+      const add = '⟦⟦ ADD_TASK {"taskId": "a", "role": "dev"} ⟧⟧';
+      const cancel = '⟦⟦ CANCEL_TASK {"taskId": "a"} ⟧⟧';
 
       // DECLARE_TASKS only matches declare
       expect(declare.match(DECLARE_TASKS_REGEX)).not.toBeNull();

@@ -9,6 +9,7 @@ import { logger } from '../../utils/logger.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   lockFileSchema,
@@ -40,12 +41,13 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
     const request = parseCommandPayload(agent, match[1], lockFileSchema, 'LOCK_FILE');
     if (!request) return;
     const agentRole = agent.role?.id ?? 'unknown';
-    const result = ctx.lockRegistry.acquire(agent.id, agentRole, request.filePath, request.reason);
+    const projectId = ctx.getProjectIdForAgent(agent.id) ?? '';
+    const result = ctx.lockRegistry.acquire(agent.id, agentRole, request.filePath, request.reason, 300, projectId);
     if (result.ok) {
       ctx.activityLedger.log(agent.id, agentRole, 'lock_acquired', `Locked ${request.filePath}`, {
         filePath: request.filePath,
         reason: request.reason,
-      });
+      }, projectId);
       agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with ⟦⟦ UNLOCK_FILE {"filePath": "${request.filePath}"} ⟧⟧`);
     } else {
       const holderShort = result.holder?.slice(0, 8) ?? 'unknown';
@@ -53,7 +55,7 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
       ctx.activityLedger.log(agent.id, agentRole, 'lock_denied', `Lock denied on ${request.filePath} (held by ${holderShort})`, {
         filePath: request.filePath,
         holder: result.holder,
-      });
+      }, projectId);
     }
   } catch (err) {
     logger.debug('command', 'Failed to parse LOCK_FILE command', { error: (err as Error).message });
@@ -92,7 +94,7 @@ function releaseLock(ctx: CommandHandlerContext, agent: Agent, filePath: string)
   const released = ctx.lockRegistry.release(agent.id, filePath);
   if (released) {
     const agentRole = agent.role?.id ?? 'unknown';
-    ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${filePath}`, { filePath });
+    ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${filePath}`, { filePath }, ctx.getProjectIdForAgent(agent.id) ?? '');
     agent.sendMessage(`[System] Lock released on \`${filePath}\`.`);
   }
 }
@@ -111,6 +113,7 @@ function handleActivity(ctx: CommandHandlerContext, agent: Agent, data: string):
       entry.actionType ?? 'message_sent' as any,
       entry.summary ?? '',
       entry.details ?? {},
+      ctx.getProjectIdForAgent(agent.id) ?? '',
     );
   } catch (err) {
     logger.debug('command', 'Failed to parse ACTIVITY command', { error: (err as Error).message });
@@ -270,6 +273,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
         ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'file_edit',
           `Commit: ${message.slice(0, 120)} (${files.length} files)`,
           { type: 'commit', files, message },
+          ctx.getProjectIdForAgent(agent.id) ?? '',
         );
         logger.info('commit', `COMMIT for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
       })
@@ -286,11 +290,11 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
 export function getCoordCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d) },
-    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d) },
-    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d) },
-    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d) },
-    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d) },
-    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d) },
+    { regex: LOCK_REQUEST_REGEX, name: 'LOCK_FILE', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: deriveArgs(lockFileSchema) } },
+    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK_FILE', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: deriveArgs(unlockFileSchema) } },
+    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"actionType": "milestone", "summary": "phase 1 complete"}', category: 'Coordination', args: deriveArgs(activitySchema) } },
+    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d), help: { description: 'Record an architectural decision', example: 'DECISION {"title": "Use React", "rationale": "team expertise"}', category: 'Coordination', args: deriveArgs(decisionSchema) } },
+    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d), help: { description: 'Report progress on current work', example: 'PROGRESS {"summary": "50% complete"}', category: 'Coordination', args: deriveArgs(progressSchema) } },
+    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d), help: { description: 'Commit locked files', example: 'COMMIT {"message": "feat: add new feature"}', category: 'Coordination', args: deriveArgs(commitSchema) } },
   ];
 }

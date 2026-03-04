@@ -6,11 +6,11 @@ import type { ActivityLedger } from './ActivityLedger.js';
 import { SynthesisEngine } from './SynthesisEngine.js';
 import { SmartActivityFilter } from './SmartActivityFilter.js';
 
-/** Interval for periodic status updates during active work (ms) */
-const ACTIVE_UPDATE_INTERVAL_MS = 30_000;
-
-/** Interval for periodic status updates during idle periods (ms) */
-const IDLE_UPDATE_INTERVAL_MS = 120_000;
+/**
+ * Periodic update interval when sub-leads are active (ms).
+ * Only used when the project has sub-leads who can CREATE_AGENT autonomously.
+ */
+const SUB_LEAD_UPDATE_INTERVAL_MS = 180_000;
 
 export class ContextRefresher {
   private agentManager: AgentManager;
@@ -22,7 +22,7 @@ export class ContextRefresher {
   private periodicHandle: ReturnType<typeof setTimeout> | null = null;
   private boundRefresh: () => void;
   private boundCompacted: (data: { agentId: string }) => void;
-  private currentIntervalMs: number = ACTIVE_UPDATE_INTERVAL_MS;
+  private currentIntervalMs: number = SUB_LEAD_UPDATE_INTERVAL_MS;
   private running: boolean = false;
 
   constructor(
@@ -40,12 +40,8 @@ export class ContextRefresher {
     this.boundRefresh = () => this.scheduleRefresh();
     this.boundCompacted = (data) => this.refreshOne(data.agentId);
 
-    // Listen to significant events with debounce
+    // Notify lead when new agents appear (sub-leads can CREATE_AGENT independently)
     this.agentManager.on('agent:spawned', this.boundRefresh);
-    this.agentManager.on('agent:terminated', this.boundRefresh);
-    this.agentManager.on('agent:exit', this.boundRefresh);
-    this.lockRegistry.on('lock:acquired', this.boundRefresh);
-    this.lockRegistry.on('lock:released', this.boundRefresh);
 
     // Re-inject crew context immediately after Copilot CLI compacts an agent's context
     this.agentManager.on('agent:context_compacted', this.boundCompacted);
@@ -61,10 +57,6 @@ export class ContextRefresher {
     this.running = false;
     // Remove event listeners to prevent leaks
     this.agentManager.off('agent:spawned', this.boundRefresh);
-    this.agentManager.off('agent:terminated', this.boundRefresh);
-    this.agentManager.off('agent:exit', this.boundRefresh);
-    this.lockRegistry.off('lock:acquired', this.boundRefresh);
-    this.lockRegistry.off('lock:released', this.boundRefresh);
     this.agentManager.off('agent:context_compacted', this.boundCompacted);
 
     if (this.debounceHandle) {
@@ -79,15 +71,18 @@ export class ContextRefresher {
 
   refreshAll(): void {
     const peers = this.buildPeerList();
-    const recentActivity = this.buildRecentActivity();
+    const lockSection = this.buildFileLockSection();
+    const alerts = this.buildAlerts(peers);
+    const lockActivity = this.buildLockActivity();
 
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
+      if (!agent.role.receivesStatusUpdates) continue;
       const otherPeers = peers.filter((p) => p.id !== agent.id);
-      const healthHeader = agent.role.receivesStatusUpdates
-        ? this.buildHealthHeader(agent.id, agent.role.id !== 'lead')
-        : undefined;
-      agent.injectContextUpdate(otherPeers, recentActivity, healthHeader);
+      const isSecretary = agent.role.id === 'secretary';
+      const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
+      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
+      agent.injectContextUpdate(otherPeers, [], `${healthHeader}\n${lockSection}${extra}`, alerts);
     }
   }
 
@@ -95,12 +90,13 @@ export class ContextRefresher {
     const agent = this.agentManager.get(agentId);
     if (!agent || agent.status !== 'running') return;
 
-    const peers = this.buildPeerList().filter((p) => p.id !== agentId);
-    const recentActivity = this.buildRecentActivity();
+    const peers = this.buildPeerList();
+    const otherPeers = peers.filter((p) => p.id !== agentId);
+    const alerts = this.buildAlerts(peers);
     const healthHeader = agent.role.receivesStatusUpdates
-      ? this.buildHealthHeader(agent.id, agent.role.id !== 'lead')
+      ? `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${this.buildFileLockSection()}`
       : undefined;
-    agent.injectContextUpdate(peers, recentActivity, healthHeader);
+    agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
   }
 
   /** Refresh only agents whose role has receivesStatusUpdates */
@@ -111,12 +107,17 @@ export class ContextRefresher {
     if (statusAgents.length === 0) return;
 
     const peers = this.buildPeerList();
-    const recentActivity = this.buildRecentActivity();
+    const lockSection = this.buildFileLockSection();
+    const alerts = this.buildAlerts(peers);
+    // Build lock activity once — only appended for secretaries
+    const lockActivity = this.buildLockActivity();
 
     for (const agent of statusAgents) {
       const otherPeers = peers.filter((p) => p.id !== agent.id);
-      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
-      agent.injectContextUpdate(otherPeers, recentActivity, healthHeader);
+      const isSecretary = agent.role.id === 'secretary';
+      const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
+      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}${extra}`;
+      agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
     }
   }
 
@@ -136,6 +137,10 @@ export class ContextRefresher {
       lockedFiles: allLocks
         .filter((lock) => lock.agentId === agent.id)
         .map((lock) => lock.filePath),
+      pendingMessages: agent.pendingMessageCount ?? 0,
+      createdAt: agent.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      contextWindowSize: agent.contextWindowSize ?? 0,
+      contextWindowUsed: agent.contextWindowUsed ?? 0,
     }));
   }
 
@@ -227,58 +232,78 @@ export class ContextRefresher {
     return healthLine;
   }
 
-  /** Check if crew is fully idle — no worker agents active and DAG complete */
-  private isCrewIdle(): boolean {
-    const agents = this.agentManager.getAll();
-    // Exclude pure status receivers (secretaries) from the "active work" check
-    const hasActiveWorker = agents.some(
-      a => a.status === 'running' && !a.role.receivesStatusUpdates,
-    );
-    if (hasActiveWorker) return false;
+  /** Build a summary of currently held file locks */
+  private buildFileLockSection(): string {
+    const locks = this.lockRegistry.getAll();
+    if (locks.length === 0) return '== ACTIVE FILE LOCKS ==\nNone';
 
-    // Check DAG — if it exists and has incomplete tasks, not idle
-    try {
-      const taskDAG = this.agentManager.getTaskDAG();
-      const leadAgent = agents.find(a => a.role.id === 'lead' && !a.parentId);
-      if (leadAgent) {
-        const status = taskDAG.getStatus(leadAgent.id);
-        const { summary } = status;
-        const incomplete = summary.pending + summary.ready + summary.running + summary.blocked + summary.paused;
-        if (incomplete > 0) return false;
+    const lines = locks.map(lock => {
+      const agent = this.agentManager.get(lock.agentId);
+      const roleName = agent?.role.name ?? 'Unknown';
+      return `- ${lock.filePath} \u2192 ${lock.agentId.slice(0, 8)} (${roleName})`;
+    });
+    return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
+  }
+
+  /** Build actionable alerts: high context usage */
+  private buildAlerts(peers: import('../agents/Agent.js').AgentContextInfo[]): string[] {
+    const alerts: string[] = [];
+
+    for (const p of peers) {
+      // Context usage warning at 80%
+      if (p.contextWindowSize && p.contextWindowSize > 0 && p.contextWindowUsed) {
+        const pct = Math.round((p.contextWindowUsed / p.contextWindowSize) * 100);
+        if (pct >= 80) {
+          alerts.push(`${p.id.slice(0, 8)} near context limit (${pct}%)`);
+        }
       }
-    } catch {
-      // No DAG available — that's fine
     }
 
-    return true;
+    return alerts;
   }
 
-  /** Determine the appropriate update interval based on crew activity */
-  private getAdaptiveInterval(): number {
-    const agents = this.agentManager.getAll();
-    // Only count non-status-receiver agents as "active work"
-    const activeWorkers = agents.filter(
-      a => a.status === 'running' && !a.role.receivesStatusUpdates,
-    ).length;
-    return activeWorkers > 0 ? ACTIVE_UPDATE_INTERVAL_MS : IDLE_UPDATE_INTERVAL_MS;
+  /** Build recent lock_denied activity for the secretary's CREW_UPDATE. */
+  private buildLockActivity(): string {
+    const entries = this.activityLedger.getRecent(50)
+      .filter(e => e.actionType === 'lock_denied');
+    if (entries.length === 0) return '';
+
+    const lines = entries.slice(0, 10).map(e => {
+      const shortId = e.agentId.slice(0, 8);
+      return `[${e.timestamp}] ${shortId} (${e.agentRole}): ${e.actionType} — ${e.summary}`;
+    });
+    return `== RECENT LOCK DENIALS ==\n${lines.join('\n')}`;
   }
 
-  /** Schedule the next periodic refresh with adaptive timing */
+  /**
+   * Check if running sub-leads exist (agents with role 'lead' that have a parentId).
+   * Only when sub-leads are active does the lead need periodic updates,
+   * since sub-leads can CREATE_AGENT autonomously.
+   */
+  private hasActiveSubLeads(): boolean {
+    return this.agentManager.getAll().some(
+      a => a.role.id === 'lead' && !!a.parentId && a.status === 'running',
+    );
+  }
+
+  /** Schedule the next periodic refresh — only runs when sub-leads are active */
   private schedulePeriodicRefresh(): void {
     if (!this.running) return;
     if (this.periodicHandle) {
       clearTimeout(this.periodicHandle);
+      this.periodicHandle = null;
     }
-    this.currentIntervalMs = this.getAdaptiveInterval();
+
+    // No periodic updates if no sub-leads — the lead gets direct Agent Reports
+    if (!this.hasActiveSubLeads()) return;
+
+    this.currentIntervalMs = SUB_LEAD_UPDATE_INTERVAL_MS;
     this.periodicHandle = setTimeout(() => {
       this.periodicHandle = null;
       if (!this.running) return;
-
-      // Idle collapse: skip update entirely when crew is idle and DAG complete
-      if (!this.isCrewIdle()) {
+      if (this.hasActiveSubLeads()) {
         this.refreshStatusReceivers();
       }
-
       this.schedulePeriodicRefresh();
     }, this.currentIntervalMs);
   }
@@ -290,6 +315,8 @@ export class ContextRefresher {
     this.debounceHandle = setTimeout(() => {
       this.debounceHandle = null;
       this.refreshAll();
+      // Re-evaluate periodic timer (a new sub-lead may have spawned)
+      if (!this.periodicHandle) this.schedulePeriodicRefresh();
     }, 2000);
   }
 }

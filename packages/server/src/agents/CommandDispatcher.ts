@@ -10,6 +10,7 @@
 import type { Agent } from './Agent.js';
 import { logger } from '../utils/logger.js';
 import type { CommandEntry, CommandContext, CommandHandlerContext, Delegation } from './commands/types.js';
+import { buildCommandHelp, getCommandExample, setRegisteredPatterns } from './commands/CommandHelp.js';
 import {
   getAgentCommands,
   notifyParentOfIdle as _notifyParentOfIdle,
@@ -73,6 +74,9 @@ export class CommandDispatcher {
         ? getTemplateCommands(this.handlerCtx, this.handlerCtx.taskTemplateRegistry, this.handlerCtx.taskDecomposer)
         : []),
     ];
+
+    // Register patterns so CommandHelp can build help from live metadata
+    setRegisteredPatterns(this.patterns);
   }
 
   // ── Buffer management ──────────────────────────────────────────────
@@ -115,6 +119,11 @@ export class CommandDispatcher {
         // Skip commands whose ⟦⟦ is nested inside another ⟦⟦ ⟧⟧ block
         if (CommandDispatcher.isInsideCommandBlock(buf, best.index)) {
           logger.debug('agent', `Skipped nested command: ${best.name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+          agent.sendMessage(
+            `[System] Nested ${best.name} was stripped — it appeared inside another command's payload. ` +
+            `To show command examples in text, refer to commands by name (e.g. "use the ${best.name} command") ` +
+            `instead of including literal bracket delimiters.`,
+          );
           buf = buf.slice(0, best.index) + buf.slice(best.end);
           found = true;
         } else {
@@ -122,13 +131,20 @@ export class CommandDispatcher {
           try {
             best.handler(agent, best.text);
           } catch (err) {
-            logger.error('command', `Handler error for ${best.name} from ${agent.role.name}: ${(err as Error).message}`);
+            const errMsg = (err as Error).message;
+            logger.error('command', `Handler error for ${best.name} from ${agent.role.name}: ${errMsg}`);
+            const example = getCommandExample(best.name);
+            const exampleHint = example ? `\nCorrect format: ${example}` : '';
+            agent.sendMessage(`[System] ${best.name} failed: ${errMsg}${exampleHint}`);
           }
           buf = buf.slice(0, best.index) + buf.slice(best.end);
           found = true;
         }
       }
     }
+
+    // Detect unrecognized commands: ⟦⟦ UNKNOWN_WORD ... ⟧⟧ that didn't match any known pattern
+    buf = CommandDispatcher.detectUnknownCommands(agent, buf, this.patterns);
 
     // Lead processed output — mark human message as responded
     if (agent.role.id === 'lead' && !agent.humanMessageResponded) {
@@ -230,5 +246,31 @@ export class CommandDispatcher {
       }
     }
     return depth > 0 || inString;
+  }
+
+  /**
+   * Detect unrecognized ⟦⟦ COMMAND ⟧⟧ blocks remaining in the buffer.
+   * Sends a help message to the agent and strips the unrecognized block.
+   */
+  static detectUnknownCommands(agent: Agent, buf: string, knownPatterns: CommandEntry[]): string {
+    // Match any complete ⟦⟦ WORD ... ⟧⟧ block
+    const unknownRegex = /⟦⟦\s*([A-Z][A-Z0-9_]*)\s*(?:\{[\s\S]*?\})?\s*⟧⟧/;
+    let match = unknownRegex.exec(buf);
+    while (match && match.index !== undefined) {
+      // Skip if inside a nested block or string
+      if (CommandDispatcher.isInsideCommandBlock(buf, match.index)) {
+        buf = buf.slice(0, match.index) + buf.slice(match.index + match[0].length);
+        match = unknownRegex.exec(buf);
+        continue;
+      }
+      const cmdName = match[1];
+      logger.warn('command', `Unknown command "${cmdName}" from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      agent.sendMessage(
+        `[System] Unknown command: ${cmdName}. Did you mean one of the available commands?\n\n${buildCommandHelp()}`,
+      );
+      buf = buf.slice(0, match.index) + buf.slice(match.index + match[0].length);
+      match = unknownRegex.exec(buf);
+    }
+    return buf;
   }
 }

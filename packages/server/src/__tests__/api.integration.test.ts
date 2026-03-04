@@ -109,7 +109,9 @@ const mockDecisionLog = {
 
 const mockAgentManager = {
   getAll: vi.fn().mockReturnValue([]),
+  getByProject: vi.fn().mockReturnValue([]),
   get: vi.fn().mockReturnValue(undefined),
+  getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
   spawn: vi.fn(),
   terminate: vi.fn().mockReturnValue(true),
   restart: vi.fn().mockReturnValue(null),

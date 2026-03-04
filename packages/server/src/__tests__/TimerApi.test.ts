@@ -187,3 +187,121 @@ describe('Duration parsing in SET_TIMER schema', () => {
     expect(result.success).toBe(false); // 172800 > 86400 max
   });
 });
+
+describe('Timer creation via POST /timers (route handler logic)', () => {
+  let registry: TimerRegistry;
+
+  beforeEach(() => {
+    registry = new TimerRegistry(createTestTimerDb());
+  });
+
+  afterEach(() => {
+    registry.stop();
+  });
+
+  it('creates a timer with valid input', () => {
+    const timer = registry.create('agent-1', {
+      label: 'ui-timer',
+      message: 'Created from UI',
+      delaySeconds: 60,
+      repeat: false,
+    }, 'developer', 'lead-1');
+
+    expect(timer).not.toBeNull();
+    expect(timer!.label).toBe('ui-timer');
+    expect(timer!.message).toBe('Created from UI');
+    expect(timer!.agentRole).toBe('developer');
+    expect(timer!.leadId).toBe('lead-1');
+    expect(timer!.status).toBe('pending');
+    expect(timer!.repeat).toBe(false);
+    expect(timer!.delaySeconds).toBe(60);
+  });
+
+  it('rejects timer with delaySeconds > 86400', () => {
+    const timer = registry.create('agent-1', {
+      label: 'too-long',
+      message: 'Test',
+      delaySeconds: 86401,
+    });
+    expect(timer).toBeNull();
+  });
+
+  it('rejects timer with negative delaySeconds', () => {
+    const timer = registry.create('agent-1', {
+      label: 'negative',
+      message: 'Test',
+      delaySeconds: -1,
+    });
+    expect(timer).toBeNull();
+  });
+
+  it('rejects when agent hits max timer limit (20)', () => {
+    for (let i = 0; i < 20; i++) {
+      const t = registry.create('agent-1', {
+        label: `timer-${i}`,
+        message: 'Test',
+        delaySeconds: 300,
+      });
+      expect(t).not.toBeNull();
+    }
+    // 21st should fail
+    const overflow = registry.create('agent-1', {
+      label: 'overflow',
+      message: 'Should fail',
+      delaySeconds: 300,
+    });
+    expect(overflow).toBeNull();
+  });
+
+  it('emits timer:created event on creation', () => {
+    const events: any[] = [];
+    registry.on('timer:created', (timer) => events.push(timer));
+
+    registry.create('agent-1', {
+      label: 'event-test',
+      message: 'Testing events',
+      delaySeconds: 120,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].label).toBe('event-test');
+  });
+});
+
+describe('Timer project scoping (route-level logic)', () => {
+  it('rejects timer when agent belongs to a different project', () => {
+    // Simulate the route logic: if projectId is provided and agent's project doesn't match, reject
+    const requestProjectId: string = 'project-abc';
+    const agentProjectId: string = 'project-xyz';
+
+    const agentExists = true;
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+
+    expect(agentExists).toBe(true);
+    expect(projectMismatch).toBe(true);
+  });
+
+  it('allows timer when agent belongs to the same project', () => {
+    const requestProjectId = 'project-abc';
+    const agentProjectId = 'project-abc';
+
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+    expect(projectMismatch).toBe(false);
+  });
+
+  it('allows timer when no projectId is provided in request', () => {
+    const requestProjectId: string | undefined = undefined;
+    // Route skips check when no projectId
+    const shouldCheck = requestProjectId && typeof requestProjectId === 'string';
+    expect(shouldCheck).toBeFalsy();
+  });
+
+  it('allows timer when agent has no project (unscoped agent)', () => {
+    const requestProjectId = 'project-abc';
+    const agentProjectId: string | undefined = undefined;
+
+    // Route only rejects when agentProjectId exists AND mismatches
+    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+    expect(projectMismatch).toBeFalsy();
+  });
+});

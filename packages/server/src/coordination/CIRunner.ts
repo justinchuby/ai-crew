@@ -47,7 +47,7 @@ interface CIRunnerDeps {
   /** Project root directory (for running npm commands) */
   cwd: string;
   /** To send results to agents */
-  getAgent: (id: string) => { sendMessage(msg: string): void; role: { id: string } } | undefined;
+  getAgent: (id: string) => { sendMessage(msg: string): void; role: { id: string }; projectId?: string } | undefined;
   /** To find lead agent for result notifications */
   getAllAgents: () => Array<{ id: string; role: { id: string }; status: string; sendMessage(msg: string): void }>;
   /** To log CI activity */
@@ -192,6 +192,7 @@ export class CIRunner extends EventEmitter {
       result.success ? 'task_completed' : 'error',
       `CI ${result.success ? '✅ passed' : '❌ failed'} (${Math.round(result.durationMs / 1000)}s): ${result.steps.map(s => `${s.name}:${s.success ? '✅' : '❌'}`).join(' ')}`,
       { type: 'ci_run', success: result.success, steps: result.steps.map(s => ({ name: s.name, success: s.success, durationMs: s.durationMs })) },
+      this.deps.getAgent(committerIds[0])?.projectId ?? '',
     );
     } finally {
       this.running = false;
@@ -300,7 +301,7 @@ export class CIRunner extends EventEmitter {
 
       const taskLabel = `fix-build-${Date.now()}`;
       this.deps.taskDAG.declareTaskBatch(lead.id, [{
-        id: taskLabel,
+        taskId: taskLabel,
         role: 'developer',
         description: `CI failure in ${failedStep.name}: fix the build/test error. Committer: ${committerIds.map(id => id.slice(0, 8)).join(', ')}. Error: ${failedStep.output.slice(-200)}`,
       }]);

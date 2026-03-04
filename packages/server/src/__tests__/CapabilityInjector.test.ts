@@ -61,6 +61,7 @@ describe('CapabilityInjector', () => {
         'status_change',
         expect.stringContaining('Architecture'),
         expect.objectContaining({ capability: 'architecture', reason: 'need system design' }),
+        expect.any(String),
       );
     });
 

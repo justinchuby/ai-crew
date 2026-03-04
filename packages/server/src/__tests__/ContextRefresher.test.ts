@@ -69,15 +69,19 @@ describe('ContextRefresher', () => {
       const peers = refresher.buildPeerList();
 
       expect(peers).toHaveLength(2);
-      expect(peers[0]).toEqual({
+      expect(peers[0]).toMatchObject({
         id: 'a1',
         role: 'dev',
         roleName: 'Developer',
         status: 'running',
         task: 't1',
         lockedFiles: [],
+        pendingMessages: 0,
+        contextWindowSize: 0,
+        contextWindowUsed: 0,
       });
-      expect(peers[1]).toEqual({
+      expect(peers[0]!.createdAt).toBeDefined();
+      expect(peers[1]).toMatchObject({
         id: 'a2',
         role: 'qa',
         roleName: 'QA Engineer',
@@ -146,12 +150,19 @@ describe('ContextRefresher', () => {
   });
 
   describe('refreshAll', () => {
-    it('calls injectContextUpdate on all running agents', () => {
-      const a1 = makeAgent({ id: 'a1', status: 'running' });
-      const a2 = makeAgent({ id: 'a2', status: 'running' });
+    it('calls injectContextUpdate on running status-receiver agents', () => {
+      const a1 = makeAgent({ id: 'a1', status: 'running', role: { id: 'lead', name: 'Lead', receivesStatusUpdates: true } });
+      const a2 = makeAgent({ id: 'a2', status: 'running', role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true } });
       mocks.agentManager.getAll.mockReturnValue([a1, a2]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getByLeadId: vi.fn().mockReturnValue([]),
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
 
       refresher.refreshAll();
 
@@ -165,12 +176,19 @@ describe('ContextRefresher', () => {
     });
 
     it('skips non-running agents (completed/failed)', () => {
-      const running = makeAgent({ id: 'r1', status: 'running' });
+      const running = makeAgent({ id: 'r1', status: 'running', role: { id: 'lead', name: 'Lead', receivesStatusUpdates: true } });
       const completed = makeAgent({ id: 'c1', status: 'completed' });
       const failed = makeAgent({ id: 'f1', status: 'failed' });
       mocks.agentManager.getAll.mockReturnValue([running, completed, failed]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getByLeadId: vi.fn().mockReturnValue([]),
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
 
       refresher.refreshAll();
 
@@ -241,19 +259,27 @@ describe('ContextRefresher', () => {
       expect(a1.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('stop clears any pending debounce', () => {
-      const a1 = makeAgent({ id: 'a1', status: 'running' });
-      mocks.agentManager.getAll.mockReturnValue([a1]);
+    it('stop prevents further periodic refreshes', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
 
       refresher.start();
-      // Trigger debounced refresh via event
-      mocks.agentManager.emit('agent:spawned', {});
       refresher.stop();
-      vi.advanceTimersByTime(10000);
-      // Debounce was cleared — no calls
-      expect(a1.injectContextUpdate).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(300000);
+      // Periodic refresh was cleared — no calls
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
     });
 
     it('start can be called multiple times safely', () => {
@@ -300,20 +326,27 @@ describe('ContextRefresher', () => {
         status: 'running',
         role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
       });
+      const subLead = makeAgent({
+        id: 'sub-lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Sub Lead', receivesStatusUpdates: true },
+        parentId: 'lead-1',
+      });
       const dev = makeAgent({ id: 'd1', status: 'running' });
-      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.agentManager.getAll.mockReturnValue([secretary, subLead, dev]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
       (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
         getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
       });
       (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
         getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
       });
 
       refresher.start();
-      // Active interval is 30s when agents are running
-      vi.advanceTimersByTime(30000);
+      // Periodic interval is 180s when sub-leads are active
+      vi.advanceTimersByTime(180000);
 
       // Secretary gets periodic update
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
@@ -374,7 +407,7 @@ describe('ContextRefresher', () => {
       expect(healthHeader).toContain('1 active');
     });
 
-    it('regular dev does not receive health header', () => {
+    it('regular dev does not receive refreshAll updates', () => {
       const dev = makeAgent({ id: 'd1', status: 'running' });
       mocks.agentManager.getAll.mockReturnValue([dev]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
@@ -382,9 +415,8 @@ describe('ContextRefresher', () => {
 
       refresher.refreshAll();
 
-      expect(dev.injectContextUpdate).toHaveBeenCalledTimes(1);
-      const healthHeader = dev.injectContextUpdate.mock.calls[0][2];
-      expect(healthHeader).toBeUndefined();
+      // Dev without receivesStatusUpdates is skipped entirely by refreshAll
+      expect(dev.injectContextUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -407,7 +439,7 @@ describe('ContextRefresher', () => {
     it('CREW_UPDATE sent to other agents shows re-delegated task', () => {
       const lead = makeAgent({
         id: 'lead-1',
-        role: { id: 'lead', name: 'Project Lead' },
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
         status: 'running',
         task: 'Coordinate project',
       });
@@ -420,6 +452,12 @@ describe('ContextRefresher', () => {
       mocks.agentManager.getAll.mockReturnValue([lead, dev]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
 
       refresher.refreshAll();
 
@@ -441,7 +479,7 @@ describe('ContextRefresher', () => {
     });
   });
 
-  describe('adaptive frequency and idle collapse', () => {
+  describe('periodic timer policy — sub-lead gated', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -450,7 +488,46 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('uses shorter interval (30s) when agents are active', () => {
+    it('sends periodic updates at 180s when sub-leads are active', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const topLead = makeAgent({
+        id: 'lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // At 179s — no update yet
+      vi.advanceTimersByTime(179000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // At 180s — first update
+      vi.advanceTimersByTime(1000);
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips periodic updates when no sub-leads exist', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
@@ -469,44 +546,12 @@ describe('ContextRefresher', () => {
 
       refresher.start();
 
-      // At 29s — no update yet
-      vi.advanceTimersByTime(29000);
-      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
-
-      // At 30s — first update
-      vi.advanceTimersByTime(1000);
-      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
-    });
-
-    it('uses longer interval (120s) when all agents are idle', () => {
-      const secretary = makeAgent({
-        id: 's1',
-        status: 'idle',
-        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
-      });
-      const dev = makeAgent({ id: 'd1', status: 'idle' });
-      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
-      mocks.lockRegistry.getAll.mockReturnValue([]);
-      mocks.activityLedger.getRecent.mockReturnValue([]);
-      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
-        getAll: vi.fn().mockReturnValue([]),
-      });
-      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 5, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
-      });
-
-      refresher.start();
-
-      // At 30s — no update (idle interval is 120s)
-      vi.advanceTimersByTime(30000);
-      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
-
-      // At 120s — idle collapse kicks in: all idle + DAG done = skip update
-      vi.advanceTimersByTime(90000);
+      // Even after 5 minutes, no periodic update (no sub-leads)
+      vi.advanceTimersByTime(300000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('suppresses updates when crew is fully idle and DAG complete', () => {
+    it('no periodic updates when all agents are idle (no sub-leads)', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'idle',
@@ -520,49 +565,264 @@ describe('ContextRefresher', () => {
       mocks.agentManager.getAll.mockReturnValue([lead, secretary]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
-      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
-        getAll: vi.fn().mockReturnValue([]),
-        getByLeadId: vi.fn().mockReturnValue([]),
-      });
-      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 1 } }),
-      });
 
       refresher.start();
 
-      // Even after multiple intervals, no updates sent (idle collapse)
-      vi.advanceTimersByTime(300000);
+      vi.advanceTimersByTime(600000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
       expect(lead.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('sends updates when DAG has incomplete tasks even if agents idle', () => {
+    it('starts sending updates when a sub-lead appears', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
         role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
       });
-      const lead = makeAgent({
+      const topLead = makeAgent({
         id: 'lead-1',
-        status: 'idle',
-        role: { id: 'lead', name: 'Project Lead' },
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
       });
-      mocks.agentManager.getAll.mockReturnValue([lead, secretary]);
+      // Start without sub-leads
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // First 180s — no update (no sub-leads)
+      vi.advanceTimersByTime(180000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // Add a sub-lead and emit agent:spawned to trigger timer re-evaluation
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead, subLead]);
+      mocks.agentManager.emit('agent:spawned', { id: 'sublead-1' });
+
+      // Debounce (2s) + periodic interval (180s) = update fires
+      vi.advanceTimersByTime(2000); // debounce fires refreshAll
+      secretary.injectContextUpdate.mockClear(); // clear the refreshAll call
+      vi.advanceTimersByTime(180000); // periodic timer fires
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('event triggers', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('agent:spawned triggers debounced refreshAll to status receivers', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
       (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
         getAll: vi.fn().mockReturnValue([]),
       });
-      // DAG has pending tasks — not fully complete
       (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 2, ready: 1, running: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
       });
 
       refresher.start();
 
-      // Idle interval (120s) — but DAG incomplete so update should fire
-      vi.advanceTimersByTime(120000);
+      // Emit agent:spawned
+      mocks.agentManager.emit('agent:spawned', { id: 'new-agent' });
+
+      // Before debounce fires — no update yet
+      vi.advanceTimersByTime(1999);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // After debounce (2s) — refreshAll fires for status receivers
+      vi.advanceTimersByTime(1);
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Dev does NOT receive update (not a status receiver)
+      expect(dev.injectContextUpdate).not.toHaveBeenCalled();
+    });
+
+    it('agent:context_compacted triggers immediate refreshOne for that agent', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const dev = makeAgent({ id: 'd1', status: 'running' });
+      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.agentManager.get.mockImplementation((id: string) => {
+        if (id === 's1') return secretary;
+        if (id === 'd1') return dev;
+        return undefined;
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+
+      refresher.start();
+
+      // Emit context_compacted for dev
+      mocks.agentManager.emit('agent:context_compacted', { agentId: 'd1' });
+
+      // refreshOne is synchronous — dev gets update immediately
+      expect(dev.injectContextUpdate).toHaveBeenCalledTimes(1);
+      // Secretary is NOT refreshed (only the compacted agent is)
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+    });
+
+    it('agent:spawned debounce deduplicates rapid events', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // Fire 3 rapid agent:spawned events
+      mocks.agentManager.emit('agent:spawned', { id: 'a1' });
+      mocks.agentManager.emit('agent:spawned', { id: 'a2' });
+      mocks.agentManager.emit('agent:spawned', { id: 'a3' });
+
+      // After debounce — only 1 refreshAll (debounced, not 3)
+      vi.advanceTimersByTime(2000);
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('lock activity routing', () => {
+    it('secretary receives RECENT LOCK DENIALS section (only lock_denied, not acquire/release)', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([
+        {
+          id: 1,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_acquired',
+          summary: 'Locked src/index.ts',
+          timestamp: '2026-01-01T00:00:00Z',
+          details: {},
+          projectId: '',
+        },
+        {
+          id: 2,
+          agentId: 'dev-789012',
+          agentRole: 'developer',
+          actionType: 'lock_denied',
+          summary: 'Denied access to src/index.ts',
+          timestamp: '2026-01-01T00:01:00Z',
+          details: {},
+          projectId: '',
+        },
+        {
+          id: 3,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_released',
+          summary: 'Released src/index.ts',
+          timestamp: '2026-01-01T00:02:00Z',
+          details: {},
+          projectId: '',
+        },
+      ]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = secretary.injectContextUpdate.mock.calls[0][2] as string;
+      expect(healthHeader).toContain('RECENT LOCK DENIALS');
+      expect(healthHeader).toContain('lock_denied');
+      // lock_acquired and lock_released should NOT appear in the lock denials section
+      expect(healthHeader).not.toContain('lock_acquired');
+      expect(healthHeader).not.toContain('lock_released');
+    });
+
+    it('lead does NOT receive lock denials section', () => {
+      const lead = makeAgent({
+        id: 'lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([lead, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([
+        {
+          id: 1,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_denied',
+          summary: 'Denied access to src/index.ts',
+          timestamp: '2026-01-01T00:00:00Z',
+          details: {},
+          projectId: '',
+        },
+      ]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(lead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = lead.injectContextUpdate.mock.calls[0][2] as string;
+      expect(healthHeader).not.toContain('RECENT LOCK DENIALS');
     });
   });
 });

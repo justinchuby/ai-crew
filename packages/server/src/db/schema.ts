@@ -51,8 +51,10 @@ export const fileLocks = sqliteTable('file_locks', {
   reason: text('reason').default(''),
   acquiredAt: text('acquired_at').default(sql`(datetime('now'))`),
   expiresAt: text('expires_at').notNull(),
+  projectId: text('project_id').default(''),
 }, (table) => [
   index('idx_file_locks_agent').on(table.agentId),
+  index('idx_file_locks_project').on(table.projectId),
 ]);
 
 // ── Activity Log ─────────────────────────────────────────────────────
@@ -65,9 +67,11 @@ export const activityLog = sqliteTable('activity_log', {
   summary: text('summary').notNull(),
   details: text('details').default('{}'),
   timestamp: text('timestamp').default(sql`(datetime('now'))`),
+  projectId: text('project_id').default(''),
 }, (table) => [
   index('idx_activity_agent').on(table.agentId),
   index('idx_activity_type').on(table.actionType),
+  index('idx_activity_project').on(table.projectId),
 ]);
 
 // ── Decisions ────────────────────────────────────────────────────────
@@ -200,6 +204,7 @@ export const projects = sqliteTable('projects', {
   description: text('description').default(''),
   cwd: text('cwd'),
   status: text('status').default('active'),       // active | archived | completed
+  modelConfig: text('model_config').default('{}'),  // JSON: role → allowed model IDs
   createdAt: text('created_at').default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 }, (table) => [
@@ -245,13 +250,15 @@ export const collectiveMemory = sqliteTable('collective_memory', {
   key: text('key').notNull(),
   value: text('value').notNull(),
   source: text('source').notNull(),      // agentId who discovered it
+  projectId: text('project_id').default(''),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
   lastUsedAt: text('last_used_at').default(sql`(datetime('now'))`),
   useCount: integer('use_count').default(0),
 }, (table) => [
   index('idx_collective_memory_category').on(table.category),
   index('idx_collective_memory_key').on(table.key),
-  uniqueIndex('idx_collective_memory_cat_key').on(table.category, table.key),
+  index('idx_collective_memory_project').on(table.projectId),
+  uniqueIndex('idx_collective_memory_cat_key').on(table.category, table.key, table.projectId),
 ]);
 
 // ── Task Cost Records (per-agent per-task token usage) ──────────────

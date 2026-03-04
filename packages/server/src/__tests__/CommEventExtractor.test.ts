@@ -13,6 +13,7 @@ function makeEntry(overrides: Partial<ActivityEntry>): ActivityEntry {
     summary: 'Test summary',
     details: {},
     timestamp: BASE_TIMESTAMP,
+    projectId: '',
     ...overrides,
   };
 }

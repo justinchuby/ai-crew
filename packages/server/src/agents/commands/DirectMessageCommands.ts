@@ -11,6 +11,7 @@ import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { isTerminalStatus } from '../Agent.js';
 import { parseCommandPayload, directMessageSchema } from './commandSchemas.js';
+import { deriveArgs } from './CommandHelp.js';
 
 const DM_REGEX = /⟦⟦\s*DIRECT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
 const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*⟧⟧/s;
@@ -25,9 +26,15 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
     const { to, content } = payload;
 
     // Resolve target: exact ID first, then short prefix match
-    const target =
-      ctx.getAgent(to) ??
-      ctx.getAllAgents().find((a) => a.id.startsWith(to));
+    // Scope to sender's project to prevent cross-project messaging
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const isInSameProject = (a: Agent) =>
+      !senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId;
+
+    const exactMatch = ctx.getAgent(to);
+    const target = (exactMatch && isInSameProject(exactMatch))
+      ? exactMatch
+      : ctx.getAllAgents().find((a) => a.id.startsWith(to) && isInSameProject(a));
 
     if (!target) {
       agent.sendMessage(`[System] Agent "${to}" not found. Use QUERY_PEERS to see available agents.`);
@@ -53,6 +60,7 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
       'message_sent',
       `DM to ${target.role.id} (${target.id.slice(0, 8)}): ${content.slice(0, 100)}`,
       { type: 'direct_message', targetId: target.id, targetRole: target.role.id },
+      ctx.getProjectIdForAgent(agent.id) ?? '',
     );
   } catch {
     agent.sendMessage('[System] DIRECT_MESSAGE error: use {"to": "agent-id", "content": "your message"}');
@@ -92,7 +100,7 @@ function handleQueryPeers(ctx: CommandHandlerContext, agent: Agent): void {
 
 export function getDirectMessageCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DM_REGEX, name: 'DIRECT_MESSAGE', handler: (a, d) => handleDirectMessage(ctx, a, d) },
-    { regex: QUERY_PEERS_REGEX, name: 'QUERY_PEERS', handler: (a) => handleQueryPeers(ctx, a) },
+    { regex: DM_REGEX, name: 'DIRECT_MESSAGE', handler: (a, d) => handleDirectMessage(ctx, a, d), help: { description: 'Queue a message for an agent (non-interrupting)', example: 'DIRECT_MESSAGE {"to": "agent-id", "content": "your message"}', category: 'Communication', args: deriveArgs(directMessageSchema) } },
+    { regex: QUERY_PEERS_REGEX, name: 'QUERY_PEERS', handler: (a) => handleQueryPeers(ctx, a), help: { description: 'List peer agents for direct messaging', example: 'QUERY_PEERS {}', category: 'System' } },
   ];
 }

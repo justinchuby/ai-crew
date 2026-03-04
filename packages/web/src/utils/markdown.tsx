@@ -69,22 +69,30 @@ export function MentionText({ text, agents, onClickAgent }: {
         parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
       }
       const isUser = agent.id === 'user';
-      parts.push(
-        <AgentMentionTooltip key={`m-${match.index}`} agent={agent}>
+      if (isUser) {
+        // @user: light yellow highlight, regular text, no interactivity
+        parts.push(
           <span
-            className={`inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded cursor-pointer transition-colors ${
-              isUser
-                ? 'bg-green-500/20 text-green-600 dark:text-green-300 hover:bg-green-500/30'
-                : 'bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:bg-blue-500/30'
-            }`}
-            style={isUser ? undefined : { borderBottom: `1px solid ${idColor(agent.id)}` }}
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
+            key={`m-${match.index}`}
+            className="bg-yellow-500/20 rounded px-0.5"
           >
-            @{isUser ? 'user' : `${agent.role.name.toLowerCase()}-${agent.id.slice(0, 6)}`}
-          </span>
-        </AgentMentionTooltip>,
-      );
+            @user
+          </span>,
+        );
+      } else {
+        parts.push(
+          <AgentMentionTooltip key={`m-${match.index}`} agent={agent}>
+            <span
+              className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded cursor-pointer transition-colors bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:bg-blue-500/30"
+              style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
+            >
+              @{`${agent.role.name.toLowerCase()}-${agent.id.slice(0, 6)}`}
+            </span>
+          </AgentMentionTooltip>,
+        );
+      }
       lastIdx = match.index + match[0].length;
     }
   }

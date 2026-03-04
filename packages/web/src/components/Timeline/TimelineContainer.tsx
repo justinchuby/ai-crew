@@ -172,7 +172,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
 
 function TimelineLegend() {
   return (
-    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted timeline-legend" role="group" aria-label="Timeline legend: status colors and communication types">
+    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted timeline-legend shrink-0" role="group" aria-label="Timeline legend: status colors and communication types">
       {Object.entries(STATUS_COLORS).map(([status, colors]) => (
         <span key={status} className="flex items-center gap-1">
           {status === 'idle' ? (
@@ -279,10 +279,33 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     rafIdRef.current = requestAnimationFrame(() => updateTooltipPosition(clientX));
   }, [updateTooltipPosition]);
 
-  const fullRange = useMemo(() => ({
-    start: new Date(data.timeRange.start),
-    end: new Date(data.timeRange.end),
-  }), [data.timeRange]);
+  // Stabilize time range to prevent layout jumps on data updates.
+  // Keep the start anchored and only extend the end.
+  const stableRangeRef = useRef<{ start: Date; end: Date } | null>(null);
+
+  const fullRange = useMemo(() => {
+    const newStart = new Date(data.timeRange.start);
+    const newEnd = new Date(data.timeRange.end);
+    const prev = stableRangeRef.current;
+
+    if (!prev) {
+      const range = { start: newStart, end: newEnd };
+      stableRangeRef.current = range;
+      return range;
+    }
+
+    if (!liveMode) {
+      // When live mode is OFF, freeze the range completely
+      return prev;
+    }
+
+    // In live mode: keep earliest start, extend end only
+    const stableStart = newStart < prev.start ? newStart : prev.start;
+    const stableEnd = newEnd > prev.end ? newEnd : prev.end;
+    const range = { start: stableStart, end: stableEnd };
+    stableRangeRef.current = range;
+    return range;
+  }, [data.timeRange, liveMode]);
 
   // Always show the full range — no zoom/pan
   const visibleRange = fullRange;

@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
-import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
+import { X, Send, Maximize2, Minimize2, Megaphone, Zap } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
 import { AgentIdBadge } from '../../utils/markdown';
 
@@ -16,10 +16,9 @@ interface Props {
     resizeAgent: (id: string, cols: number, rows: number) => void;
     send: (msg: any) => void;
   };
-  api: any;
 }
 
-export function ChatPanel({ agentId, ws, api }: Props) {
+export function ChatPanel({ agentId, ws }: Props) {
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
@@ -78,20 +77,24 @@ export function ChatPanel({ agentId, ws, api }: Props) {
     });
   };
 
+  const interruptAgent = (targetId: string) => {
+    apiFetch(`/agents/${targetId}/interrupt`, { method: 'POST' }).catch((err: Error) => {
+      useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+    });
+  };
+
   const handleSend = (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!inputText.trim()) return;
 
     // Record user message in store so it appears in chat
-    const state = useAppStore.getState();
-    const existing = state.agents.find((a) => a.id === agentId);
+    const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
     const isAgentBusy = existing?.status === 'running';
     const msgs = [...(existing?.messages ?? [])];
     msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
     if (broadcast) {
-      const allAgents = useAppStore.getState().agents;
-      const running = allAgents.filter((a) => a.status === 'running');
+      const running = useAppStore.getState().agents.filter((a) => a.status === 'running');
       running.forEach((a) => sendToAgent(a.id, inputText, mode));
     } else {
       sendToAgent(agentId, inputText, mode);
@@ -195,11 +198,7 @@ export function ChatPanel({ agentId, ws, api }: Props) {
                 handleSend();
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                if (inputText.trim()) {
-                  handleSend('interrupt');
-                } else {
-                  api.interruptAgent(agentId);
-                }
+                if (inputText.trim()) handleSend('interrupt');
               }
             }}
             onInput={(e) => {
@@ -218,6 +217,19 @@ export function ChatPanel({ agentId, ws, api }: Props) {
             title="Broadcast to all running agents"
           >
             <Megaphone size={14} />
+          </button>
+          <button
+            onClick={() => {
+              if (inputText.trim()) {
+                handleSend('interrupt');
+              } else {
+                interruptAgent(agentId);
+              }
+            }}
+            className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
+            title="Interrupt agent (Ctrl+Enter)"
+          >
+            <Zap size={14} />
           </button>
           <button
             onClick={() => handleSend()}

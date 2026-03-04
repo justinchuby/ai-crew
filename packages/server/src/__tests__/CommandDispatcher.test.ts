@@ -35,6 +35,11 @@ function makeAgent(overrides: Partial<Record<string, any>> = {}): Agent {
     lastHumanMessageAt: null,
     lastHumanMessageText: null,
     hierarchyLevel: 0,
+    isSystemAgent: false,
+    pendingMessageCount: 0,
+    createdAt: new Date(),
+    contextWindowSize: 0,
+    contextWindowUsed: 0,
     sendMessage: vi.fn(),
     getBufferedOutput: vi.fn().mockReturnValue(''),
     toJSON: vi.fn(),
@@ -56,6 +61,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
   return {
     getAgent: vi.fn(),
     getAllAgents: vi.fn().mockReturnValue([]),
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
     getRunningCount: vi.fn().mockReturnValue(1),
     spawnAgent: vi.fn(),
     terminateAgent: vi.fn().mockReturnValue(true),
@@ -69,6 +75,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       acquire: vi.fn().mockReturnValue({ ok: true }),
       release: vi.fn().mockReturnValue(true),
       releaseAll: vi.fn(),
+      getAll: vi.fn().mockReturnValue([]),
     } as any,
     activityLedger: {
       log: vi.fn(),
@@ -164,6 +171,8 @@ describe('CommandDispatcher', () => {
         'lead',
         'src/index.ts',
         'editing',
+        300,
+        expect.any(String),
       );
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Lock acquired'),
@@ -197,6 +206,7 @@ describe('CommandDispatcher', () => {
         'file_edit',
         'edited index.ts',
         expect.any(Object),
+        expect.any(String),
       );
     });
   });
@@ -455,7 +465,7 @@ describe('CommandDispatcher', () => {
       const child = makeChildAgent(leadAgent.id);
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${child.id}", "reason": "done"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${child.id}", "reason": "done"} ⟧⟧`);
 
       expect(ctx.terminateAgent).toHaveBeenCalledWith(child.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -469,7 +479,7 @@ describe('CommandDispatcher', () => {
         role: makeRole(),
       });
 
-      dispatch(dispatcher, devAgent, '⟦⟦ TERMINATE_AGENT {"id": "agent-123", "reason": "done"} ⟧⟧');
+      dispatch(dispatcher, devAgent, '⟦⟦ TERMINATE_AGENT {"agentId": "agent-123", "reason": "done"} ⟧⟧');
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -488,7 +498,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, subLead, grandchild]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${grandchild.id}", "reason": "cleanup"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${grandchild.id}", "reason": "cleanup"} ⟧⟧`);
 
       expect(ctx.terminateAgent).toHaveBeenCalledWith(grandchild.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -507,7 +517,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, otherLead, otherChild]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${otherChild.id}", "reason": "steal"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${otherChild.id}", "reason": "steal"} ⟧⟧`);
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -523,7 +533,7 @@ describe('CommandDispatcher', () => {
       });
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, otherLead]);
 
-      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"id": "${otherLead.id}", "reason": "remove"} ⟧⟧`);
+      dispatch(dispatcher, leadAgent, `⟦⟦ TERMINATE_AGENT {"agentId": "${otherLead.id}", "reason": "remove"} ⟧⟧`);
 
       expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -595,6 +605,8 @@ describe('CommandDispatcher', () => {
         'lead',
         'src/main.ts',
         'editing',
+        300,
+        expect.any(String),
       );
       expect(ctx.activityLedger.log).toHaveBeenCalledWith(
         leadAgent.id,
@@ -602,6 +614,7 @@ describe('CommandDispatcher', () => {
         'file_edit',
         'changed main',
         expect.any(Object),
+        expect.any(String),
       );
     });
   });
@@ -1270,7 +1283,7 @@ describe('CommandDispatcher', () => {
       (ctx.taskDAG.getTransitionError as any).mockReturnValue(null);
       (ctx.taskDAG.completeTask as any).mockReturnValue([{ id: 'task-2' }]);
 
-      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"id": "task-1", "summary": "Auth done"} ⟧⟧');
+      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"taskId": "task-1", "summary": "Auth done"} ⟧⟧');
 
       expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -1289,7 +1302,7 @@ describe('CommandDispatcher', () => {
         validStatuses: ['running', 'ready'],
       });
 
-      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"id": "task-999"} ⟧⟧');
+      dispatch(dispatcher, leadAgent, '⟦⟦ COMPLETE_TASK {"taskId": "task-999"} ⟧⟧');
 
       expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
@@ -1302,7 +1315,7 @@ describe('CommandDispatcher', () => {
 
       expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('requires an "id" field'),
+        expect.stringContaining('requires a "taskId" field'),
       );
     });
 

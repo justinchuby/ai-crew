@@ -41,6 +41,7 @@ export interface Delegation {
 export interface CommandContext {
   getAgent(id: string): Agent | undefined;
   getAllAgents(): Agent[];
+  getProjectIdForAgent(agentId: string): string | undefined;
   getRunningCount(): number;
   spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string }): Agent;
   terminateAgent(id: string): boolean;
@@ -71,10 +72,27 @@ export interface CommandHandlerContext extends CommandContext {
   pendingSystemActions: Map<string, { type: string; value: number; agentId: string }>;
 }
 
+// ── CommandArg — structured argument metadata for help generation ─────
+
+export interface CommandArg {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  default?: string;
+}
+
 // ── CommandEntry — uniform return type from all modules ──────────────
 
 export interface CommandEntry {
   regex: RegExp;
   name: string;
   handler: (agent: Agent, data: string) => void;
+  /** Help metadata — used to auto-generate the command help menu. */
+  help?: {
+    description: string;
+    example: string;
+    category: string;
+    args?: CommandArg[];
+  };
 }

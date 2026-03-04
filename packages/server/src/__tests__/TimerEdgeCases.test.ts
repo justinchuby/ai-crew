@@ -102,23 +102,23 @@ describe('SET_TIMER delay validation', () => {
 // ── CANCEL_TIMER validation ─────────────────────────────────────────
 
 describe('CANCEL_TIMER validation', () => {
-  it('accepts id field', () => {
-    const result = cancelTimerSchema.safeParse({ id: 'tmr-123' });
+  it('accepts timerId field', () => {
+    const result = cancelTimerSchema.safeParse({ timerId: 'tmr-123' });
     expect(result.success).toBe(true);
   });
 
-  it('accepts name field', () => {
-    const result = cancelTimerSchema.safeParse({ name: 'check-build' });
+  it('accepts label field', () => {
+    const result = cancelTimerSchema.safeParse({ label: 'check-build' });
     expect(result.success).toBe(true);
   });
 
-  it('rejects when both id and name missing', () => {
+  it('rejects when both timerId and label missing', () => {
     const result = cancelTimerSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 
-  it('accepts both id and name (id takes precedence in handler)', () => {
-    const result = cancelTimerSchema.safeParse({ id: 'tmr-123', name: 'backup' });
+  it('accepts both timerId and label (timerId takes precedence in handler)', () => {
+    const result = cancelTimerSchema.safeParse({ timerId: 'tmr-123', label: 'backup' });
     expect(result.success).toBe(true);
   });
 });

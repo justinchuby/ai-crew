@@ -49,7 +49,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   });
   ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Completion report → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
     toAgentId: parent.id, toRole: parent.role.id,
-  });
+  }, ctx.getProjectIdForAgent(agent.id) ?? '');
   ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status: 'completed' });
 
   if (agent.parentId) {
@@ -124,7 +124,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
   });
   ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Exit report (${status}) → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
     toAgentId: parent.id, toRole: parent.role.id,
-  });
+  }, ctx.getProjectIdForAgent(agent.id) ?? '');
   ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
 
   if (agent.parentId) {

@@ -7,7 +7,7 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; fill: string }
   running:    { bg: 'bg-blue-500/30',    border: 'border-blue-500',    fill: 'rgb(59 130 246 / 0.35)' },
   idle:       { bg: 'bg-gray-300/30',    border: 'border-gray-400',    fill: 'rgb(156 163 175 / 0.25)' },
   creating:   { bg: 'bg-amber-400/30',   border: 'border-amber-500',   fill: 'rgb(251 191 36 / 0.35)' },
-  completed:  { bg: 'bg-green-500/30',   border: 'border-green-500',   fill: 'rgb(5 150 105 / 0.35)' },
+  completed:  { bg: 'bg-purple-500/30',   border: 'border-purple-500',   fill: 'rgb(168 85 247 / 0.35)' },
   failed:     { bg: 'bg-red-500/30',     border: 'border-red-500',     fill: 'rgb(239 68 68 / 0.35)' },
   terminated: { bg: 'bg-orange-500/30',  border: 'border-orange-500',  fill: 'rgb(249 115 22 / 0.35)' },
 };

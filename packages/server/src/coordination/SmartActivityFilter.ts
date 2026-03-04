@@ -47,6 +47,28 @@ const DEDUPLICATE_TYPES = new Set<ActionType>([
   'lock_released',
 ]);
 
+/**
+ * Inter-agent DMs and group messages are noise for the lead.
+ * Keep: completion reports, delegation acks, broadcasts, messages to lead.
+ * Drop: DMs between agents, group chat chatter.
+ */
+function isInterAgentNoise(entry: ActivityEntry): boolean {
+  // All group messages are inter-agent chatter
+  if (entry.actionType === 'group_message') return true;
+
+  // For message_sent, check if it's a DM between agents (not a completion/delegation report)
+  if (entry.actionType === 'message_sent') {
+    const details = typeof entry.details === 'string'
+      ? (() => { try { return JSON.parse(entry.details); } catch { return {}; } })()
+      : entry.details ?? {};
+
+    // Direct messages between agents
+    if (details.type === 'direct_message') return true;
+  }
+
+  return false;
+}
+
 export function getActivityPriority(actionType: ActionType): ActivityPriority {
   return PRIORITY_MAP[actionType] ?? 'low';
 }
@@ -60,10 +82,13 @@ export class SmartActivityFilter {
    * @returns Filtered entries, newest-first
    */
   filter(entries: ActivityEntry[], limit: number = 20): ActivityEntry[] {
-    // Step 1: Deduplicate — for noisy action types, keep only the latest per agent
-    const deduped = this.deduplicatePerAgent(entries);
+    // Step 1: Remove inter-agent DMs and group messages (noise for lead)
+    const relevant = entries.filter((e) => !isInterAgentNoise(e));
 
-    // Step 2: Partition by priority
+    // Step 2: Deduplicate — for noisy action types, keep only the latest per agent
+    const deduped = this.deduplicatePerAgent(relevant);
+
+    // Step 3: Partition by priority
     const high: ActivityEntry[] = [];
     const medium: ActivityEntry[] = [];
     const low: ActivityEntry[] = [];
@@ -75,14 +100,14 @@ export class SmartActivityFilter {
       else low.push(entry);
     }
 
-    // Step 3: Compose result — high first, then medium, then low, up to limit
+    // Step 4: Compose result — high first, then medium, then low, up to limit
     const result: ActivityEntry[] = [...high.slice(0, limit)];
     const mediumSlots = Math.max(0, limit - result.length);
     if (mediumSlots > 0) result.push(...medium.slice(0, mediumSlots));
     const lowSlots = Math.max(0, limit - result.length);
     if (lowSlots > 0) result.push(...low.slice(0, lowSlots));
 
-    // Step 4: Re-sort by id desc (preserve newest-first order)
+    // Step 5: Re-sort by id desc (preserve newest-first order)
     return result.sort((a, b) => b.id - a.id);
   }
 

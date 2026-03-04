@@ -17,6 +17,7 @@ export interface CollectiveMemoryEntry {
   key: string;
   value: string;
   source: string;
+  projectId: string;
   createdAt: string;
   lastUsedAt: string;
   useCount: number;
@@ -29,6 +30,7 @@ function rowToEntry(row: typeof collectiveMemory.$inferSelect): CollectiveMemory
     key: row.key,
     value: row.value,
     source: row.source,
+    projectId: row.projectId ?? '',
     createdAt: row.createdAt!,
     lastUsedAt: row.lastUsedAt!,
     useCount: row.useCount!,
@@ -44,14 +46,15 @@ export class CollectiveMemory {
     this.db = db;
   }
 
-  /** Store a memory (upsert by category+key) */
-  remember(category: MemoryCategory, key: string, value: string, sourceAgentId: string): CollectiveMemoryEntry {
+  /** Store a memory (upsert by category+key+projectId) */
+  remember(category: MemoryCategory, key: string, value: string, sourceAgentId: string, projectId = ''): CollectiveMemoryEntry {
     const existing = this.db.drizzle
       .select({ id: collectiveMemory.id })
       .from(collectiveMemory)
       .where(and(
         eq(collectiveMemory.category, category),
         eq(collectiveMemory.key, key),
+        eq(collectiveMemory.projectId, projectId),
       ))
       .get();
 
@@ -71,17 +74,20 @@ export class CollectiveMemory {
 
     const result = this.db.drizzle
       .insert(collectiveMemory)
-      .values({ category, key, value, source: sourceAgentId })
+      .values({ category, key, value, source: sourceAgentId, projectId })
       .run();
 
     return this.getById(Number(result.lastInsertRowid))!;
   }
 
-  /** Retrieve memories by category, optionally filtered by key prefix. Sorted by useCount desc. */
-  recall(category: MemoryCategory, keyPrefix?: string): CollectiveMemoryEntry[] {
+  /** Retrieve memories by category, optionally filtered by key prefix and project. Sorted by useCount desc. */
+  recall(category: MemoryCategory, keyPrefix?: string, projectId?: string): CollectiveMemoryEntry[] {
     const conditions = [eq(collectiveMemory.category, category)];
     if (keyPrefix) {
       conditions.push(like(collectiveMemory.key, `${escapeLike(keyPrefix)}%`));
+    }
+    if (projectId !== undefined) {
+      conditions.push(eq(collectiveMemory.projectId, projectId));
     }
 
     const rows = this.db.drizzle
@@ -105,11 +111,16 @@ export class CollectiveMemory {
   }
 
   /** Retrieve all memories related to a file path (key contains the filepath) */
-  recallForFile(filepath: string): CollectiveMemoryEntry[] {
+  recallForFile(filepath: string, projectId?: string): CollectiveMemoryEntry[] {
+    const conditions = [like(collectiveMemory.key, `%${escapeLike(filepath)}%`)];
+    if (projectId !== undefined) {
+      conditions.push(eq(collectiveMemory.projectId, projectId));
+    }
+
     const rows = this.db.drizzle
       .select()
       .from(collectiveMemory)
-      .where(like(collectiveMemory.key, `%${escapeLike(filepath)}%`))
+      .where(and(...conditions))
       .orderBy(desc(collectiveMemory.useCount))
       .all();
 
@@ -117,22 +128,28 @@ export class CollectiveMemory {
   }
 
   /** Retrieve all memories across all categories, sorted by useCount desc */
-  getAll(): CollectiveMemoryEntry[] {
+  getAll(projectId?: string): CollectiveMemoryEntry[] {
+    const condition = projectId !== undefined ? eq(collectiveMemory.projectId, projectId) : undefined;
     return this.db.drizzle
       .select()
       .from(collectiveMemory)
+      .where(condition)
       .orderBy(desc(collectiveMemory.useCount))
       .all()
       .map(rowToEntry);
   }
 
-  /** Remove memories not used in the last N days */
-  prune(maxAgeDays: number): number {
+  /** Remove memories not used in the last N days, optionally scoped to a project */
+  prune(maxAgeDays: number, projectId?: string): number {
+    const conditions = [
+      sql`julianday('now') - julianday(${collectiveMemory.lastUsedAt}) > ${maxAgeDays}`,
+    ];
+    if (projectId !== undefined) {
+      conditions.push(eq(collectiveMemory.projectId, projectId));
+    }
     const result = this.db.drizzle
       .delete(collectiveMemory)
-      .where(
-        sql`julianday('now') - julianday(${collectiveMemory.lastUsedAt}) > ${maxAgeDays}`,
-      )
+      .where(and(...conditions))
       .run();
     return result.changes;
   }

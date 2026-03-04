@@ -13,12 +13,15 @@ interface ClientConnection {
   id: string;
   ws: WebSocket;
   subscribedAgents: Set<string>;
+  subscribedProject: string | null;
 }
 
 export class WebSocketServer {
   private wss: WsServer;
   private clients: Map<string, ClientConnection> = new Map();
   private eventCleanups: Array<() => void> = [];
+  private agentManager: AgentManager;
+  private lockRegistry: FileLockRegistry;
 
   constructor(
     server: HttpServer,
@@ -29,6 +32,8 @@ export class WebSocketServer {
     chatGroupRegistry: ChatGroupRegistry,
   ) {
     this.wss = new WsServer({ server, path: '/ws' });
+    this.agentManager = agentManager;
+    this.lockRegistry = lockRegistry;
 
     this.wss.on('connection', (ws, req) => {
       // Check auth if secret is configured (allow localhost without token)
@@ -46,13 +51,13 @@ export class WebSocketServer {
       }
 
       const clientId = uuid();
-      const client: ClientConnection = { id: clientId, ws, subscribedAgents: new Set() };
+      const client: ClientConnection = { id: clientId, ws, subscribedAgents: new Set(), subscribedProject: null };
       this.clients.set(clientId, client);
 
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
-          this.handleMessage(client, msg, agentManager);
+          this.handleMessage(client, msg);
         } catch {
           try { ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' })); } catch { /* broken */ }
         }
@@ -70,7 +75,8 @@ export class WebSocketServer {
       // Flush any buffered agent messages so the new client gets complete data
       agentManager.flushAllMessages();
 
-      // Send current state on connect
+      // Send full state on connect — browser UI needs all data; agent clients
+      // that call subscribe-project will get re-filtered data at that point.
       ws.send(
         JSON.stringify({
           type: 'init',
@@ -95,101 +101,121 @@ export class WebSocketServer {
   }
 
   private wireAgentEvents(agentManager: AgentManager): void {
-    this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
-      this.broadcast(
-        { type: 'agent:data', agentId, data: text },
-        (c) => c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*'),
-      );
-    });
-
     this.track(agentManager, 'agent:spawned', (agentJson: any) => {
-      this.broadcastAll({ type: 'agent:spawned', agent: agentJson });
+      this.broadcastToProject({ type: 'agent:spawned', agent: agentJson }, agentJson.projectId);
     });
 
     this.track(agentManager, 'agent:terminated', (agentId: string) => {
-      this.broadcastAll({ type: 'agent:terminated', agentId });
+      const projectId = this.resolveAgentProjectId(agentId);
+      this.broadcastToProject({ type: 'agent:terminated', agentId }, projectId);
     });
 
     this.track(agentManager, 'agent:exit', ({ agentId, code }: { agentId: string; code: number }) => {
-      this.broadcastAll({ type: 'agent:exit', agentId, code });
+      const projectId = this.resolveAgentProjectId(agentId);
+      this.broadcastToProject({ type: 'agent:exit', agentId, code }, projectId);
     });
 
     this.track(agentManager, 'agent:status', (data: any) => {
-      this.broadcastAll({ type: 'agent:status', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:status', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:crashed', (data: any) => {
-      this.broadcastAll({ type: 'agent:crashed', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:crashed', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:auto_restarted', (data: any) => {
-      this.broadcastAll({ type: 'agent:auto_restarted', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:auto_restarted', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:restart_limit', (data: any) => {
-      this.broadcastAll({ type: 'agent:restart_limit', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:restart_limit', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:sub_spawned', (data: any) => {
-      this.broadcastAll({ type: 'agent:sub_spawned', parentId: data.parentId, child: data.child });
+      const projectId = this.resolveAgentProjectId(data.parentId);
+      this.broadcastToProject({ type: 'agent:sub_spawned', parentId: data.parentId, child: data.child }, projectId);
     });
 
     this.track(agentManager, 'agent:tool_call', (data: any) => {
-      this.broadcastAll({ type: 'agent:tool_call', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:tool_call', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
-      this.broadcastAll({ type: 'agent:text', agentId, text });
+      const projectId = this.resolveAgentProjectId(agentId);
+      this.broadcast(
+        { type: 'agent:text', agentId, text },
+        (c) =>
+          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
+          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
+      );
     });
 
     this.track(agentManager, 'agent:content', (data: any) => {
-      this.broadcastAll({ type: 'agent:content', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:content', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:thinking', (data: any) => {
-      this.broadcastAll({ type: 'agent:thinking', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:thinking', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:plan', (data: any) => {
-      this.broadcastAll({ type: 'agent:plan', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:plan', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:permission_request', (data: any) => {
-      this.broadcastAll({ type: 'agent:permission_request', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:permission_request', ...data }, projectId);
     });
 
     this.track(agentManager, 'lead:decision', (data: any) => {
-      this.broadcastAll({ type: 'lead:decision', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'lead:decision', ...data }, projectId);
     });
 
     this.track(agentManager, 'lead:progress', (data: any) => {
-      this.broadcastAll({ type: 'lead:progress', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId ?? data.leadId);
+      this.broadcastToProject({ type: 'lead:progress', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:delegated', (data: any) => {
-      this.broadcastAll({ type: 'agent:delegated', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:delegated', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:completion_reported', (data: any) => {
-      this.broadcastAll({ type: 'agent:completion_reported', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:completion_reported', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:message_sent', (data: any) => {
-      this.broadcastAll({ type: 'agent:message_sent', ...data });
+      const projectId = this.resolveAgentProjectId(data.from);
+      this.broadcastToProject({ type: 'agent:message_sent', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:session_ready', (data: any) => {
-      this.broadcastAll({ type: 'agent:session_ready', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:session_ready', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:context_compacted', (data: any) => {
-      this.broadcastAll({ type: 'agent:context_compacted', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:context_compacted', ...data }, projectId);
     });
 
     this.track(agentManager, 'dag:updated', (data: any) => {
-      this.broadcastAll({ type: 'dag:updated', ...data });
+      const projectId = this.resolveAgentProjectId(data.leadId);
+      this.broadcastToProject({ type: 'dag:updated', ...data }, projectId);
     });
 
+    // system:paused is global — always broadcast to all clients
     this.track(agentManager, 'system:paused', (data: any) => {
       this.broadcastAll({ type: 'system:paused', ...data });
     });
@@ -197,54 +223,64 @@ export class WebSocketServer {
 
   private wireCoordinationEvents(lockRegistry: FileLockRegistry, activityLedger: ActivityLedger): void {
     this.track(lockRegistry, 'lock:acquired', (data: any) => {
-      this.broadcastAll({ type: 'lock:acquired', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'lock:acquired', ...data }, projectId);
     });
 
     this.track(lockRegistry, 'lock:released', (data: any) => {
-      this.broadcastAll({ type: 'lock:released', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'lock:released', ...data }, projectId);
     });
 
     this.track(lockRegistry, 'lock:expired', (data: any) => {
-      this.broadcastAll({ type: 'lock:expired', ...data });
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'lock:expired', ...data }, projectId);
     });
 
     this.track(activityLedger, 'activity', (entry: any) => {
-      this.broadcastAll({ type: 'activity', entry });
+      const projectId = this.resolveAgentProjectId(entry.agentId);
+      this.broadcastToProject({ type: 'activity', entry }, projectId);
     });
   }
 
   private wireDecisionEvents(decisionLog: DecisionLog): void {
     this.track(decisionLog, 'decision:confirmed', (decision: any) => {
-      this.broadcastAll({ type: 'decision:confirmed', decision });
+      const projectId = decision.projectId ?? this.resolveAgentProjectId(decision.agentId);
+      this.broadcastToProject({ type: 'decision:confirmed', decision }, projectId);
     });
 
     this.track(decisionLog, 'decision:rejected', (decision: any) => {
-      this.broadcastAll({ type: 'decision:rejected', decision });
+      const projectId = decision.projectId ?? this.resolveAgentProjectId(decision.agentId);
+      this.broadcastToProject({ type: 'decision:rejected', decision }, projectId);
     });
   }
 
   private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
     this.track(chatGroupRegistry, 'group:created', (data: any) => {
-      this.broadcastAll({ type: 'group:created', ...data });
+      const projectId = data.projectId ?? this.resolveAgentProjectId(data.leadId);
+      this.broadcastToProject({ type: 'group:created', ...data }, projectId);
     });
     this.track(chatGroupRegistry, 'group:message', (data: any) => {
-      this.broadcastAll({ type: 'group:message', ...data });
+      const projectId = data.projectId ?? this.resolveAgentProjectId(data.message?.leadId ?? data.leadId);
+      this.broadcastToProject({ type: 'group:message', ...data }, projectId);
     });
     this.track(chatGroupRegistry, 'group:member_added', (data: any) => {
-      this.broadcastAll({ type: 'group:member_added', ...data });
+      const projectId = data.projectId ?? this.resolveAgentProjectId(data.leadId);
+      this.broadcastToProject({ type: 'group:member_added', ...data }, projectId);
     });
     this.track(chatGroupRegistry, 'group:member_removed', (data: any) => {
-      this.broadcastAll({ type: 'group:member_removed', ...data });
+      const projectId = data.projectId ?? this.resolveAgentProjectId(data.leadId);
+      this.broadcastToProject({ type: 'group:member_removed', ...data }, projectId);
     });
     this.track(chatGroupRegistry, 'group:reaction', (data: any) => {
-      this.broadcastAll({ type: 'group:reaction', ...data });
+      const projectId = data.projectId ?? this.resolveAgentProjectId(data.leadId);
+      this.broadcastToProject({ type: 'group:reaction', ...data }, projectId);
     });
   }
 
   private handleMessage(
     client: ClientConnection,
     msg: any,
-    agentManager: AgentManager,
   ): void {
     switch (msg.type) {
       case 'subscribe':
@@ -252,7 +288,7 @@ export class WebSocketServer {
         client.subscribedAgents.add(msg.agentId || '*');
         // Send buffered output
         if (msg.agentId && msg.agentId !== '*') {
-          const agent = agentManager.get(msg.agentId);
+          const agent = this.agentManager.get(msg.agentId);
           if (agent) {
             client.ws.send(
               JSON.stringify({
@@ -269,10 +305,28 @@ export class WebSocketServer {
         client.subscribedAgents.delete(msg.agentId || '*');
         break;
 
+      case 'subscribe-project':
+        client.subscribedProject = msg.projectId || null;
+        // Re-send filtered init so client immediately sees only its project's data
+        if (client.subscribedProject) {
+          const agents = this.agentManager.getByProject(client.subscribedProject);
+          try {
+            client.ws.send(
+              JSON.stringify({
+                type: 'init',
+                agents: agents.map((a) => a.toJSON()),
+                locks: this.lockRegistry.getByProject(client.subscribedProject),
+                systemPaused: this.agentManager.isSystemPaused,
+              }),
+            );
+          } catch { /* connection broken */ }
+        }
+        break;
+
       case 'input':
         // Send input to an agent
         if (msg.agentId) {
-          const agent = agentManager.get(msg.agentId);
+          const agent = this.agentManager.get(msg.agentId);
           if (agent) {
             logger.info('ws', `Input → ${agent.role.name} (${msg.agentId.slice(0, 8)}): "${(msg.text || '').slice(0, 80)}"`);
             agent.write(msg.text);
@@ -288,7 +342,7 @@ export class WebSocketServer {
 
       case 'permission_response':
         if (msg.agentId) {
-          agentManager.resolvePermission(msg.agentId, msg.approved);
+          this.agentManager.resolvePermission(msg.agentId, msg.approved);
         }
         break;
     }
@@ -311,9 +365,22 @@ export class WebSocketServer {
     this.broadcast(msg, () => true);
   }
 
-  /** Public broadcast for external event sources (e.g., AlertEngine) */
-  broadcastEvent(msg: any): void {
-    this.broadcastAll(msg);
+  /** Broadcast only to clients subscribed to the given project (or all if no project filter) */
+  private broadcastToProject(msg: any, projectId?: string): void {
+    this.broadcast(msg, (c) =>
+      !c.subscribedProject || !projectId || c.subscribedProject === projectId,
+    );
+  }
+
+  /** Resolve projectId from an agentId via AgentManager's parent-chain walk */
+  private resolveAgentProjectId(agentId: string | undefined): string | undefined {
+    if (!agentId) return undefined;
+    return this.agentManager.getProjectIdForAgent(agentId);
+  }
+
+  /** Public broadcast for external event sources (e.g., AlertEngine, TimerRegistry) */
+  broadcastEvent(msg: any, projectId?: string): void {
+    this.broadcastToProject(msg, projectId);
   }
 
   /** Remove all event listeners and close the WebSocket server */
