@@ -62,7 +62,12 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
     if (initialPrompt) {
       return conn.prompt(initialPrompt);
     }
-  }).catch((_err) => {
+  }).catch((err) => {
+    logger.error('acp', `Agent ${agent.id.slice(0, 8)} ACP start failed: ${err?.message || err}`, {
+      cliCommand: config.cliCommand,
+      cwd: agent.cwd || process.cwd(),
+      role: agent.role?.id,
+    });
     agent.status = 'failed';
     agent._notifyExit(1);
   });

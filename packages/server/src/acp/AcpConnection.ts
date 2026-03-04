@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execFileSync, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 
@@ -86,7 +86,27 @@ export class AcpConnection extends EventEmitter {
     return sessionId;
   }
 
+  /**
+   * Verify that the CLI binary exists in PATH before attempting to spawn.
+   * Throws a descriptive error if the command is not found.
+   */
+  private validateCliCommand(command: string): void {
+    try {
+      // Use 'command -v' on Unix (works in sh/bash/zsh); 'where' on Windows
+      const checkCmd = process.platform === 'win32' ? 'where' : 'command';
+      const checkArgs = process.platform === 'win32' ? [command] : ['-v', command];
+      execFileSync(checkCmd, checkArgs, { timeout: 3000, stdio: 'ignore' });
+    } catch {
+      throw new Error(
+        `CLI binary "${command}" not found in PATH. ` +
+        `Install it or set COPILOT_CLI_PATH to the full path of the binary.`,
+      );
+    }
+  }
+
   private async spawnAndConnect(opts: AcpConnectionOptions): Promise<void> {
+    this.validateCliCommand(opts.cliCommand);
+
     const args = ['--acp', '--stdio', ...(opts.cliArgs || [])];
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -94,8 +114,18 @@ export class AcpConnection extends EventEmitter {
     });
 
     if (!this.process.stdin || !this.process.stdout) {
-      throw new Error('Failed to start Copilot ACP process');
+      throw new Error('Failed to start ACP process — stdin/stdout not available');
     }
+
+    this.process.on('error', (err) => {
+      const errCode = (err as NodeJS.ErrnoException).code;
+      logger.error('acp', `Spawn error for "${opts.cliCommand}": ${err.message}`, {
+        code: errCode,
+        command: opts.cliCommand,
+      });
+      this._isConnected = false;
+      this.emit('exit', 1);
+    });
 
     this.process.on('exit', (code) => {
       this._isConnected = false;
