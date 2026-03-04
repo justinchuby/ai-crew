@@ -29,6 +29,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
     activityLedger: {
       log: vi.fn(),
     },
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
     delegations: new Map(),
     reportedCompletions: new Set(),
     pendingSystemActions: new Map(),
@@ -223,6 +224,7 @@ describe('CoordCommands — COMMIT handler', () => {
         files: ['a.ts', 'b.ts'],
         message: 'ship it',
       }),
+      expect.any(String),
     );
   });
 

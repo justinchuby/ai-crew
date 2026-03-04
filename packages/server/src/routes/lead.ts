@@ -84,8 +84,12 @@ export function leadRoutes(ctx: AppContext): Router {
     }
   });
 
-  router.get('/lead', (_req, res) => {
-    const leads = agentManager.getAll()
+  router.get('/lead', (req, res) => {
+    const projectId = req.query.projectId as string | undefined;
+    const allAgents = projectId
+      ? agentManager.getByProject(projectId)
+      : agentManager.getAll();
+    const leads = allAgents
       .filter((a) => a.role.id === 'lead' && !a.parentId)
       .map((a) => a.toJSON());
     res.json(leads);

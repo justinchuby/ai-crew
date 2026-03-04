@@ -40,12 +40,13 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
     const request = parseCommandPayload(agent, match[1], lockFileSchema, 'LOCK_FILE');
     if (!request) return;
     const agentRole = agent.role?.id ?? 'unknown';
-    const result = ctx.lockRegistry.acquire(agent.id, agentRole, request.filePath, request.reason);
+    const projectId = ctx.getProjectIdForAgent(agent.id) ?? '';
+    const result = ctx.lockRegistry.acquire(agent.id, agentRole, request.filePath, request.reason, 300, projectId);
     if (result.ok) {
       ctx.activityLedger.log(agent.id, agentRole, 'lock_acquired', `Locked ${request.filePath}`, {
         filePath: request.filePath,
         reason: request.reason,
-      });
+      }, projectId);
       agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with ⟦⟦ UNLOCK_FILE {"filePath": "${request.filePath}"} ⟧⟧`);
     } else {
       const holderShort = result.holder?.slice(0, 8) ?? 'unknown';
@@ -53,7 +54,7 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
       ctx.activityLedger.log(agent.id, agentRole, 'lock_denied', `Lock denied on ${request.filePath} (held by ${holderShort})`, {
         filePath: request.filePath,
         holder: result.holder,
-      });
+      }, projectId);
     }
   } catch (err) {
     logger.debug('command', 'Failed to parse LOCK_FILE command', { error: (err as Error).message });
@@ -92,7 +93,7 @@ function releaseLock(ctx: CommandHandlerContext, agent: Agent, filePath: string)
   const released = ctx.lockRegistry.release(agent.id, filePath);
   if (released) {
     const agentRole = agent.role?.id ?? 'unknown';
-    ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${filePath}`, { filePath });
+    ctx.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${filePath}`, { filePath }, ctx.getProjectIdForAgent(agent.id) ?? '');
     agent.sendMessage(`[System] Lock released on \`${filePath}\`.`);
   }
 }
@@ -111,6 +112,7 @@ function handleActivity(ctx: CommandHandlerContext, agent: Agent, data: string):
       entry.actionType ?? 'message_sent' as any,
       entry.summary ?? '',
       entry.details ?? {},
+      ctx.getProjectIdForAgent(agent.id) ?? '',
     );
   } catch (err) {
     logger.debug('command', 'Failed to parse ACTIVITY command', { error: (err as Error).message });
@@ -270,6 +272,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
         ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'file_edit',
           `Commit: ${message.slice(0, 120)} (${files.length} files)`,
           { type: 'commit', files, message },
+          ctx.getProjectIdForAgent(agent.id) ?? '',
         );
         logger.info('commit', `COMMIT for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
       })

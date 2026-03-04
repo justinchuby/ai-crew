@@ -147,12 +147,12 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       });
       ctx.activityLedger.log(child.id, role.id, 'message_sent', `Created & delegated ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
       ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
       ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
         toAgentId: child.id, toRole: role.id, childId: child.id, childRole: role.id, delegationId: delegation.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
     } else {
       const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''} — ready for tasks.`;
       agent.sendMessage(ackMsg);
@@ -163,7 +163,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       });
       ctx.activityLedger.log(child.id, role.id, 'message_sent', `Agent created ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
     }
 
     ctx.agentMemory.store(agent.id, child.id, 'role', role.name);
@@ -303,11 +303,11 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     });
     ctx.activityLedger.log(child.id, child.role.id, 'message_sent', `Delegation ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
       toAgentId: agent.id, toRole: agent.role.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 100)}`, {
       toAgentId: child.id, toRole: child.role.id, childId: child.id, childRole: child.role.id, delegationId: delegation.id,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
@@ -361,7 +361,7 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
       terminatedAgentId: target.id,
       terminatedRole: target.role.id,
       sessionId: sessionId || null,
-    });
+    }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     logger.info('agent', `Lead ${agent.id.slice(0, 8)} terminated ${roleName} (${shortId})${req.reason ? ': ' + req.reason : ''}`);
   } catch (err) {
@@ -415,7 +415,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         targetAgentId: targetId,
         cancelledDelegations: cancelledCount,
         clearedMessages: cleared.count,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
       logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}), cleared ${cleared.count} queued message(s)`);
 
@@ -447,7 +447,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         delegationId: req.delegationId,
         targetAgentId: del.toAgentId,
         clearedMessages: cleared.count,
-      });
+      }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
       logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled delegation ${req.delegationId} to ${del.toRole} (${del.toAgentId.slice(0, 8)})`);
 

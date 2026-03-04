@@ -49,6 +49,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       getByAgent: vi.fn().mockReturnValue([]),
     },
     activityLedger: { log: vi.fn() },
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
     delegations: new Map(),
     reportedCompletions: new Set(),
     taskDAG: {

@@ -165,6 +165,8 @@ describe('CommandDispatcher', () => {
         'lead',
         'src/index.ts',
         'editing',
+        300,
+        expect.any(String),
       );
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Lock acquired'),
@@ -198,6 +200,7 @@ describe('CommandDispatcher', () => {
         'file_edit',
         'edited index.ts',
         expect.any(Object),
+        expect.any(String),
       );
     });
   });
@@ -596,6 +599,8 @@ describe('CommandDispatcher', () => {
         'lead',
         'src/main.ts',
         'editing',
+        300,
+        expect.any(String),
       );
       expect(ctx.activityLedger.log).toHaveBeenCalledWith(
         leadAgent.id,
@@ -603,6 +608,7 @@ describe('CommandDispatcher', () => {
         'file_edit',
         'changed main',
         expect.any(Object),
+        expect.any(String),
       );
     });
   });

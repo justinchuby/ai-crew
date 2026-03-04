@@ -121,6 +121,7 @@ export class CapabilityInjector {
       'status_change',
       `Acquired "${cap.name}" capability: ${reason}`,
       { capability: capabilityId, reason },
+      agent.projectId ?? '',
     );
 
     logger.info(

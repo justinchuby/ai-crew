@@ -201,6 +201,7 @@ const ciRunner = new CIRunner({
 eventPipeline.register(ciRunner.createHandler());
 ciRunner.on('ci:complete', (result: { success: boolean }) => {
   wsServer.broadcastEvent({ type: 'ci:complete', success: result.success });
+  // CI events are global — no project scoping (they apply to the shared repo)
 });
 
 // Proactive alert engine — watches for stuck agents, context pressure, stale decisions
@@ -230,13 +231,16 @@ timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; messag
   if (agent && agent.status === 'running') {
     agent.sendMessage(`[System Timer "${timer.label}"] ${timer.message}`);
   }
-  wsServer.broadcastEvent({ type: 'timer:fired', timer });
+  const timerProjectId = agentManager.getProjectIdForAgent(timer.agentId);
+  wsServer.broadcastEvent({ type: 'timer:fired', timer }, timerProjectId);
 });
 timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string }) => {
-  wsServer.broadcastEvent({ type: 'timer:created', timer });
+  const timerProjectId = agentManager.getProjectIdForAgent(timer.agentId);
+  wsServer.broadcastEvent({ type: 'timer:created', timer }, timerProjectId);
 });
 timerRegistry.on('timer:cancelled', (timer: { id: string; agentId: string; label: string }) => {
-  wsServer.broadcastEvent({ type: 'timer:cancelled', timer });
+  const timerProjectId = agentManager.getProjectIdForAgent(timer.agentId);
+  wsServer.broadcastEvent({ type: 'timer:cancelled', timer }, timerProjectId);
 });
 
 // Wire dag:updated → eager scheduler re-evaluates immediately on any DAG change

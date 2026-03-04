@@ -46,7 +46,7 @@ function handleDeferIssue(ctx: CommandHandlerContext, agent: Agent, data: string
       req.sourceFile || req.file || '',
     );
     agent.sendMessage(`[System] Deferred issue #${issue.id} recorded (${issue.severity}): ${issue.description.slice(0, 100)}`);
-    ctx.activityLedger.log(agent.id, agent.role.name, 'deferred_issue', `Deferred ${issue.severity}: ${issue.description.slice(0, 120)}`);
+    ctx.activityLedger.log(agent.id, agent.role.name, 'deferred_issue', `Deferred ${issue.severity}: ${issue.description.slice(0, 120)}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
     ctx.emit('deferred_issue:created', { leadId, issue });
   } catch (err: any) {
     agent.sendMessage(`[System] DEFER_ISSUE error: ${err.message}`);

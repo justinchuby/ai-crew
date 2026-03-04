@@ -59,6 +59,7 @@ describe('INTERRUPT command', () => {
       'lead-001', 'lead', 'agent_interrupted',
       expect.stringContaining('Switch to task X'),
       expect.objectContaining({ toAgentId: 'child-001' }),
+      expect.any(String),
     );
     expect(ctx.emit).toHaveBeenCalledWith('agent:interrupted', expect.objectContaining({
       from: 'lead-001', to: 'child-001',

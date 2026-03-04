@@ -147,6 +147,7 @@ describe('DIRECT_MESSAGE', () => {
       'message_sent',
       expect.stringContaining('Logging test'),
       expect.objectContaining({ type: 'direct_message', targetId: target.id }),
+      expect.any(String),
     );
   });
 

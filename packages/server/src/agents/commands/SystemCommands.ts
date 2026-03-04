@@ -117,7 +117,7 @@ function handleHaltHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
   }
   ctx.markHumanInterrupt(agent.id);
   logger.info('lead', `Heartbeat halted by ${agent.role.name} (${agent.id.slice(0, 8)})`);
-  ctx.activityLedger.log(agent.id, agent.role.id, 'heartbeat_halted', `Heartbeat halted by lead`, {});
+  ctx.activityLedger.log(agent.id, agent.role.id, 'heartbeat_halted', `Heartbeat halted by lead`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
   agent.sendMessage('[System] Heartbeat nudges paused. They will resume automatically when you start running again.');
 }
 
@@ -144,7 +144,7 @@ function handleRequestLimitChange(ctx: CommandHandlerContext, agent: Agent, data
     ctx.pendingSystemActions.set(decision.id, { type: 'set_max_concurrent', value: newLimit, agentId: agent.id });
     ctx.decisionLog.markSystemDecision(decision.id);
     logger.info('lead', `Limit change requested by ${agent.role.name} (${agent.id.slice(0, 8)}): ${currentLimit} → ${newLimit}`);
-    ctx.activityLedger.log(agent.id, agent.role.id, 'limit_change_requested', `Requested agent limit change: ${currentLimit} → ${newLimit}`, { currentLimit, newLimit, reason: req.reason });
+    ctx.activityLedger.log(agent.id, agent.role.id, 'limit_change_requested', `Requested agent limit change: ${currentLimit} → ${newLimit}`, { currentLimit, newLimit, reason: req.reason }, ctx.getProjectIdForAgent(agent.id) ?? '');
     agent.sendMessage(`[System] Your request to change the agent limit from ${currentLimit} to ${newLimit} has been submitted for user approval. You will be notified when the user responds.`);
   } catch {
     agent.sendMessage('[System] REQUEST_LIMIT_CHANGE error: invalid payload. Use {"limit": 15, "reason": "..."}');

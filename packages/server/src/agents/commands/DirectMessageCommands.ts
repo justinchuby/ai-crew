@@ -59,6 +59,7 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
       'message_sent',
       `DM to ${target.role.id} (${target.id.slice(0, 8)}): ${content.slice(0, 100)}`,
       { type: 'direct_message', targetId: target.id, targetRole: target.role.id },
+      ctx.getProjectIdForAgent(agent.id) ?? '',
     );
   } catch {
     agent.sendMessage('[System] DIRECT_MESSAGE error: use {"to": "agent-id", "content": "your message"}');
