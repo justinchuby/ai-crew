@@ -122,6 +122,48 @@ describe('ModelConfigDefaults', () => {
     it('has secretary defaults', () => {
       expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-4.1', 'gpt-5.2', 'gpt-5.1']);
     });
+
+    it('has qa-tester defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG['qa-tester']).toEqual(['claude-sonnet-4.6']);
+    });
+
+    it('has designer defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG.designer).toEqual(['claude-opus-4.6']);
+    });
+
+    it('has product-manager defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG['product-manager']).toEqual(['gpt-5.3-codex']);
+    });
+
+    it('has generalist defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG.generalist).toEqual(['claude-opus-4.6']);
+    });
+
+    it('has radical-thinker defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG['radical-thinker']).toEqual(['gemini-3-pro-preview']);
+    });
+
+    it('has agent defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG.agent).toEqual(['claude-sonnet-4.6']);
+    });
+
+    it('has lead defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG.lead).toEqual(['claude-opus-4.6']);
+    });
+
+    it('has defaults for all 14 built-in roles', () => {
+      const expectedRoles = [
+        'developer', 'architect', 'code-reviewer', 'critical-reviewer',
+        'readability-reviewer', 'tech-writer', 'secretary', 'qa-tester',
+        'designer', 'product-manager', 'generalist', 'radical-thinker',
+        'agent', 'lead',
+      ];
+      expect(Object.keys(DEFAULT_MODEL_CONFIG)).toHaveLength(expectedRoles.length);
+      for (const role of expectedRoles) {
+        expect(DEFAULT_MODEL_CONFIG[role], `missing default for role: ${role}`).toBeDefined();
+        expect(DEFAULT_MODEL_CONFIG[role].length, `empty defaults for role: ${role}`).toBeGreaterThan(0);
+      }
+    });
   });
 });
 
