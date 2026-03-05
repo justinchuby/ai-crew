@@ -59,11 +59,14 @@ export const spawnAgentSchema = z.object({
   sessionId: z.string().optional(),
 });
 
+/** Allowed image MIME types (blocks SVG XSS and non-image files) */
+const ALLOWED_IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+
 /** Attachment schema for file/image uploads in messages */
 export const attachmentSchema = z.object({
   name: z.string().min(1),
-  mimeType: z.string().min(1),
-  data: z.string().min(1),  // base64-encoded
+  mimeType: z.enum(ALLOWED_IMAGE_MIMES),
+  data: z.string().min(1).max(14_000_000),  // base64-encoded, ~10MB binary
 });
 
 /** POST /api/agents/:id/message */

@@ -414,6 +414,11 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     return this.pendingMessages.length;
   }
 
+  /** Whether the agent's LLM supports image content blocks */
+  get supportsImages(): boolean {
+    return this.acpConnection?.supportsImages ?? false;
+  }
+
   /** Whether this agent has an active/in-progress LLM call */
   get isPrompting(): boolean {
     return this.acpConnection?.isPrompting ?? false;

@@ -815,12 +815,16 @@ export function LeadDashboard({ api, ws }: Props) {
         .filter((a) => a.data)
         .map((a) => ({ name: a.name, mimeType: a.mimeType, data: a.data }));
     }
-    await fetch(`/api/lead/${selectedLeadId}/message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    clearAttachments();
+    try {
+      const resp = await fetch(`/api/lead/${selectedLeadId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) clearAttachments();
+    } catch {
+      // Network error — keep attachments so user can retry
+    }
   }, [input, selectedLeadId, attachments, clearAttachments]);
 
   const removeQueuedMessage = useCallback(async (queueIndex: number) => {

@@ -1,8 +1,24 @@
 import { Router } from 'express';
+import type { ContentBlock } from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
+
+/** Build ContentBlock array from text + optional attachments */
+function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
+  const blocks: ContentBlock[] = [{ type: 'text', text }];
+  for (const att of attachments ?? []) {
+    if (att.mimeType.startsWith('image/')) {
+      if (supportsImages) {
+        blocks.push({ type: 'image', data: att.data, mimeType: att.mimeType });
+      } else {
+        blocks[0] = { type: 'text', text: (blocks[0] as { text: string }).text + `\n[Attached image: ${att.name}]` };
+      }
+    }
+  }
+  return blocks;
+}
 
 export function leadRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry } = ctx;
@@ -102,7 +118,7 @@ export function leadRoutes(ctx: AppContext): Router {
   });
 
   router.post('/lead/:id/message', messageLimiter, validateBody(leadMessageSchema), async (req, res) => {
-    const { text, mode = 'interrupt' } = req.body;
+    const { text, mode = 'interrupt', attachments } = req.body;
     const agent = agentManager.get(req.params.id as string);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
 
@@ -114,15 +130,16 @@ export function leadRoutes(ctx: AppContext): Router {
     agentManager.persistHumanMessage(agent.id, text);
 
     const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. Start your response with @user on its own line. The user is waiting for your reply.`;
+    const content = buildContentBlocks(formatted, attachments, agent.supportsImages);
 
     if (mode === 'queue') {
-      logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
-      agent.queueMessage(formatted);
+      logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      agent.queueMessage(content);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount });
     } else {
-      logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
+      logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
       agentManager.markHumanInterrupt(agent.id);
-      await agent.interruptWithMessage(formatted);
+      await agent.interruptWithMessage(content);
       res.json({ ok: true, mode: 'interrupt' });
     }
   });

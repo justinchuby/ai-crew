@@ -5,6 +5,22 @@ import { logger } from '../utils/logger.js';
 import { validateBody, spawnAgentSchema, sendMessageSchema, agentInputSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
+import type { ContentBlock } from '@agentclientprotocol/sdk';
+
+/** Build ContentBlock array from text + optional attachments */
+function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
+  const blocks: ContentBlock[] = [{ type: 'text', text }];
+  for (const att of attachments ?? []) {
+    if (att.mimeType.startsWith('image/')) {
+      if (supportsImages) {
+        blocks.push({ type: 'image', data: att.data, mimeType: att.mimeType });
+      } else {
+        blocks[0] = { type: 'text', text: (blocks[0] as { text: string }).text + `\n[Attached image: ${att.name}]` };
+      }
+    }
+  }
+  return blocks;
+}
 
 export function agentsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, db: _db } = ctx;
@@ -94,7 +110,7 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   // Send a message to an agent: mode "queue" (default) waits for idle, "interrupt" cancels current work first
   router.post('/agents/:id/message', messageLimiter, validateBody(sendMessageSchema), async (req, res) => {
-    const { text, mode = 'queue' } = req.body;
+    const { text, mode = 'queue', attachments } = req.body;
     const agent = agentManager.get(req.params.id as string);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
@@ -106,15 +122,16 @@ export function agentsRoutes(ctx: AppContext): Router {
 
     const prefix = `[USER MESSAGE] The human user says:\n`;
     const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message. Start your response with @user on its own line.`;
+    const content = buildContentBlocks(formatted, attachments, agent.supportsImages);
 
     if (mode === 'interrupt') {
-      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
       agentManager.markHumanInterrupt(agent.id);
-      await agent.interruptWithMessage(formatted);
+      await agent.interruptWithMessage(content);
       res.json({ ok: true, mode: 'interrupt', status: agent.status });
     } else {
-      logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
-      agent.queueMessage(formatted);
+      logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      agent.queueMessage(content);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount, status: agent.status });
     }
   });

@@ -67,7 +67,7 @@ app.use(helmet());
 // CSRF protection — reject requests from non-localhost origins
 app.use(originValidation);
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 const httpServer = createServer(app);
 
