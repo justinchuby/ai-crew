@@ -14,6 +14,8 @@ function getGitHash(): string {
   }
 }
 
+// Read from the root package.json — this is the published package version
+// that represents the overall Flightdeck release, not the web workspace version.
 function getAppVersion(): string {
   try {
     const rootPkg = JSON.parse(
