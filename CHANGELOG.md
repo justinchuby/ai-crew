@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multiproject isolation** — CREW_UPDATE, heartbeat data, and message commands are now project-scoped
 - **Per-project model config** — wire model config enforcement into agent spawning with caching and integration tests
 - `RESUME_TASK` command and allow `COMPLETE_TASK` on paused tasks
+- **`REOPEN_TASK` command** — reverts a completed (done) task back to ready/pending based on dependency state; clears completedAt and assignedAgentId; warns if dependents already started
 - Restore sibling sub-lead visibility in `CREW_UPDATE`
 - Bezier edges in DAG visualization for clearer connectivity
 - Hide incoming DMs in main chat feed and auto-scroll agent reports
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - @mention rendering in user messages, system messages, and agent comms panel
 - Google eng-practices reference added to code-reviewer role
 - '@ to mention files' hint in lead chat placeholder
+- **Drag & drop images hint** — chat input placeholder now mentions drag & drop image support
 
 ### Changed
 
@@ -37,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped lucide-react ^0.575.0 → ^0.577.0 and postcss ^8.5.6 → ^8.5.8
 - Global JSON body parser limit raised from 1MB to 10MB to support image attachments
 - Renamed 'OTHER PROJECT AGENTS' to 'OTHER TEAM MEMBERS' for clarity
+- **Updated default model allowlist** — updated DEFAULT_MODEL_CONFIG for 7 roles: developer, architect, code-reviewer, critical-reviewer, readability-reviewer, tech-writer, secretary
 - Comprehensive documentation refresh across README, docs site, and presentation slides
   - Standardized command field names across all documentation
   - Added Agent role, `SPAWN_AGENT`, `ACTIVITY`, `LIST_TEMPLATES`, `APPLY_TEMPLATE`, `DECOMPOSE_TASK` to README
@@ -48,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`COMPLETE_TASK` now works on `ready` tasks** — previously only accepted running/paused; also fixed stale error messages to use `formatTransitionError()`
+- **`resumeTask` dep-check alignment** — aligned resumeTask's dependency checking with the canonical `resolveReady` pattern; missing/deleted dependencies are now correctly treated as satisfied
 - **Attachment schema** — `attachmentSchema` was referenced before definition (ReferenceError); fixed `const` ordering
 - **Body parser dead code** — route-level `json({ limit })` middleware was shadowed by global parser
 - **Attachment schema security** — mimeType restricted to `image/png`, `image/jpeg`, `image/gif`, `image/webp`; data field capped at ~10MB base64
