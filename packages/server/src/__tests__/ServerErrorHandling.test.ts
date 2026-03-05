@@ -6,6 +6,7 @@ import { AddressInfo } from 'net';
 /**
  * Mirrors the listenWithRetry function from index.ts to test auto-port-finding.
  * Tries successive ports starting from basePort, skipping EADDRINUSE errors.
+ * NOTE: Keep in sync with listenWithRetry in packages/server/src/index.ts
  */
 async function listenWithRetry(
   server: Server,
@@ -59,13 +60,15 @@ describe('Server EADDRINUSE error handling', () => {
   });
 
   it('listenWithRetry throws when all ports are exhausted', async () => {
-    // Occupy 3 consecutive ports
-    const blockers: Server[] = [];
-    const basePort = 19200; // high port to avoid conflicts
-    for (let i = 0; i < 3; i++) {
+    // Occupy 3 consecutive ports using OS-assigned base port
+    const firstBlocker = createServer();
+    servers.push(firstBlocker);
+    await new Promise<void>((resolve) => firstBlocker.listen(0, '127.0.0.1', resolve));
+    const basePort = (firstBlocker.address() as AddressInfo).port;
+
+    for (let i = 1; i < 3; i++) {
       const b = createServer();
       servers.push(b);
-      blockers.push(b);
       await new Promise<void>((resolve, reject) => {
         b.once('error', reject);
         b.listen(basePort + i, '127.0.0.1', () => {
