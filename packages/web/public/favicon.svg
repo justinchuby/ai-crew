@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Rocket icon for Flightdeck -->
+  <path d="M16 2c-3.5 5-5.5 10-6 15l4 3v7l3-4 3 4v-7l4-3c-.5-5-2.5-10-6-15z" fill="#6366f1" stroke="#6366f1" stroke-width="0.5" stroke-linejoin="round"/>
+  <circle cx="16" cy="14" r="2" fill="#1e1b4b"/>
+  <path d="M10 17c-2 1-3.5 3-4 5l4-2z" fill="#6366f1" opacity="0.7"/>
+  <path d="M22 17c2 1 3.5 3 4 5l-4-2z" fill="#6366f1" opacity="0.7"/>
+</svg>
