@@ -28,7 +28,7 @@ function NavItem({ to, icon: Icon, label, badge, end }: {
       to={to}
       end={end}
       className={({ isActive }: { isActive: boolean }) =>
-        `relative flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-colors w-[52px] ${
+        `relative flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-colors w-[58px] ${
           isActive
             ? 'bg-accent/20 text-accent'
             : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
@@ -66,7 +66,7 @@ export function Sidebar() {
   };
 
   return (
-    <nav className="w-16 border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
+    <nav className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
       {/* Primary nav */}
       {primaryLinks.map(({ to, icon, label }) => (
         <NavItem
@@ -86,7 +86,7 @@ export function Sidebar() {
       {/* ··· More section */}
       <button
         onClick={toggleMore}
-        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-colors w-[52px] text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50"
+        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-colors w-[58px] text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50"
         aria-label={moreOpen ? 'Collapse more items' : 'Expand more items'}
         data-testid="sidebar-more-toggle"
       >
