@@ -364,6 +364,16 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
     updateConfig({ port: actualPort });
   }
 
+  // Permanent error handler — catches runtime errors after successful startup
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${actualPort} is already in use. Is another instance running? Kill it with: lsof -ti:${actualPort} | xargs kill`);
+    } else {
+      console.error(`\n❌ HTTP server error: ${err.message}`);
+    }
+    process.exit(1);
+  });
+
   const url = `http://${config.host}:${actualPort}`;
   console.log(`FLIGHTDECK_PORT=${actualPort}`);
   console.log(`🚀 Flightdeck server running on ${url}`);
@@ -379,7 +389,11 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   contextRefresher.start();
   escalationManager.start();
 }).catch((err) => {
-  console.error(`❌ Failed to start server: ${err.message}`);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Port ${config.port} is already in use. Is another instance running? Kill it with: lsof -ti:${config.port} | xargs kill`);
+  } else {
+    console.error(`❌ Failed to start server: ${err.message}`);
+  }
   process.exit(1);
 });
 
