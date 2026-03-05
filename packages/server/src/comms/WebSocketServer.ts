@@ -22,6 +22,7 @@ export class WebSocketServer {
   private eventCleanups: Array<() => void> = [];
   private agentManager: AgentManager;
   private lockRegistry: FileLockRegistry;
+  private decisionLog: DecisionLog;
 
   constructor(
     server: HttpServer,
@@ -34,6 +35,7 @@ export class WebSocketServer {
     this.wss = new WsServer({ server, path: '/ws' });
     this.agentManager = agentManager;
     this.lockRegistry = lockRegistry;
+    this.decisionLog = decisionLog;
 
     // Prevent unhandled 'error' events from crashing the process.
     // EADDRINUSE is handled by listenWithRetry in index.ts (auto-port-finding);
@@ -369,6 +371,16 @@ export class WebSocketServer {
         if (msg.agentId) {
           this.agentManager.resolvePermission(msg.agentId, msg.approved);
         }
+        break;
+
+      case 'queue_open':
+        // User opened the approval queue — pause auto-approve timers
+        this.decisionLog.pauseTimers();
+        break;
+
+      case 'queue_closed':
+        // User closed the approval queue — resume auto-approve timers
+        this.decisionLog.resumeTimers();
         break;
     }
   }

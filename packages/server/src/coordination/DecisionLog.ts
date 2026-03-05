@@ -76,6 +76,12 @@ export class DecisionLog extends EventEmitter {
   private autoApproveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private static AUTO_APPROVE_MS = 60_000;
   private intentRules: IntentRule[] = [];
+  /** When true, auto-approve timers are paused (user has approval queue open) */
+  private timersPaused = false;
+  /** Decision IDs whose timers were paused — will be resumed with remaining time */
+  private pausedTimers = new Map<string, { remaining: number; pausedAt: number }>();
+  /** Tracks when each timer was started (for calculating remaining time on pause) */
+  private timerStartTimes = new Map<string, number>();
 
   constructor(db: Database) {
     super();
@@ -180,15 +186,25 @@ export class DecisionLog extends EventEmitter {
     }
   }
 
-  private scheduleAutoApprove(id: string): void {
+  private scheduleAutoApprove(id: string, delayMs?: number): void {
+    const delay = delayMs ?? DecisionLog.AUTO_APPROVE_MS;
+
+    // If timers are paused, store the decision for later resumption
+    if (this.timersPaused) {
+      this.pausedTimers.set(id, { remaining: delay, pausedAt: Date.now() });
+      return;
+    }
+
     const timer = setTimeout(() => {
       this.autoApproveTimers.delete(id);
+      this.timerStartTimes.delete(id);
       const existing = this.getById(id);
       if (existing && existing.status === 'recorded') {
         this.autoApprove(id);
       }
-    }, DecisionLog.AUTO_APPROVE_MS);
+    }, delay);
     this.autoApproveTimers.set(id, timer);
+    this.timerStartTimes.set(id, Date.now());
   }
 
   private autoApprove(id: string): Decision | undefined {
@@ -354,10 +370,51 @@ export class DecisionLog extends EventEmitter {
     return grouped as Record<DecisionCategory, Decision[]>;
   }
 
+  /** Pause all auto-approve timers (user opened the approval queue) */
+  pauseTimers(): void {
+    if (this.timersPaused) return; // idempotent
+    this.timersPaused = true;
+    const now = Date.now();
+
+    for (const [id, timer] of this.autoApproveTimers) {
+      clearTimeout(timer);
+      const startTime = this.timerStartTimes.get(id) ?? now;
+      const elapsed = now - startTime;
+      const remaining = Math.max(0, DecisionLog.AUTO_APPROVE_MS - elapsed);
+      this.pausedTimers.set(id, { remaining, pausedAt: now });
+    }
+    this.autoApproveTimers.clear();
+    this.timerStartTimes.clear();
+    this.emit('timers:paused');
+  }
+
+  /** Resume all paused auto-approve timers (user closed the approval queue) */
+  resumeTimers(): void {
+    if (!this.timersPaused) return; // idempotent
+    this.timersPaused = false;
+
+    for (const [id, { remaining }] of this.pausedTimers) {
+      const existing = this.getById(id);
+      if (existing && existing.status === 'recorded') {
+        this.scheduleAutoApprove(id, remaining);
+      }
+    }
+    this.pausedTimers.clear();
+    this.emit('timers:resumed');
+  }
+
+  /** Whether auto-approve timers are currently paused */
+  get isTimersPaused(): boolean {
+    return this.timersPaused;
+  }
+
   clear(): void {
     // Cancel all pending timers
     for (const timer of this.autoApproveTimers.values()) clearTimeout(timer);
     this.autoApproveTimers.clear();
+    this.timerStartTimes.clear();
+    this.pausedTimers.clear();
+    this.timersPaused = false;
     this.systemDecisionIds.clear();
     this.db.drizzle.delete(decisions).run();
   }

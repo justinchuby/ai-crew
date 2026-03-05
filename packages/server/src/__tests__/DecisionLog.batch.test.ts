@@ -222,4 +222,60 @@ describe('DecisionLog — Batch Operations', () => {
       expect(grouped.dependency).toHaveLength(1);
     });
   });
+
+  // ── Timer Pause/Resume ──────────────────────────────────────────
+
+  describe('pauseTimers / resumeTimers', () => {
+    it('pauseTimers stops auto-approve from firing', async () => {
+      const decision = log.add('a1', 'dev', 'Format imports', 'Cleaner imports', true);
+
+      log.pauseTimers();
+      expect(log.isTimersPaused).toBe(true);
+
+      // Even after a short wait, decision should remain pending
+      await new Promise(r => setTimeout(r, 50));
+      const d = log.getById(decision.id);
+      expect(d!.status).toBe('recorded');
+    });
+
+    it('resumeTimers restarts paused timers', () => {
+      log.add('a1', 'dev', 'Format imports', 'Cleaner imports', true);
+
+      log.pauseTimers();
+      log.resumeTimers();
+      expect(log.isTimersPaused).toBe(false);
+    });
+
+    it('pauseTimers is idempotent', () => {
+      log.add('a1', 'dev', 'Format imports', 'Cleaner imports', true);
+
+      log.pauseTimers();
+      log.pauseTimers(); // second call is no-op
+      expect(log.isTimersPaused).toBe(true);
+    });
+
+    it('resumeTimers is idempotent', () => {
+      log.resumeTimers(); // no-op when not paused
+      expect(log.isTimersPaused).toBe(false);
+    });
+
+    it('new decisions added while paused are also paused', () => {
+      log.pauseTimers();
+      const decision = log.add('a1', 'dev', 'Format code', 'Style fix', true);
+      expect(decision.status).toBe('recorded');
+      expect(log.getById(decision.id)!.status).toBe('recorded');
+    });
+
+    it('emits timers:paused and timers:resumed events', () => {
+      const events: string[] = [];
+      log.on('timers:paused', () => events.push('paused'));
+      log.on('timers:resumed', () => events.push('resumed'));
+
+      log.add('a1', 'dev', 'Format code', 'Style', true);
+      log.pauseTimers();
+      log.resumeTimers();
+
+      expect(events).toEqual(['paused', 'resumed']);
+    });
+  });
 });
