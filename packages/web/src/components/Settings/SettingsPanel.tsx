@@ -10,6 +10,8 @@ import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
 import { PredictionSettingsPanel } from '../Predictions';
 import { WorkflowDashboard } from '../Workflow';
+import { GitHubSetup } from '../GitHub';
+import { ConflictSettingsPanel } from '../Conflicts';
 
 interface Props {
   api: any;
@@ -203,6 +205,16 @@ export function SettingsPanel({ api }: Props) {
       {/* Prediction Settings */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <PredictionSettingsPanel />
+      </section>
+
+      {/* GitHub Integration */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <GitHubSetup />
+      </section>
+
+      {/* Conflict Detection */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <ConflictSettingsPanel />
       </section>
 
       {/* Recovery Settings */}

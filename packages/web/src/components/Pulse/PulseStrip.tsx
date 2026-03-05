@@ -5,6 +5,8 @@ import type { AgentInfo } from '../../types';
 import { estimateCostUsd } from '../../constants/pricing';
 import { PulseRecoveryIndicator } from '../Recovery';
 import { PulsePredictionIndicator } from '../Predictions';
+import { PulsePRIndicator } from '../GitHub';
+import { PulseConflictIndicator } from '../Conflicts';
 
 function formatCost(usd: number): string {
   if (usd < 0.01) return '<$0.01';
@@ -216,6 +218,18 @@ export function PulseStrip() {
 
       {/* Prediction Indicator */}
       <PulsePredictionIndicator />
+
+      {/* Separator */}
+      <div className="w-px h-4 bg-th-border/50" />
+
+      {/* PR Status */}
+      <PulsePRIndicator />
+
+      {/* Separator */}
+      <div className="w-px h-4 bg-th-border/50" />
+
+      {/* Conflict Detection */}
+      <PulseConflictIndicator />
     </div>
   );
 }

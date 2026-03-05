@@ -27,6 +27,7 @@ export const DEFAULT_PANELS: PanelConfig[] = [
   { id: 'debates',    label: 'Debates',           visible: true,  order: 12 },
   { id: 'handoffs',   label: 'Handoff History',   visible: true,  order: 13 },
   { id: 'predictions', label: 'Predictions',      visible: true,  order: 14 },
+  { id: 'github',      label: 'Pull Requests',    visible: true,  order: 15 },
 ];
 
 const STORAGE_KEY = 'dashboard-layout';

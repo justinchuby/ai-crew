@@ -16,6 +16,7 @@ import { DiffPreview } from '../DiffPreview';
 import { DebatesPanel } from '../Debates';
 import { HandoffHistoryPanel } from '../Handoff';
 import { PredictionsPanel } from '../Predictions';
+import { PRStatusPanel } from '../GitHub';
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 import type { PanelConfig } from '../../hooks/useDashboardLayout';
@@ -116,6 +117,12 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
       return (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
           <PredictionsPanel />
+        </div>
+      );
+    case 'github':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <PRStatusPanel />
         </div>
       );
     default:

@@ -9,6 +9,8 @@ import {
   type PaletteItemType,
 } from '../../services/PaletteSearchEngine';
 import { generateSuggestions } from '../../services/PaletteSuggestionEngine';
+import { getNLPaletteItems, type NLPattern } from '../../services/NLCommandRegistry';
+import { apiFetch } from '../../hooks/useApi';
 import { useRecentCommands } from '../../hooks/useRecentCommands';
 import { PreviewPanel, buildPreviewData } from './PreviewPanel';
 import type { AgentInfo, DagStatus } from '../../types';
@@ -231,6 +233,17 @@ export function CommandPaletteV2({ onClose, onOpenSearch }: Props) {
     const actionItems = buildActionItems(onClose, setApprovalQueueOpen);
     const settingItems = buildSettingItems(navigate, onClose);
 
+    // NL commands — execute via backend
+    const nlItems = getNLPaletteItems(async (pattern: NLPattern) => {
+      try {
+        await apiFetch('/nl/execute', {
+          method: 'POST',
+          body: JSON.stringify({ commandId: pattern.id, input: pattern.phrases[0] }),
+        });
+      } catch {}
+      onClose();
+    });
+
     // Context-aware suggestions
     const rawSuggestions = generateSuggestions({
       agents,
@@ -297,6 +310,7 @@ export function CommandPaletteV2({ onClose, onOpenSearch }: Props) {
       ...taskItems,
       ...actionItems,
       ...settingItems,
+      ...nlItems,
       ...searchItems,
     ];
   }, [
