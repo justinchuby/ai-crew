@@ -1,5 +1,7 @@
 # Flightdeck — Multi-Agent Copilot CLI Orchestrator
 
+[![npm](https://img.shields.io/npm/v/%40flightdeck-ai%2Fflightdeck)](https://www.npmjs.com/package/@flightdeck-ai/flightdeck)
+
 > [!WARNING]
 > This is purely AI generated code. Use the project with this understanding in mind.
 
