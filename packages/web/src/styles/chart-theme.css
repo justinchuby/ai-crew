@@ -1,0 +1,101 @@
+/* ── Chart Theme ───────────────────────────────────────────────────────
+ * Color tokens for visx charts and SVG visualizations.
+ * Uses RGB triplets so they can be used with opacity:
+ *   fill: rgb(var(--chart-1));
+ *   fill: rgba(var(--chart-1), 0.5);
+ *
+ * Light and dark variants ensure contrast on any background.
+ * ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Series Colors (light mode) ─────────────────────────────────── */
+  --chart-1: 99 102 241;      /* indigo-500 */
+  --chart-2: 34 211 238;      /* cyan-400 */
+  --chart-3: 245 158 11;      /* amber-500 */
+  --chart-4: 168 85 247;      /* purple-500 */
+  --chart-5: 34 197 94;       /* green-500 */
+  --chart-6: 244 63 94;       /* rose-500 */
+  --chart-7: 59 130 246;      /* blue-500 */
+  --chart-8: 251 146 60;      /* orange-400 */
+
+  /* ── Semantic Colors ────────────────────────────────────────────── */
+  --chart-success: 16 185 129;    /* emerald-500 */
+  --chart-warning: 234 179 8;     /* yellow-500 */
+  --chart-danger: 239 68 68;      /* red-500 */
+  --chart-info: 59 130 246;       /* blue-500 */
+  --chart-neutral: 107 114 128;   /* gray-500 */
+
+  /* ── Status Colors (agent/task state) ───────────────────────────── */
+  --chart-running: 34 197 94;     /* green-500 */
+  --chart-idle: 148 163 184;      /* slate-400 */
+  --chart-completed: 59 130 246;  /* blue-500 */
+  --chart-failed: 239 68 68;      /* red-500 */
+  --chart-creating: 245 158 11;   /* amber-500 */
+  --chart-terminated: 107 114 128; /* gray-500 */
+
+  /* ── Communication Edge Colors ──────────────────────────────────── */
+  --chart-edge-delegation: 59 130 246;  /* blue-500 */
+  --chart-edge-message: 168 85 247;     /* purple-500 */
+  --chart-edge-group: 249 115 22;       /* orange-500 */
+  --chart-edge-broadcast: 34 211 238;   /* cyan-400 */
+  --chart-edge-report: 16 185 129;      /* emerald-500 */
+
+  /* ── Progress Colors ────────────────────────────────────────────── */
+  --chart-progress-completed: 16 185 129;   /* emerald-500 */
+  --chart-progress-active: 59 130 246;      /* blue-500 */
+  --chart-progress-remaining: 107 114 128;  /* gray-500 */
+
+  /* ── Structural Colors ──────────────────────────────────────────── */
+  --chart-grid: 229 231 235;         /* gray-200 */
+  --chart-axis: 156 163 175;         /* gray-400 */
+  --chart-tooltip-bg: 255 255 255;   /* white */
+  --chart-tooltip-text: 17 24 39;    /* gray-900 */
+  --chart-tooltip-border: 229 231 235; /* gray-200 */
+}
+
+/* ── Dark Mode ────────────────────────────────────────────────────── */
+.dark {
+  /* Series — brighter variants for dark backgrounds */
+  --chart-1: 129 140 248;     /* indigo-400 */
+  --chart-2: 103 232 249;     /* cyan-300 */
+  --chart-3: 252 211 77;      /* amber-300 */
+  --chart-4: 192 132 252;     /* purple-400 */
+  --chart-5: 74 222 128;      /* green-400 */
+  --chart-6: 251 113 133;     /* rose-400 */
+  --chart-7: 96 165 250;      /* blue-400 */
+  --chart-8: 253 186 116;     /* orange-300 */
+
+  /* Semantic — brighter */
+  --chart-success: 52 211 153;     /* emerald-400 */
+  --chart-warning: 250 204 21;     /* yellow-400 */
+  --chart-danger: 248 113 113;     /* red-400 */
+  --chart-info: 96 165 250;        /* blue-400 */
+  --chart-neutral: 156 163 175;    /* gray-400 */
+
+  /* Status — brighter */
+  --chart-running: 74 222 128;     /* green-400 */
+  --chart-idle: 148 163 184;       /* slate-400 */
+  --chart-completed: 96 165 250;   /* blue-400 */
+  --chart-failed: 248 113 113;     /* red-400 */
+  --chart-creating: 252 211 77;    /* amber-300 */
+  --chart-terminated: 156 163 175; /* gray-400 */
+
+  /* Communication edges — brighter */
+  --chart-edge-delegation: 96 165 250;   /* blue-400 */
+  --chart-edge-message: 192 132 252;     /* purple-400 */
+  --chart-edge-group: 251 146 60;        /* orange-400 */
+  --chart-edge-broadcast: 103 232 249;   /* cyan-300 */
+  --chart-edge-report: 52 211 153;       /* emerald-400 */
+
+  /* Progress — brighter */
+  --chart-progress-completed: 52 211 153;    /* emerald-400 */
+  --chart-progress-active: 96 165 250;       /* blue-400 */
+  --chart-progress-remaining: 156 163 175;   /* gray-400 */
+
+  /* Structural */
+  --chart-grid: 55 65 81;           /* gray-700 */
+  --chart-axis: 107 114 128;        /* gray-500 */
+  --chart-tooltip-bg: 31 41 55;     /* gray-800 */
+  --chart-tooltip-text: 243 244 246; /* gray-100 */
+  --chart-tooltip-border: 55 65 81;  /* gray-700 */
+}

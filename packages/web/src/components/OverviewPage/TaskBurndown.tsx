@@ -66,7 +66,7 @@ export function TaskBurndown({ data, totalTasks, width = 260, height = 180 }: Ta
             data={idealLine}
             x={(d) => xScale(new Date(d.time)) ?? 0}
             y={(d) => yScale(d.remaining) ?? 0}
-            stroke="#6b7280"
+            stroke="rgb(var(--chart-neutral))"
             strokeWidth={1}
             strokeDasharray="4 3"
             strokeOpacity={0.5}
@@ -77,7 +77,7 @@ export function TaskBurndown({ data, totalTasks, width = 260, height = 180 }: Ta
             data={data}
             x={(d) => xScale(new Date(d.time)) ?? 0}
             y={(d) => yScale(d.remaining) ?? 0}
-            stroke="#10b981"
+            stroke="rgb(var(--chart-success))"
             strokeWidth={2}
           />
 

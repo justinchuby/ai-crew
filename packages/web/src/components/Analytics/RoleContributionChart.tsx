@@ -50,7 +50,11 @@ export function RoleContributionChart({ overview }: RoleContributionChartProps) 
     );
   }
 
-  const COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
+  const COLORS = [
+    'rgb(var(--chart-1))', 'rgb(var(--chart-2))', 'rgb(var(--chart-3))',
+    'rgb(var(--chart-4))', 'rgb(var(--chart-5))', 'rgb(var(--chart-6))',
+    'rgb(var(--chart-7))',
+  ];
 
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="role-contribution-chart">

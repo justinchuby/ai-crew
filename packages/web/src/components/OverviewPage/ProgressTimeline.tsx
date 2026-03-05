@@ -22,9 +22,9 @@ interface ProgressTimelineProps {
 
 const STACK_KEYS = ['completed', 'inProgress', 'remaining'] as const;
 const COLORS: Record<string, string> = {
-  completed: '#10b981',   // green
-  inProgress: '#3b82f6',  // blue
-  remaining: '#6b7280',   // gray
+  completed: 'rgb(var(--chart-progress-completed))',
+  inProgress: 'rgb(var(--chart-progress-active))',
+  remaining: 'rgb(var(--chart-progress-remaining))',
 };
 
 const MARGIN = { top: 16, right: 48, bottom: 32, left: 48 };

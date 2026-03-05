@@ -86,7 +86,7 @@ export function ModelEffectivenessChart({ overview }: ModelEffectivenessChartPro
                       y={barY}
                       width={barWidth}
                       height={barH}
-                      fill="var(--color-accent, #6366f1)"
+                      fill="rgb(var(--chart-1))"
                       rx={3}
                     >
                       <title>{`${d.label}: ${d.value.toFixed(1)} tasks/M tokens`}</title>

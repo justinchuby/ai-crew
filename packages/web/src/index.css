@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./styles/motion.css";
+@import "./styles/chart-theme.css";
 @config "../tailwind.config.js";
 
 /* ── Theme custom properties ──────────────────────────────────────────── */
@@ -147,52 +149,17 @@ body {
   padding: 4px;
 }
 
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+/* ── Animation Utility Classes ─────────────────────────────────────────
+ * These map legacy class names to the unified motion system (motion.css).
+ * Keyframes are defined in styles/motion.css.
+ * ──────────────────────────────────────────────────────────────────── */
 
 .animate-slide-in {
-  animation: slide-in 0.2s ease-out;
-}
-
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  animation: slide-in var(--motion-standard) var(--ease-enter);
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.25s ease-out;
-}
-
-@keyframes pulse-border {
-  0%, 100% {
-    border-color: rgb(234 179 8 / 0.4);
-    background-color: rgb(113 63 18 / 0.2);
-  }
-  50% {
-    border-color: rgb(234 179 8 / 0.7);
-    background-color: rgb(113 63 18 / 0.35);
-  }
-}
-
-@keyframes pulse-slow {
-  0%, 100% {
-    border-color: rgb(234 179 8 / 0.5);
-  }
-  50% {
-    border-color: rgb(234 179 8 / 0.8);
-  }
+  animation: slide-in-right var(--motion-standard) var(--ease-enter);
 }
 
 .animate-pulse-border {
@@ -200,22 +167,11 @@ body {
 }
 
 .animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
-}
-
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
 
 .animate-slide-up {
-  animation: slide-up 0.25s ease-out;
+  animation: slide-up var(--motion-standard) var(--ease-enter);
 }
 
 /* ── Liquid Glass Toast (Apple-style glassmorphism) ───────────────────── */

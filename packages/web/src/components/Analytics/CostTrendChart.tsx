@@ -65,7 +65,7 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
                 x={(d) => xScale(d.date) ?? 0}
                 y={(d) => yScale(d.costUsd)}
                 yScale={yScale}
-                fill="var(--color-accent, #6366f1)"
+                fill="rgb(var(--chart-1))"
                 fillOpacity={0.1}
               />
 
@@ -74,7 +74,7 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
                 data={costTrend}
                 x={(d) => xScale(d.date) ?? 0}
                 y={(d) => yScale(d.costUsd)}
-                stroke="var(--color-accent, #6366f1)"
+                stroke="rgb(var(--chart-1))"
                 strokeWidth={2}
               />
 
@@ -96,7 +96,7 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
                   cx={xScale(d.date) ?? 0}
                   cy={yScale(d.costUsd)}
                   r={3}
-                  fill="var(--color-accent, #6366f1)"
+                  fill="rgb(var(--chart-1))"
                 >
                   <title>{`${d.date}: $${d.costUsd.toFixed(2)}`}</title>
                 </circle>

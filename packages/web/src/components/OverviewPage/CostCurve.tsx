@@ -56,7 +56,7 @@ export function CostCurve({ data, budget, width = 260, height = 180 }: CostCurve
   // Determine fill color based on current spend vs budget
   const currentCost = data[data.length - 1]?.cumulativeCost ?? 0;
   const ratio = budget ? currentCost / budget : 0;
-  const areaColor = ratio > 0.9 ? '#ef4444' : ratio > 0.7 ? '#eab308' : '#10b981';
+  const areaColor = ratio > 0.9 ? 'rgb(var(--chart-danger))' : ratio > 0.7 ? 'rgb(var(--chart-warning))' : 'rgb(var(--chart-success))';
 
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px]" data-testid="cost-curve">
@@ -96,7 +96,7 @@ export function CostCurve({ data, budget, width = 260, height = 180 }: CostCurve
               x2={innerW}
               y1={yScale(budget) ?? 0}
               y2={yScale(budget) ?? 0}
-              stroke="#ef4444"
+              stroke="rgb(var(--chart-danger))"
               strokeWidth={1}
               strokeDasharray="6 3"
               strokeOpacity={0.7}

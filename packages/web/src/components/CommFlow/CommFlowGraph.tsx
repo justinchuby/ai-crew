@@ -70,22 +70,22 @@ function buildEdges(comms: AgentComm[]): GraphEdge[] {
 // ── Status colors ────────────────────────────────────────────────────
 
 const STATUS_FILL: Record<string, string> = {
-  running: '#22c55e',
-  idle: '#94a3b8',
-  completed: '#3b82f6',
-  failed: '#ef4444',
-  creating: '#f59e0b',
-  terminated: '#6b7280',
+  running: 'rgb(var(--chart-running))',
+  idle: 'rgb(var(--chart-idle))',
+  completed: 'rgb(var(--chart-completed))',
+  failed: 'rgb(var(--chart-failed))',
+  creating: 'rgb(var(--chart-creating))',
+  terminated: 'rgb(var(--chart-terminated))',
 };
 
 const EDGE_COLORS: Record<string, string> = {
-  delegation: '#3b82f6',
-  message: '#a855f7',
-  agent_message: '#a855f7',
-  message_sent: '#a855f7',
-  group_message: '#f97316',
-  broadcast: '#22d3ee',
-  report: '#10b981',
+  delegation: 'rgb(var(--chart-edge-delegation))',
+  message: 'rgb(var(--chart-edge-message))',
+  agent_message: 'rgb(var(--chart-edge-message))',
+  message_sent: 'rgb(var(--chart-edge-message))',
+  group_message: 'rgb(var(--chart-edge-group))',
+  broadcast: 'rgb(var(--chart-edge-broadcast))',
+  report: 'rgb(var(--chart-edge-report))',
 };
 
 function edgeColor(types: Set<string>): string {
@@ -242,7 +242,7 @@ export function CommFlowGraph({ leadId, width = 500, height = 400 }: CommFlowGra
           refY="3"
           orient="auto"
         >
-          <polygon points="0 0, 8 3, 0 6" fill="#64748b" fillOpacity={0.6} />
+          <polygon points="0 0, 8 3, 0 6" fill="rgb(var(--chart-neutral))" fillOpacity={0.6} />
         </marker>
       </defs>
 
