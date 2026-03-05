@@ -75,7 +75,7 @@ export function MentionText({ text, agents, onClickAgent }: {
         parts.push(
           <span
             key={`m-${match.index}`}
-            className="bg-yellow-500/25 text-yellow-700 dark:bg-yellow-400/35 dark:text-yellow-200 rounded px-0.5 font-medium"
+            className="bg-yellow-500/20 text-yellow-700 dark:bg-yellow-400/35 dark:text-yellow-200 rounded px-0.5 font-medium"
           >
             @user
           </span>,
