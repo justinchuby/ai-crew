@@ -490,6 +490,7 @@ export class TaskDAG extends EventEmitter {
     const task = this.getTask(leadId, taskId)!;
     const depsOk = task.dependsOn.every(depId => {
       const dep = this.getTask(leadId, depId);
+      // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
       return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
     });
     const newStatus = depsOk ? 'ready' : 'pending';

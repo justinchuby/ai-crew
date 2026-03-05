@@ -1583,5 +1583,22 @@ describe('TaskDAG', () => {
       expect(result).not.toBeNull();
       expect(result!.dagStatus).toBe('ready');
     });
+
+    it('reopens to ready when a dependency was cancelled (cancelled dep = satisfied)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      // Complete both, then cancel a (removes it), then reopen b
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      dag.startTask('lead-1', 'b', 'agent-2');
+      dag.completeTask('lead-1', 'b');
+      dag.cancelTask('lead-1', 'a');
+      // Cancelled deps are treated as satisfied, consistent with resolveReady
+      const result = dag.reopenTask('lead-1', 'b');
+      expect(result).not.toBeNull();
+      expect(result!.dagStatus).toBe('ready');
+    });
   });
 });
