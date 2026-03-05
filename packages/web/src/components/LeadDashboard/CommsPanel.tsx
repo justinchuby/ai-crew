@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Users, MessageSquare, Filter } from 'lucide-react';
+import { EmptyState } from '../Shared';
 import type { AgentComm } from '../../stores/leadStore';
 import type { GroupMessage } from '../../types';
 import { useAppStore } from '../../stores/appStore';
@@ -91,9 +92,11 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
 
       <div ref={feedRef} className="h-full overflow-y-auto">
         {classifiedFeed.length === 0 ? (
-          <p className="text-xs text-th-text-muted text-center py-4 font-mono">
-            {feed.length === 0 ? 'No messages yet' : 'No messages match this filter'}
-          </p>
+          <EmptyState
+            icon="💬"
+            title={feed.length === 0 ? 'No messages yet' : 'No messages match this filter'}
+            compact
+          />
         ) : (
           classifiedFeed.map(({ entry, tier }, i) => {
             const tierStyle = TIER_CONFIG[tier];

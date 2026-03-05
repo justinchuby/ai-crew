@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GitBranch, CheckCircle, MessageSquare, BarChart3, Loader2, Wrench } from 'lucide-react';
+import { EmptyState } from '../Shared';
 import type { ActivityEvent } from '../../stores/leadStore';
 
 export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
@@ -25,7 +26,7 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
   return (
     <div ref={feedRef} className="h-full overflow-y-auto">
       {recent.length === 0 ? (
-        <p className="text-xs text-th-text-muted text-center py-4 font-mono">No activity yet</p>
+        <EmptyState icon="📡" title="No activity yet" compact />
       ) : (
         recent.map((evt) => {
           const agent = agents.find((a: any) => a.id === evt.agentId);

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect } from 'react';
 import { Radio } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { EmptyState } from '../Shared';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ export function ActivityFeed({ leadId }: ActivityFeedProps) {
       </h3>
       <div ref={feedRef} className="flex-1 overflow-y-auto px-2">
         {feedItems.length === 0 && (
-          <p className="text-xs text-th-text-muted px-2 py-4 text-center">No activity yet</p>
+          <EmptyState icon="📡" title="No activity yet" compact />
         )}
         {feedItems.map((item) => (
           <div

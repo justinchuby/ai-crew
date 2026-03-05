@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { Users, Clock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { formatElapsed } from './dagCriticalPath';
+import { EmptyState } from '../Shared';
 import type { DagStatus, DagTask } from '../../types';
 
 // ---------------------------------------------------------------------------
@@ -70,11 +71,7 @@ export function DagResourceView({ dagStatus }: DagResourceViewProps) {
   }, [dagStatus]);
 
   if (!dagStatus || dagStatus.tasks.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8 text-th-text-muted text-sm">
-        No tasks to display
-      </div>
-    );
+    return <EmptyState icon="📋" title="No tasks to display" compact />;
   }
 
   const totalTasks = dagStatus.tasks.length;

@@ -7,6 +7,7 @@
  */
 import { useMemo, useState, useRef, useCallback } from 'react';
 import { computeCriticalPath, type CriticalPathTask } from './dagCriticalPath';
+import { EmptyState } from '../Shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -110,11 +111,7 @@ export function DagGantt({ tasks }: DagGanttProps) {
   const rowCY = (i: number) => i * (ROW_H + ROW_GAP) + ROW_H / 2;
 
   if (tasks.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-8 text-th-text-muted text-sm">
-        No tasks to display in Gantt view
-      </div>
-    );
+    return <EmptyState icon="📊" title="No tasks to display" description="Tasks will appear here as a Gantt chart" compact />;
   }
 
   return (

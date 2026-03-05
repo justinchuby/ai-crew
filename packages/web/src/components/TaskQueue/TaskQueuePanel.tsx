@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2 } from 'lucide-react';
+import { EmptyState } from '../Shared';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
 import { DagGraph } from './DagGraph';
 import { DagGantt } from './DagGantt';
@@ -38,7 +39,7 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
   const hasDelegations = delegationTotal > 0;
 
   if (!hasDag && !hasDelegations) {
-    return <div className="text-sm text-th-text-muted py-2">No tasks or delegations yet</div>;
+    return <EmptyState icon="📋" title="No tasks or delegations yet" compact />;
   }
 
   return (

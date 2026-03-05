@@ -137,7 +137,7 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   if (entries.length === 0) {
-    return <div className="text-th-text-muted text-sm text-center py-4">No messages yet</div>;
+    return <EmptyState icon="💬" title="No messages yet" compact />;
   }
 
   const toggle = (id: string) => {
