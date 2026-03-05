@@ -5,6 +5,19 @@ import { activityLog } from '../db/schema.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
+export interface SessionListItem {
+  id: string;
+  leadId: string;
+  projectId: string | null;
+  status: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  estimatedCostUsd: number;
+  taskCount: number;
+  agentCount: number;
+}
+
 export interface SessionSummary {
   leadId: string;
   projectId: string | null;
@@ -46,6 +59,65 @@ const OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000;
 
 export class AnalyticsService {
   constructor(private db: Database) {}
+
+  /** List past sessions with summary data */
+  getSessions(projectId?: string): SessionListItem[] {
+    const sessionCondition = projectId
+      ? eq(projectSessions.projectId, projectId)
+      : undefined;
+
+    const sessions = this.db.drizzle
+      .select()
+      .from(projectSessions)
+      .where(sessionCondition)
+      .orderBy(desc(projectSessions.startedAt))
+      .all();
+
+    // Batch-fetch cost data
+    const costRows = this.db.drizzle
+      .select({
+        leadId: taskCostRecords.leadId,
+        totalInput: sql<number>`sum(${taskCostRecords.inputTokens})`,
+        totalOutput: sql<number>`sum(${taskCostRecords.outputTokens})`,
+        taskCount: sql<number>`count(distinct ${taskCostRecords.dagTaskId})`,
+      })
+      .from(taskCostRecords)
+      .groupBy(taskCostRecords.leadId)
+      .all();
+    const costByLead = new Map(costRows.map(r => [r.leadId, r]));
+
+    // Batch-fetch agent counts
+    const agentCountRows = this.db.drizzle
+      .select({
+        projectId: activityLog.projectId,
+        agentCount: sql<number>`count(distinct ${activityLog.agentId})`,
+      })
+      .from(activityLog)
+      .groupBy(activityLog.projectId)
+      .all();
+    const agentCountByProject = new Map(agentCountRows.map(r => [r.projectId, r.agentCount ?? 0]));
+
+    return sessions.map(s => {
+      const cost = costByLead.get(s.leadId);
+      const inputTokens = cost?.totalInput ?? 0;
+      const outputTokens = cost?.totalOutput ?? 0;
+      const startMs = s.startedAt ? new Date(s.startedAt).getTime() : 0;
+      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : null;
+
+      return {
+        id: s.leadId,
+        leadId: s.leadId,
+        projectId: s.projectId,
+        status: s.status ?? 'unknown',
+        startedAt: s.startedAt ?? '',
+        endedAt: s.endedAt ?? null,
+        durationMs: endMs && startMs ? endMs - startMs : null,
+        estimatedCostUsd: Math.round((inputTokens * INPUT_COST_PER_TOKEN + outputTokens * OUTPUT_COST_PER_TOKEN) * 100) / 100,
+        taskCount: cost?.taskCount ?? 0,
+        agentCount: agentCountByProject.get(s.leadId) ?? 0,
+      };
+    });
+  }
 
   /** Get analytics overview across all sessions */
   getOverview(projectId?: string): AnalyticsOverview {

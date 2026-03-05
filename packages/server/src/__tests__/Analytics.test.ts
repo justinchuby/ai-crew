@@ -57,4 +57,45 @@ describe('AnalyticsService', () => {
     expect(comparison.sessions).toHaveLength(3);
     expect(comparison.deltas).toBeNull();
   });
+
+  describe('getSessions', () => {
+    it('returns empty list with no data', () => {
+      const sessions = service.getSessions();
+      expect(sessions).toEqual([]);
+    });
+
+    it('returns sessions with summary data', () => {
+      db.run(`INSERT INTO projects (id, name, created_at) VALUES ('proj-1', 'Test', datetime('now'))`);
+      db.run(`INSERT INTO project_sessions (project_id, lead_id, status, started_at, ended_at) VALUES ('proj-1', 'lead-1', 'completed', '2025-01-01T10:00:00Z', '2025-01-01T11:30:00Z')`);
+
+      const sessions = service.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].id).toBe('lead-1');
+      expect(sessions[0].leadId).toBe('lead-1');
+      expect(sessions[0].status).toBe('completed');
+      expect(sessions[0].durationMs).toBe(90 * 60 * 1000); // 1.5 hours
+      expect(sessions[0].estimatedCostUsd).toBe(0);
+      expect(sessions[0].taskCount).toBe(0);
+      expect(sessions[0].agentCount).toBe(0);
+    });
+
+    it('returns null durationMs for active sessions', () => {
+      db.run(`INSERT INTO projects (id, name, created_at) VALUES ('proj-1', 'Test', datetime('now'))`);
+      db.run(`INSERT INTO project_sessions (project_id, lead_id, status, started_at) VALUES ('proj-1', 'lead-1', 'active', '2025-01-01T10:00:00Z')`);
+
+      const sessions = service.getSessions();
+      expect(sessions[0].durationMs).toBeNull();
+    });
+
+    it('filters by projectId', () => {
+      db.run(`INSERT INTO projects (id, name, created_at) VALUES ('proj-1', 'P1', datetime('now'))`);
+      db.run(`INSERT INTO projects (id, name, created_at) VALUES ('proj-2', 'P2', datetime('now'))`);
+      db.run(`INSERT INTO project_sessions (project_id, lead_id, status, started_at) VALUES ('proj-1', 'lead-1', 'completed', datetime('now'))`);
+      db.run(`INSERT INTO project_sessions (project_id, lead_id, status, started_at) VALUES ('proj-2', 'lead-2', 'active', datetime('now'))`);
+
+      expect(service.getSessions('proj-1')).toHaveLength(1);
+      expect(service.getSessions('proj-2')).toHaveLength(1);
+      expect(service.getSessions()).toHaveLength(2);
+    });
+  });
 });

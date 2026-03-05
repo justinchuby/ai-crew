@@ -18,6 +18,17 @@ export function analyticsRoutes(ctx: AppContext): Router {
     }
   });
 
+  // GET /api/analytics/sessions — list past sessions with summary data
+  router.get('/analytics/sessions', (req, res) => {
+    try {
+      const projectId = req.query.projectId as string | undefined;
+      const sessions = service.getSessions(projectId);
+      res.json({ sessions });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to list sessions', detail: (err as Error).message });
+    }
+  });
+
   // GET /api/analytics/compare — compare sessions side by side
   router.get('/analytics/compare', (req, res) => {
     const sessionsParam = req.query.sessions as string;
