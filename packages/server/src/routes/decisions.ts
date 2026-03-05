@@ -158,5 +158,20 @@ export function decisionsRoutes(ctx: AppContext): Router {
     res.json({ deleted: true });
   });
 
+  // --- Timer Pause (REST alternative to queue_open/queue_closed WebSocket messages) ---
+
+  router.post('/decisions/pause-timer', (req, res) => {
+    const { paused } = req.body;
+    if (typeof paused !== 'boolean') {
+      return res.status(400).json({ error: 'paused must be a boolean' });
+    }
+    if (paused) {
+      decisionLog.pauseTimers();
+    } else {
+      decisionLog.resumeTimers();
+    }
+    res.json({ paused: decisionLog.isTimersPaused });
+  });
+
   return router;
 }
