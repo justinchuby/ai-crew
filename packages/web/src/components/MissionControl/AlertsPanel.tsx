@@ -251,7 +251,13 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
     }
   }, [addToast]);
 
-  if (alerts.length === 0) return null;
+  if (alerts.length === 0) {
+    return (
+      <div className="text-center text-th-text-muted text-xs py-6 opacity-60">
+        No active alerts
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5">
@@ -260,7 +266,7 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
         return (
           <div
             key={alert.id}
-            className={`flex items-start gap-2 px-3 py-2 rounded-md border ${style.bg} ${style.border}`}
+            className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-all duration-200 ${style.bg} ${style.border}`}
           >
             <span className="text-sm flex-shrink-0">{alert.icon}</span>
             <div className="min-w-0 flex-1">

@@ -78,7 +78,7 @@ function FileDiffSection({ file, defaultExpanded = false }: FileDiffSectionProps
   const dirPath = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/') + 1) : '';
 
   return (
-    <div className="border border-th-border rounded-md overflow-hidden">
+    <div className="border border-th-border rounded-md overflow-hidden transition-all duration-200">
       {/* File header */}
       <button
         onClick={() => setExpanded(!expanded)}
