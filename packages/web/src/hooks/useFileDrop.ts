@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import type { Attachment } from './useAttachments';
 
 // ── File type classification ────────────────────────────────────────────
 
@@ -49,11 +50,60 @@ export function buildInsertText(file: DroppedFile): string {
   return `@${file.path || file.name}`;
 }
 
+// ── Thumbnail generation ────────────────────────────────────────────────
+
+const THUMBNAIL_SIZE = 96; // 2x for retina, displayed at 48x48
+
+/**
+ * Generate a small thumbnail data URL from an image file via canvas downscale.
+ * Returns undefined if generation fails (e.g., in non-browser environments).
+ */
+export function generateThumbnail(file: File): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined') {
+      resolve(undefined);
+      return;
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(THUMBNAIL_SIZE / img.width, THUMBNAIL_SIZE / img.height, 1);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(undefined);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      } catch {
+        resolve(undefined);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(undefined);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 // ── Hook ────────────────────────────────────────────────────────────────
 
 export interface UseFileDropOptions {
-  /** Called with text to insert into the textarea */
-  onInsertText: (text: string) => void;
+  /** Called with text to insert into the textarea (legacy interface) */
+  onInsertText?: (text: string) => void;
+  /** Called with a structured Attachment when a file is dropped */
+  onAttach?: (attachment: Attachment) => void;
   /** Whether the drop zone is enabled (default: true) */
   enabled?: boolean;
 }
@@ -71,7 +121,7 @@ export interface UseFileDropResult {
   dropZoneClassName: string;
 }
 
-export function useFileDrop({ onInsertText, enabled = true }: UseFileDropOptions): UseFileDropResult {
+export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileDropOptions): UseFileDropResult {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -123,9 +173,13 @@ export function useFileDrop({ onInsertText, enabled = true }: UseFileDropOptions
       const files = Array.from(e.dataTransfer.files);
       if (files.length === 0) return;
 
-      processDroppedFiles(files, onInsertText);
+      if (onAttach) {
+        processDroppedFilesAsAttachments(files, onAttach);
+      } else if (onInsertText) {
+        processDroppedFiles(files, onInsertText);
+      }
     },
-    [enabled, onInsertText],
+    [enabled, onInsertText, onAttach],
   );
 
   const dropZoneClassName = isDragOver
@@ -149,21 +203,98 @@ export function useFileDrop({ onInsertText, enabled = true }: UseFileDropOptions
   };
 }
 
-// ── File processing ─────────────────────────────────────────────────────
+// ── File processing (attachment mode) ───────────────────────────────────
 
-/** Max image file size for inline base64 embedding (5 MB) */
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/** Max image file size for attachment (10 MB) */
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data URL prefix to get raw base64
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function processDroppedFilesAsAttachments(
+  files: File[],
+  onAttach: (attachment: Attachment) => void,
+): Promise<void> {
+  for (const file of files) {
+    const kind = classifyFileExtension(file.name);
+    const filePath = (file as any).path || file.name;
+
+    if (kind === 'image') {
+      if (file.size > MAX_IMAGE_SIZE) {
+        console.warn(`Image "${file.name}" exceeds 10MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB). Skipped.`);
+        continue;
+      }
+
+      try {
+        const [data, thumbnailDataUrl] = await Promise.all([
+          readFileAsBase64(file),
+          generateThumbnail(file),
+        ]);
+
+        onAttach({
+          id: generateId(),
+          kind: 'image',
+          name: file.name,
+          mimeType: file.type || 'image/png',
+          data,
+          localPath: filePath !== file.name ? filePath : undefined,
+          thumbnailDataUrl,
+          size: file.size,
+        });
+      } catch {
+        // Fall back to file attachment without data
+        onAttach({
+          id: generateId(),
+          kind: 'file',
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          localPath: filePath !== file.name ? filePath : undefined,
+          size: file.size,
+        });
+      }
+    } else {
+      onAttach({
+        id: generateId(),
+        kind: 'file',
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        localPath: filePath !== file.name ? filePath : undefined,
+        size: file.size,
+      });
+    }
+  }
+}
+
+// ── File processing (legacy text insertion mode) ────────────────────────
+
+/** @deprecated Use MAX_IMAGE_SIZE instead — kept for backward compatibility */
+const LEGACY_MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 function processDroppedFiles(files: File[], onInsertText: (text: string) => void): void {
   const insertions: Promise<string>[] = files.map((file) => {
     const kind = classifyFileExtension(file.name);
-    // file.path is an Electron extension; in standard browsers it's undefined,
-    // so we fall back to file.name (filename only, no directory info).
     const path = (file as any).path || file.name;
 
     if (kind === 'image') {
-      if (file.size > MAX_IMAGE_SIZE) {
-        // Too large for inline base64 — insert as a file mention instead
+      if (file.size > LEGACY_MAX_IMAGE_SIZE) {
         return Promise.resolve(
           buildInsertText({ kind: 'code', name: file.name, path, file }),
         );
@@ -173,7 +304,6 @@ function processDroppedFiles(files: File[], onInsertText: (text: string) => void
           buildInsertText({ kind, name: file.name, path, dataUrl, file }),
         )
         .catch(() => {
-          // Fall back to a file mention if the image can't be read
           return buildInsertText({ kind: 'code', name: file.name, path, file });
         });
     }
@@ -197,3 +327,4 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+

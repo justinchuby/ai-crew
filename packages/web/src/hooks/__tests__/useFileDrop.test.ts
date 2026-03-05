@@ -91,8 +91,8 @@ describe('buildInsertText', () => {
 });
 
 describe('MAX_IMAGE_SIZE', () => {
-  it('is set to 5 MB', () => {
-    expect(MAX_IMAGE_SIZE).toBe(5 * 1024 * 1024);
+  it('is set to 10 MB', () => {
+    expect(MAX_IMAGE_SIZE).toBe(10 * 1024 * 1024);
   });
 
   it('is exported so consumers can reference the limit', () => {
