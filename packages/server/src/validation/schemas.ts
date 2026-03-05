@@ -59,16 +59,25 @@ export const spawnAgentSchema = z.object({
   sessionId: z.string().optional(),
 });
 
+/** Attachment schema for file/image uploads in messages */
+export const attachmentSchema = z.object({
+  name: z.string().min(1),
+  mimeType: z.string().min(1),
+  data: z.string().min(1),  // base64-encoded
+});
+
 /** POST /api/agents/:id/message */
 export const sendMessageSchema = z.object({
   text: z.string().min(1, 'text is required'),
   mode: z.enum(['queue', 'interrupt']).optional(),
+  attachments: z.array(attachmentSchema).max(10).optional(),
 });
 
 /** POST /api/lead/:id/message */
 export const leadMessageSchema = z.object({
   text: z.string().min(1, 'text is required'),
   mode: z.enum(['queue', 'interrupt']).optional(),
+  attachments: z.array(attachmentSchema).max(10).optional(),
 });
 
 /** PATCH /api/config — only mutable runtime fields */
