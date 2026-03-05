@@ -22,70 +22,72 @@ afterEach(() => {
   (globalThis as any).__GIT_HASH__ = originalHash;
 });
 
+// Vitest runs with import.meta.env.DEV = true, so these tests exercise
+// dev-mode behavior by default. Production behavior (DEV = false) is
+// verified by the Vite production build where import.meta.env.DEV is
+// statically replaced with false.
+
 describe('VersionBadge', () => {
-  it('shows clean version for stable release (no hash)', () => {
-    setGlobals('1.2.3', 'def5678');
-    render(<VersionBadge />);
-    const badge = screen.getByText('v1.2.3');
-    expect(badge.textContent).not.toContain('def5678');
+  describe('in dev mode (import.meta.env.DEV = true)', () => {
+    it('shows hash for stable version in dev mode', () => {
+      setGlobals('1.2.3', 'def5678');
+      render(<VersionBadge />);
+      expect(screen.getByText('v1.2.3 (def5678)')).toBeDefined();
+    });
+
+    it('shows hash for pre-release version in dev mode', () => {
+      setGlobals('1.2.3-dev', 'abc1234');
+      render(<VersionBadge />);
+      expect(screen.getByText('v1.2.3-dev (abc1234)')).toBeDefined();
+    });
+
+    it('shows hash for alpha pre-release', () => {
+      setGlobals('0.5.0-alpha.1', 'bbb2222');
+      render(<VersionBadge />);
+      expect(screen.getByText('v0.5.0-alpha.1 (bbb2222)')).toBeDefined();
+    });
+
+    it('shows hash for beta pre-release', () => {
+      setGlobals('3.0.0-beta', 'ccc3333');
+      render(<VersionBadge />);
+      expect(screen.getByText('v3.0.0-beta (ccc3333)')).toBeDefined();
+    });
   });
 
-  it('hides git hash for stable release even when available', () => {
-    setGlobals('2.0.0', 'aaa1111');
-    render(<VersionBadge />);
-    const badge = screen.getByText('v2.0.0');
-    expect(badge.textContent).not.toContain('aaa1111');
+  describe('hash unavailable', () => {
+    it('hides hash when git hash is "unknown"', () => {
+      setGlobals('1.0.0-dev', 'unknown');
+      render(<VersionBadge />);
+      const badge = screen.getByText('v1.0.0-dev');
+      expect(badge.textContent).not.toContain('unknown');
+    });
+
+    it('hides hash when git hash is empty', () => {
+      setGlobals('1.0.0', '');
+      render(<VersionBadge />);
+      expect(screen.getByText('v1.0.0')).toBeDefined();
+    });
+
+    it('shows version only when both fallbacks are active', () => {
+      setGlobals('0.0.0', 'unknown');
+      render(<VersionBadge />);
+      expect(screen.getByText('v0.0.0')).toBeDefined();
+    });
   });
 
-  it('shows git hash for dev version with hyphen', () => {
-    setGlobals('1.2.3-dev', 'abc1234');
-    render(<VersionBadge />);
-    expect(screen.getByText('v1.2.3-dev (abc1234)')).toBeDefined();
-  });
+  describe('common behavior', () => {
+    it('has a title attribute with full version info', () => {
+      setGlobals('1.0.0', 'xyz9999');
+      render(<VersionBadge />);
+      const badge = screen.getByText('v1.0.0 (xyz9999)');
+      expect(badge.getAttribute('title')).toBe('Version 1.0.0 — xyz9999');
+    });
 
-  it('shows git hash for alpha pre-release', () => {
-    setGlobals('0.5.0-alpha.1', 'bbb2222');
-    render(<VersionBadge />);
-    expect(screen.getByText('v0.5.0-alpha.1 (bbb2222)')).toBeDefined();
-  });
-
-  it('shows git hash for beta pre-release', () => {
-    setGlobals('3.0.0-beta', 'ccc3333');
-    render(<VersionBadge />);
-    expect(screen.getByText('v3.0.0-beta (ccc3333)')).toBeDefined();
-  });
-
-  it('hides hash for pre-release when git hash is "unknown"', () => {
-    setGlobals('1.0.0-dev', 'unknown');
-    render(<VersionBadge />);
-    const badge = screen.getByText('v1.0.0-dev');
-    expect(badge.textContent).not.toContain('unknown');
-  });
-
-  it('shows fallback version without hash for stable fallback', () => {
-    setGlobals('0.0.0', 'abc1234');
-    render(<VersionBadge />);
-    const badge = screen.getByText('v0.0.0');
-    expect(badge.textContent).not.toContain('abc1234');
-  });
-
-  it('shows version only when both fallbacks are active', () => {
-    setGlobals('0.0.0', 'unknown');
-    render(<VersionBadge />);
-    expect(screen.getByText('v0.0.0')).toBeDefined();
-  });
-
-  it('has a title attribute with full version info regardless of display', () => {
-    setGlobals('1.0.0', 'xyz9999');
-    render(<VersionBadge />);
-    const badge = screen.getByText('v1.0.0');
-    expect(badge.getAttribute('title')).toBe('Version 1.0.0 — xyz9999');
-  });
-
-  it('renders with muted text styling', () => {
-    render(<VersionBadge />);
-    const badge = screen.getByText('v1.0.0');
-    expect(badge.className).toContain('text-th-text-muted');
-    expect(badge.className).toContain('text-[11px]');
+    it('renders with muted text styling', () => {
+      render(<VersionBadge />);
+      const badge = screen.getByText('v1.0.0 (abc1234)');
+      expect(badge.className).toContain('text-th-text-muted');
+      expect(badge.className).toContain('text-[11px]');
+    });
   });
 });
