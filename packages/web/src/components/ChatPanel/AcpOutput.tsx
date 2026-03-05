@@ -23,40 +23,6 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   low: 'bg-gray-500/20 text-th-text-muted',
 };
 
-
-/** Render inline markdown: **bold**, *italic*, `code` */
-function renderMarkdown(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_|`([^`]+)`)/g;
-  let lastIndex = 0;
-  let match;
-  let key = 0;
-
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
-    }
-    if (match[2]) {
-      parts.push(<strong key={key++} className="font-bold text-th-text">{match[2]}</strong>);
-    } else if (match[3]) {
-      parts.push(<em key={key++} className="italic text-th-text-alt">{match[3]}</em>);
-    } else if (match[4]) {
-      parts.push(<em key={key++} className="italic text-th-text-alt">{match[4]}</em>);
-    } else if (match[5]) {
-      parts.push(
-        <code key={key++} className="bg-th-bg-muted/60 text-blue-600 dark:text-blue-300 rounded px-1 py-0.5 text-[11px] font-mono">
-          {match[5]}
-        </code>,
-      );
-    }
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-  return parts.length > 0 ? parts : [text];
-}
-
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
