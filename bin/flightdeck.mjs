@@ -80,10 +80,18 @@ const server = spawn('node', [serverDist], {
 });
 
 // Open browser after a short delay (unless --no-browser)
+// Read .flightdeck/port to get the actual port (server may have auto-incremented on EADDRINUSE)
 if (!noBrowser) {
   setTimeout(() => {
+    const portFile = resolve(process.cwd(), '.flightdeck', 'port');
+    let actualPort = port;
+    try {
+      if (existsSync(portFile)) {
+        actualPort = readFileSync(portFile, 'utf-8').trim();
+      }
+    } catch { /* fall back to configured port */ }
     const browserHost = formatHost(host);
-    const url = `http://${browserHost}:${port}`;
+    const url = `http://${browserHost}:${actualPort}`;
     const platform = process.platform;
     try {
       let child;

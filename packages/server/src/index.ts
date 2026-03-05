@@ -339,8 +339,45 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
-httpServer.listen(config.port, config.host, () => {
-  const url = `http://${config.host}:${config.port}`;
+const PORT_FILE = path.resolve(process.cwd(), '.flightdeck', 'port');
+
+async function listenWithRetry(basePort: number, host: string, maxRetries = 10): Promise<number> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const port = basePort + attempt;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        httpServer.once('error', reject);
+        httpServer.listen(port, host, () => {
+          httpServer.removeListener('error', reject);
+          resolve();
+        });
+      });
+      return port;
+    } catch (err: any) {
+      if (err.code !== 'EADDRINUSE') throw err;
+      console.warn(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+    }
+  }
+  throw new Error(`No available port found in range ${basePort}–${basePort + maxRetries - 1}`);
+}
+
+function writePortFile(port: number) {
+  const dir = path.dirname(PORT_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(PORT_FILE, String(port), 'utf-8');
+}
+
+function removePortFile() {
+  try { fs.unlinkSync(PORT_FILE); } catch { /* already gone */ }
+}
+
+listenWithRetry(config.port, config.host).then((actualPort) => {
+  if (actualPort !== config.port) {
+    updateConfig({ port: actualPort });
+  }
+  writePortFile(actualPort);
+
+  const url = `http://${config.host}:${actualPort}`;
   console.log(`🚀 Flightdeck server running on ${url}`);
   if (authToken) {
     console.log(`🔑 Auth token: ${authToken}`);
@@ -353,11 +390,15 @@ httpServer.listen(config.port, config.host, () => {
   }
   contextRefresher.start();
   escalationManager.start();
+}).catch((err) => {
+  console.error(`❌ Failed to start server: ${err.message}`);
+  process.exit(1);
 });
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+  removePortFile();
   contextRefresher.stop();
   scheduler.stop();
   eagerScheduler.stop();
