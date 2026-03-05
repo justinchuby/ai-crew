@@ -4,6 +4,7 @@ import { scaleTime } from '@visx/scale';
 import { AxisTop } from '@visx/axis';
 import { Group } from '@visx/group';
 import { useTooltip, defaultStyles } from '@visx/tooltip';
+import { timeFormat } from 'd3-time-format';
 import { CommunicationLinks } from './CommunicationLinks';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { formatTimestamp } from './formatTimestamp';
@@ -344,6 +345,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     [visibleRange, chartWidth],
   );
 
+  const formatTick = useMemo(() => timeFormat('%H:%M'), []);
+
   const agentPositions = useMemo(() => {
     const map = new Map<string, number>();
     for (const lane of laneLayout) {
@@ -508,6 +511,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             <Group top={AXIS_HEIGHT - 4}>
               <AxisTop
                 scale={timeScale}
+                tickFormat={(d) => formatTick(d as Date)}
                 stroke="var(--graph-border)"
                 tickStroke="var(--graph-border)"
                 tickLabelProps={() => ({
@@ -614,7 +618,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
 export function TimelineContainer({ data, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps) {
   return (
-    <div className="bg-th-bg rounded-lg border border-th-border-muted min-h-[300px] flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
+    <div className="bg-th-bg rounded-lg border border-th-border-muted min-h-[300px] flex flex-col flex-1 min-h-0">
       <ParentSize>
         {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} lastSeenTimestamp={lastSeenTimestamp} /> : null}
       </ParentSize>
