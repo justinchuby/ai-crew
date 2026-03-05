@@ -36,7 +36,7 @@ function DetailPopup({ title, children, onClose }: { title: string; children: Re
       <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-th-border">
           <h3 className="text-sm font-semibold text-th-text truncate">{title}</h3>
-          <button onClick={onClose} className="text-th-text-muted hover:text-th-text text-lg leading-none p-1">×</button>
+          <button type="button" aria-label="Close detail panel" onClick={onClose} className="text-th-text-muted hover:text-th-text text-lg leading-none p-1">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm text-th-text-alt">
           {children}

@@ -61,7 +61,7 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
           <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
           <span className="text-sm font-semibold text-th-text">Select Directory</span>
           <span className="flex-1" />
-          <button onClick={onClose} className="text-th-text-muted hover:text-th-text text-lg leading-none p-1">×</button>
+          <button type="button" aria-label="Close folder picker" onClick={onClose} className="text-th-text-muted hover:text-th-text text-lg leading-none p-1">×</button>
         </div>
 
         {/* Current path */}
@@ -69,6 +69,8 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
           <span className="text-xs font-mono text-th-text-alt truncate flex-1" title={current}>{current}</span>
           {parent && parent !== current && (
             <button
+              type="button"
+              aria-label="Go to parent directory"
               onClick={() => browse(parent)}
               className="p-1 text-th-text-muted hover:text-th-text shrink-0"
               title="Go up"

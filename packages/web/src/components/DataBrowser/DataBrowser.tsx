@@ -45,7 +45,7 @@ export function DataBrowser() {
       <div className="flex items-center gap-3 mb-6">
         <Database className="w-6 h-6 text-th-text-muted" />
         <h2 className="text-xl font-semibold">Database</h2>
-        <button onClick={loadStats} className="ml-auto p-1.5 text-th-text-muted hover:text-th-text rounded hover:bg-th-bg-muted transition-colors" title="Refresh">
+        <button type="button" aria-label="Refresh database stats" onClick={loadStats} className="ml-auto p-1.5 text-th-text-muted hover:text-th-text rounded hover:bg-th-bg-muted transition-colors" title="Refresh">
           <RefreshCw size={14} />
         </button>
       </div>

@@ -65,9 +65,9 @@ const MAX_VISIBLE_LINKS = 500;
 
 const tooltipStyles: React.CSSProperties = {
   ...defaultStyles,
-  backgroundColor: '#1e1e2e',
-  color: '#e2e8f0',
-  border: '1px solid #4b5563',
+  backgroundColor: 'rgb(var(--th-bg-alt))',
+  color: 'rgb(var(--th-text-alt))',
+  border: '1px solid rgb(var(--th-border))',
   borderRadius: 6,
   padding: '8px 12px',
   fontSize: 12,
@@ -271,7 +271,7 @@ export function CommunicationLinks({
               {isMissing && (
                 <text
                   x={x + 28} y={y1 + 4}
-                  fontSize={10} fill="#9ca3af"
+                  fontSize={10} className="fill-gray-400"
                   style={{ pointerEvents: 'none' }}
                 >{comm.groupName ? `👥 ${comm.groupName}` : '?'}</text>
               )}

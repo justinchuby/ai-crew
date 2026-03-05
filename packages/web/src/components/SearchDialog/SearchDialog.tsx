@@ -153,7 +153,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             className="flex-1 bg-transparent text-th-text-alt text-sm placeholder-th-text-muted outline-none"
           />
           {query && (
-            <button onClick={() => { setQuery(''); setResults([]); setSearched(false); }} className="text-th-text-muted hover:text-th-text-alt">
+            <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); setResults([]); setSearched(false); }} className="text-th-text-muted hover:text-th-text-alt">
               <X className="w-4 h-4" />
             </button>
           )}

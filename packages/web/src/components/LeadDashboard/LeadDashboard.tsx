@@ -1665,16 +1665,16 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       {i > 0 && (
-                        <button onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
+                        <button type="button" aria-label="Move message up" onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
                           <ChevronUp className="w-3 h-3" />
                         </button>
                       )}
                       {i < arr.length - 1 && (
-                        <button onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
+                        <button type="button" aria-label="Move message down" onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
                           <ChevronDown className="w-3 h-3" />
                         </button>
                       )}
-                      <button onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
+                      <button type="button" aria-label="Remove queued message" onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
                         <X className="w-3 h-3" />
                       </button>
                     </div>
@@ -1760,6 +1760,8 @@ export function LeadDashboard({ api, ws }: Props) {
           {sidebarCollapsed ? (
             <div className="border-l border-th-border flex flex-col items-center py-2 w-10 shrink-0">
               <button
+                type="button"
+                aria-label="Expand sidebar"
                 onClick={() => setSidebarCollapsed(false)}
                 className="p-1.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text relative"
                 title="Expand sidebar"
@@ -1782,6 +1784,8 @@ export function LeadDashboard({ api, ws }: Props) {
               <div className="flex-1 border-l border-th-border flex flex-col overflow-hidden min-w-0">
                 <div className="px-2 py-1 border-b border-th-border flex items-center justify-end shrink-0">
                   <button
+                    type="button"
+                    aria-label="Collapse sidebar"
                     onClick={() => setSidebarCollapsed(true)}
                     className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
                     title="Collapse sidebar"
@@ -1933,7 +1937,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 <BarChart3 className="w-4 h-4 text-purple-400" />
                 <span className="text-sm font-semibold text-th-text">Progress Detail</span>
               </div>
-              <button onClick={() => setShowProgressDetail(false)} className="text-th-text-muted hover:text-th-text">
+              <button type="button" aria-label="Close progress detail" onClick={() => setShowProgressDetail(false)} className="text-th-text-muted hover:text-th-text">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -2094,7 +2098,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 <span className="text-xs font-mono text-th-text-muted">
                   {new Date(expandedReport.timestamp).toLocaleTimeString()}
                 </span>
-                <button onClick={() => setExpandedReport(null)} className="text-th-text-muted hover:text-th-text">
+                <button type="button" aria-label="Close report" onClick={() => setExpandedReport(null)} className="text-th-text-muted hover:text-th-text">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -2235,6 +2239,8 @@ function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
         className="flex-1 bg-th-bg border border-th-border rounded px-2 py-1 text-xs text-th-text-alt focus:outline-none focus:border-yellow-500"
       />
       <button
+        type="button"
+        aria-label="Confirm decision"
         onClick={() => onConfirm(decisionId, reason.trim() || undefined)}
         className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-600 dark:text-green-200 transition-colors"
         title="Confirm"
@@ -2242,6 +2248,8 @@ function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
         <Check className="w-3.5 h-3.5" />
       </button>
       <button
+        type="button"
+        aria-label="Reject decision"
         onClick={() => onReject(decisionId, reason.trim() || undefined)}
         className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-600 dark:text-red-200 transition-colors"
         title="Reject"
@@ -2340,7 +2348,7 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
                 <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedDecision.timestamp).toLocaleString()}
                 </span>
-                <button onClick={() => setSelectedDecision(null)} className="text-th-text-muted hover:text-th-text">
+                <button type="button" aria-label="Close decision detail" onClick={() => setSelectedDecision(null)} className="text-th-text-muted hover:text-th-text">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -2760,7 +2768,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 <span className="text-xs font-mono text-th-text-muted">
                   {new Date(selectedComm.timestamp).toLocaleTimeString()}
                 </span>
-                <button onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
+                <button type="button" aria-label="Close communication detail" onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -2989,7 +2997,16 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
   );
 }
 function roleColor(role: string): string {
-  const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#60a5fa', '#e879f9', '#fb923c'];
+  const colors = [
+    'text-cyan-400',
+    'text-violet-400',
+    'text-emerald-400',
+    'text-amber-400',
+    'text-red-400',
+    'text-blue-400',
+    'text-fuchsia-400',
+    'text-orange-400',
+  ];
   let hash = 0;
   for (let i = 0; i < role.length; i++) hash = (hash * 31 + role.charCodeAt(i)) | 0;
   return colors[Math.abs(hash) % colors.length];
@@ -3078,7 +3095,7 @@ function GroupsPanelContent({
                         <div key={m.id} className="px-2 py-1 rounded bg-th-bg-alt/50 text-xs font-mono">
                           <div className="flex items-center gap-1">
                             <span className="text-th-text-muted text-[10px] shrink-0">{time}</span>
-                            <span style={{ color: roleColor(m.fromRole) }} className="font-semibold truncate">
+                            <span className={`${roleColor(m.fromRole)} font-semibold truncate`}>
                               {m.fromRole}{shortId ? ` (${shortId})` : ''}:
                             </span>
                           </div>
@@ -3250,8 +3267,8 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
             className="flex-1 bg-th-bg-alt border border-th-border rounded px-2 py-0.5 text-xs font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
             autoFocus
           />
-          <button onClick={save} className="text-green-400 hover:text-green-600 dark:hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
-          <button onClick={() => setEditing(false)} className="text-th-text-muted hover:text-th-text p-0.5"><X className="w-3 h-3" /></button>
+          <button type="button" aria-label="Save working directory" onClick={save} className="text-green-400 hover:text-green-600 dark:hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
+          <button type="button" aria-label="Cancel edit" onClick={() => setEditing(false)} className="text-th-text-muted hover:text-th-text p-0.5"><X className="w-3 h-3" /></button>
         </>
       ) : (
         <>
