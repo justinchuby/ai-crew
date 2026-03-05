@@ -35,14 +35,10 @@ export class WebSocketServer {
     this.agentManager = agentManager;
     this.lockRegistry = lockRegistry;
 
-    // Handle WebSocket server errors (e.g., EADDRINUSE propagated from shared HTTP server)
+    // Prevent unhandled 'error' events from crashing the process.
+    // EADDRINUSE is handled by listenWithRetry in index.ts (auto-port-finding);
+    // this handler catches any residual or runtime WSS errors.
     this.wss.on('error', (err: Error & { code?: string }) => {
-      if (err.code === 'EADDRINUSE') {
-        const addr = server.address();
-        const port = typeof addr === 'object' && addr ? addr.port : 'unknown';
-        console.error(`\n❌ Port ${port} is already in use. Is another instance running? Kill it with: lsof -ti:${port} | xargs kill`);
-        process.exit(1);
-      }
       logger.error('ws', `WebSocket server error: ${err.message}`);
     });
 

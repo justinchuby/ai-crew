@@ -364,13 +364,11 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
     updateConfig({ port: actualPort });
   }
 
-  // Permanent error handler — catches runtime errors after successful startup
+  // Permanent error handler — catches runtime errors after successful startup.
+  // EADDRINUSE is already handled by listenWithRetry during startup; this covers
+  // unexpected runtime errors (EACCES, ECONNRESET, etc.).
   httpServer.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\n❌ Port ${actualPort} is already in use. Is another instance running? Kill it with: lsof -ti:${actualPort} | xargs kill`);
-    } else {
-      console.error(`\n❌ HTTP server error: ${err.message}`);
-    }
+    console.error(`\n❌ HTTP server error: ${err.message}`);
     process.exit(1);
   });
 
@@ -389,10 +387,9 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   contextRefresher.start();
   escalationManager.start();
 }).catch((err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`\n❌ Port ${config.port} is already in use. Is another instance running? Kill it with: lsof -ti:${config.port} | xargs kill`);
-  } else {
-    console.error(`❌ Failed to start server: ${err.message}`);
+  console.error(`❌ Failed to start server: ${err.message}`);
+  if (err.message.includes('No available port')) {
+    console.error(`   All ports ${config.port}–${config.port + 9} are in use. Kill existing instances with: lsof -ti:${config.port} | xargs kill`);
   }
   process.exit(1);
 });
