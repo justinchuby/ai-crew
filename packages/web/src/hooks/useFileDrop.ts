@@ -117,6 +117,8 @@ export interface UseFileDropResult {
   handleDragLeave: (e: React.DragEvent) => void;
   /** Attach to the drop zone wrapper's onDrop */
   handleDrop: (e: React.DragEvent) => void;
+  /** Attach to the chat container's onPaste for clipboard image support */
+  handlePaste: (e: React.ClipboardEvent) => void;
   /** CSS class string for the drop zone indicator */
   dropZoneClassName: string;
 }
@@ -182,6 +184,25 @@ export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileD
     [enabled, onInsertText, onAttach],
   );
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (!enabled) return;
+      const items = Array.from(e.clipboardData.items);
+      const files = items
+        .filter((item) => item.kind === 'file')
+        .map((item) => item.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (files.length === 0) return;
+      e.preventDefault();
+      if (onAttach) {
+        processDroppedFilesAsAttachments(files, onAttach);
+      } else if (onInsertText) {
+        processDroppedFiles(files, onInsertText);
+      }
+    },
+    [enabled, onInsertText, onAttach],
+  );
+
   const dropZoneClassName = isDragOver
     ? 'ring-2 ring-accent bg-accent/5 border-accent'
     : '';
@@ -199,6 +220,7 @@ export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileD
     },
     handleDragLeave,
     handleDrop,
+    handlePaste,
     dropZoneClassName,
   };
 }

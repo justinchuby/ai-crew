@@ -7,6 +7,9 @@ import { X, Send, Maximize2, Minimize2, Megaphone, Zap } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
 import { AgentIdBadge } from '../../utils/markdown';
 import { useFileDrop } from '../../hooks/useFileDrop';
+import { useAttachments } from '../../hooks/useAttachments';
+import { AttachmentBar } from '../AttachmentBar';
+import { DropOverlay } from '../DropOverlay';
 
 interface Props {
   agentId: string;
@@ -33,8 +36,10 @@ export function ChatPanel({ agentId, ws }: Props) {
     setInputText((prev) => (prev ? prev + ' ' + text : text));
     inputRef.current?.focus();
   }, []);
-  const { isDragOver, handleDragOver, handleDragLeave, handleDrop, dropZoneClassName } = useFileDrop({
+  const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
+  const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handlePaste, dropZoneClassName } = useFileDrop({
     onInsertText: handleFileInsert,
+    onAttach: addAttachment,
   });
 
   const activeAgents = useMemo(
@@ -77,10 +82,16 @@ export function ChatPanel({ agentId, ws }: Props) {
 
   const runningAgents = agents.filter((a) => a.status === 'running');
 
-  const sendToAgent = (targetId: string, text: string, mode: 'queue' | 'interrupt' = 'queue') => {
+  const sendToAgent = (targetId: string, text: string, mode: 'queue' | 'interrupt' = 'queue', atts?: typeof attachments) => {
+    const payload: Record<string, unknown> = { text, mode };
+    if (atts && atts.length > 0) {
+      payload.attachments = atts
+        .filter((a) => a.data)
+        .map((a) => ({ name: a.name, mimeType: a.mimeType, data: a.data }));
+    }
     apiFetch(`/agents/${targetId}/message`, {
       method: 'POST',
-      body: JSON.stringify({ text, mode }),
+      body: JSON.stringify(payload),
     }).catch((err: Error) => {
       useToastStore.getState().add('error', `Failed to send: ${err.message}`);
     });
@@ -111,9 +122,9 @@ export function ChatPanel({ agentId, ws }: Props) {
 
     if (broadcast) {
       const running = useAppStore.getState().agents.filter((a) => a.status === 'running');
-      running.forEach((a) => sendToAgent(a.id, inputText, mode));
+      running.forEach((a) => sendToAgent(a.id, inputText, mode, attachments));
     } else {
-      sendToAgent(agentId, inputText, mode);
+      sendToAgent(agentId, inputText, mode, attachments);
     }
     // Send to @mentioned agents
     const mentionPattern = /@([a-f0-9]{4,8})\b/g;
@@ -126,10 +137,18 @@ export function ChatPanel({ agentId, ws }: Props) {
     }
     setInputText('');
     setMentionQuery(null);
+    clearAttachments();
   };
 
   return (
-    <div className={`flex flex-col h-full ${expanded ? 'fixed inset-0 z-50 bg-surface' : ''}`}>
+    <div
+      className={`flex flex-col h-full relative ${expanded ? 'fixed inset-0 z-50 bg-surface' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
+    >
+      {isDragOver && <DropOverlay />}
       <div className="h-10 border-b border-th-border flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
           <span>{agent?.role.icon}</span>
@@ -175,17 +194,10 @@ export function ChatPanel({ agentId, ws }: Props) {
             Broadcasting to {runningAgents.length} agents
           </div>
         )}
+        <AttachmentBar attachments={attachments} onRemove={removeAttachment} />
         <div
-          className={`flex gap-2 items-end relative rounded-lg transition-all ${dropZoneClassName}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          className="flex gap-2 items-end relative rounded-lg transition-all"
         >
-          {isDragOver && (
-            <div className="absolute inset-0 flex items-center justify-center bg-accent/10 border-2 border-dashed border-accent rounded-lg z-10 pointer-events-none">
-              <span className="text-xs font-medium text-accent">Drop file to mention or attach</span>
-            </div>
-          )}
           <textarea
             ref={inputRef}
             value={inputText}

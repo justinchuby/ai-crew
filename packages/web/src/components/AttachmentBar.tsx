@@ -16,8 +16,9 @@ export function AttachmentBar({ attachments, onRemove }: AttachmentBarProps) {
   if (attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 px-3 py-2 border-b border-th-border bg-th-bg-alt/40">
-      {attachments.map((att) => (
+    <div className="relative mb-1">
+      <div className="flex flex-wrap gap-2 px-3 py-2 rounded-lg border border-th-border bg-th-bg shadow-lg">
+        {attachments.map((att) => (
         <div
           key={att.id}
           className="flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-md bg-th-bg border border-th-border text-xs text-th-text-alt group hover:border-th-border-hover transition-colors"
@@ -37,6 +38,7 @@ export function AttachmentBar({ attachments, onRemove }: AttachmentBarProps) {
           </button>
         </div>
       ))}
+      </div>
     </div>
   );
 }

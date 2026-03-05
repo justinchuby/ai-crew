@@ -44,7 +44,7 @@ export function LeadDashboard({ api, ws }: Props) {
     setInput(input ? input + ' ' + text : text);
   }, [input, setInput]);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
-  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
+  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, handlePaste: leadPaste, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
     onInsertText: handleLeadFileInsert,
     onAttach: addAttachment,
   });
@@ -1341,7 +1341,14 @@ export function LeadDashboard({ api, ws }: Props) {
       ) : (
         <>
           {/* Chat area */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div
+            className="flex-1 flex flex-col min-w-0 relative"
+            onDragOver={leadDragOver}
+            onDragLeave={leadDragLeave}
+            onDrop={leadDrop}
+            onPaste={leadPaste}
+          >
+            {isLeadDragOver && <DropOverlay />}
             {/* Progress banner — clickable to open detail */}
             {progress && progress.totalDelegations > 0 && (
               <div
@@ -1687,12 +1694,8 @@ export function LeadDashboard({ api, ws }: Props) {
             <div className="border-t border-th-border p-3">
               <AttachmentBar attachments={attachments} onRemove={removeAttachment} />
               <div
-                className={`flex gap-2 items-end relative rounded transition-all ${leadDropZoneClassName}`}
-                onDragOver={leadDragOver}
-                onDragLeave={leadDragLeave}
-                onDrop={leadDrop}
+                className="flex gap-2 items-end relative rounded transition-all"
               >
-                {isLeadDragOver && <DropOverlay />}
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
