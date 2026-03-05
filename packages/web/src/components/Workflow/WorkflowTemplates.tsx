@@ -1,5 +1,6 @@
 import { useWorkflowTemplates } from '../../hooks/useWorkflowRules';
 import { TEMPLATE_CATEGORIES, type WorkflowTemplate } from './types';
+import { EmptyState } from '../Shared';
 
 interface Props {
   onSelect: (template: WorkflowTemplate) => void;
@@ -24,7 +25,7 @@ export function WorkflowTemplates({ onSelect, onClose }: Props) {
       </div>
 
       {grouped.length === 0 ? (
-        <div className="text-xs text-th-text-muted text-center py-6">No templates available</div>
+        <EmptyState icon="📋" title="No templates available" description="Templates will appear when the workflow engine provides them." />
       ) : (
         grouped.map((g) => (
           <div key={g.category}>

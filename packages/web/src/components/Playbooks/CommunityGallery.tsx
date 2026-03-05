@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, ChevronDown, Star, Users, Sparkles } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { EmptyState } from '../Shared';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -251,12 +252,14 @@ export function CommunityGallery({ onSelect }: CommunityGalleryProps) {
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-th-border rounded-lg" data-testid="community-empty">
-            <p className="text-xs text-th-text-muted">No playbooks match your search.</p>
+            <EmptyState icon="📚" title="No playbooks found" description="Try adjusting your search or category filter." />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visible.map((pb) => (
-              <CommunityCard key={pb.id} playbook={pb} onSelect={onSelect} />
+            {visible.map((pb, i) => (
+              <div key={pb.id} className="motion-stagger" style={{ '--stagger-index': i } as React.CSSProperties}>
+                <CommunityCard playbook={pb} onSelect={onSelect} />
+              </div>
             ))}
           </div>
         )}

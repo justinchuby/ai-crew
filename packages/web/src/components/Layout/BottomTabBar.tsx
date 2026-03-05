@@ -50,7 +50,7 @@ export function BottomTabBar() {
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowMore(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <div
-            className="absolute bottom-14 left-0 right-0 bg-th-bg border-t border-th-border rounded-t-xl p-4"
+            className="absolute bottom-14 left-0 right-0 bg-th-bg border-t border-th-border rounded-t-xl p-4 motion-fade-in"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-8 h-1 rounded-full bg-th-border mx-auto mb-3" />
@@ -70,7 +70,7 @@ export function BottomTabBar() {
 
       {/* Tab bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 h-14 bg-th-bg border-t border-th-border flex items-center justify-around md:hidden z-30"
+        className="fixed bottom-0 left-0 right-0 h-14 bg-th-bg border-t border-th-border flex items-center justify-around md:hidden z-30 motion-slide-up"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         role="navigation"
         aria-label="Main navigation"

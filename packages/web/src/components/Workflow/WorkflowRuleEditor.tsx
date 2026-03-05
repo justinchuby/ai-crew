@@ -55,7 +55,7 @@ export function WorkflowRuleEditor({ rule, onSave, onCancel }: Props) {
   const summary = `When ${EVENT_LABELS[event].toLowerCase()}${scopeRole ? ` for ${scopeRole}` : ''}${conditions.length > 0 ? ` and ${conditions.length} condition${conditions.length > 1 ? 's' : ''}` : ''}, ${actions.map((a) => ACTION_LABELS[a.type].toLowerCase()).join(' and ')}${notifications.length > 0 ? `, notify via ${notifications.map((n) => n.channel).join(', ')}` : ''}.`;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 motion-slide-in">
       <h3 className="text-sm font-semibold text-th-text">
         ⚡ {rule?.id ? 'Edit' : 'New'} Workflow Rule
       </h3>

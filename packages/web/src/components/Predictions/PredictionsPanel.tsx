@@ -1,5 +1,6 @@
 import { usePredictions, usePredictionAccuracy } from '../../hooks/usePredictions';
 import { PredictionCard } from './PredictionCard';
+import { EmptyState } from '../Shared';
 
 export function PredictionsPanel() {
   const { predictions, loading, dismiss } = usePredictions();
@@ -35,7 +36,7 @@ export function PredictionsPanel() {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="text-xs text-th-text-muted text-center py-4">No active predictions</div>
+        <EmptyState icon="🔮" title="No active predictions" description="Predictions appear after agents accumulate enough data." />
       ) : (
         <div className="space-y-2">
           {sorted.slice(0, 5).map(p => (

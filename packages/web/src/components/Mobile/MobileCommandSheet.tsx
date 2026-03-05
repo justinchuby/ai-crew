@@ -37,7 +37,7 @@ export function MobileCommandSheet({ isOpen, onClose, items }: Props) {
     <div className="fixed inset-0 z-50 md:hidden" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <div
-        className="absolute bottom-0 left-0 right-0 bg-th-bg border-t border-th-border rounded-t-2xl max-h-[70vh] overflow-y-auto"
+        className="absolute bottom-0 left-0 right-0 bg-th-bg border-t border-th-border rounded-t-2xl max-h-[70vh] overflow-y-auto motion-slide-up"
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-label="Command palette"

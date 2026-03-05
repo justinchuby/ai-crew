@@ -1,5 +1,6 @@
 import { usePullRequests } from '../../hooks/useGitHubConnection';
 import { ciConclusionIcon, PR_STATUS_LABELS, type PullRequest, type CICheck } from './types';
+import { EmptyState } from '../Shared';
 
 function CheckItem({ check }: { check: CICheck }) {
   const icon =
@@ -94,7 +95,7 @@ export function PRStatusPanel() {
         <span>🔀</span> Pull Requests
       </h3>
       {pulls.length === 0 ? (
-        <div className="text-xs text-th-text-muted text-center py-4">No pull requests</div>
+        <EmptyState icon="🔗" title="No pull requests" description="Connect GitHub and create a PR to see status here." />
       ) : (
         <div className="space-y-2">
           {pulls.map((pr) => (

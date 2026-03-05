@@ -137,7 +137,7 @@ export function RoleBuilder({ initial, onSave, onCancel, onDelete }: Props) {
   }, [initial, onDelete]);
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-2xl motion-fade-in">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-th-text">
           🎭 {initial?.id ? 'Edit Role' : 'Create Custom Role'}

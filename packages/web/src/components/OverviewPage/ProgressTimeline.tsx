@@ -92,7 +92,7 @@ export function ProgressTimeline({ data, width = 800, height = 240 }: ProgressTi
                 <path
                   key={stack.key}
                   d={path(stack) ?? ''}
-                  fill={COLORS[stack.key] ?? '#888'}
+                  fill={COLORS[stack.key] ?? 'currentColor'}
                   opacity={0.6}
                 />
               ))

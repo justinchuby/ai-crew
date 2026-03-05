@@ -89,7 +89,7 @@ export function MobileApprovalStack() {
           onTouchStart={swipe.onTouchStart}
           onTouchMove={swipe.onTouchMove}
           onTouchEnd={swipe.onTouchEnd}
-          className="relative bg-th-bg border border-th-border rounded-xl p-5 shadow-lg transition-colors"
+          className="relative bg-th-bg border border-th-border rounded-xl p-5 shadow-lg transition-colors motion-scale-in"
           style={{
             transform: `translate(${swipe.offsetX}px, ${Math.min(0, swipe.offsetY)}px) rotate(${swipe.offsetX * 0.05}deg)`,
             transition: swipe.swiping ? 'none' : 'transform 0.3s ease',
