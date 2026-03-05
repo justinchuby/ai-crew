@@ -14,7 +14,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   tool_access: '🔧 Tool Access',
   dependency: '📦 Dependencies',
   testing: '🧪 Testing',
-  file_operation: '📁 File Operations',
   general: '📋 General',
 };
 

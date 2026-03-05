@@ -15,7 +15,7 @@ export interface AlertAction {
   description: string;
   actionType: 'api_call' | 'dismiss';
   endpoint: string;
-  method: 'POST' | 'DELETE' | 'PATCH';
+  method: 'POST' | 'DELETE';
   body?: Record<string, any>;
   confidence?: number;
 }
@@ -69,7 +69,7 @@ export function detectAlerts(
           description: 'Change to a model with larger context window',
           actionType: 'api_call',
           endpoint: `/agents/${agent.id}`,
-          method: 'PATCH',
+          method: 'POST',
           body: { model: 'claude-opus-4.6-1m' },
         },
       ];
