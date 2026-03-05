@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-03-05
 
 ### Added
 
@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Google eng-practices reference added to code-reviewer role
 - '@ to mention files' hint in lead chat placeholder
 - **Drag & drop images hint** — chat input placeholder now mentions drag & drop image support
+- **DAG edge highlighting** — hovering or clicking a task card highlights connected edges and dims unconnected ones; click to pin, Escape to unpin
+- **Dynamic port allocation** — server auto-retries on EADDRINUSE (up to 10 ports), prints `FLIGHTDECK_PORT=NNNN` to stdout for discovery
+- **Sequential dev launcher** (`scripts/dev.mjs`) — `npm run dev` starts Express first, captures the actual port, then starts Vite with the correct proxy target; multiple instances can run simultaneously
+- **Commit sign-off convention** — all agent commits now include agent ID, role, and model name
 
 ### Changed
 
@@ -48,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Polished README for new-user experience
   - Updated repo URL and installation instructions (global install pattern)
   - Updated footer to note AI-assisted documentation
+- Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
 
 ### Fixed
 
@@ -81,6 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline legend visibility and timestamp formatting
 - Exit code normalization, scroll fix, and shell safety improvements
 - ContextRefresher test mocks updated for project scoping
+- **Gantt chart vertical alignment** — fixed SVG viewBox stretching, time axis overlap with first task row, and container height formula for small task counts
+
+### Removed
+
+- Tool call activity cards from agent chat panel (redundant with inline activity messages)
+- `.flightdeck/port` file mechanism replaced with stdout-based port discovery
 
 ## [0.1.0] - 2026-03-01
 
