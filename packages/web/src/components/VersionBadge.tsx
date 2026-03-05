@@ -1,12 +1,14 @@
 /**
- * Displays the app version and git commit hash next to the logo.
- * The hash is always shown so developers can identify the exact build.
+ * Displays the app version next to the logo.
+ * For dev/pre-release versions (containing a hyphen per semver),
+ * the short git commit hash is also shown for debugging.
  */
 export function VersionBadge() {
   const version = __APP_VERSION__;
   const gitHash = __GIT_HASH__;
 
-  const showHash = gitHash && gitHash !== 'unknown';
+  const isPreRelease = version.includes('-');
+  const showHash = isPreRelease && gitHash && gitHash !== 'unknown';
   const displayText = showHash ? `v${version} (${gitHash})` : `v${version}`;
 
   return (
