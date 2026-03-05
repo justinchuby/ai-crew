@@ -68,7 +68,7 @@ export function Sidebar() {
   };
 
   return (
-    <nav className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
+    <nav data-tour="sidebar" className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
       {/* Primary nav */}
       {primaryLinks.map(({ to, icon, label }) => (
         <NavItem

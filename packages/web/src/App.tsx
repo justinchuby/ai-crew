@@ -4,7 +4,8 @@ import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
-import { CommandPalette } from './components/CommandPalette/CommandPalette';
+import { CommandPaletteV2 } from './components/CommandPalette/CommandPaletteV2';
+import { ContextualCoach } from './components/Onboarding';
 
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { LeadDashboard } from './components/LeadDashboard';
@@ -218,8 +219,9 @@ export function App() {
                 {systemPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                 <span>{systemPaused ? 'Resume' : 'Pause'}</span>
               </button>
-              <ApprovalBadge />
+              <span data-tour="approval-badge"><ApprovalBadge /></span>
               <button
+                data-tour="cmd-k"
                 onClick={openCmd}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
               >
@@ -237,7 +239,7 @@ export function App() {
             </div>
           </header>
 
-          <PulseStrip />
+          <div data-tour="pulse-strip"><PulseStrip /></div>
 
           <ErrorBoundary>
           <Suspense fallback={<RouteSpinner />}>
@@ -273,8 +275,9 @@ export function App() {
       <ApprovalSlideOver />
       <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
-      {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
+      {cmdOpen && <CommandPaletteV2 onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
     </div>
   );
 }
