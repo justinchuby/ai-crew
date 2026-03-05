@@ -1,9 +1,35 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const serverPort = process.env.SERVER_PORT || '3001';
 
+function getGitHash(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+function getAppVersion(): string {
+  try {
+    const rootPkg = JSON.parse(
+      readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'),
+    );
+    return rootPkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(getAppVersion()),
+    __GIT_HASH__: JSON.stringify(getGitHash()),
+  },
   plugins: [react()],
   server: {
     port: 5173,

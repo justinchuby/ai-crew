@@ -26,6 +26,7 @@ import { playAttentionSound, playCompletionSound } from './utils/notificationSou
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { VersionBadge } from './components/VersionBadge';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
@@ -161,7 +162,10 @@ export function App() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
-            <h1 className="text-lg font-semibold">Flightdeck</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">Flightdeck</h1>
+              <VersionBadge />
+            </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={togglePause}
