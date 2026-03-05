@@ -518,9 +518,7 @@ export function LeadDashboard({ api, ws }: Props) {
               type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
             });
           } else if (isBroadcast) {
-            store.addMessage(leadId, {
-              type: 'text', text: `📢 [${senderRole} ${senderId} → All] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
-            });
+            // Broadcasts tracked in comms panel — don't duplicate in chat
           } else if (msg.to === leadId) {
             store.addMessage(leadId, {
               type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
@@ -532,11 +530,7 @@ export function LeadDashboard({ api, ws }: Props) {
               type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
             });
           } else {
-            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
-            const recipientId = (msg.to ?? '').slice(0, 8);
-            store.addMessage(leadId, {
-              type: 'text', text: `💬 [${senderRole} ${senderId} → ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
-            });
+            // Inter-agent DMs tracked in comms panel — don't duplicate in chat
           }
         }
       }
@@ -562,17 +556,7 @@ export function LeadDashboard({ api, ws }: Props) {
             timestamp: Date.now(),
             type: 'group_message',
           });
-          // Surface group messages in the lead chat panel
-          const senderRole = gm.fromRole || 'Agent';
-          const senderId = (gm.fromAgentId ?? '').slice(0, 8);
-          const groupName = msg.groupName || 'Group';
-          const preview = (gm.content ?? '').slice(0, 2000);
-          store.addMessage(selectedLeadId!, {
-            type: 'text',
-            text: `🗣️ [${groupName}: ${senderRole} ${senderId}] ${preview}`,
-            sender: 'system' as any,
-            timestamp: Date.now(),
-          });
+          // Group messages tracked in comms panel and groups tab — don't duplicate in chat
         }
       }
 
@@ -1567,6 +1551,12 @@ export function LeadDashboard({ api, ws }: Props) {
                   if (sysText.startsWith('📤')) return null;
                   // Hide incoming DM notifications — shown in agent chat panes instead
                   if (sysText.startsWith('📨')) return null;
+                  // Hide inter-agent DMs — shown in comms panel
+                  if (sysText.startsWith('💬')) return null;
+                  // Hide broadcasts — shown in comms panel
+                  if (sysText.startsWith('📢')) return null;
+                  // Hide group messages — shown in comms panel and groups tab
+                  if (sysText.startsWith('🗣️')) return null;
                   return (
                     <div key={i} className="flex justify-center py-1">
                       <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-th-bg-alt/60 border border-th-border/50 text-xs font-mono text-th-text-muted">
