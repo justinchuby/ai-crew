@@ -380,6 +380,7 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   writePortFile(actualPort);
 
   const url = `http://${config.host}:${actualPort}`;
+  console.log(`FLIGHTDECK_PORT=${actualPort}`);
   console.log(`🚀 Flightdeck server running on ${url}`);
   if (authToken) {
     console.log(`🔑 Auth token: ${authToken}`);
