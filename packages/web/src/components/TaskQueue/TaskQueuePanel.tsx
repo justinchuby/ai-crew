@@ -51,11 +51,11 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
             <span className="text-xs text-th-text-alt">{dagDone}/{dagTotal} done ({dagPct}%)</span>
           </div>
           <div className="w-full h-2 bg-th-bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500 transition-all duration-300 rounded-full" style={{ width: `${dagPct}%` }} />
+            <div className="h-full bg-purple-500 transition-all duration-300 rounded-full" style={{ width: `${dagPct}%` }} />
           </div>
           <div className="flex gap-3 mt-1 text-[11px]">
             {dagRunning > 0 && <span className="text-blue-400">🔵 {dagRunning} running</span>}
-            {dagDone > 0 && <span className="text-emerald-400">✅ {dagDone} done</span>}
+            {dagDone > 0 && <span className="text-purple-400">✅ {dagDone} done</span>}
             {dagFailed > 0 && <span className="text-red-400">❌ {dagFailed} failed</span>}
             {(dagStatus?.summary.pending ?? 0) > 0 && <span className="text-th-text-muted">⏳ {dagStatus!.summary.pending} pending</span>}
             {(dagStatus?.summary.ready ?? 0) > 0 && <span className="text-green-400">🟢 {dagStatus!.summary.ready} ready</span>}
@@ -75,7 +75,7 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
           </div>
           <div className="flex gap-3 mt-1 text-[11px]">
             {delegationActive > 0 && <span className="text-blue-400"><Loader2 size={10} className="inline animate-spin mr-0.5" />{delegationActive} active</span>}
-            {delegationCompleted > 0 && <span className="text-emerald-400"><CheckCircle2 size={10} className="inline mr-0.5" />{delegationCompleted} completed</span>}
+            {delegationCompleted > 0 && <span className="text-purple-400"><CheckCircle2 size={10} className="inline mr-0.5" />{delegationCompleted} completed</span>}
             {delegationFailed > 0 && <span className="text-red-400"><XCircle size={10} className="inline mr-0.5" />{delegationFailed} failed</span>}
           </div>
         </div>
@@ -264,7 +264,7 @@ export function TaskQueuePanel({ api }: Props) {
                   {taskCount > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 rounded-full min-w-[18px] text-center ${
                       doneCount === taskCount
-                        ? 'bg-green-900/50 text-green-400'
+                        ? 'bg-purple-900/50 text-purple-400'
                         : 'bg-th-bg-alt text-th-text-muted'
                     }`}>
                       {doneCount}/{taskCount}

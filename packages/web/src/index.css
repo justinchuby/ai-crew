@@ -26,7 +26,7 @@
   --st-terminated: #ea580c;
   --st-pending: #6b7280;
   --st-ready: #10b981;
-  --st-done: #059669;
+  --st-done: #9333ea;
   --st-blocked: #d97706;
   --st-paused: #ca8a04;
   --st-skipped: #6b7280;
@@ -43,7 +43,7 @@
   --st-pending-bg: #e5e7eb;
   --st-ready-bg: #d1fae5;
   --st-running-bg: #dbeafe;
-  --st-done-bg: #d1fae5;
+  --st-done-bg: #f3e8ff;
   --st-failed-bg: #fee2e2;
   --st-blocked-bg: #fef3c7;
   --st-paused-bg: #fef9c3;
@@ -94,7 +94,7 @@
   --st-terminated: #f0883e;
   --st-pending: #6b7280;
   --st-ready: #10b981;
-  --st-done: #3fb950;
+  --st-done: #a855f7;
   --st-blocked: #f59e0b;
   --st-paused: #eab308;
   --st-skipped: #4b5563;
@@ -111,7 +111,7 @@
   --st-pending-bg: #374151;
   --st-ready-bg: #065f46;
   --st-running-bg: #1e3a5f;
-  --st-done-bg: #064e3b;
+  --st-done-bg: #581c87;
   --st-failed-bg: #7f1d1d;
   --st-blocked-bg: #78350f;
   --st-paused-bg: #713f12;
