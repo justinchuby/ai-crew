@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -45,10 +45,18 @@ function CanvasInner() {
   );
   const comms = project?.comms ?? EMPTY_COMMS;
 
-  // Historical data fallback: derive agents from keyframes when no live agents
-  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(liveAgents.length, effectiveLeadId);
+  // Filter live agents by selected project (lead + its children)
+  const projectAgents = useMemo(() => {
+    if (!effectiveLeadId || liveAgents.length === 0) return liveAgents;
+    return liveAgents.filter(
+      (a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId,
+    );
+  }, [liveAgents, effectiveLeadId]);
 
-  const agents = liveAgents.length > 0 ? liveAgents : (historicalAgents as any[]);
+  // Historical data fallback: derive agents from keyframes when no live agents
+  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(projectAgents.length, effectiveLeadId);
+
+  const agents = projectAgents.length > 0 ? projectAgents : (historicalAgents as any[]);
 
   const [layout, updateLayout] = useCanvasLayout(effectiveLeadId);
   const { nodes: graphNodes, edges: graphEdges } = useCanvasGraph(agents, comms, layout);
@@ -61,15 +69,11 @@ function CanvasInner() {
   const [showAnimations, setShowAnimations] = useState(true);
 
   const { fitView, setViewport } = useReactFlow();
-  const prevNodesRef = useRef(graphNodes);
 
-  // Sync graph changes from store → local state
-  useMemo(() => {
-    if (graphNodes !== prevNodesRef.current) {
-      prevNodesRef.current = graphNodes;
-      setNodes(graphNodes);
-      setEdges(graphEdges);
-    }
+  // Sync graph changes from hook → local state
+  useEffect(() => {
+    setNodes(graphNodes);
+    setEdges(graphEdges);
   }, [graphNodes, graphEdges]);
 
   // Handle node position changes (drag)
@@ -175,7 +179,7 @@ function CanvasInner() {
         {/* Legend */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-th-bg-alt/90 border border-th-border/50 text-[10px] text-th-text-muted backdrop-blur-sm">
           <Info size={12} className="shrink-0" />
-          <span>{liveAgents.length > 0 ? 'Live visualization — edges show agent messages' : 'Historical view — showing past agent relationships'}</span>
+          <span>{projectAgents.length > 0 ? 'Live visualization — edges show agent messages' : 'Historical view — showing past agent relationships'}</span>
         </div>
       </div>
 
