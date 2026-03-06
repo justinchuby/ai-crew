@@ -53,7 +53,7 @@ describe('PulseStrip', () => {
     ]);
     render(<PulseStrip />);
     // Token count: 50k + 10k + 30k + 5k = 95k
-    expect(screen.getByText('95k')).toBeDefined();
+    expect(screen.getByText('~95k')).toBeDefined();
   });
 
   it('shows pending decisions count from appStore', () => {

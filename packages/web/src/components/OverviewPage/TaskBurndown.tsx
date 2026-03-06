@@ -85,14 +85,15 @@ export function TaskBurndown({ data, totalTasks, width = 260, height = 180 }: Ta
             top={innerH}
             scale={xScale}
             numTicks={3}
+            hideZero
             tickFormat={(d) => {
               const date = d instanceof Date ? d : new Date(d as number);
               return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }}
-            stroke="var(--th-border, #374151)"
-            tickStroke="var(--th-border, #374151)"
+            stroke="#6b7280"
+            tickStroke="#6b7280"
             tickLabelProps={() => ({
-              fill: 'var(--th-text-muted, #6b7280)',
+              fill: '#9ca3af',
               fontSize: 9,
               textAnchor: 'middle' as const,
             })}
@@ -100,10 +101,11 @@ export function TaskBurndown({ data, totalTasks, width = 260, height = 180 }: Ta
           <AxisLeft
             scale={yScale}
             numTicks={3}
-            stroke="var(--th-border, #374151)"
-            tickStroke="var(--th-border, #374151)"
+            hideZero
+            stroke="#6b7280"
+            tickStroke="#6b7280"
             tickLabelProps={() => ({
-              fill: 'var(--th-text-muted, #6b7280)',
+              fill: '#9ca3af',
               fontSize: 9,
               textAnchor: 'end' as const,
               dx: -4,

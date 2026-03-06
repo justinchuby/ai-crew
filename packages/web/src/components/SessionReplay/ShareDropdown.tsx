@@ -11,6 +11,7 @@ interface ShareDropdownProps {
 export function ShareDropdown({ onShareLink, onExportHTML, onExportJSON, onHighlightsReel }: ShareDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [dropUp, setDropUp] = useState(true);
 
   // Close on outside click
   useEffect(() => {
@@ -22,10 +23,20 @@ export function ShareDropdown({ onShareLink, onExportHTML, onExportJSON, onHighl
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // Viewport-aware positioning
+  const handleToggle = () => {
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      // If not enough room above, drop down instead
+      setDropUp(rect.top > 250);
+    }
+    setOpen(!open);
+  };
+
   return (
     <div ref={ref} className="relative" data-testid="share-dropdown">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
       >
         <Share2 className="w-3.5 h-3.5" />
@@ -34,7 +45,9 @@ export function ShareDropdown({ onShareLink, onExportHTML, onExportJSON, onHighl
       </button>
 
       {open && (
-        <div className="absolute right-0 bottom-full mb-1 w-56 bg-surface-raised border border-th-border rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className={`absolute right-0 w-56 bg-surface-raised border border-th-border rounded-lg shadow-xl z-50 overflow-hidden ${
+          dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+        }`}>
           <p className="px-3 py-2 text-[11px] font-medium text-th-text-muted border-b border-th-border/50">
             📎 Share Session Replay
           </p>

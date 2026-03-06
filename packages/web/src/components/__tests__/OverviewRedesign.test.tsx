@@ -51,7 +51,7 @@ describe('KeyStats', () => {
       i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
     );
     render(<KeyStats agents={agentsWithTokens} totalTokens={1500} />);
-    expect(screen.getByText('2k total')).toBeTruthy();
+    expect(screen.getByText('~2k total')).toBeTruthy();
   });
 
   it('shows token count when token data available', () => {
@@ -59,7 +59,7 @@ describe('KeyStats', () => {
       i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
     );
     render(<KeyStats agents={agentsWithTokens} totalTokens={150000} />);
-    expect(screen.getByText('150k total')).toBeTruthy();
+    expect(screen.getByText('~150k total')).toBeTruthy();
   });
 });
 

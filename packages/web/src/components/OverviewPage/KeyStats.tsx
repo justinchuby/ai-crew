@@ -29,7 +29,7 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
 
     const hasTokenData = agents.some((a) => (a.inputTokens ?? 0) > 0 || (a.outputTokens ?? 0) > 0);
     const tokenCount = totalTokens ?? agents.reduce((s, a) => s + (a.inputTokens ?? 0) + (a.outputTokens ?? 0), 0);
-    const tokenStr = tokenCount >= 1_000_000 ? `${(tokenCount / 1_000_000).toFixed(1)}M` : tokenCount >= 1_000 ? `${(tokenCount / 1_000).toFixed(0)}k` : String(tokenCount);
+    const tokenStr = tokenCount >= 1_000_000 ? `~${(tokenCount / 1_000_000).toFixed(1)}M` : tokenCount >= 1_000 ? `~${(tokenCount / 1_000).toFixed(0)}k` : `~${tokenCount}`;
 
     return [
       {
@@ -39,7 +39,7 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
         color: running > 0 ? 'text-blue-400' : 'text-th-text-muted',
       },
       {
-        label: 'Tokens',
+        label: 'Tokens (est.)',
         value: hasTokenData ? `${tokenStr} total` : 'N/A',
         icon: <Hash size={14} />,
         color: hasTokenData ? 'text-th-text-alt' : 'text-th-text-muted',

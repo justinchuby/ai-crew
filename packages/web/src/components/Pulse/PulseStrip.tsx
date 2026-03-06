@@ -8,9 +8,9 @@ import { PulsePRIndicator } from '../GitHub';
 import { PulseConflictIndicator } from '../Conflicts';
 
 function formatTokensCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
-  return String(n);
+  if (n >= 1_000_000) return `~${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `~${(n / 1_000).toFixed(0)}k`;
+  return `~${n}`;
 }
 
 // ── Token pressure helpers ───────────────────────────────────────────
@@ -110,18 +110,18 @@ export function PulseStrip() {
 
   return (
     <div className="h-10 border-b border-th-border bg-th-bg-alt/40 flex items-center px-4 gap-6 text-xs shrink-0 overflow-x-auto">
-      {/* Session Tokens */}
-      <div className="flex items-center gap-1.5 text-th-text-muted" title={stats.totalTokens > 0 ? `${formatTokensCompact(stats.totalTokens)} tokens total (${formatTokensCompact(stats.totalInput)} in / ${formatTokensCompact(stats.totalOutput)} out)` : 'Token data not available — Copilot CLI does not expose token counts'}>
-        <Hash className="w-3.5 h-3.5 text-blue-400" />
-        {stats.totalTokens > 0 ? (
-          <span className="font-mono font-medium text-th-text-alt">{formatTokensCompact(stats.totalTokens)}<span className="text-th-text-muted ml-1 hidden sm:inline">tokens</span></span>
-        ) : (
-          <span className="text-th-text-muted text-[10px]">Tokens N/A</span>
-        )}
-      </div>
+      {/* Session Tokens — only show when data exists */}
+      {stats.totalTokens > 0 && (
+        <>
+          <div className="flex items-center gap-1.5 text-th-text-muted" title={`~${formatTokensCompact(stats.totalTokens)} tokens total (~${formatTokensCompact(stats.totalInput)} in / ~${formatTokensCompact(stats.totalOutput)} out). Estimated from message length — actual usage may vary.`}>
+            <Hash className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-mono font-medium text-th-text-alt">{formatTokensCompact(stats.totalTokens)}<span className="text-th-text-muted ml-1 hidden sm:inline">tokens (est.)</span></span>
+          </div>
 
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
+          {/* Separator */}
+          <div className="w-px h-4 bg-th-border/50" />
+        </>
+      )}
 
       {/* Agent Status Breakdown */}
       <div className="flex items-center gap-1.5" title={`${stats.agentCount} agents: ${stats.running} running, ${stats.idle} idle, ${stats.failed} failed`}>
@@ -169,36 +169,34 @@ export function PulseStrip() {
         )}
       </button>
 
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
-
-      {/* Token Pressure Mini-Indicators */}
-      <div className="flex items-center gap-1.5">
-        <Brain className={`w-3.5 h-3.5 ${stats.maxPressure >= 80 ? 'text-red-400' : stats.maxPressure >= 60 ? 'text-yellow-400' : 'text-th-text-muted'}`} />
-        {stats.agentsWithContext.length > 0 ? (
-          <div className="flex items-center gap-1" title="Token pressure per agent (sorted by pressure)">
-            {stats.agentsWithContext.slice(0, 8).map((a) => (
-              <div
-                key={a.id}
-                className="flex flex-col items-center gap-0.5"
-                title={`${a.roleName}: ${a.pct.toFixed(0)}% context used`}
-              >
-                <div className="w-4 h-1.5 rounded-full bg-th-bg-muted overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${pressureBarColor(a.pct)}`}
-                    style={{ width: `${Math.max(a.pct, 2)}%` }}
-                  />
+      {/* Token Pressure Mini-Indicators — only show when context data exists */}
+      {stats.agentsWithContext.length > 0 && (
+        <>
+          <div className="w-px h-4 bg-th-border/50" />
+          <div className="flex items-center gap-1.5">
+            <Brain className={`w-3.5 h-3.5 ${stats.maxPressure >= 80 ? 'text-red-400' : stats.maxPressure >= 60 ? 'text-yellow-400' : 'text-th-text-muted'}`} />
+            <div className="flex items-center gap-1" title="Context pressure per agent (sorted by pressure)">
+              {stats.agentsWithContext.slice(0, 8).map((a) => (
+                <div
+                  key={a.id}
+                  className="flex flex-col items-center gap-0.5"
+                  title={`${a.roleName}: ${a.pct.toFixed(0)}% context used`}
+                >
+                  <div className="w-4 h-1.5 rounded-full bg-th-bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${pressureBarColor(a.pct)}`}
+                      style={{ width: `${Math.max(a.pct, 2)}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-            {stats.agentsWithContext.length > 8 && (
-              <span className="text-th-text-muted text-[10px]">+{stats.agentsWithContext.length - 8}</span>
-            )}
+              ))}
+              {stats.agentsWithContext.length > 8 && (
+                <span className="text-th-text-muted text-[10px]">+{stats.agentsWithContext.length - 8}</span>
+              )}
+            </div>
           </div>
-        ) : (
-          <span className="text-th-text-muted">—</span>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />

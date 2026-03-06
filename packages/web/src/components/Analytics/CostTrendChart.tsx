@@ -123,16 +123,16 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
               <AxisBottom
                 scale={xScale}
                 top={innerH}
-                stroke="var(--th-border)"
-                tickStroke="var(--th-border)"
-                tickLabelProps={() => ({ fill: 'var(--th-text-muted)', fontSize: 9, textAnchor: 'middle' as const })}
+                stroke="#6b7280"
+                tickStroke="#6b7280"
+                tickLabelProps={() => ({ fill: '#9ca3af', fontSize: 9, textAnchor: 'middle' as const })}
                 numTicks={Math.min(tokenTrend.length, 6)}
               />
               <AxisLeft
                 scale={yScale}
-                stroke="var(--th-border)"
-                tickStroke="var(--th-border)"
-                tickLabelProps={() => ({ fill: 'var(--th-text-muted)', fontSize: 9, textAnchor: 'end' as const })}
+                stroke="#6b7280"
+                tickStroke="#6b7280"
+                tickLabelProps={() => ({ fill: '#9ca3af', fontSize: 9, textAnchor: 'end' as const })}
                 tickFormat={(v) => formatTokenAxis(Number(v))}
                 numTicks={4}
               />

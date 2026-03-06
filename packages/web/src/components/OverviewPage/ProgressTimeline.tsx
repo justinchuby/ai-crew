@@ -115,14 +115,15 @@ export function ProgressTimeline({ data, width = 800, height = 240 }: ProgressTi
             top={innerH}
             scale={xScale}
             numTicks={6}
+            hideZero
             tickFormat={(d) => {
               const date = d instanceof Date ? d : new Date(d as number);
               return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }}
-            stroke="var(--th-border, #374151)"
-            tickStroke="var(--th-border, #374151)"
+            stroke="#6b7280"
+            tickStroke="#6b7280"
             tickLabelProps={() => ({
-              fill: 'var(--th-text-muted, #6b7280)',
+              fill: '#9ca3af',
               fontSize: 10,
               textAnchor: 'middle' as const,
             })}
@@ -132,10 +133,11 @@ export function ProgressTimeline({ data, width = 800, height = 240 }: ProgressTi
           <AxisLeft
             scale={yScale}
             numTicks={4}
-            stroke="var(--th-border, #374151)"
-            tickStroke="var(--th-border, #374151)"
+            hideZero
+            stroke="#6b7280"
+            tickStroke="#6b7280"
             tickLabelProps={() => ({
-              fill: 'var(--th-text-muted, #6b7280)',
+              fill: '#9ca3af',
               fontSize: 10,
               textAnchor: 'end' as const,
               dx: -4,
