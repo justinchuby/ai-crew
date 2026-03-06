@@ -49,12 +49,12 @@ export function OverviewPage(_props: Props) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive the effective ID used for data fetching.
-  // Priority: live lead agent > sidebar-selected lead > user-picked project > first project
+  // Priority: user-picked project (explicit) > live lead agent > sidebar > first project
   const effectiveId = useMemo(() => {
+    if (selectedProjectId) return selectedProjectId;
     if (selectedLeadId) return selectedLeadId;
     const lead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
     if (lead?.id) return lead.id;
-    if (selectedProjectId) return selectedProjectId;
     return projects.length > 0 ? projects[0].id : null;
   }, [selectedLeadId, agents, selectedProjectId, projects]);
 
