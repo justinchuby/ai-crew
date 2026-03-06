@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { GitBranch } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { dagMinimapColor } from '../../utils/statusColors';
@@ -78,9 +79,9 @@ export function DagMinimap({ leadId }: DagMinimapProps) {
       <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2 mb-3">
         <GitBranch size={14} className="text-th-text-muted" />
         Task Progress
-        <a href="/tasks" className="text-xs text-th-text-muted hover:text-th-text-muted ml-auto">
+        <Link to="/tasks" className="text-xs text-th-text-muted hover:text-th-text-muted ml-auto">
           Full DAG →
-        </a>
+        </Link>
       </h3>
 
       <DagStatusBar summary={dagStatus.summary} />
