@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, Me
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { PromptNav, hasUserMention } from '../PromptNav';
+import { groupTimeline, type TimelineItem } from './groupTimeline';
 
 interface Props {
   agentId: string;
@@ -65,10 +66,6 @@ export function AcpOutput({ agentId }: Props) {
   }
 
   // Build merged timeline of messages + activity
-  type TimelineItem =
-    | { kind: 'message'; msg: (typeof messages)[0]; index: number }
-    | { kind: 'activity'; evt: ActivityEvent };
-
   const timeline: TimelineItem[] = [];
   messages.forEach((msg, i) => {
     if ((msg.text || msg.contentType) && !msg.queued) {
@@ -84,6 +81,9 @@ export function AcpOutput({ agentId }: Props) {
     const tB = b.kind === 'message' ? (b.msg.timestamp || 0) : b.evt.timestamp;
     return tA - tB;
   });
+
+  // Group consecutive agent messages, collecting interleaved system events
+  const groupedTimeline = groupTimeline(timeline);
 
   useAutoScroll(containerRef, messagesEndRef, [messages], { resetKey: agentId });
 
@@ -157,9 +157,47 @@ export function AcpOutput({ agentId }: Props) {
       )}
 
       {/* Messages + Activity Timeline */}
-      {timeline.length > 0 && (
+      {groupedTimeline.length > 0 && (
         <div className="space-y-1">
-          {timeline.map((item, i) => {
+          {groupedTimeline.map((item, i) => {
+            // Grouped agent messages — continuous block with collapsed system events
+            if (item.kind === 'agent-group') {
+              const group = item;
+              const lastMsg = group.messages[group.messages.length - 1];
+              const lastTs = lastMsg.msg.timestamp ? new Date(lastMsg.msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              const hasMention = group.messages.some((m) => hasUserMention(typeof m.msg.text === 'string' ? m.msg.text : ''));
+              const mentionAttr = hasMention ? { 'data-user-prompt': group.messages[0].index } : {};
+
+              return (
+                <div key={`grp-${group.messages[0].index}`} className="py-1" {...mentionAttr}>
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      {group.messages.map((m) => {
+                        const sender = m.msg.sender ?? 'agent';
+                        const text = typeof m.msg.text === 'string' ? m.msg.text : JSON.stringify(m.msg.text, null, 2);
+                        if (sender === 'thinking') {
+                          return (
+                            <div key={`msg-${m.index}`} className="font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
+                              {text}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={`msg-${m.index}`} className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
+                            <AgentTextBlockSimple text={text} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{lastTs}</span>
+                  </div>
+                  {group.systemEvents.length > 0 && (
+                    <CollapsibleSystemEvents events={group.systemEvents} />
+                  )}
+                </div>
+              );
+            }
+
             if (item.kind === 'activity') {
               const evt = item.evt;
               const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -173,7 +211,8 @@ export function AcpOutput({ agentId }: Props) {
                 </div>
               );
             }
-            // Message rendering
+
+            // Message rendering (standalone items)
             const msg = item.msg;
             const sender = msg.sender ?? 'agent';
             const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -195,7 +234,7 @@ export function AcpOutput({ agentId }: Props) {
               );
             }
 
-            // Thinking/reasoning — italic, lighter color
+            // Thinking/reasoning — italic, lighter color (standalone, not in a group)
             if (sender === 'thinking') {
               const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
               return (
@@ -210,7 +249,7 @@ export function AcpOutput({ agentId }: Props) {
               );
             }
 
-            // System messages — centered, muted, smaller
+            // System messages — centered, muted, smaller (standalone, not in a group)
             if (sender === 'system') {
               const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
               // Hide outgoing DM notifications — redundant with command blocks
@@ -265,7 +304,7 @@ export function AcpOutput({ agentId }: Props) {
               );
             }
 
-            // Agent messages — flowing text, no bubble
+            // Agent messages — flowing text, no bubble (standalone, not grouped)
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
             const agentMentionAttr = hasUserMention(text) ? { 'data-user-prompt': item.index } : {};
             return (
@@ -351,6 +390,50 @@ function CollapsibleIncomingMessage({ text, timestamp }: { text: string; timesta
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Collapsed-by-default section showing system events that occurred during an agent turn */
+function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; msg: { text: string; sender?: string; timestamp?: number }; index: number } | { kind: 'activity'; evt: ActivityEvent }> }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center gap-1 text-[10px] text-th-text-muted hover:text-th-text-alt transition-colors"
+      >
+        {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {events.length} system event{events.length !== 1 ? 's' : ''}
+      </button>
+      {expanded && (
+        <div className="ml-4 mt-0.5 space-y-0.5">
+          {events.map((item, i) => {
+            if (item.kind === 'activity') {
+              const evt = item.evt;
+              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={`sysevt-${i}`} className="flex items-center gap-2 text-[10px] text-th-text-muted">
+                  <span>{time}</span>
+                  <span className="italic">
+                    {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
+                    {' '}{evt.summary}
+                  </span>
+                </div>
+              );
+            }
+            const msg = item.msg;
+            const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+            const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            return (
+              <div key={`sysevt-${i}`} className="flex items-center gap-2 text-[10px] text-th-text-muted">
+                <span>{ts}</span>
+                <span className="whitespace-pre-wrap">{text}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
