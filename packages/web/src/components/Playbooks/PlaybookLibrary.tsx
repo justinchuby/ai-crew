@@ -90,7 +90,7 @@ export function PlaybookLibrary() {
 
       {/* Built-in section */}
       <div>
-        <h4 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider mb-3">
+        <h4 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3">
           Built-in
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -108,7 +108,7 @@ export function PlaybookLibrary() {
 
       {/* User section */}
       <div>
-        <h4 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider mb-3">
+        <h4 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3">
           My Playbooks
         </h4>
         {loading ? (

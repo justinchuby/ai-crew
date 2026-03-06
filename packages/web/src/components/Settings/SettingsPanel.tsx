@@ -233,7 +233,7 @@ export function SettingsPanel({ api }: Props) {
       <DataManagement />
 
       {/* Roles */}
-      <section className="mb-8">
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
             <Users className="w-3.5 h-3.5" /> Agent Roles

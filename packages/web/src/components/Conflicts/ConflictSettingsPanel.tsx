@@ -9,8 +9,8 @@ export function ConflictSettingsPanel() {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-th-text flex items-center gap-2">
-        <span>⚠</span> Conflict Detection
+      <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
+        ⚠ Conflict Detection
       </h3>
 
       <label className="flex items-center justify-between">

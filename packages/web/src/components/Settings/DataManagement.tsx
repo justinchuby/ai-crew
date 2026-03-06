@@ -106,12 +106,11 @@ export function DataManagement() {
   };
 
   return (
-    <section className="bg-surface-raised border border-th-border rounded-xl p-5 space-y-4">
+    <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6 space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Database className="w-5 h-5 text-th-accent" />
-          <h3 className="text-sm font-semibold text-th-text">Data Management</h3>
-        </div>
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
+          <Database className="w-3.5 h-3.5" /> Data Management
+        </h3>
         <button
           onClick={fetchStats}
           disabled={loading}

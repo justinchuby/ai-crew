@@ -19,7 +19,7 @@ export function NotificationActivityLog() {
 
   return (
     <div data-testid="notification-activity-log">
-      <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wide mb-2">
+      <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-2">
         Notification Activity Log
       </h3>
 

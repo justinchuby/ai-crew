@@ -42,8 +42,8 @@ export function GitHubSetup() {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-th-text flex items-center gap-2">
-        <span>🔗</span> Integrations
+      <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
+        🔗 Integrations
       </h3>
 
       <div className="border border-th-border rounded-lg p-4">

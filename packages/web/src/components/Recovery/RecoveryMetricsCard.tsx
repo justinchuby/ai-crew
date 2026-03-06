@@ -37,7 +37,7 @@ export function RecoveryMetricsCard({ metrics: propMetrics, triggerBreakdown }: 
   if (metrics.totalCrashes === 0) {
     return (
       <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="recovery-metrics-card">
-        <h3 className="text-xs font-semibold text-th-text-muted uppercase tracking-wide mb-2">🔄 Recovery Health</h3>
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-2">🔄 Recovery Health</h3>
         <div className="text-center py-4">
           <span className="text-2xl">🎉</span>
           <p className="text-xs text-green-500 font-medium mt-1">Zero crashes this session</p>
@@ -49,7 +49,7 @@ export function RecoveryMetricsCard({ metrics: propMetrics, triggerBreakdown }: 
 
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="recovery-metrics-card">
-      <h3 className="text-xs font-semibold text-th-text-muted uppercase tracking-wide mb-3">🔄 Recovery Health</h3>
+      <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3">🔄 Recovery Health</h3>
 
       {/* Four stats */}
       <div className="grid grid-cols-4 gap-2 mb-3">

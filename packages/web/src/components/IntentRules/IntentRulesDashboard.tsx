@@ -103,7 +103,7 @@ export function IntentRulesDashboard() {
     <div className="space-y-3" data-testid="intent-rules-dashboard">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2">
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
           🎯 Intent Rules
         </h3>
         <button
