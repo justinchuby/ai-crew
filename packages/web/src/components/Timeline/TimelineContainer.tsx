@@ -381,7 +381,10 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     return sortDirection === 'newest-first' ? sorted.reverse() : sorted;
   }, [data.agents, sortDirection]);
 
-  const chartWidth = Math.max(containerWidth - LABEL_WIDTH, 400);
+  // Minimum chart width: ensure time segments stay readable.
+  // Scale with agent count — more agents produce more events needing horizontal space.
+  const MIN_CHART_WIDTH = Math.max(600, sortedAgents.length * 80);
+  const chartWidth = Math.max(containerWidth - LABEL_WIDTH, MIN_CHART_WIDTH);
 
   // Drag handlers must be after chartWidth for correct closure
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
