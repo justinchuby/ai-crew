@@ -296,8 +296,10 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     }
 
     if (!liveMode) {
-      // When live mode is OFF, freeze the range completely
-      return prev;
+      // During replay, follow the clipped time range from displayData
+      const range = { start: newStart, end: newEnd };
+      stableRangeRef.current = range;
+      return range;
     }
 
     // In live mode: keep earliest start, extend end only
