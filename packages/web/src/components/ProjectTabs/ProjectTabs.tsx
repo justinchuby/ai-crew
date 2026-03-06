@@ -38,10 +38,11 @@ export function ProjectTabs({ activeId, onChange, className }: ProjectTabsProps)
 
     for (const lead of leads) {
       seen.add(lead.id);
+      const active = lead.status === 'running' || lead.status === 'creating' || lead.status === 'idle';
       items.push({
         id: lead.id,
         label: lead.projectName || lead.role?.name || lead.id.slice(0, 8),
-        isLive: true,
+        isLive: active,
       });
     }
 
