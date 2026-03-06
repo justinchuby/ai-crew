@@ -58,7 +58,7 @@ The **Radical Thinker** agent role is designed for first-principles brainstormin
 
 ---
 
-## Joining Group Discussions
+## Monitoring Group Discussions
 
 When multiple agents need to coordinate on a shared concern (API design, naming conventions, architecture), they use **group chats**.
 

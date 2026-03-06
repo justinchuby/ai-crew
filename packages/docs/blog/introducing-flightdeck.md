@@ -15,7 +15,7 @@ You kick off a multi-agent session — 5, 7, 10 AI agents coding, reviewing, and
 - Who's talking to whom?
 - Did two agents just edit the same file?
 - Why has one agent been idle for 10 minutes?
-- Is this session going to cost $5 or $50?
+- Is this session burning through context faster than expected?
 - What actually happened while you were away?
 
 Multi-agent AI tools exist. But none of them show you what's happening inside. **You're flying blind.**
@@ -42,16 +42,16 @@ See your agent crew as an interactive graph with real-time communication edges f
 
 ![Canvas View — agents as nodes, communication as edges](/images/03-canvas-with-panel.png)
 
-### ⏪ Session Replay & Timeline
-Scrub through any past session at up to 32× speed — like a flight recorder for AI work. The swim-lane Timeline shows exactly what each agent did and when. Hit Play and watch agents appear, task bars grow, and messages fire between them — all synchronized to a scrubber you can drag to any point.
+### ⏪ Session Replay
+The **Timeline** page shows a swim-lane Gantt chart of exactly what each agent did and when. **Session Replay** lets you scrub through any past session at up to 32× speed — like a flight recorder for AI work. Hit Play and watch agents appear, task bars grow, and messages fire between them, all synchronized to a scrubber you can drag to any point.
 
-![Session Replay — Gantt chart with swim lanes for every agent](/images/09-timeline.png)
+![Timeline page with Session Replay — Gantt chart with swim lanes for every agent](/images/09-timeline.png)
 
 ### 📊 Overview Dashboard
-Token usage curves, cumulative flow diagrams, and agent activity heatmaps give you the full picture at a glance. See which projects are on track and which need attention.
+Cumulative flow diagrams, agent activity heatmaps, and context usage tracking give you the full picture at a glance. See which projects are on track and which need attention.
 
-### 💰 Token Tracking
-See per-agent token usage, cumulative burn rate, and running totals. Spot runaway agents before they waste your budget. The Overview dashboard shows exactly where your tokens are going — no surprises at the end of a session.
+### 🔎 Context Awareness
+Monitor per-agent context window usage and cumulative token consumption across the crew. Spot agents approaching their context limit before they stall — and intervene early.
 
 ### 🛡️ Context & Health Alerts
 See which agents are running low on context before they stall. Monitor active task counts, error rates, and idle time across the crew. Approve queued decisions from a single batch-approval panel — no terminal switching.
@@ -70,11 +70,11 @@ MIT licensed. Zero-infrastructure SQLite backend. Runs locally. Extensible archi
 - **AI engineers** building and debugging agent systems who need observability
 - **Engineering managers** who want to understand how AI-assisted development actually works
 
-> **Real scenario:** Agent #3 gets stuck in a retry loop, burning tokens on the same failing approach. Without Flightdeck, you notice 40 minutes later — tokens wasted. With the Timeline view, you spot the loop in 2 minutes, intervene, and redirect the agent.
+> **Real scenario:** Agent #3 gets stuck in a retry loop, burning through its context window on the same failing approach. Without Flightdeck, you find out when the session fails. With the Timeline page, you spot the loop in 2 minutes, interrupt, and redirect the agent.
 
 ## The Competitive Gap
 
-Most AI coding tools are single-agent. The few multi-agent tools (CrewAI, AutoGen) have no visual dashboard. **Flightdeck is the first purpose-built observability layer for AI agent crews.**
+Most AI coding tools are single-agent. The few multi-agent frameworks that exist have no visual dashboard. **Flightdeck is the first purpose-built observability layer for AI agent crews.**
 
 This isn't an AI tool. It's a tool *for* AI.
 
