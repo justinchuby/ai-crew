@@ -41,7 +41,7 @@ Browse historical project data even when no live session is running. All pages (
 ### Coordination Timeline
 Chronological view of all inter-agent events: messages sent, tasks delegated, files locked, code reviewed. Filter by agent or event type.
 
-![Timeline](/images/09-timeline.png)
+![Timeline](/screenshots/timeline-live.png)
 
 ## Phase 3 — Automation & Trust
 

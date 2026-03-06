@@ -23,6 +23,11 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
   <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
 </p>
 
+<p align="center">
+  <img src="packages/docs/public/screenshots/timeline-live.png" alt="Timeline — zoom, scroll, and replay agent activity over time" width="720" />
+  <br /><em>Timeline — zoom, scroll, and replay agent activity with session scrubber</em>
+</p>
+
 <details>
 <summary><strong>More screenshots</strong></summary>
 

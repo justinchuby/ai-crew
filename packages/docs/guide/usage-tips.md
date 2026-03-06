@@ -112,7 +112,7 @@ The **Overview** page is your health dashboard for the entire crew.
 
 The **Timeline** is the most detailed view of what your agents did and when.
 
-![Timeline View](/screenshots/timeline.png)
+![Timeline View](/screenshots/timeline-live.png)
 
 ### Reading the Gantt Chart
 
