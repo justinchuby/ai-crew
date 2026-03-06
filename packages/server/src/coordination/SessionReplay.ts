@@ -128,13 +128,13 @@ export class SessionReplay {
         if (type === 'delegation' && entry.summary.startsWith('Created &')) {
           keyframes.push({
             timestamp: entry.timestamp,
-            label: entry.summary.replace('Created & delegated to', 'Spawned').slice(0, 80),
+            label: entry.summary.replace('Created & delegated to', 'Spawned'),
             type: 'spawn',
           });
         }
         keyframes.push({
           timestamp: entry.timestamp,
-          label: entry.summary.slice(0, 80),
+          label: entry.summary,
           type,
         });
       }
