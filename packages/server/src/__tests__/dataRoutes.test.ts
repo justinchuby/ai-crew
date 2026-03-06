@@ -103,11 +103,12 @@ describe('POST /data/cleanup', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it('rejects zero days', () => {
+  it('accepts zero days as purge-all', () => {
     const handler = getCleanupHandler();
     const res = mockRes();
     handler({ body: { olderThanDays: 0 } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    // 0 means "all data" — should NOT return 400
+    expect(res.status).not.toHaveBeenCalledWith(400);
   });
 
   it('rejects string days', () => {

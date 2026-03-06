@@ -150,7 +150,12 @@ const mockConfig = {
 
 const mockDb = {
   drizzle: {
-    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null) }) }) }),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(null), all: vi.fn().mockReturnValue([]) }),
+        groupBy: vi.fn().mockReturnValue({ all: vi.fn().mockReturnValue([]) }),
+      }),
+    }),
   },
   setSetting: vi.fn(),
 } as any;
