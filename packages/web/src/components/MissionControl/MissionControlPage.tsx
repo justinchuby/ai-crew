@@ -17,7 +17,6 @@ import { CommFlowGraph } from '../CommFlow';
 import { DiffPreview } from '../DiffPreview';
 import { DebatesPanel } from '../Debates';
 import { HandoffHistoryPanel } from '../Handoff';
-import { PRStatusPanel } from '../GitHub';
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 import { useProjects } from '../../hooks/useProjects';
@@ -114,12 +113,6 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
       return (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
           <HandoffHistoryPanel />
-        </div>
-      );
-    case 'github':
-      return (
-        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
-          <PRStatusPanel />
         </div>
       );
     default:

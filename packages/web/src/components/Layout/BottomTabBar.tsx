@@ -39,7 +39,6 @@ export function BottomTabBar() {
     { icon: '⚙️', label: 'Canvas', route: '/canvas' },
     { icon: '📈', label: 'Analytics', route: '/analytics' },
     { icon: '💬', label: 'Groups', route: '/groups' },
-    { icon: '🔗', label: 'GitHub', route: '/github' },
     { icon: '⚙', label: 'Settings', route: '/settings' },
   ];
 
