@@ -11,7 +11,7 @@ function contextPercent(agent: AgentInfo): number {
 /**
  * Compact horizontal status bar for mobile.
  * Shows running/idle/failed agent counts, pending decisions,
- * estimated cost, and max context pressure. Hidden on desktop.
+ * token usage, and max context pressure. Hidden on desktop.
  */
 export function MobilePulse() {
   const agents = useAppStore(s => s.agents);
@@ -68,8 +68,8 @@ export function MobilePulse() {
         <span className="text-accent shrink-0">{stats.pendingCount} pend</span>
       )}
       {stats.totalTokens > 0 ? (
-        <span className="text-emerald-400 shrink-0">
-          ${stats.cost < 1 ? stats.cost.toFixed(2) : stats.cost.toFixed(0)}
+        <span className="text-blue-400 shrink-0">
+          {stats.totalTokens >= 1_000_000 ? `${(stats.totalTokens / 1_000_000).toFixed(1)}M` : stats.totalTokens >= 1_000 ? `${(stats.totalTokens / 1_000).toFixed(0)}k` : stats.totalTokens} tok
         </span>
       ) : (
         <span className="text-th-text-muted shrink-0">Tokens N/A</span>
