@@ -42,16 +42,19 @@ See your agent crew as an interactive graph with real-time communication edges f
 
 ![Canvas View — agents as nodes, communication as edges](/images/03-canvas-with-panel.png)
 
-### ⏪ Session Replay
-Scrub through any past session at up to 32× speed — like a flight recorder for AI work. Agents appear, task bars grow, messages fire between them, all synchronized to a scrubber you can drag to any point.
+### ⏪ Session Replay & Timeline
+Scrub through any past session at up to 32× speed — like a flight recorder for AI work. The swim-lane Timeline shows exactly what each agent did and when. Hit Play and watch agents appear, task bars grow, and messages fire between them — all synchronized to a scrubber you can drag to any point.
 
-![Timeline — Gantt chart with swim lanes for every agent](/images/09-timeline.png)
+![Session Replay — Gantt chart with swim lanes for every agent](/images/09-timeline.png)
 
-### 📊 Timeline & Overview
-Swim-lane Gantt charts show exactly what each agent did and when. Token usage curves, cumulative flow diagrams, and agent activity heatmaps give you the full picture at a glance.
+### 📊 Overview Dashboard
+Token usage curves, cumulative flow diagrams, and agent activity heatmaps give you the full picture at a glance. See which projects are on track and which need attention.
 
-### 🛡️ Mission Control
-Fleet health monitoring, context pressure alerts, and a decision approval queue. Know when agents need attention — don't babysit them.
+### 💰 Token Tracking
+See per-agent token usage, cumulative burn rate, and running totals. Spot runaway agents before they waste your budget. The Overview dashboard shows exactly where your tokens are going — no surprises at the end of a session.
+
+### 🛡️ Context & Health Alerts
+See which agents are running low on context before they stall. Monitor active task counts, error rates, and idle time across the crew. Approve queued decisions from a single batch-approval panel — no terminal switching.
 
 ### 🔍 Historical Data Browser
 Browse any past session, search agent output, review conversations. Per-project tabs keep everything organized. Nothing is lost.
@@ -66,7 +69,8 @@ MIT licensed. Zero-infrastructure SQLite backend. Runs locally. Extensible archi
 - **Developers using GitHub Copilot** who run multi-agent sessions and want visibility into what's happening
 - **AI engineers** building and debugging agent systems who need observability
 - **Engineering managers** who want to understand how AI-assisted development actually works
-- **Anyone who's run a multi-agent session**, watched agents burn through tokens, and thought: *"I need to see what's happening in there"*
+
+> **Real scenario:** Agent #3 gets stuck in a retry loop, burning tokens on the same failing approach. Without Flightdeck, you notice 40 minutes later — tokens wasted. With the Timeline view, you spot the loop in 2 minutes, intervene, and redirect the agent.
 
 ## The Competitive Gap
 
@@ -76,17 +80,18 @@ This isn't an AI tool. It's a tool *for* AI.
 
 ---
 
-## Try It
+## 🚀 Get Started in 60 Seconds
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
+flightdeck
 ```
+
+That's it. The dashboard opens, detects your agent sessions, and starts streaming. No config files, no API keys.
 
 ⭐ **Star on GitHub**: [github.com/justinchuby/flightdeck](https://github.com/justinchuby/flightdeck)
 
 📖 **Read the docs**: [Quickstart Guide](/guide/quickstart)
-
-💬 **We'd love to hear from you** — especially if you're already running multi-agent workflows. What's missing? What would make this indispensable?
 
 ---
 
