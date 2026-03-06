@@ -308,8 +308,50 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     return range;
   }, [data.timeRange, liveMode]);
 
-  // Always show the full range — no zoom/pan
-  const visibleRange = fullRange;
+  // ── Zoom state ────────────────────────────────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = full range, higher = zoomed in
+  const [panOffset, setPanOffset] = useState(0); // 0-1, fraction of total range
+
+  const visibleRange = useMemo(() => {
+    if (zoomLevel <= 1) return fullRange;
+    const totalMs = fullRange.end - fullRange.start;
+    const visibleMs = totalMs / zoomLevel;
+    const maxOffset = totalMs - visibleMs;
+    const offsetMs = maxOffset * panOffset;
+    return {
+      start: fullRange.start + offsetMs,
+      end: fullRange.start + offsetMs + visibleMs,
+    };
+  }, [fullRange, zoomLevel, panOffset]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Ctrl+wheel or pinch = zoom, plain wheel = pan
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      setZoomLevel((prev) => {
+        const next = e.deltaY < 0 ? prev * 1.15 : prev / 1.15;
+        return Math.max(1, Math.min(20, next));
+      });
+    } else if (zoomLevel > 1 && e.deltaX !== 0) {
+      e.preventDefault();
+      setPanOffset((prev) => Math.max(0, Math.min(1, prev + e.deltaX * 0.002)));
+    }
+  }, [zoomLevel]);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(20, prev * 1.5));
+  }, []);
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => {
+      const next = prev / 1.5;
+      if (next <= 1.05) { setPanOffset(0); return 1; }
+      return next;
+    });
+  }, []);
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1);
+    setPanOffset(0);
+  }, []);
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
@@ -457,6 +499,29 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           {sortedAgents.length} agents · {data.communications.length} communications
         </span>
         <div className="flex items-center gap-2">
+          {zoomLevel > 1 && (
+            <button
+              className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+              onClick={handleZoomReset}
+              aria-label="Reset zoom"
+              title="Reset zoom to full view"
+            >⊞ Fit</button>
+          )}
+          <button
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            aria-label="Zoom out"
+            title="Zoom out (Ctrl+scroll down)"
+          >−</button>
+          <span className="text-[10px] text-th-text-muted font-mono w-10 text-center">{zoomLevel > 1 ? `${zoomLevel.toFixed(1)}×` : '1×'}</span>
+          <button
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 20}
+            aria-label="Zoom in"
+            title="Zoom in (Ctrl+scroll up)"
+          >+</button>
           <button
             className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={() => setSortDirection(sortDirection === 'oldest-first' ? 'newest-first' : 'oldest-first')}
@@ -495,6 +560,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           className="flex-1 overflow-auto"
           style={{ position: 'relative' }}
           onScroll={() => { syncScroll('timeline'); hideTooltip(); }}
+          onWheel={handleWheel}
         >
           <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`}>
             {/* Idle hatch pattern */}

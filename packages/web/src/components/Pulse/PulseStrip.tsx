@@ -123,8 +123,8 @@ export function PulseStrip() {
         </>
       )}
 
-      {/* Agent Status Breakdown */}
-      <div className="flex items-center gap-1.5" title={`${stats.agentCount} agents: ${stats.running} running, ${stats.idle} idle, ${stats.failed} failed`}>
+      {/* Agent Status Breakdown — click navigates to Agents page */}
+      <a href="/agents" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity" title={`${stats.agentCount} agents: ${stats.running} running, ${stats.idle} idle, ${stats.failed} failed — click to view`}>
         <Users className="w-3.5 h-3.5 text-blue-400" />
         <div className="flex items-center gap-2 font-mono">
           {stats.running > 0 && (
@@ -146,7 +146,7 @@ export function PulseStrip() {
             </span>
           )}
         </div>
-      </div>
+      </a>
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />
