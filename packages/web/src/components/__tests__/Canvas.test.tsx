@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -124,9 +125,13 @@ describe('Canvas Lite', () => {
 
     it('renders ReactFlow when agents exist', () => {
       useAppStore.getState().setAgents([
-        makeAgent('agent-lead-001', 'lead'),
+        makeAgent('lead-1', 'lead'),
         makeAgent('agent-dev-002', 'developer'),
       ]);
+      // Set parentId so developer is part of the lead's project
+      const agents = useAppStore.getState().agents;
+      agents[1] = { ...agents[1], parentId: 'lead-1' };
+      useAppStore.getState().setAgents(agents);
       render(
         <MemoryRouter>
           <CanvasPage />
@@ -204,8 +209,8 @@ describe('Canvas Lite', () => {
 
     it('creates nodes for visible agents', () => {
       const agents = [
-        makeAgent('lead-001', 'lead'),
-        makeAgent('dev-001', 'developer'),
+        makeAgent('lead-1', 'lead'),
+        { ...makeAgent('dev-001', 'developer'), parentId: 'lead-1' },
       ];
       useAppStore.getState().setAgents(agents);
       render(
