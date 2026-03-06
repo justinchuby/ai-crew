@@ -10,7 +10,7 @@ And here's the meta part: **Flightdeck was built by a team of AI agents, orchest
 
 ## The Problem: Multi-Agent = Chaos Without Coordination
 
-You tell an AI to "build a feature." It spawns 8 agents. They all start coding. Two of them edit the same file. A third rewrites what the fourth just finished. The architect and the developer spend 15 messages debating an approach nobody asked for. Meanwhile, a critical task sits unstarted because no one picked it up.
+You tell an AI to "build a feature." It spawns 8 agents. They all start coding — in complete isolation. No shared context, no structured communication. Two of them edit the same file without knowing. A third rewrites what the fourth just finished. A critical task sits unstarted because no one was assigned it. By default, agents work in silos. They don't coordinate because they have no way to.
 
 **More agents doesn't mean more output — not without coordination.**
 
