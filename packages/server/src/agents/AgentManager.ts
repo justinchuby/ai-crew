@@ -1,4 +1,5 @@
 import { Agent, isTerminalStatus } from './Agent.js';
+import { randomUUID } from 'crypto';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
@@ -338,6 +339,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           agent.projectId = parentProjectId;
         }
       }
+    }
+
+    // Ensure root agents (no parent) always have a projectId.
+    // This prevents "untitled project" scenarios where activities are logged
+    // with projectId: '' and become invisible to scoped queries.
+    if (!parentId && !agent.projectId) {
+      agent.projectId = randomUUID();
+      logger.warn('agent', `Root agent ${agent.id.slice(0, 8)} spawned without projectId — generated ${agent.projectId.slice(0, 8)}`);
     }
 
     this.agents.set(agent.id, agent);
