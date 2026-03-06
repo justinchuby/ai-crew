@@ -212,6 +212,31 @@ alertEngine.on('alert:new', (alert) => {
   wsServer.broadcastEvent({ type: 'alert:new', alert }, alert.projectId);
 });
 
+// Prediction service — auto-generates context exhaustion, cost overrun, agent stall predictions
+import { PredictionService, type AgentSnapshot } from './coordination/PredictionService.js';
+const predictionService = new PredictionService(db);
+const predictionInterval = setInterval(() => {
+  const agents = agentManager.getAll();
+  const running = agents.filter(a => a.status === 'running' || a.status === 'idle');
+  if (running.length === 0) return;
+  const snapshots: AgentSnapshot[] = running.map(a => ({
+    id: a.id,
+    role: a.role?.id ?? 'unknown',
+    status: a.status,
+    contextWindowUsed: a.contextWindowUsed ?? 0,
+    contextWindowSize: a.contextWindowSize ?? 0,
+    contextBurnRate: a.contextBurnRate ?? 0,
+    estimatedExhaustionMinutes: a.estimatedExhaustionMinutes ?? null,
+    lastActivityAt: a.toolCalls.length > 0
+      ? (a.toolCalls[a.toolCalls.length - 1] as any).timestamp ?? a.createdAt.toISOString()
+      : a.createdAt.toISOString(),
+  }));
+  const newPredictions = predictionService.generatePredictions(snapshots);
+  if (newPredictions.length > 0) {
+    wsServer.broadcastEvent({ type: 'predictions:updated', predictions: newPredictions });
+  }
+}, 30_000);
+
 // Capability registry — tracks which agents have expertise on which files/technologies
 import { CapabilityRegistry } from './coordination/CapabilityRegistry.js';
 const capabilityRegistry = new CapabilityRegistry(db, lockRegistry, () => agentManager.getAll());
@@ -399,6 +424,7 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+  clearInterval(predictionInterval);
   contextRefresher.stop();
   scheduler.stop();
   eagerScheduler.stop();
