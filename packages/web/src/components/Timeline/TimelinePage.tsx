@@ -146,6 +146,14 @@ export function TimelinePage({ api, ws }: Props) {
       setSelectedLead(leads[0].id);
     }
   }, [leads, selectedLead, setSelectedLead]);
+
+  // Auto-switch to replay mode when no live agents (historical data only)
+  useEffect(() => {
+    if (leads.length === 0 && projects.length > 0 && liveMode) {
+      setLiveMode(false);
+    }
+  }, [leads.length, projects.length, liveMode, setLiveMode]);
+
   const { data: liveData, loading, error, refetch } = useTimelineData(effectiveLeadId);
 
   // Cache data in store for persistence across tab switches
