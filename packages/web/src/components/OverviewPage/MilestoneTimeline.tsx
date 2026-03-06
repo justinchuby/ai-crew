@@ -58,7 +58,10 @@ export function MilestoneTimeline({ keyframes, onSeek }: MilestoneTimelineProps)
               </span>
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <span className="text-xs text-th-text-alt group-hover:text-th-text transition-colors truncate block">
+                <span
+                  className="text-xs text-th-text-alt group-hover:text-th-text transition-colors line-clamp-2"
+                  title={kf.label}
+                >
                   {kf.label}
                 </span>
                 <span className="text-[10px] text-th-text-muted">{timeStr}</span>
