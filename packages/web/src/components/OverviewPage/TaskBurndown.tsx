@@ -42,14 +42,14 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
 
   if (data.length === 0) {
     return (
-      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px] flex items-center justify-center" data-testid="task-burndown">
+      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px] flex items-center justify-center" data-testid="cumulative-flow">
         <p className="text-xs text-th-text-muted opacity-60">No task data</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px]" data-testid="task-burndown">
+    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px]" data-testid="cumulative-flow">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider">
           Task Flow
