@@ -159,13 +159,96 @@ const replay = useSessionReplay(replayLeadId);
 
 Replay data flows DOWN to `TimelineContainer` and `ReplayScrubber` as props. If you put replay state inside the visualization component, you get re-render cascades and stale closures.
 
-### Progressive Reveal
+### Progressive Reveal (commit 18045d10)
 
-During replay, the timeline only shows events up to `currentTime`:
-- Filter `agents` to only those spawned before `currentTime`
-- Clip `segments` that extend past `currentTime` (partial visibility)
-- Filter `communications` to only those sent before `currentTime`
-- Filter `locks` to only those acquired before `currentTime`
+This was the breakthrough commit that made replay actually animate. Before this fix, hitting Play did nothing visible — the scrubber would advance but the timeline showed no visual changes.
+
+#### What Was Broken
+
+`useSessionReplay` was originally called inside `ReplayScrubber` only. The scrubber tracked `currentTime` internally but the Timeline visualization never saw that state — it always rendered the full dataset. Result: the scrubber moved, the speed indicator worked, but the Gantt chart was static.
+
+#### Root Cause
+
+The replay state (particularly `currentTime`) was trapped inside a child component (`ReplayScrubber`) with no way to flow UP to the data layer. The parent `TimelinePage` — which owned the timeline data and passed it down to `TimelineContainer` — had no access to `currentTime`.
+
+#### The Fix — State Lifting + Data Clipping
+
+1. **Lift `useSessionReplay`** into `TimelinePage` (the data owner):
+   ```tsx
+   // TimelinePage.tsx — NOW owns replay state
+   const replayLeadId = (!liveMode && effectiveLeadId) ? effectiveLeadId : null;
+   const replay = useSessionReplay(replayLeadId);
+   ```
+
+2. **Pass replay down** to `ReplayScrubber` as a prop (avoiding a duplicate hook call):
+   ```tsx
+   <ReplayScrubber leadId={effectiveLeadId} replay={replay} />
+   ```
+   `ReplayScrubber` accepts an optional `replay?: UseSessionReplayResult` prop. When provided, it uses the external state. When not provided, it creates its own internally (backward-compatible).
+
+3. **Filter all timeline data** to only show events up to `currentTime`:
+   ```tsx
+   const displayData = useMemo(() => {
+     if (!filteredData) return null;
+     if (!replay.keyframes.length || liveMode) return filteredData;
+     // When paused at end, show everything
+     if (!replay.playing && replay.currentTime >= replay.duration && replay.duration > 0)
+       return filteredData;
+
+     const sessionStart = new Date(replay.keyframes[0].timestamp).getTime();
+     const cutoffMs = sessionStart + replay.currentTime;
+     const cutoff = new Date(cutoffMs).toISOString();
+
+     return {
+       ...filteredData,
+       agents: filteredData.agents
+         .filter(a => new Date(a.createdAt).getTime() <= cutoffMs)
+         .map(a => ({
+           ...a,
+           segments: a.segments
+             .filter(s => new Date(s.startAt).getTime() <= cutoffMs)
+             .map(s => ({
+               ...s,
+               // Clip segment end to cutoff for partial visibility
+               endAt: s.endAt && new Date(s.endAt).getTime() > cutoffMs
+                 ? cutoff : s.endAt,
+             })),
+         })),
+       communications: filteredData.communications
+         .filter(c => new Date(c.timestamp).getTime() <= cutoffMs),
+       locks: filteredData.locks
+         .filter(l => new Date(l.acquiredAt).getTime() <= cutoffMs),
+       timeRange: {
+         start: filteredData.timeRange.start,
+         end: cutoff < filteredData.timeRange.end ? cutoff : filteredData.timeRange.end,
+       },
+     };
+   }, [filteredData, replay.keyframes, replay.playing,
+       replay.currentTime, replay.duration, liveMode]);
+   ```
+
+4. **Pass `displayData`** (not `filteredData`) to `TimelineContainer`.
+
+#### How Progressive Reveal Works
+
+As the replay scrubber advances `currentTime`, the `displayData` memo recalculates:
+- **Agents** — only agents spawned before the cutoff time appear (swim lanes emerge progressively)
+- **Segments** — only segments that started before cutoff are shown. Segments that span the cutoff boundary get their `endAt` clipped to the cutoff time, showing a partial-length Gantt bar that grows as the scrubber advances
+- **Communications** — message arrows appear when their `timestamp` is reached
+- **Locks** — lock indicators appear when their `acquiredAt` is reached
+- **Time range** — the chart's `timeRange.end` is clamped to the cutoff, so the visible X-axis grows with the replay
+
+The effect is a progressive "unfolding" of the session — agents appear, their task bars grow, messages fire between them, and file locks flash on, all synchronized to the scrubber position.
+
+#### Key Insight
+
+Replay animation does NOT animate individual SVG elements. It progressively reveals the entire dataset by filtering on time. The visualization components are pure — they simply render whatever data they receive. The animation emerges from rapidly changing the input data.
+
+#### Edge Cases Handled
+- **Paused at end**: When `!playing && currentTime >= duration`, returns full unfiltered data (no clipping)
+- **Live mode**: During live mode, replay filtering is skipped entirely
+- **No keyframes**: If keyframes haven't loaded yet, returns unfiltered data
+- **Scrubber seeking**: Works for both play and manual scrubber drag — the memo reacts to any `currentTime` change
 
 ### Sticky Scrubber Bar
 
@@ -340,3 +423,4 @@ Run with: `cd packages/web && npx vitest run src/components/Timeline/`
 | 28d7d9d | Auto-switch to replay mode for historical sessions |
 | 74f57f4 | Keyframe scoping by projectId (P2 bug fix) |
 | 0483145 | Animation timing fix |
+| 18045d1 | Replay progressive reveal — the breakthrough that made replay animate |
