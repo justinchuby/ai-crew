@@ -55,8 +55,13 @@ function pressureTextColor(pct: number): string {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function TokenEconomics() {
-  const agents = useAppStore((s) => s.agents);
+interface TokenEconomicsProps {
+  agents?: AgentInfo[];
+}
+
+export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {}) {
+  const storeAgents = useAppStore((s) => s.agents);
+  const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
 
   const { sorted, totalIn, totalOut } = useMemo(() => {
     const withTokens = agents.filter(

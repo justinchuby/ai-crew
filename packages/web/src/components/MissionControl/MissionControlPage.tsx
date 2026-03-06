@@ -33,13 +33,13 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
     case 'health':
       return <HealthSummary leadId={leadId} />;
     case 'tokens':
-      return <TokenEconomics />;
+      return <TokenEconomics agents={agents} />;
     case 'costs':
       return <CostBreakdown />;
     case 'timers':
       return <TimerDisplay />;
     case 'fleet':
-      return <AgentFleet leadId={leadId} />;
+      return <AgentFleet leadId={leadId} agents={agents} />;
     case 'dag':
       return <DagMinimap leadId={leadId} />;
     case 'activity':
@@ -99,7 +99,7 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
       return (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
           <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">🔀 Communication Flow</h3>
-          <CommFlowGraph leadId={leadId} width={600} height={400} />
+          <CommFlowGraph leadId={leadId} width={600} height={400} agents={agents} />
         </div>
       );
     case 'diff':

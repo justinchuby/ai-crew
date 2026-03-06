@@ -1,6 +1,7 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { apiFetch } from '../../hooks/useApi';
 import { EmptyState } from '../Shared';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 
@@ -73,7 +74,33 @@ const EMPTY_COMMS: AgentComm[] = [];
 export function ActivityFeed({ leadId }: ActivityFeedProps) {
   const activity = useLeadStore((s) => s.projects[leadId]?.activity ?? EMPTY_ACTIVITY);
   const comms = useLeadStore((s) => s.projects[leadId]?.comms ?? EMPTY_COMMS);
-  const feedItems = useMemo(() => buildFeedItems(activity, comms), [activity, comms]);
+
+  // Fetch historical events from REST API when no live data
+  const [historicalEvents, setHistoricalEvents] = useState<FeedItem[]>([]);
+  useEffect(() => {
+    if (activity.length > 0 || comms.length > 0 || !leadId) {
+      setHistoricalEvents([]);
+      return;
+    }
+    apiFetch<{ events: any[] }>(`/replay/${leadId}/events?limit=50`)
+      .then((data) => {
+        const events = data?.events ?? [];
+        const items: FeedItem[] = events.map((ev: any, i: number) => ({
+          id: `hist-${ev.id ?? i}`,
+          icon: ACTIVITY_ICONS[ev.type] ?? '•',
+          iconColor: ACTIVITY_COLORS[ev.type] ?? 'text-th-text-muted',
+          text: ev.label || ev.summary || ev.type || 'Event',
+          timestamp: new Date(ev.timestamp ?? ev.createdAt ?? 0).getTime(),
+          agentRole: ev.agentRole ?? ev.role ?? undefined,
+        }));
+        setHistoricalEvents(items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 30));
+      })
+      .catch(() => {});
+  }, [leadId, activity.length, comms.length]);
+
+  const liveFeedItems = useMemo(() => buildFeedItems(activity, comms), [activity, comms]);
+  const feedItems = liveFeedItems.length > 0 ? liveFeedItems : historicalEvents;
+  const isHistorical = liveFeedItems.length === 0 && historicalEvents.length > 0;
   const feedRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to top when new items arrive
@@ -86,8 +113,8 @@ export function ActivityFeed({ leadId }: ActivityFeedProps) {
   return (
     <div className="bg-th-bg rounded-lg border border-th-border-muted flex flex-col h-full">
       <h3 className="text-sm font-semibold text-th-text-alt flex items-center gap-2 px-4 py-3 border-b border-th-border-muted">
-        <Radio size={14} className="text-green-400 animate-pulse" />
-        Live Activity
+        <Radio size={14} className={isHistorical ? 'text-th-text-muted' : 'text-green-400 animate-pulse'} />
+        {isHistorical ? 'Activity History' : 'Live Activity'}
         <span className="text-xs font-normal text-th-text-muted ml-auto">
           {feedItems.length} events
         </span>

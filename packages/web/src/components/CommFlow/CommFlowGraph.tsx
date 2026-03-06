@@ -184,10 +184,12 @@ interface CommFlowGraphProps {
   leadId: string;
   width?: number;
   height?: number;
+  agents?: AgentInfo[];
 }
 
-export function CommFlowGraph({ leadId, width = 500, height = 400 }: CommFlowGraphProps) {
-  const agents = useAppStore((s) => s.agents);
+export function CommFlowGraph({ leadId, width = 500, height = 400, agents: agentsProp }: CommFlowGraphProps) {
+  const storeAgents = useAppStore((s) => s.agents);
+  const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
   const comms = useLeadStore((s) => s.projects[leadId]?.comms ?? EMPTY_COMMS);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);

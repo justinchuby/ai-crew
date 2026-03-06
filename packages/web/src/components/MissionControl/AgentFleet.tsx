@@ -78,10 +78,12 @@ function AgentRow({ agent }: { agent: AgentInfo }) {
 
 interface AgentFleetProps {
   leadId: string;
+  agents?: AgentInfo[];
 }
 
-export function AgentFleet({ leadId }: AgentFleetProps) {
-  const agents = useAppStore((s) => s.agents);
+export function AgentFleet({ leadId, agents: agentsProp }: AgentFleetProps) {
+  const storeAgents = useAppStore((s) => s.agents);
+  const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
 
   const { teamAgents, activeCount } = useMemo(() => {
     // Try filtering by parentId (direct children of this lead)
