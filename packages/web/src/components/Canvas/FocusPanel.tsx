@@ -4,11 +4,23 @@ import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { DiffPreview } from '../DiffPreview';
 import { EmptyState, SkeletonCard } from '../Shared';
 
-/** Safely convert any API value to a renderable string */
+/** Safely convert any API value to a human-readable string */
 function safeText(val: unknown): string {
   if (val == null) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  // Format activity-like objects nicely
+  if (typeof val === 'object' && !Array.isArray(val)) {
+    const obj = val as Record<string, unknown>;
+    // Common activity patterns: show type/action + summary/details
+    const label = obj.type ?? obj.action ?? obj.command ?? obj.event;
+    const detail = obj.summary ?? obj.message ?? obj.details ?? obj.description ?? obj.text;
+    if (typeof label === 'string' && typeof detail === 'string') {
+      return `${label}: ${detail}`;
+    }
+    if (typeof label === 'string') return label;
+    if (typeof detail === 'string') return detail;
+  }
   return JSON.stringify(val);
 }
 

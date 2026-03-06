@@ -84,8 +84,10 @@ export function AgentFleet({ leadId }: AgentFleetProps) {
   const agents = useAppStore((s) => s.agents);
 
   const { teamAgents, activeCount } = useMemo(() => {
-    const team = agents
-      .filter((a) => a.parentId === leadId || a.id === leadId)
+    // Try filtering by parentId (direct children of this lead)
+    const direct = agents.filter((a) => a.parentId === leadId || a.id === leadId);
+    // Fallback: if parentId isn't populated, show all agents
+    const team = (direct.length > 1 ? direct : agents)
       .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
     return {
       teamAgents: team,
