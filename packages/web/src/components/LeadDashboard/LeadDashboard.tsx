@@ -898,7 +898,12 @@ export function LeadDashboard({ api, ws }: Props) {
   const groups = currentProject?.groups ?? [];
   const groupMessages = currentProject?.groupMessages ?? {};
   const dagStatus = currentProject?.dagStatus ?? null;
-  const teamAgents = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+  const teamAgents = (() => {
+    const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+    if (live.length > 0) return live;
+    // Fallback: use agent roster from REST progress endpoint
+    return progress?.teamAgents ?? [];
+  })();
 
   return (
     <div className="flex-1 flex overflow-hidden">

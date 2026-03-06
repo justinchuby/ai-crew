@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function AgentDashboard({ api, ws }: Props) {
-  const agents = useAppStore((s) => s.agents);
+  const liveAgents = useAppStore((s) => s.agents);
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [showSpawn, setShowSpawn] = useState(false);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
@@ -28,6 +28,33 @@ export function AgentDashboard({ api, ws }: Props) {
   const [bottomOpen, setBottomOpen] = useState(false);
   const [groupByProject, setGroupByProject] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
+
+  // Fetch historical agents from REST API when no live agents
+  useEffect(() => {
+    if (liveAgents.length > 0) return;
+    fetch('/api/agents')
+      .then((r) => r.json())
+      .then((data: any) => {
+        const arr = Array.isArray(data) ? data : [];
+        // Normalize shape to match AgentInfo
+        setHistoricalAgents(arr.map((a: any) => ({
+          id: a.id ?? 'unknown',
+          role: a.role ?? { id: 'agent', name: 'Agent', icon: '🤖' },
+          status: a.status ?? 'completed',
+          messages: [],
+          childIds: a.childIds ?? [],
+          parentId: a.parentId,
+          inputTokens: a.inputTokens ?? 0,
+          outputTokens: a.outputTokens ?? 0,
+          contextWindowSize: a.contextWindowSize ?? 0,
+          contextWindowUsed: a.contextWindowUsed ?? 0,
+        })));
+      })
+      .catch(() => {});
+  }, [liveAgents.length]);
+
+  const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
 
   // Keyboard shortcut: 'n' to spawn new agent
   useEffect(() => {

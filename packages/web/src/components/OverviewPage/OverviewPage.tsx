@@ -76,22 +76,56 @@ export function OverviewPage(_props: Props) {
     if (!effectiveId) return;
 
     try {
-      // Fetch agents from REST API when live WebSocket agents are empty
-      let fetchedAgents: any[] = [];
+      // Fetch keyframes first — they drive all visualization panels
+      const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(`/replay/${effectiveId}/keyframes`);
+      const kf: ReplayKeyframe[] = kfData.keyframes ?? [];
+
+      // Fetch/derive agent roster when live WebSocket agents are empty
+      let resolvedAgents: any[] = [];
       if (agents.length === 0) {
         try {
           const agentData = await apiFetch<any[]>('/agents');
-          fetchedAgents = Array.isArray(agentData) ? agentData : [];
-          if (mountedRef.current) setHistoricalAgents(fetchedAgents);
+          resolvedAgents = Array.isArray(agentData) ? agentData : [];
         } catch { /* API may not have agent list endpoint */ }
+
+        // Derive agents from spawn keyframes when REST /agents returns empty
+        if (resolvedAgents.length === 0 && kf.length > 0) {
+          const derivedMap = new Map<string, any>();
+          for (const frame of kf) {
+            if (frame.type === 'spawn') {
+              const roleMatch = frame.label.match(/^Spawned\s+(.+?):\s/);
+              const roleName = roleMatch?.[1] ?? 'Agent';
+              const agentId = `kf-${derivedMap.size}`;
+              derivedMap.set(agentId, {
+                id: agentId,
+                status: 'completed',
+                role: { id: roleName.toLowerCase().replace(/\s+/g, '-'), name: roleName },
+                inputTokens: 0,
+                outputTokens: 0,
+                createdAt: frame.timestamp,
+              });
+            }
+            if (frame.type === 'agent_exit') {
+              const exitMatch = frame.label.match(/^Terminated\s+(.+?)\s+\(([a-f0-9]+)\)/);
+              if (exitMatch) {
+                for (const [, agent] of derivedMap) {
+                  if (agent.role?.name === exitMatch[1] && agent.status !== 'terminated') {
+                    agent.status = 'terminated';
+                    agent.shortId = exitMatch[2];
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          resolvedAgents = [...derivedMap.values()];
+        }
+
+        if (mountedRef.current) setHistoricalAgents(resolvedAgents);
       }
 
-      // Use live agents if available, otherwise the just-fetched historical data
-      const currentAgents = agents.length > 0 ? agents : fetchedAgents;
-
-      // Fetch keyframes for milestones
-      const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(`/replay/${effectiveId}/keyframes`);
-      const kf: ReplayKeyframe[] = kfData.keyframes ?? [];
+      // Use live agents if available, otherwise the resolved historical data
+      const currentAgents = agents.length > 0 ? agents : resolvedAgents;
       if (mountedRef.current) {
         setKeyframes(kf);
 
@@ -103,6 +137,7 @@ export function OverviewPage(_props: Props) {
           const cPoints: CostPoint[] = [];
           const hBuckets: HeatmapBucket[] = [];
           let taskTotal = 0;
+          let spawnIdx = 0;
 
           // Use real token counts from available agents
           const totalInput = currentAgents.reduce((s: number, a: any) => s + (a.inputTokens ?? 0), 0);
@@ -114,7 +149,11 @@ export function OverviewPage(_props: Props) {
 
             if (frame.type === 'spawn') {
               agentCount++;
-              hBuckets.push({ agentId: frame.label.split(' ')[0] ?? 'unknown', time: t, intensity: 0.8 });
+              // Map heatmap bucket to matching derived/live agent ID
+              const matchAgent = currentAgents[spawnIdx];
+              const bucketId = matchAgent?.id ?? `agent-${spawnIdx}`;
+              spawnIdx++;
+              hBuckets.push({ agentId: bucketId, time: t, intensity: 0.8 });
             }
             if (frame.type === 'agent_exit') agentCount = Math.max(0, agentCount - 1);
             if (frame.type === 'delegation') { taskTotal++; inProgress++; }
@@ -132,6 +171,34 @@ export function OverviewPage(_props: Props) {
               agentCount,
             });
             bPoints.push({ time: t, remaining: Math.max(0, taskTotal - completed) });
+          }
+
+          // Derive synthetic agents from spawn keyframes when no real agent data exists
+          if (currentAgents.length === 0) {
+            const exitedIds = new Set(
+              kf.filter((f) => f.type === 'agent_exit').map((f) => f.label.split(' ')[0]),
+            );
+            const synthAgents = kf
+              .filter((f) => f.type === 'spawn')
+              .map((f) => {
+                const parts = f.label.split(' ');
+                const id = parts[0] ?? 'unknown';
+                const role = parts[1] ?? 'Agent';
+                return {
+                  id,
+                  role: { id: role.toLowerCase(), name: role, icon: '🤖' },
+                  status: exitedIds.has(id) ? 'completed' : 'idle',
+                  messages: [],
+                  childIds: [],
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  contextWindowSize: 0,
+                  contextWindowUsed: 0,
+                } as any;
+              });
+            if (mountedRef.current && synthAgents.length > 0) {
+              setHistoricalAgents(synthAgents);
+            }
           }
 
           setTimelineData(tPoints);
