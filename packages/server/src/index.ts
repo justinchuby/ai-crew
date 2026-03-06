@@ -189,20 +189,7 @@ agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
 
-// CI runner — auto-builds and tests after commits, reports results to agents
-import { CIRunner } from './coordination/CIRunner.js';
-const ciRunner = new CIRunner({
-  cwd: repoRoot,
-  getAgent: (id) => agentManager.get(id),
-  getAllAgents: () => agentManager.getAll(),
-  activityLedger,
-  taskDAG,
-});
-eventPipeline.register(ciRunner.createHandler());
-ciRunner.on('ci:complete', (result: { success: boolean }) => {
-  wsServer.broadcastEvent({ type: 'ci:complete', success: result.success });
-  // CI events are global — no project scoping (they apply to the shared repo)
-});
+// ── Session replay ─────────────────────
 
 // Proactive alert engine — watches for stuck agents, context pressure, stale decisions
 import { AlertEngine } from './coordination/AlertEngine.js';
