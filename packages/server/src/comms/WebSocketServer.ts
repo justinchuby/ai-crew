@@ -315,6 +315,15 @@ export class WebSocketServer {
       const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
       this.broadcastToProject({ type: 'decisions:batch', action: 'reject', decisions }, projectId);
     });
+
+    this.track(decisionLog, 'intent:alert', (data: any) => {
+      const projectId = data.decision.projectId ?? this.resolveAgentProjectId(data.decision.agentId);
+      this.broadcastToProject({
+        type: 'intent:alert',
+        decision: data.decision,
+        rule: { pattern: data.rule.pattern, action: data.rule.action, label: data.rule.label },
+      }, projectId);
+    });
   }
 
   private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
