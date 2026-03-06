@@ -1,15 +1,22 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter, Download, Settings, Eye, EyeOff } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Square, Filter, Download, Settings, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
+import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
 import { MentionText, MarkdownContent, InlineMarkdownWithMentions } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { ModelConfigPanel } from './ModelConfigPanel';
+import { formatTokens, AgentReportBlock } from './AgentReportBlock';
+import { BannerDecisionActions, DecisionPanelContent } from './DecisionPanel';
+import { CommsPanelContent } from './CommsPanel';
+import { GroupsPanelContent } from './GroupsPanel';
+import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
+import { CwdBar } from './CwdBar';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
@@ -35,6 +42,18 @@ export function LeadDashboard({ api, ws }: Props) {
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
   const agents = useAppStore((s) => s.agents);
+
+  // Resolve project ID for historical agent derivation:
+  // - "project:xxx" → strip prefix to get the project UUID
+  // - Live lead UUID → use the lead's projectId, or the lead UUID itself as fallback
+  const historicalProjectId = useMemo(() => {
+    if (!selectedLeadId) return null;
+    if (selectedLeadId.startsWith('project:')) return selectedLeadId.slice(8);
+    const lead = agents.find((a) => a.id === selectedLeadId);
+    return lead?.projectId ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
+  const { agents: derivedAgents } = useHistoricalAgents(agents.length, historicalProjectId);
   const activeTimerCount = useTimerStore(selectActiveTimerCount);
   const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
   const setInput = useCallback((text: string) => {
@@ -69,7 +88,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
-    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
+    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
@@ -237,7 +256,12 @@ export function LeadDashboard({ api, ws }: Props) {
     // Load persisted message history if we don't have any messages yet
     const proj = useLeadStore.getState().projects[selectedLeadId];
     if (!proj || proj.messages.length === 0) {
-      fetch(`/api/agents/${selectedLeadId}/messages?limit=200`)
+      // For historical projects (project:XYZ), use project messages endpoint
+      const isHistorical = selectedLeadId.startsWith('project:');
+      const url = isHistorical
+        ? `/api/projects/${selectedLeadId.slice(8)}/messages?limit=200`
+        : `/api/agents/${selectedLeadId}/messages?limit=200`;
+      fetch(url)
         .then((r) => r.json())
         .then((data: any) => {
           if (Array.isArray(data.messages) && data.messages.length > 0) {
@@ -723,7 +747,7 @@ export function LeadDashboard({ api, ws }: Props) {
       if (next.has(tabId)) {
         setSidebarTab((current) => {
           if (current === tabId) {
-            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
+            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
             return allSupportedTabs.find((id) => !next.has(id)) ?? 'team';
           }
           return current;
@@ -792,7 +816,18 @@ export function LeadDashboard({ api, ws }: Props) {
         store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
       }
     }
-    store.addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
+    store.addMessage(selectedLeadId, {
+      type: 'text',
+      text,
+      sender: 'user',
+      queued: mode === 'queue',
+      timestamp: Date.now(),
+      attachments: attachments.length > 0
+        ? attachments
+            .filter((a) => a.kind === 'image')
+            .map((a) => ({ name: a.name, mimeType: a.mimeType, thumbnailDataUrl: a.thumbnailDataUrl }))
+        : undefined,
+    });
     const payload: Record<string, unknown> = { text, mode };
     if (attachments.length > 0) {
       payload.attachments = attachments
@@ -892,7 +927,15 @@ export function LeadDashboard({ api, ws }: Props) {
   const groups = currentProject?.groups ?? [];
   const groupMessages = currentProject?.groupMessages ?? {};
   const dagStatus = currentProject?.dagStatus ?? null;
-  const teamAgents = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+  const teamAgents = (() => {
+    const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+    if (live.length > 0) return live;
+    // Fallback: progress endpoint, then keyframe-derived agents
+    const progressTeam = progress?.teamAgents ?? [];
+    return progressTeam.length > 0 ? progressTeam : derivedAgents;
+  })();
+
+  const teamAgentIds = useMemo(() => new Set(teamAgents.map((a: any) => a.id)), [teamAgents]);
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -1024,15 +1067,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
                 <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
                   {lead.status} · {agents.filter((a: any) => a.parentId === lead.id).length} agents
-                  {(() => {
-                    const allIds = [lead.id, ...(lead.childIds || [])];
-                    const total = allIds.reduce((s, id) => {
-                      const a = agents.find((ag: any) => ag.id === id);
-                      return s + (a?.inputTokens || 0) + (a?.outputTokens || 0);
-                    }, 0);
-                    return total > 0 ? ` · ${formatTokens(total)} tokens` : '';
-                  })()}
-                </div>
+                  </div>
               </button>
             );
           })}
@@ -1359,17 +1394,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 )}
                 {(() => {
-                  const leadIn = progress.leadTokens?.input || 0;
-                  const leadOut = progress.leadTokens?.output || 0;
-                  const teamIn = (progress.teamAgents || []).reduce((s: number, a: any) => s + (a.inputTokens || 0), 0);
-                  const teamOut = (progress.teamAgents || []).reduce((s: number, a: any) => s + (a.outputTokens || 0), 0);
-                  const total = leadIn + leadOut + teamIn + teamOut;
-                  return total > 0 ? (
-                    <div className="flex items-center gap-1.5 text-th-text-muted" title={`Input: ${formatTokens(leadIn + teamIn)} · Output: ${formatTokens(leadOut + teamOut)}`}>
-                      <BarChart3 className="w-4 h-4 text-purple-400" />
-                      <span>{formatTokens(total)} tokens</span>
-                    </div>
-                  ) : null;
+                  return null;
                 })()}
                 <div className="ml-auto">
                   <div className="w-32 bg-th-bg-muted rounded-full h-2">
@@ -1523,8 +1548,23 @@ export function LeadDashboard({ api, ws }: Props) {
                   return (
                     <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
                       <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
-                      <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-                        <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                      <div className="max-w-[80%]">
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end">
+                            {msg.attachments.map((att, ai) => (
+                              <div key={ai} className="rounded-lg overflow-hidden border border-white/20">
+                                {att.thumbnailDataUrl ? (
+                                  <img src={att.thumbnailDataUrl} alt={att.name} className="max-h-24 rounded-lg" />
+                                ) : (
+                                  <div className="px-2 py-1 bg-blue-700 text-xs text-blue-200">{att.name}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
+                          <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                        </div>
                       </div>
                     </div>
                   );
@@ -1735,10 +1775,10 @@ export function LeadDashboard({ api, ws }: Props) {
                       }
                     }}
                     disabled={!isActive}
-                    title="Interrupt current work (Ctrl+Enter)"
+                    title="Interrupt agent (Ctrl+Enter)"
                     className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
                   >
-                    <AlertCircle className="w-3.5 h-3.5" />
+                    <Zap className="w-3.5 h-3.5" />
                     Interrupt
                   </button>
                 </div>
@@ -1814,8 +1854,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
                         models: { icon: <Wrench className="w-3 h-3" />, label: 'Models' },
-                        tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
-                        costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
+                        costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Attribution' },
                         timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
                       };
                       const orderedIds = tabOrder.filter((id) => id in allTabs && !hiddenTabs.has(id));
@@ -1865,7 +1904,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowTabConfig(false)} />
                           <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
-                            {(['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'] as const).map((tabId) => (
+                            {(['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
                               <button
                                 key={tabId}
                                 onClick={() => toggleTabVisibility(tabId)}
@@ -1886,7 +1925,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
-                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
+                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
                     {sidebarTab === 'models' && leadAgent?.projectId && (
                       <div className="h-full overflow-y-auto p-2">
@@ -1898,9 +1937,8 @@ export function LeadDashboard({ api, ws }: Props) {
                         No project selected
                       </div>
                     )}
-                    {sidebarTab === 'tokens' && <TokenEconomics />}
                     {sidebarTab === 'costs' && <CostBreakdown />}
-                    {sidebarTab === 'timers' && <TimerDisplay />}
+                    {sidebarTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
                   </div>
                   {/* Resize handle for tabbed section */}
                   <div
@@ -2103,278 +2141,6 @@ export function LeadDashboard({ api, ws }: Props) {
   );
 }
 
-/** Format token count for display (e.g. 1234 → "1.2k", 1234567 → "1.2M") */
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
-/** Parse [Agent Report] or [Agent ACK] formatted content into structured parts */
-function parseAgentReport(content: string): { header: string; task: string; output: string; sessionId: string; isReport: boolean; isAck: boolean } {
-  // Check for ACK first
-  const ackMatch = content.match(/^\[Agent ACK\]\s*(.+?)(?:\n|$)/);
-  if (ackMatch) {
-    const header = ackMatch[1].trim();
-    const taskMatch = header.match(/acknowledged task:\s*(.*)/);
-    return {
-      header: header.replace(/\s*acknowledged task:.*/, ''),
-      task: taskMatch ? taskMatch[1].trim() : '',
-      output: '',
-      sessionId: '',
-      isReport: true,
-      isAck: true,
-    };
-  }
-
-  const reportMatch = content.match(/^\[Agent Report\]\s*(.+?)(?:\n|$)/);
-  if (!reportMatch) return { header: '', task: '', output: '', sessionId: '', isReport: false, isAck: false };
-
-  const header = reportMatch[1].trim();
-  const taskMatch = content.match(/\nTask:\s*(.*?)(?:\n|$)/);
-  const sessionMatch = content.match(/\nSession ID:\s*(.*?)(?:\n|$)/);
-  const outputMatch = content.match(/\nOutput summary:\s*([\s\S]*)$/);
-
-  // Clean output: strip ⟦⟦ ... ⟧⟧ fragments and normalize whitespace
-  let output = outputMatch ? outputMatch[1].trim() : '';
-  output = output.replace(/⟦⟦[\s\S]*?⟧⟧/g, '').replace(/⟦⟦[\s\S]*$/g, '').replace(/^[\s\S]*?⟧⟧/g, '').trim();
-  output = output.replace(/\n\s(?=\S)/g, ' ');
-
-  return {
-    header,
-    task: taskMatch ? taskMatch[1].trim() : '',
-    output,
-    sessionId: sessionMatch ? sessionMatch[1].trim() : '',
-    isReport: true,
-    isAck: false,
-  };
-}
-
-/** Render an agent report with structured formatting */
-function AgentReportBlock({ content, compact }: { content: string; compact?: boolean }) {
-  const parsed = parseAgentReport(content);
-  if (!parsed.isReport) {
-    return <span className="text-xs font-mono text-th-text-alt whitespace-pre-wrap break-words">{content}</span>;
-  }
-
-  // ACK messages: compact inline rendering
-  if (parsed.isAck) {
-    return (
-      <div className="text-xs font-mono flex items-center gap-1.5">
-        <Check className="w-3 h-3 text-amber-500 shrink-0" />
-        <span className="text-amber-600 dark:text-amber-400">{parsed.header}</span>
-        {parsed.task && <span className="text-th-text-muted"> — {compact && parsed.task.length > 60 ? parsed.task.slice(0, 60) + '…' : parsed.task}</span>}
-      </div>
-    );
-  }
-
-  if (compact) {
-    return (
-      <div className="text-xs font-mono">
-        <span className="text-th-text-alt">{parsed.header}</span>
-        {parsed.task && <span className="text-th-text-muted"> — {parsed.task.length > 80 ? parsed.task.slice(0, 80) + '…' : parsed.task}</span>}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2 text-sm font-mono">
-      <div className="flex items-center gap-2">
-        <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-        <span className="text-th-text-alt font-semibold">{parsed.header}</span>
-      </div>
-      {parsed.task && (
-        <div>
-          <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Task</span>
-          <p className="text-th-text-alt whitespace-pre-wrap break-words mt-0.5">{parsed.task}</p>
-        </div>
-      )}
-      {parsed.output && (
-        <div>
-          <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Output</span>
-          <pre className="text-th-text-alt whitespace-pre-wrap break-words mt-0.5 bg-th-bg/50 rounded p-2 text-xs max-h-60 overflow-y-auto">{parsed.output}</pre>
-        </div>
-      )}
-      {parsed.sessionId && (
-        <div className="flex items-center gap-2 text-[10px]">
-          <span className="text-th-text-muted uppercase tracking-wider">Session</span>
-          <code className="text-th-text-muted bg-th-bg/50 px-1.5 py-0.5 rounded">{parsed.sessionId}</code>
-          <button
-            onClick={() => navigator.clipboard.writeText(parsed.sessionId)}
-            className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400"
-          >
-            copy
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Inline comment + action buttons for pending decisions in the banner */
-function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
-  decisionId: string;
-  onConfirm: (id: string, reason?: string) => void;
-  onReject: (id: string, reason?: string) => void;
-}) {
-  const [reason, setReason] = useState('');
-  return (
-    <div className="mt-2 flex items-center gap-2">
-      <input
-        type="text"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') onConfirm(decisionId, reason.trim() || undefined); }}
-        placeholder="Comment (optional)..."
-        className="flex-1 bg-th-bg border border-th-border rounded px-2 py-1 text-xs text-th-text-alt focus:outline-none focus:border-yellow-500"
-      />
-      <button
-        type="button"
-        aria-label="Confirm decision"
-        onClick={() => onConfirm(decisionId, reason.trim() || undefined)}
-        className="p-1.5 rounded bg-green-800 hover:bg-green-700 text-green-600 dark:text-green-200 transition-colors"
-        title="Confirm"
-      >
-        <Check className="w-3.5 h-3.5" />
-      </button>
-      <button
-        type="button"
-        aria-label="Reject decision"
-        onClick={() => onReject(decisionId, reason.trim() || undefined)}
-        className="p-1.5 rounded bg-red-800 hover:bg-red-700 text-red-600 dark:text-red-200 transition-colors"
-        title="Reject"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
-
-function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: any[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void }) {
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
-  const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
-    });
-  }, [decisions.length]);
-
-  return (
-    <>
-      <div ref={feedRef} className="h-full overflow-y-auto p-2 space-y-2">
-        {decisions.length === 0 ? (
-          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No decisions yet</p>
-        ) : (
-          decisions.map((d: any, i: number) => (
-            <div
-              key={d.id || `dec-${i}`}
-              className={`bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
-              onClick={() => setSelectedDecision(d)}
-            >
-              <div className="flex items-start gap-2">
-                <Lightbulb className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-mono font-semibold text-th-text-alt truncate">{d.title}</p>
-                    {d.agentRole && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
-                    )}
-                    {d.status && d.status !== 'recorded' && (
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-600 dark:text-green-300' : 'bg-red-500/20 text-red-600 dark:text-red-300'}`}>{d.status}</span>
-                    )}
-                  </div>
-                  {d.rationale && <p className="text-xs font-mono text-th-text-muted mt-1 line-clamp-2">{d.rationale}</p>}
-                  <p className="text-xs text-th-text-muted mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
-                  {d.needsConfirmation && d.status === 'recorded' && (
-                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={decisionReasons[d.id] ?? ''}
-                        onChange={(e) => setDecisionReasons((prev) => ({ ...prev, [d.id]: e.target.value }))}
-                        onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); } }}
-                        placeholder="Add a comment (optional)..."
-                        className="w-full bg-th-bg border border-th-border rounded px-2 py-1 text-xs text-th-text-alt focus:outline-none focus:border-yellow-500 mb-2"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => { onConfirm?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
-                          className="text-xs px-2 py-1 rounded bg-green-800 hover:bg-green-700 text-green-600 dark:text-green-200 flex items-center gap-1"
-                        >
-                          <Check className="w-3 h-3" /> Confirm
-                        </button>
-                        <button
-                          onClick={() => { onReject?.(d.id, decisionReasons[d.id]?.trim() || undefined); }}
-                          className="text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-600 dark:text-red-200 flex items-center gap-1"
-                        >
-                          <X className="w-3 h-3" /> Reject
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Decision detail popup */}
-      {selectedDecision && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedDecision(null); }}
-        >
-          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                <span className="text-sm font-semibold text-th-text">Decision</span>
-                {selectedDecision.agentRole && (
-                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">by {selectedDecision.agentRole}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedDecision.timestamp).toLocaleString()}
-                </span>
-                <button type="button" aria-label="Close decision detail" onClick={() => setSelectedDecision(null)} className="text-th-text-muted hover:text-th-text">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="p-4 overflow-y-auto">
-              <h3 className="text-base font-mono font-semibold text-th-text mb-3">{selectedDecision.title}</h3>
-              {selectedDecision.rationale && (
-                <div className="mb-3">
-                  <p className="text-xs font-semibold text-th-text-muted mb-1">Rationale</p>
-                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDecision.rationale}</p>
-                </div>
-              )}
-              {selectedDecision.alternatives && selectedDecision.alternatives.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs font-semibold text-th-text-muted mb-1">Alternatives considered</p>
-                  <ul className="list-disc list-inside text-sm font-mono text-th-text-muted space-y-1">
-                    {selectedDecision.alternatives.map((alt: string, i: number) => (
-                      <li key={i}>{alt}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {selectedDecision.impact && (
-                <div>
-                  <p className="text-xs font-semibold text-th-text-muted mb-1">Impact</p>
-                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDecision.impact}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
@@ -2421,18 +2187,12 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}
-                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
-                    )}
                   </div>
                 )}
-                {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
+                {!delegation && (agent.model || agent.role.model) && (
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
-                    )}
-                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
                     )}
                   </div>
                 )}
@@ -2484,9 +2244,9 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   <button
                     onClick={() => apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
                     className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
-                    title="Interrupt — cancel current work"
+                    title="Interrupt agent"
                   >
-                    <Hand size={12} /> Interrupt
+                    <Zap size={12} /> Interrupt
                   </button>
                   <button
                     onClick={() => {
@@ -2527,33 +2287,28 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 </div>
               )}
 
-              {/* Token Usage */}
-              {(selectedAgent.inputTokens > 0 || selectedAgent.outputTokens > 0) && (
+              {/* Token Usage — hidden (issue #106) */}
+
+              {/* Context Window — keep this, it's real data from ACP */}
+              {selectedAgent.contextWindowSize > 0 && (
                 <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Token Usage</h4>
-                  <div className="flex gap-4 text-xs font-mono">
-                    <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(selectedAgent.inputTokens)} in</span>
-                    <span className="text-green-600 dark:text-green-300">↓ {formatTokens(selectedAgent.outputTokens)} out</span>
-                    <span className="text-th-text-muted">Σ {formatTokens(selectedAgent.inputTokens + selectedAgent.outputTokens)}</span>
-                  </div>
-                  {selectedAgent.contextWindowSize > 0 && (
-                    <div className="mt-1.5">
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
-                        <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
-                        <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
-                      </div>
-                      <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
-                        <div
-                          className={`h-1 rounded-full transition-all ${
-                            selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
-                            selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
-                            'bg-blue-500'
-                          }`}
-                          style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
-                        />
-                      </div>
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Context Window</h4>
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
+                      <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
+                      <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
                     </div>
-                  )}
+                    <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
+                      <div
+                        className={`h-1 rounded-full transition-all ${
+                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
+                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
+                          'bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2729,7 +2484,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                     className="px-3 py-1.5 rounded bg-orange-600/80 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
                     title="Interrupt agent (Ctrl+Enter)"
                   >
-                    <AlertCircle size={12} /> Interrupt
+                    <Zap size={12} /> Interrupt
                   </button>
                 </div>
               </div>
@@ -2775,754 +2530,5 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
         </div>
       )}
     </>
-  );
-}
-
-function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[]; groupMessages: Record<string, GroupMessage[]>; leadId?: string }) {
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
-  const [selectedGroupMsg, setSelectedGroupMsg] = useState<GroupMessage | null>(null);
-  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
-
-  // Merge 1:1 comms and group messages into a unified feed sorted by timestamp
-  const feed = useMemo(() => {
-    const items: FeedItem[] = comms.map(c => ({ type: '1:1' as const, item: c }));
-    for (const msgs of Object.values(groupMessages)) {
-      for (const m of msgs) {
-        items.push({ type: 'group' as const, item: m });
-      }
-    }
-    items.sort((a, b) => {
-      const ta = typeof a.item.timestamp === 'string' ? new Date(a.item.timestamp).getTime() : a.item.timestamp;
-      const tb = typeof b.item.timestamp === 'string' ? new Date(b.item.timestamp).getTime() : b.item.timestamp;
-      return ta - tb;
-    });
-    return items.slice(-50);
-  }, [comms, groupMessages]);
-
-  // Classify and filter
-  const classifiedFeed = useMemo(() => {
-    return feed
-      .map(entry => ({ entry, tier: classifyMessage(entry, leadId) }))
-      .filter(({ tier }) => tierPassesFilter(tier, tierFilter));
-  }, [feed, leadId, tierFilter]);
-
-  // Count by tier for filter bar
-  const tierCounts = useMemo(() => {
-    const counts = { critical: 0, notable: 0, routine: 0 };
-    for (const entry of feed) {
-      counts[classifyMessage(entry, leadId)]++;
-    }
-    return counts;
-  }, [feed, leadId]);
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
-    });
-  }, [classifiedFeed.length]);
-
-  const FILTER_OPTIONS: { value: TierFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'notable', label: `Important (${tierCounts.critical + tierCounts.notable})` },
-    { value: 'critical', label: `Critical (${tierCounts.critical})` },
-  ];
-
-  return (
-    <>
-      {/* Tier filter bar */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-th-border/50 bg-th-bg/50">
-        <Filter className="w-3 h-3 text-th-text-muted shrink-0" />
-        {FILTER_OPTIONS.map(opt => (
-          <button
-            key={opt.value}
-            className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${tierFilter === opt.value ? 'bg-th-bg-muted text-th-text-alt' : 'text-th-text-muted hover:text-th-text-alt hover:bg-th-bg-alt'}`}
-            onClick={() => setTierFilter(opt.value)}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      <div ref={feedRef} className="h-full overflow-y-auto">
-        {classifiedFeed.length === 0 ? (
-          <p className="text-xs text-th-text-muted text-center py-4 font-mono">
-            {feed.length === 0 ? 'No messages yet' : 'No messages match this filter'}
-          </p>
-        ) : (
-          classifiedFeed.map(({ entry, tier }, i) => {
-            const tierStyle = TIER_CONFIG[tier];
-
-            if (entry.type === 'group') {
-              const gm = entry.item;
-              const time = new Date(gm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              return (
-                <div
-                  key={gm.id || `gm-${i}`}
-                  className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'routine' ? 'border-b-emerald-400/10 border-l-emerald-400/15 opacity-60 hover:opacity-100 hover:bg-emerald-500/[0.06]' : 'border-b-emerald-400/20 bg-emerald-500/[0.04] border-l-emerald-400/30 hover:bg-emerald-500/[0.08]'}`}
-                  onClick={() => setSelectedGroupMsg(gm)}
-                >
-                  <div className="flex items-center gap-1 text-xs">
-                    <Users className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span className="font-mono font-semibold text-emerald-400 truncate">{gm.groupName}</span>
-                    <span className="text-th-text-muted">·</span>
-                    <span className="font-mono text-cyan-400">{gm.fromRole}</span>
-                    {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
-                    <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
-                  </div>
-                  <div className="text-xs font-mono text-th-text-alt mt-0.5">
-                    <p className="truncate">
-                      <MentionText text={gm.content.length > 120 ? gm.content.slice(0, 120) + '…' : gm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                    </p>
-                  </div>
-                </div>
-              );
-            }
-            const c = entry.item as AgentComm;
-            const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const isToUser = leadId && c.toId === leadId;
-            return (
-              <div
-                key={c.id}
-                className={`px-3 py-1.5 border-b border-l-2 cursor-pointer transition-colors ${tier === 'critical' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-red-500/[0.12]` : tier === 'notable' ? `${tierStyle.bgClass} ${tierStyle.borderBClass} ${tierStyle.borderClass} hover:bg-blue-500/[0.08]` : `${isToUser ? 'bg-blue-500/[0.04] border-b-blue-400/15 border-l-blue-400/20' : 'border-b-gray-700/30 border-l-transparent'} opacity-60 hover:opacity-100 hover:bg-th-bg-muted/30`}`}
-                onClick={() => setSelectedComm(c)}
-              >
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
-                  <span className="text-th-text-muted">→</span>
-                  <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
-                  {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
-                  <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
-                </div>
-                <div className="text-xs font-mono text-th-text-alt mt-0.5">
-                  {c.content.startsWith('[Agent Report]') || c.content.startsWith('[Agent ACK]')
-                    ? <AgentReportBlock content={c.content} compact />
-                    : <p className="truncate">
-                        <MentionText text={c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                      </p>
-                  }
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Full message popup */}
-      {selectedComm && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
-        >
-          <div
-            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
-                <span className="text-th-text-muted">→</span>
-                <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
-                </span>
-                <button
-                  onClick={() => setSelectedComm(null)}
-                  className="text-th-text-muted hover:text-th-text text-lg leading-none"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
-                ? <AgentReportBlock content={selectedComm.content} />
-                : (
-                  <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
-                    <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
-                  </pre>
-                )
-              }
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Group message popup */}
-      {selectedGroupMsg && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedGroupMsg(null); }}
-        >
-          <div className="bg-th-bg-alt border border-emerald-600/40 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-700/40">
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4 text-emerald-400" />
-                <span className="font-mono font-semibold text-emerald-400">{selectedGroupMsg.groupName}</span>
-                <span className="text-th-text-muted">·</span>
-                <span className="font-mono text-cyan-400">{selectedGroupMsg.fromRole}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedGroupMsg.timestamp).toLocaleTimeString()}
-                </span>
-                <button
-                  onClick={() => setSelectedGroupMsg(null)}
-                  className="text-th-text-muted hover:text-th-text text-lg leading-none"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
-                <MentionText text={selectedGroupMsg.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedGroupMsg(null); }} />
-              </pre>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-function roleColor(role: string): string {
-  const colors = [
-    'text-cyan-400',
-    'text-violet-400',
-    'text-emerald-400',
-    'text-amber-400',
-    'text-red-400',
-    'text-blue-400',
-    'text-fuchsia-400',
-    'text-orange-400',
-  ];
-  let hash = 0;
-  for (let i = 0; i < role.length; i++) hash = (hash * 31 + role.charCodeAt(i)) | 0;
-  return colors[Math.abs(hash) % colors.length];
-}
-
-function GroupsPanelContent({
-  groups,
-  groupMessages,
-  leadId,
-}: {
-  groups: ChatGroup[];
-  groupMessages: Record<string, GroupMessage[]>;
-  leadId: string | null;
-}) {
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [fetchedGroups, setFetchedGroups] = useState<Set<string>>(new Set());
-
-  // Reset expanded state when lead changes
-  useEffect(() => {
-    setExpandedGroup(null);
-    setFetchedGroups(new Set());
-  }, [leadId]);
-
-  // Fetch messages when a group is first expanded
-  useEffect(() => {
-    if (!expandedGroup || !leadId || fetchedGroups.has(expandedGroup)) return;
-    setFetchedGroups((prev) => new Set(prev).add(expandedGroup));
-    fetch(`/api/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const store = useLeadStore.getState();
-          // Bulk-set messages for this group
-          const proj = store.projects[leadId];
-          if (proj) {
-            data.forEach((msg: GroupMessage) => {
-              store.addGroupMessage(leadId, expandedGroup, msg);
-            });
-          }
-        }
-      })
-      .catch(() => {});
-  }, [expandedGroup, leadId, fetchedGroups]);
-
-  // Auto-scroll when messages change for expanded group
-  useEffect(() => {
-    if (expandedGroup) {
-      requestAnimationFrame(() => {
-        feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
-      });
-    }
-  }, [expandedGroup, groupMessages[expandedGroup ?? '']?.length]);
-
-  return (
-    <div ref={feedRef} className="h-full overflow-y-auto">
-      {groups.length === 0 ? (
-        <p className="text-xs text-th-text-muted text-center py-4 font-mono">No groups yet</p>
-      ) : (
-        groups.map((g) => {
-          const isExpanded = expandedGroup === g.name;
-          const msgs = groupMessages[g.name] ?? [];
-          return (
-            <div key={g.name} className="border-b border-th-border/30">
-              <button
-                className="w-full text-left px-3 py-1.5 hover:bg-th-bg-muted/30 transition-colors flex items-center gap-2"
-                onClick={() => setExpandedGroup(isExpanded ? null : g.name)}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3 h-3 text-th-text-muted shrink-0" />
-                ) : (
-                  <ChevronRight className="w-3 h-3 text-th-text-muted shrink-0" />
-                )}
-                <span className="text-xs font-mono font-semibold text-teal-400 truncate flex-1">{g.name}</span>
-                <span className="text-[10px] font-mono text-th-text-muted shrink-0">{g.memberIds.length} members</span>
-              </button>
-              {isExpanded && (
-                <div className="px-2 pb-2 space-y-0.5 max-h-60 overflow-y-auto">
-                  {msgs.length === 0 ? (
-                    <p className="text-[10px] text-th-text-muted text-center py-2 font-mono">No messages</p>
-                  ) : (
-                    msgs.map((m) => {
-                      const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                      const shortId = m.fromAgentId?.slice(0, 6) ?? '';
-                      return (
-                        <div key={m.id} className="px-2 py-1 rounded bg-th-bg-alt/50 text-xs font-mono">
-                          <div className="flex items-center gap-1">
-                            <span className="text-th-text-muted text-[10px] shrink-0">{time}</span>
-                            <span className={`${roleColor(m.fromRole)} font-semibold truncate`}>
-                              {m.fromRole}{shortId ? ` (${shortId})` : ''}:
-                            </span>
-                          </div>
-                          <p className="text-th-text-alt break-words mt-0.5 whitespace-pre-wrap">
-                            <MentionText text={m.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                          </p>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
-  const feedRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
-    });
-  }, [activity.length]);
-
-  const recent = activity.slice(-30);
-
-  const getIcon = (type: string, status?: string) => {
-    if (type === 'delegation') return <GitBranch className="w-3 h-3 text-yellow-600 dark:text-yellow-400 shrink-0" />;
-    if (type === 'completion') return <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />;
-    if (type === 'message_sent') return <MessageSquare className="w-3 h-3 text-blue-400 shrink-0" />;
-    if (type === 'progress') return <BarChart3 className="w-3 h-3 text-purple-400 shrink-0" />;
-    if (status === 'in_progress') return <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />;
-    if (status === 'completed') return <CheckCircle className="w-3 h-3 text-purple-500 shrink-0" />;
-    return <Wrench className="w-3 h-3 text-th-text-muted shrink-0" />;
-  };
-
-  return (
-    <div ref={feedRef} className="h-full overflow-y-auto">
-      {recent.length === 0 ? (
-        <p className="text-xs text-th-text-muted text-center py-4 font-mono">No activity yet</p>
-      ) : (
-        recent.map((evt) => {
-          const agent = agents.find((a: any) => a.id === evt.agentId);
-          const label = agent?.role?.name ?? evt.agentRole;
-          const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          return (
-            <div key={evt.id} className="px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
-              {getIcon(evt.type, evt.status)}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono text-th-text-muted">{label}</span>
-                  <span className="text-[10px] font-mono text-th-text-muted">{evt.agentId?.slice(0, 8)}</span>
-                  <span className="text-xs font-mono text-th-text-muted ml-auto shrink-0">{time}</span>
-                </div>
-                <span className="text-xs font-mono text-th-text-alt break-words">{typeof evt.summary === 'string' ? evt.summary : JSON.stringify(evt.summary)}</span>
-              </div>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-function CollapsibleSection({
-  title,
-  icon,
-  badge,
-  defaultHeight = 160,
-  minHeight = 60,
-  maxHeight = 500,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  badge?: number;
-  defaultHeight?: number;
-  minHeight?: number;
-  maxHeight?: number;
-  children: React.ReactNode;
-}) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [height, setHeight] = useState(defaultHeight);
-  const isResizing = useRef(false);
-
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startY = e.clientY;
-    const startH = height;
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current) return;
-      const newH = Math.min(maxHeight, Math.max(minHeight, startH + (e.clientY - startY)));
-      setHeight(newH);
-    };
-
-    const onMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [height, minHeight, maxHeight]);
-
-  return (
-    <div className="border-t border-th-border flex flex-col shrink-0" style={collapsed ? undefined : { height }}>
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="px-3 py-1.5 flex items-center gap-2 shrink-0 hover:bg-th-bg-alt/50 transition-colors w-full text-left"
-      >
-        {collapsed ? <ChevronRight className="w-3 h-3 text-th-text-muted" /> : <ChevronDown className="w-3 h-3 text-th-text-muted" />}
-        {icon}
-        <span className="text-xs font-semibold">{title}</span>
-        {badge !== undefined && <span className="text-[10px] text-th-text-muted ml-auto">{badge}</span>}
-      </button>
-      {!collapsed && (
-        <>
-          <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
-          <div
-            onMouseDown={startResize}
-            className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(cwd || '');
-  const { updateAgent } = useAppStore();
-
-  useEffect(() => { setValue(cwd || ''); }, [cwd]);
-
-  const save = async () => {
-    const trimmed = value.trim();
-    await fetch(`/api/lead/${leadId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cwd: trimmed || undefined }),
-    });
-    updateAgent(leadId, { cwd: trimmed || undefined });
-    setEditing(false);
-  };
-
-  return (
-    <div className="border-b border-th-border px-4 py-1.5 flex items-center gap-2 text-xs font-mono bg-th-bg-alt/30">
-      <FolderOpen className="w-3 h-3 text-th-text-muted shrink-0" />
-      {editing ? (
-        <>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
-            placeholder="/path/to/project"
-            className="flex-1 bg-th-bg-alt border border-th-border rounded px-2 py-0.5 text-xs font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
-            autoFocus
-          />
-          <button type="button" aria-label="Save working directory" onClick={save} className="text-green-400 hover:text-green-600 dark:hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
-          <button type="button" aria-label="Cancel edit" onClick={() => setEditing(false)} className="text-th-text-muted hover:text-th-text p-0.5"><X className="w-3 h-3" /></button>
-        </>
-      ) : (
-        <>
-          <span className="text-th-text-muted truncate flex-1" title={cwd}>{cwd || '(server default)'}</span>
-          <button
-            onClick={() => setEditing(true)}
-            className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
-          >
-            edit
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-function InlineMarkdown({ text }: { text: string }) {
-  const agents = useAppStore((s) => s.agents);
-  return <InlineMarkdownWithMentions text={text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />;
-}
-
-/** Renders agent text, separating ⟦⟦ command ⟧⟧ blocks from normal markdown */
-function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
-  if (msg.contentType === 'image' && msg.data) {
-    return (
-      <div className="py-1">
-        <img
-          src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`}
-          alt="Agent image"
-          className="max-w-full max-h-96 rounded-lg border border-th-border"
-        />
-        {msg.uri && <p className="text-[10px] text-th-text-muted mt-1 font-mono">{msg.uri}</p>}
-      </div>
-    );
-  }
-  if (msg.contentType === 'audio' && msg.data) {
-    return (
-      <div className="py-1">
-        <audio controls className="max-w-full">
-          <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
-        </audio>
-      </div>
-    );
-  }
-  if (msg.contentType === 'resource') {
-    return (
-      <div className="py-1">
-        {msg.uri && (
-          <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
-            <FolderOpen className="w-3 h-3" />
-            <span className="font-mono">{msg.uri}</span>
-          </div>
-        )}
-        {msg.text && (
-          <pre className="text-xs font-mono text-th-text-alt bg-th-bg-alt border border-th-border rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
-            {msg.text}
-          </pre>
-        )}
-      </div>
-    );
-  }
-  return null;
-}
-
-/** Collapsed-by-default reasoning block for lead thinking — click to expand */
-function CollapsibleReasoningBlock({ text, timestamp }: { text: string; timestamp: string }) {
-  if (!text?.trim()) return null;
-  const [expanded, setExpanded] = useState(false);
-  const preview = text.replace(/[\n\r]+/g, ' ').slice(0, 80);
-  return (
-    <div className="py-0.5">
-      <div
-        className="flex items-start gap-2 cursor-pointer group"
-        onClick={() => setExpanded((e) => !e)}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1 text-xs text-th-text-muted">
-            {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-            <Lightbulb className="w-3 h-3 shrink-0" />
-            <span className="italic">Reasoning</span>
-            {!expanded && preview && <span className="text-th-text-muted/60 truncate ml-1">— {preview}{text.length > 80 ? '…' : ''}</span>}
-          </div>
-          {expanded && (
-            <div className="mt-1 ml-5 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {text}
-            </div>
-          )}
-        </div>
-        <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{timestamp}</span>
-      </div>
-    </div>
-  );
-}
-
-/** Collapsed-by-default ⟦⟦ command ⟧⟧ block with click to expand */
-function CollapsibleCommandBlock({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/⟦⟦\s*(\w+)/);
-  const label = nameMatch ? nameMatch[1] : 'command';
-  // Extract a preview from the JSON payload
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  let preview = '';
-  if (jsonMatch) {
-    try {
-      const obj = JSON.parse(jsonMatch[0]);
-      const parts: string[] = [];
-      for (const [k, v] of Object.entries(obj)) {
-        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
-      }
-      preview = parts.join(', ');
-    } catch {
-      preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
-    }
-  }
-  return (
-    <div
-      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
-      onClick={() => setExpanded((e) => !e)}
-    >
-      <div className="flex items-center gap-1 min-w-0">
-        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
-      </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
-    </div>
-  );
-}
-
-/** Check if a ⟦⟦ ... ⟧⟧ block looks like a real command (ALL_CAPS name after ⟦⟦) */
-function isRealCommandBlock(text: string): boolean {
-  return /^⟦⟦\s*[A-Z][A-Z_]{2,}/.test(text);
-}
-
-function AgentTextBlock({ text }: { text: string }) {
-  // Split on ⟦⟦ ... ⟧⟧ blocks (complete) and also detect unclosed ⟦⟦ blocks
-  const segments = text.split(/(⟦⟦[\s\S]*?⟧⟧)/g);
-  return (
-    <>
-      {segments.map((seg, i) => {
-        // Complete ⟦⟦ ⟧⟧ block — only collapse if it looks like a real command
-        if (seg.startsWith('⟦⟦') && seg.endsWith('⟧⟧')) {
-          if (isRealCommandBlock(seg)) {
-            return <CollapsibleCommandBlock key={i} text={seg} />;
-          }
-          return <MarkdownWithTables key={i} text={seg} />;
-        }
-        // Unclosed ⟦⟦ block (still streaming or split across messages)
-        if (seg.includes('⟦⟦') && !seg.includes('⟧⟧')) {
-          const idx = seg.indexOf('⟦⟦');
-          const before = seg.slice(0, idx);
-          const cmdBlock = seg.slice(idx);
-          if (isRealCommandBlock(cmdBlock)) {
-            return (
-              <span key={i}>
-                {before.trim() ? <MarkdownWithTables text={before} /> : null}
-                <CollapsibleCommandBlock text={cmdBlock} />
-              </span>
-            );
-          }
-          return <MarkdownWithTables key={i} text={seg} />;
-        }
-        // Dangling ⟧⟧ from a block that started in a previous message
-        if (seg.includes('⟧⟧') && !seg.includes('⟦⟦')) {
-          const idx = seg.indexOf('⟧⟧') + 2;
-          const cmdBlock = seg.slice(0, idx);
-          const after = seg.slice(idx);
-          return (
-            <span key={i}>
-              <CollapsibleCommandBlock text={cmdBlock} />
-              {after.trim() ? <MarkdownWithTables text={after} /> : null}
-            </span>
-          );
-        }
-        if (!seg.trim()) return null;
-        return <MarkdownWithTables key={i} text={seg} />;
-      })}
-    </>
-  );
-}
-
-/** Detect markdown tables and code fences, render them; pass other text to InlineMarkdown */
-function MarkdownWithTables({ text }: { text: string }) {
-  // Match contiguous lines that look like table rows (start with |)
-  const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
-  const parts = text.split(TABLE_RE);
-
-  return (
-    <>
-      {parts.map((part, i) => {
-        const trimmed = part.trim();
-        if (trimmed.startsWith('|') && trimmed.includes('\n')) {
-          return <MarkdownTable key={i} raw={trimmed} />;
-        }
-        if (!trimmed) return null;
-        return <BlockMarkdown key={i} text={part} />;
-      })}
-    </>
-  );
-}
-
-/** Block-level markdown: splits on fenced code blocks, delegates non-code to InlineMarkdown */
-function BlockMarkdown({ text }: { text: string }) {
-  const CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
-  const segments = text.split(CODE_BLOCK_RE);
-  if (segments.length === 1) return <InlineMarkdown text={text} />;
-  return (
-    <>
-      {segments.map((seg, i) => {
-        if (seg.startsWith('```') && seg.endsWith('```')) {
-          const inner = seg.slice(3, -3);
-          const newlineIdx = inner.indexOf('\n');
-          const content = newlineIdx >= 0 ? inner.slice(newlineIdx + 1) : inner;
-          return (
-            <pre key={i} className="bg-th-bg-alt border border-th-border rounded-md px-3 py-2 my-1.5 overflow-x-auto text-xs font-mono text-th-text-alt whitespace-pre">
-              <code>{content}</code>
-            </pre>
-          );
-        }
-        if (!seg.trim()) return null;
-        return <InlineMarkdown key={i} text={seg} />;
-      })}
-    </>
-  );
-}
-
-/** Render a markdown table as an HTML table */
-function MarkdownTable({ raw }: { raw: string }) {
-  const lines = raw.split('\n').filter((l) => l.trim());
-  if (lines.length < 2) return <InlineMarkdown text={raw} />;
-
-  const parseRow = (line: string) =>
-    line.split('|').slice(1, -1).map((cell) => cell.trim());
-
-  const headerCells = parseRow(lines[0]);
-  // Check if line[1] is a separator (e.g., |---|---|)
-  const isSeparator = /^\|[\s:?-]+(\|[\s:?-]+)*\|?\s*$/.test(lines[1]);
-  const dataStart = isSeparator ? 2 : 1;
-  const bodyRows = lines.slice(dataStart).map(parseRow);
-
-  return (
-    <div className="my-2 overflow-x-auto">
-      <table className="text-xs font-mono border-collapse border border-th-border w-full">
-        <thead>
-          <tr className="bg-th-bg-alt">
-            {headerCells.map((cell, j) => (
-              <th key={j} className="border border-th-border px-2 py-1 text-left text-th-text-alt font-semibold">
-                <InlineMarkdown text={cell} />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {bodyRows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? 'bg-th-bg/30' : 'bg-th-bg-alt/30'}>
-              {row.map((cell, ci) => (
-                <td key={ci} className="border border-th-border px-2 py-1 text-th-text-alt">
-                  <InlineMarkdown text={cell} />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }

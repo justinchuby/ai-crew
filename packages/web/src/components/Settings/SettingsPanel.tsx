@@ -4,13 +4,21 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode } from '../../stores/settingsStore';
 import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
 import { DashboardCustomizer } from './DashboardCustomizer';
+import { PlaybookLibrary } from '../Playbooks';
+import { IntentRulesDashboard } from '../IntentRules';
+import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
+import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
+import { GitHubSetup } from '../GitHub';
+import { ConflictSettingsPanel } from '../Conflicts';
+import { DataManagement } from './DataManagement';
 
 interface Props {
   api: any;
 }
 
 export function SettingsPanel({ api }: Props) {
-  const { config, roles } = useAppStore();
+  const config = useAppStore((s) => s.config);
+  const roles = useAppStore((s) => s.roles);
   const { soundEnabled, toggleSound } = useSettingsStore();
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
@@ -79,6 +87,7 @@ export function SettingsPanel({ api }: Props) {
             ]).map(({ mode, icon, label }) => (
               <button
                 key={mode}
+                aria-label={`Set theme to ${label}`}
                 onClick={() => setThemeMode(mode)}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
                   themeMode === mode
@@ -104,6 +113,7 @@ export function SettingsPanel({ api }: Props) {
           </label>
           <input
             type="range"
+            aria-label="Maximum concurrent agents"
             min={1}
             max={50}
             value={maxAgents}
@@ -136,6 +146,7 @@ export function SettingsPanel({ api }: Props) {
           </div>
           <button
             onClick={toggleSound}
+            aria-label={soundEnabled ? 'Disable sound alerts' : 'Enable sound alerts'}
             className={`relative w-10 h-5 rounded-full transition-colors ${
               soundEnabled ? 'bg-accent' : 'bg-th-bg-hover'
             }`}
@@ -178,13 +189,57 @@ export function SettingsPanel({ api }: Props) {
       {/* Dashboard Layout */}
       <DashboardCustomizer />
 
+      {/* Playbooks */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <PlaybookLibrary />
+      </section>
+
+      {/* Intent Rules */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <IntentRulesDashboard />
+      </section>
+
+      {/* GitHub Integration */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <GitHubSetup />
+      </section>
+
+      {/* Conflict Detection */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <ConflictSettingsPanel />
+      </section>
+
+      {/* Recovery Settings */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <RecoverySettingsPanel />
+      </section>
+
+      {/* Recovery Metrics */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <RecoveryMetricsCard />
+      </section>
+
+      {/* Notification Preferences */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <NotificationPreferencesPanel />
+      </section>
+
+      {/* Notification Activity Log */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+        <NotificationActivityLog />
+      </section>
+
+      {/* Data Management */}
+      <DataManagement />
+
       {/* Roles */}
-      <section className="mb-8">
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
             <Users className="w-3.5 h-3.5" /> Agent Roles
           </h3>
           <button
+            type="button"
             onClick={() => setShowRoleForm(!showRoleForm)}
             className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-muted transition-colors px-2 py-1 rounded hover:bg-th-bg-alt"
           >
@@ -200,6 +255,7 @@ export function SettingsPanel({ api }: Props) {
               <input
                 type="text"
                 placeholder="Role ID (e.g. designer)"
+                aria-label="Role ID"
                 value={roleId}
                 onChange={(e) => setRoleId(e.target.value)}
                 className="flex-1 bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent"
@@ -207,12 +263,14 @@ export function SettingsPanel({ api }: Props) {
               <input
                 type="text"
                 placeholder="🤖"
+                aria-label="Role icon emoji"
                 value={roleIcon}
                 onChange={(e) => setRoleIcon(e.target.value)}
                 className="w-14 bg-th-bg-alt border border-th-border rounded-md px-2 py-1.5 text-sm text-center focus:outline-none focus:border-accent"
               />
               <input
                 type="color"
+                aria-label="Role color"
                 value={roleColor}
                 onChange={(e) => setRoleColor(e.target.value)}
                 className="w-10 h-8 bg-th-bg-alt border border-th-border rounded-md cursor-pointer"
@@ -221,6 +279,7 @@ export function SettingsPanel({ api }: Props) {
             <input
               type="text"
               placeholder="Display name"
+              aria-label="Role display name"
               value={roleName}
               onChange={(e) => setRoleName(e.target.value)}
               className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
@@ -228,12 +287,14 @@ export function SettingsPanel({ api }: Props) {
             <input
               type="text"
               placeholder="Short description"
+              aria-label="Role description"
               value={roleDesc}
               onChange={(e) => setRoleDesc(e.target.value)}
               className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
             />
             <textarea
               placeholder="System prompt — define the agent's behavior..."
+              aria-label="Role system prompt"
               value={rolePrompt}
               onChange={(e) => setRolePrompt(e.target.value)}
               rows={4}
@@ -241,12 +302,14 @@ export function SettingsPanel({ api }: Props) {
             />
             <div className="flex justify-end gap-2 pt-1">
               <button
+                type="button"
                 onClick={() => setShowRoleForm(false)}
                 className="px-3 py-1.5 text-xs text-th-text-muted hover:text-th-text rounded-md hover:bg-th-bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleCreateRole}
                 disabled={!roleId || !roleName}
                 className="px-4 py-1.5 text-xs bg-accent text-black rounded-md font-semibold disabled:opacity-50 transition-colors hover:bg-accent-muted"
@@ -268,6 +331,9 @@ export function SettingsPanel({ api }: Props) {
                 <div
                   className="flex items-center gap-3 p-3 cursor-pointer"
                   onClick={() => setExpandedRole(isExpanded ? null : role.id)}
+                  role="button"
+                  aria-expanded={isExpanded}
+                  aria-label={`${role.name} role details`}
                 >
                   <span className="text-lg">{role.icon}</span>
                   <div className="flex-1 min-w-0">
@@ -292,6 +358,7 @@ export function SettingsPanel({ api }: Props) {
                   {!role.builtIn && (
                     <button
                       onClick={(e) => { e.stopPropagation(); api.deleteRole(role.id); }}
+                      aria-label={`Delete role ${role.name}`}
                       className="p-1.5 text-th-text-muted hover:text-red-400 rounded hover:bg-th-bg-alt transition-colors"
                     >
                       <Trash2 size={13} />
@@ -315,6 +382,14 @@ export function SettingsPanel({ api }: Props) {
           })}
         </div>
       </section>
+
+      <footer className="mt-8 pb-4 text-center text-xs text-th-text-muted">
+        Made with care by{' '}
+        <a href="https://github.com/justinchuby" target="_blank" rel="noopener noreferrer" className="underline hover:text-th-text-alt transition-colors">
+          @justinchuby
+        </a>{' '}
+        and a team of AIs
+      </footer>
     </div>
   );
 }

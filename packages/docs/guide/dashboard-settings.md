@@ -27,3 +27,13 @@ Register new roles with:
 Agents request tool permissions (file writes, shell commands) during operation. Permission timeout behavior depends on the agent's mode:
 - **Autopilot ON** (lead-spawned or user-enabled): tool calls are auto-approved immediately
 - **Autopilot OFF** (manually spawned): tool calls are **auto-denied** after 60 seconds if the user hasn't responded
+
+## Data Management
+
+Monitor and manage the SQLite database that stores all session data.
+
+- **Database Statistics** — File size, total records, oldest session date, per-table breakdown
+- **Purge Old Data** — Select a retention period and preview what will be deleted before confirming
+- **Safety** — Only completed sessions can be purged. Active sessions are protected. All deletions are transactional.
+
+→ [Data Management Guide](/guide/data-management)

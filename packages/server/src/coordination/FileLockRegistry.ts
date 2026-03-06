@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, lte, gt } from 'drizzle-orm';
 import { Database } from '../db/database.js';
 import { fileLocks, utcNow } from '../db/schema.js';
 
@@ -232,5 +232,18 @@ export class FileLockRegistry extends EventEmitter {
       this.emit('lock:expired', { filePath: lock.filePath, agentId: lock.agentId, agentRole: lock.agentRole });
     }
     return result;
+  }
+
+  /** Get locks that were active at a given timestamp (for replay) */
+  getLocksAt(timestamp: string): FileLock[] {
+    const rows = this.db.drizzle
+      .select()
+      .from(fileLocks)
+      .where(and(
+        lte(fileLocks.acquiredAt, timestamp),
+        gt(fileLocks.expiresAt, timestamp),
+      ))
+      .all();
+    return rows.map(rowToFileLock);
   }
 }

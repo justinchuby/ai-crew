@@ -61,13 +61,13 @@ export function CostBreakdown() {
   const total = totalInput + totalOutput;
 
   if (loading) {
-    return <div className="p-4 text-sm text-th-text-muted">Loading cost data…</div>;
+    return <div className="p-4 text-sm text-th-text-muted">Loading token data…</div>;
   }
 
   if (agentCosts.length === 0 && taskCosts.length === 0) {
     return (
       <div className="p-4 text-sm text-th-text-muted">
-        No cost attribution data yet. Costs are tracked when agents work on DAG tasks.
+        No token attribution data yet. Token usage is tracked when agents work on DAG tasks.
       </div>
     );
   }
@@ -77,8 +77,8 @@ export function CostBreakdown() {
       {/* Summary bar */}
       <div className="flex items-center justify-between rounded-lg bg-th-bg-alt/60 px-4 py-2.5 border border-th-border/50">
         <div className="flex items-center gap-2">
-          <span className="text-base">💰</span>
-          <span className="font-medium text-th-text-alt">Task Costs</span>
+          <span className="text-base">📊</span>
+          <span className="font-medium text-th-text-alt">Token Attribution</span>
         </div>
         <div className="flex items-center gap-4 font-mono text-xs">
           <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(totalInput)} in</span>

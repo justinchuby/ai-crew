@@ -18,10 +18,14 @@ export function PromptNav({
   containerRef,
   messages,
   useOriginalIndices = false,
+  onJump,
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   messages: AcpTextChunk[];
   useOriginalIndices?: boolean;
+  /** Optional callback for virtualized lists where DOM elements may not exist.
+   *  Called with the original message index. When provided, skips DOM querySelector. */
+  onJump?: (messageIndex: number) => void;
 }) {
   const [currentIdx, setCurrentIdx] = useState(-1);
 
@@ -49,12 +53,21 @@ export function PromptNav({
 
   const jumpTo = useCallback(
     (promptIdx: number) => {
+      const targetIndex = userIndices[promptIdx];
+      setCurrentIdx(promptIdx);
+
+      // Virtualized mode: use callback instead of DOM query
+      if (onJump) {
+        onJump(targetIndex);
+        return;
+      }
+
+      // Non-virtualized fallback: DOM querySelector
       const container = containerRef.current;
       if (!container) return;
-      const el = container.querySelector(`[data-user-prompt="${userIndices[promptIdx]}"]`) as HTMLElement;
+      const el = container.querySelector(`[data-user-prompt="${targetIndex}"]`) as HTMLElement;
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setCurrentIdx(promptIdx);
         el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg');
         setTimeout(
           () => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg'),
@@ -62,7 +75,7 @@ export function PromptNav({
         );
       }
     },
-    [containerRef, userIndices],
+    [containerRef, userIndices, onJump],
   );
 
   const goUp = useCallback(() => {

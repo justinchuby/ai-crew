@@ -12,6 +12,22 @@ import { projectsRoutes } from './projects.js';
 import { sessionsRoutes } from './sessions.js';
 import { dbRoutes } from './db.js';
 import { servicesRoutes } from './services.js';
+import { diffRoutes } from './diff.js';
+import { replayRoutes } from './replay.js';
+import { commsRoutes } from './comms.js';
+import { summaryRoutes } from './summary.js';
+import { playbookRoutes } from './playbooks.js';
+import { debateRoutes } from './debates.js';
+import { sharedRoutes } from './shared.js';
+import { analyticsRoutes } from './analytics.js';
+import { recoveryRoutes } from './recovery.js';
+import { handoffRoutes } from './handoffs.js';
+import { notificationRoutes } from './notifications.js';
+import { nlRoutes } from './nl.js';
+import { githubRoutes } from './github.js';
+import { conflictRoutes } from './conflicts.js';
+import { communityRoutes } from './community.js';
+import { dataRoutes } from './data.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -26,4 +42,20 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(sessionsRoutes(ctx));
   router.use(dbRoutes(ctx));
   router.use(servicesRoutes(ctx));
+  router.use(diffRoutes(ctx));
+  router.use(replayRoutes(ctx));
+  router.use(commsRoutes(ctx));
+  router.use(summaryRoutes(ctx));
+  router.use(playbookRoutes(ctx));
+  router.use(debateRoutes(ctx));
+  router.use(sharedRoutes(ctx));
+  router.use(analyticsRoutes(ctx));
+  router.use(recoveryRoutes(ctx));
+  router.use(handoffRoutes(ctx));
+  router.use(notificationRoutes(ctx));
+  router.use(nlRoutes(ctx));
+  router.use(githubRoutes(ctx));
+  router.use(conflictRoutes(ctx));
+  router.use(communityRoutes(ctx));
+  router.use(dataRoutes(ctx));
 }

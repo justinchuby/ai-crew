@@ -1,12 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
+import { useToastStore } from '../Toast';
+import { apiFetch } from '../../hooks/useApi';
 import type { DagStatus, Decision } from '../../types';
 import type { AgentInfo } from '../../types';
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface AlertAction {
+  label: string;
+  description: string;
+  actionType: 'api_call' | 'dismiss';
+  endpoint: string;
+  method: 'POST' | 'DELETE';
+  body?: Record<string, any>;
+  confidence?: number;
+}
 
 export interface Alert {
   id: string;
@@ -15,6 +27,8 @@ export interface Alert {
   title: string;
   detail: string;
   timestamp: number;
+  agentId?: string;
+  actions?: AlertAction[];
 }
 
 // ── Detection ────────────────────────────────────────────────────────
@@ -29,53 +43,36 @@ export function detectAlerts(
   const alerts: Alert[] = [];
   const now = Date.now();
 
-  // 1. Context pressure (>85% critical, >70% warning)
+  // 1. Context pressure — informational only, no action buttons.
+  // Copilot manages context compaction automatically.
   for (const agent of agents) {
     if (agent.contextWindowSize && agent.contextWindowUsed) {
       const pct = agent.contextWindowUsed / agent.contextWindowSize;
       const roleName = typeof agent.role === 'object' ? agent.role.name : agent.role;
       const shortId = agent.id.slice(0, 8);
-      if (pct > 0.85) {
+      const burnLabel = agent.contextBurnRate && agent.contextBurnRate > 0
+        ? ` • ~${Math.round(agent.contextBurnRate * 60)}k tok/min`
+        : '';
+      const timeLabel = agent.estimatedExhaustionMinutes != null && agent.estimatedExhaustionMinutes > 0
+        ? ` • ~${Math.round(agent.estimatedExhaustionMinutes)} min remaining`
+        : '';
+
+      // Only show at 95%+ (critical) — Copilot handles context management automatically
+      if (pct > 0.95) {
         alerts.push({
           id: `ctx-${agent.id}`,
-          severity: 'critical',
+          severity: 'info',
           icon: '🧠',
           title: `${roleName} at ${Math.round(pct * 100)}% context`,
-          detail: `Agent ${shortId} may produce lower quality output.`,
-          timestamp: now,
-        });
-      } else if (pct > 0.70) {
-        alerts.push({
-          id: `ctx-warn-${agent.id}`,
-          severity: 'warning',
-          icon: '🧠',
-          title: `${roleName} at ${Math.round(pct * 100)}% context`,
-          detail: `Agent ${shortId} approaching context limit.`,
+          detail: `Agent ${shortId} nearing context limit — Copilot will compact automatically.${burnLabel}${timeLabel}`,
+          agentId: agent.id,
           timestamp: now,
         });
       }
     }
   }
 
-  // 2. Stuck agents (running >10 min since creation with no indication of progress)
-  for (const agent of agents) {
-    if (agent.status === 'running' && agent.createdAt) {
-      const runningMs = now - new Date(agent.createdAt).getTime();
-      if (runningMs > 600_000) {
-        const roleName = typeof agent.role === 'object' ? agent.role.name : agent.role;
-        alerts.push({
-          id: `stuck-${agent.id}`,
-          severity: 'warning',
-          icon: '⏱️',
-          title: `${roleName} may be stuck`,
-          detail: `Running for ${Math.round(runningMs / 60000)} min with no completion.`,
-          timestamp: now,
-        });
-      }
-    }
-  }
-
-  // 3. Pending decisions (>3 min old)
+  // 2. Pending decisions (>3 min old)
   for (const decision of decisions) {
     if (decision.needsConfirmation && decision.status === 'recorded') {
       const age = now - new Date(decision.timestamp).getTime();
@@ -107,21 +104,8 @@ export function detectAlerts(
     }
   }
 
-  // 5. Idle agents with ready DAG tasks
-  if (dagStatus) {
-    const readyTasks = dagStatus.tasks.filter(t => t.dagStatus === 'ready');
-    const idleAgents = agents.filter(a => a.status === 'idle');
-    if (readyTasks.length > 0 && idleAgents.length > 0) {
-      alerts.push({
-        id: 'idle-with-ready',
-        severity: 'info',
-        icon: '💡',
-        title: `${readyTasks.length} tasks ready, ${idleAgents.length} agents idle`,
-        detail: 'Consider assigning ready tasks to idle agents.',
-        timestamp: now,
-      });
-    }
-  }
+  // 5. Idle agents alert removed — idle agents don't cost anything (cost is per token),
+  // and the Lead assigns tasks, not the human user. This alert was noise.
 
   // 6. Blocked tasks
   if (dagStatus) {
@@ -159,6 +143,8 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
   const agents = useAppStore((s) => s.agents);
   const decisions = useLeadStore((s) => s.projects[leadId]?.decisions ?? EMPTY_DECISIONS);
   const dagStatus = useLeadStore((s) => s.projects[leadId]?.dagStatus ?? null);
+  const addToast = useToastStore((s) => s.add);
+  const [executingAction, setExecutingAction] = useState<string | null>(null);
 
   const teamAgents = useMemo(
     () => agents.filter((a) => a.parentId === leadId || a.id === leadId),
@@ -170,7 +156,35 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
     [teamAgents, decisions, dagStatus],
   );
 
-  if (alerts.length === 0) return null;
+  const executeAction = useCallback(async (alertId: string, action: AlertAction) => {
+    // 'dismiss' actions are client-side only — no API call
+    if (action.actionType === 'dismiss' || !action.endpoint) return;
+    // Validate endpoint starts with /api/ or relative path for safety
+    if (!action.endpoint.startsWith('/') && !action.endpoint.startsWith('api/')) {
+      addToast('error', `Invalid action endpoint: ${action.endpoint}`);
+      return;
+    }
+    setExecutingAction(`${alertId}-${action.label}`);
+    try {
+      await apiFetch(action.endpoint, {
+        method: action.method,
+        body: action.body ? JSON.stringify(action.body) : undefined,
+      });
+      addToast('success', `${action.label}: done`);
+    } catch (err: any) {
+      addToast('error', `${action.label} failed: ${err.message}`);
+    } finally {
+      setExecutingAction(null);
+    }
+  }, [addToast]);
+
+  if (alerts.length === 0) {
+    return (
+      <div className="text-center text-th-text-muted text-xs py-6 opacity-60">
+        No active alerts
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5">
@@ -179,12 +193,35 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
         return (
           <div
             key={alert.id}
-            className={`flex items-start gap-2 px-3 py-2 rounded-md border ${style.bg} ${style.border}`}
+            className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-all duration-200 ${style.bg} ${style.border}`}
           >
             <span className="text-sm flex-shrink-0">{alert.icon}</span>
             <div className="min-w-0 flex-1">
               <span className={`text-xs font-medium ${style.text}`}>{alert.title}</span>
               <p className="text-[11px] text-th-text-muted leading-tight">{alert.detail}</p>
+              {/* Actionable buttons */}
+              {alert.actions && alert.actions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {alert.actions.map((action) => {
+                    const isExecuting = executingAction === `${alert.id}-${action.label}`;
+                    return (
+                      <button
+                        key={action.label}
+                        onClick={() => executeAction(alert.id, action)}
+                        disabled={isExecuting}
+                        title={action.description}
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded border transition-colors ${
+                          isExecuting
+                            ? 'opacity-50 cursor-wait'
+                            : 'bg-th-bg/50 border-th-border/50 text-th-text-muted hover:text-th-text-alt hover:border-th-border-hover'
+                        }`}
+                      >
+                        {isExecuting ? '...' : action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );

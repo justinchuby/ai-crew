@@ -29,7 +29,8 @@ export function ChatPanel({ agentId, ws }: Props) {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { agents, setSelectedAgent } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const agent = agents.find((a) => a.id === agentId);
 
   const handleFileInsert = useCallback((text: string) => {
@@ -117,7 +118,10 @@ export function ChatPanel({ agentId, ws }: Props) {
         msgs.push({ type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
       }
     }
-    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
+    const imgAttachments = attachments.length > 0
+      ? attachments.filter((a) => a.kind === 'image').map((a) => ({ name: a.name, mimeType: a.mimeType }))
+      : undefined;
+    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}), attachments: imgAttachments && imgAttachments.length > 0 ? imgAttachments : undefined });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
     if (broadcast) {

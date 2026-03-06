@@ -2,7 +2,7 @@ import { useAppStore } from '../../stores/appStore';
 import { MessageSquare, GitBranch } from 'lucide-react';
 
 export function AgentTimeline() {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
 
   // Build timeline from agent relationships
   const roots = agents.filter((a) => !a.parentId);
@@ -24,7 +24,9 @@ export function AgentTimeline() {
 }
 
 function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
-  const { agents, setSelectedAgent, selectedAgentId } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const agent = agents.find((a) => a.id === agentId);
   if (!agent) return null;
 
@@ -44,8 +46,7 @@ function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
           <GitBranch size={12} className="text-th-text-muted shrink-0" />
         )}
         <span>{agent.role.icon}</span>
-        <span className="truncate">{agent.role.name}</span>
-        <span className="text-[10px] text-th-text-muted font-mono ml-auto">{agentId.slice(0, 6)}</span>
+        <span className="truncate">{agent.role.name} ({agentId.slice(0, 8)})</span>
       </button>
       {children.map((child) => (
         <AgentTreeNode key={child.id} agentId={child.id} depth={depth + 1} />

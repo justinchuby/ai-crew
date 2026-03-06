@@ -3,6 +3,7 @@ import { Users } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { agentStatusDot } from '../../utils/statusColors';
 import type { AgentInfo } from '../../types';
+import { EmptyState } from '../Shared';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -77,14 +78,18 @@ function AgentRow({ agent }: { agent: AgentInfo }) {
 
 interface AgentFleetProps {
   leadId: string;
+  agents?: AgentInfo[];
 }
 
-export function AgentFleet({ leadId }: AgentFleetProps) {
-  const agents = useAppStore((s) => s.agents);
+export function AgentFleet({ leadId, agents: agentsProp }: AgentFleetProps) {
+  const storeAgents = useAppStore((s) => s.agents);
+  const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
 
   const { teamAgents, activeCount } = useMemo(() => {
-    const team = agents
-      .filter((a) => a.parentId === leadId || a.id === leadId)
+    // Try filtering by parentId (direct children of this lead)
+    const direct = agents.filter((a) => a.parentId === leadId || a.id === leadId);
+    // Fallback: if parentId isn't populated, show all agents
+    const team = (direct.length > 1 ? direct : agents)
       .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
     return {
       teamAgents: team,
@@ -103,7 +108,7 @@ export function AgentFleet({ leadId }: AgentFleetProps) {
       </h3>
       <div className="flex-1 overflow-y-auto space-y-0.5 -mx-2">
         {teamAgents.length === 0 && (
-          <div className="text-xs text-th-text-muted px-2 py-4 text-center">No agents yet</div>
+          <EmptyState icon="👥" title="No agents yet" compact />
         )}
         {teamAgents.map((a) => <AgentRow key={a.id} agent={a} />)}
       </div>

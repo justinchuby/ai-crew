@@ -814,12 +814,8 @@ const darkStyles = `
     background: var(--graph-bg-alt);
     border: 1px solid var(--graph-border);
   }
-  @keyframes dagNodePulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
-    50% { box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.4); }
-  }
   .dag-node-pulse {
-    animation: dagNodePulse 2s ease-in-out infinite;
+    animation: glow-pulse 2s ease-in-out infinite;
   }
 `;
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
 import { SpawnDialog } from './SpawnDialog';
 import { FleetStats } from '../FleetOverview/FleetStats';
 import { AgentActivityTable } from '../FleetOverview/AgentActivityTable';
@@ -19,7 +20,8 @@ interface Props {
 }
 
 export function AgentDashboard({ api, ws }: Props) {
-  const { agents, setSelectedAgent } = useAppStore();
+  const liveAgents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [showSpawn, setShowSpawn] = useState(false);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
   const [locks, setLocks] = useState<FileLock[]>([]);
@@ -27,6 +29,11 @@ export function AgentDashboard({ api, ws }: Props) {
   const [bottomOpen, setBottomOpen] = useState(false);
   const [groupByProject, setGroupByProject] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  // Derive historical agents from keyframe events when no live agents
+  const { agents: historicalAgents } = useHistoricalAgents(liveAgents.length);
+
+  const agents = liveAgents.length > 0 ? liveAgents : (historicalAgents as any[]);
 
   // Keyboard shortcut: 'n' to spawn new agent
   useEffect(() => {

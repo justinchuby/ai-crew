@@ -23,5 +23,27 @@ export function rolesRoutes(ctx: AppContext): Router {
     res.json({ ok });
   });
 
+  // POST /roles/test — dry-run a custom role with a test message
+  router.post('/roles/test', (req, res) => {
+    const { role, message } = req.body as { role?: Record<string, unknown>; message?: string };
+    if (!role) return res.status(400).json({ error: 'Missing required field: role' });
+    if (!message) return res.status(400).json({ error: 'Missing required field: message' });
+
+    const name = (role.name as string) || 'Custom Role';
+    const systemPrompt = (role.systemPrompt as string) || '';
+    const description = (role.description as string) || '';
+
+    // Build a simulated response based on role config (no actual LLM call)
+    const response = [
+      `[Test Mode] Role "${name}" configured successfully.`,
+      description ? `Description: ${description}` : '',
+      systemPrompt ? `System prompt: ${systemPrompt.slice(0, 200)}${systemPrompt.length > 200 ? '...' : ''}` : '',
+      `Test message: "${message}"`,
+      `This role would respond using model: ${(role.model as string) || 'default'}`,
+    ].filter(Boolean).join('\n');
+
+    res.json({ response, role: name, valid: true });
+  });
+
   return router;
 }

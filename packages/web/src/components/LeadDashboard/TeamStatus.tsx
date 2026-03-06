@@ -3,12 +3,6 @@ import type { AgentInfo, Delegation } from '../../types';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 interface Props {
   agents: AgentInfo[];
   delegations: Delegation[];
@@ -57,7 +51,7 @@ export function TeamStatus({ agents, delegations }: Props) {
                 <div className="flex items-center gap-2">
                   <span className="text-base">{agent.role.icon}</span>
                   <span className="text-sm font-mono font-semibold text-th-text-alt truncate">
-                    {agent.role.name}
+                    {agent.role.name} <span className="text-th-text-muted text-xs">({agent.id.slice(0, 8)})</span>
                   </span>
                   <Icon className={`w-3.5 h-3.5 ${colorClass} ml-auto shrink-0 ${agent.status === 'running' ? 'animate-spin' : ''}`} />
                 </div>
@@ -68,9 +62,6 @@ export function TeamStatus({ agents, delegations }: Props) {
                 )}
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs font-mono ${colorClass}`}>{agent.status}</span>
-                  {((agent.inputTokens ?? 0) > 0 || (agent.outputTokens ?? 0) > 0) && (
-                    <span className="text-[10px] font-mono text-purple-400/70">{formatTokens((agent.inputTokens ?? 0) + (agent.outputTokens ?? 0))}</span>
-                  )}
                   <span className="ml-auto flex items-center gap-2">
                     {(agent.model || agent.role.model) && (
                       <span className="text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded" title={agent.model || agent.role.model}>

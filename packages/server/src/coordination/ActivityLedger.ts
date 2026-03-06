@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, desc, asc, gt, sql, inArray, and } from 'drizzle-orm';
+import { eq, desc, asc, gt, lte, sql, inArray, and } from 'drizzle-orm';
 import { Database } from '../db/database.js';
 import { activityLog } from '../db/schema.js';
 import { logger } from '../utils/logger.js';
@@ -148,7 +148,7 @@ export class ActivityLedger extends EventEmitter {
     return rows.map((row) => this._mapRow(row));
   }
 
-  getSince(timestamp: string, projectId?: string): ActivityEntry[] {
+  getSince(timestamp: string, projectId?: string, limit = 10_000): ActivityEntry[] {
     this.flush();
     const conditions = [gt(activityLog.timestamp, timestamp)];
     if (projectId) conditions.push(eq(activityLog.projectId, projectId));
@@ -157,6 +157,7 @@ export class ActivityLedger extends EventEmitter {
       .from(activityLog)
       .where(and(...conditions))
       .orderBy(asc(activityLog.id))
+      .limit(limit)
       .all();
     return rows.map((row) => this._mapRow(row));
   }
@@ -253,5 +254,20 @@ export class ActivityLedger extends EventEmitter {
       timestamp: row.timestamp,
       projectId: row.projectId ?? '',
     };
+  }
+
+  /** Get all activity entries up to (inclusive) a given timestamp */
+  getUntil(timestamp: string, projectId?: string, limit = 500): ActivityEntry[] {
+    this.flush();
+    const conditions = [lte(activityLog.timestamp, timestamp)];
+    if (projectId) conditions.push(eq(activityLog.projectId, projectId));
+    const rows = this.db.drizzle
+      .select()
+      .from(activityLog)
+      .where(and(...conditions))
+      .orderBy(asc(activityLog.id))
+      .limit(limit)
+      .all();
+    return rows.map((row) => this._mapRow(row));
   }
 }

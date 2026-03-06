@@ -1,7 +1,9 @@
 import { Router } from 'express';
+import { eq, inArray, desc } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
+import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
@@ -23,6 +25,148 @@ export function projectsRoutes(ctx: AppContext): Router {
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
     res.json({ ...project, sessions, activeLeadId });
+  });
+
+  // Historical DAG tasks for a project (from database)
+  router.get('/projects/:id/dag', (req, res) => {
+    if (!_db) return res.json({ tasks: [], summary: {} });
+    // Find all lead IDs for this project
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json({ tasks: [], summary: {} });
+    const leadIds = leads.map((l) => l.leadId);
+    // Fetch DAG tasks scoped to those leads
+    const allTasks = _db.drizzle.select().from(dagTasks)
+      .where(inArray(dagTasks.leadId, leadIds))
+      .all();
+    // Build summary
+    const summary: Record<string, number> = {};
+    for (const t of allTasks) {
+      const status = t.dagStatus ?? 'pending';
+      summary[status] = (summary[status] ?? 0) + 1;
+    }
+    res.json({
+      tasks: allTasks.map((t) => ({
+        id: t.id,
+        leadId: t.leadId,
+        role: t.role,
+        title: t.title,
+        description: t.description,
+        files: JSON.parse(t.files ?? '[]'),
+        dependsOn: JSON.parse(t.dependsOn ?? '[]'),
+        dagStatus: t.dagStatus ?? 'pending',
+        priority: t.priority,
+        assignedAgentId: t.assignedAgentId,
+        createdAt: t.createdAt ?? '',
+        startedAt: t.startedAt ?? null,
+        completedAt: t.completedAt ?? null,
+      })),
+      fileLockMap: {},
+      summary,
+    });
+  });
+
+  // Historical group chats for a project (from database)
+  router.get('/projects/:id/groups', (req, res) => {
+    if (!_db) return res.json([]);
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json([]);
+    const leadIds = leads.map((l) => l.leadId);
+
+    // Fetch all groups for those leads
+    const groups = _db.drizzle.select().from(chatGroups)
+      .where(inArray(chatGroups.leadId, leadIds))
+      .all();
+
+    // Fetch members and message counts for each group
+    const result = groups.map((g) => {
+      const members = _db.drizzle.select({ agentId: chatGroupMembers.agentId })
+        .from(chatGroupMembers)
+        .where(eq(chatGroupMembers.groupName, g.name))
+        .all()
+        .filter((m) => leadIds.includes(g.leadId));
+      const msgCount = _db.drizzle.select({ id: chatGroupMessages.id })
+        .from(chatGroupMessages)
+        .where(eq(chatGroupMessages.groupName, g.name))
+        .all()
+        .filter((m) => true).length; // count via length
+      return {
+        name: g.name,
+        leadId: g.leadId,
+        memberIds: members.map((m) => m.agentId),
+        messageCount: msgCount,
+        createdAt: g.createdAt,
+      };
+    });
+    res.json(result);
+  });
+
+  // Historical group chat messages for a specific group
+  router.get('/projects/:id/groups/:name/messages', (req, res) => {
+    if (!_db) return res.json([]);
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json([]);
+    const leadIds = leads.map((l) => l.leadId);
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+
+    const messages = _db.drizzle.select().from(chatGroupMessages)
+      .where(eq(chatGroupMessages.groupName, req.params.name))
+      .all()
+      .filter((m) => leadIds.includes(m.leadId))
+      .slice(-limit);
+
+    res.json(messages.map((m) => ({
+      id: m.id,
+      groupName: m.groupName,
+      leadId: m.leadId,
+      fromAgentId: m.fromAgentId,
+      fromRole: m.fromRole,
+      content: m.content,
+      reactions: JSON.parse(m.reactions ?? '{}'),
+      timestamp: m.timestamp,
+    })));
+  });
+
+  // Historical chat messages for a project (from lead conversations)
+  router.get('/projects/:id/messages', (req, res) => {
+    if (!_db) return res.json({ messages: [] });
+    const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
+    // Find all lead IDs for this project
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json({ messages: [] });
+    const leadIds = leads.map((l) => l.leadId);
+    // Query messages from all lead conversations
+    const rows = _db.drizzle
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        sender: messages.sender,
+        content: messages.content,
+        timestamp: messages.timestamp,
+      })
+      .from(messages)
+      .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(inArray(conversations.agentId, leadIds))
+      .orderBy(desc(messages.timestamp))
+      .limit(limit)
+      .all()
+      .reverse(); // chronological order
+    res.json({ messages: rows });
   });
 
   router.post('/projects', (req, res) => {

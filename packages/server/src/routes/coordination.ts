@@ -93,7 +93,17 @@ export function coordinationRoutes(ctx: AppContext): Router {
   });
 
   // ── Helper: build timeline data from activity events ──────────────────────
+  // 5s TTL cache to avoid re-computing on rapid polling
+  let _timelineCache: { key: string; data: any; ts: number } | null = null;
+  const TIMELINE_CACHE_TTL = 5_000;
+
   function buildTimelineData(leadId?: string, since?: string) {
+    const cacheKey = `${leadId ?? ''}:${since ?? ''}`;
+    const now = Date.now();
+    if (_timelineCache && _timelineCache.key === cacheKey && now - _timelineCache.ts < TIMELINE_CACHE_TTL) {
+      return _timelineCache.data;
+    }
+
     let events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
 
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
@@ -108,7 +118,21 @@ export function coordinationRoutes(ctx: AppContext): Router {
           teamAgentIds.add(agent.id);
         }
       }
-      events = events.filter(ev => teamAgentIds.has(ev.agentId));
+
+      // Historical fallback: when no live agents match, treat leadId as projectId
+      // and discover team members from the events themselves
+      const hasLiveTeam = teamAgentIds.size > 1 || events.some(ev => ev.agentId === leadId);
+      if (!hasLiveTeam) {
+        const projectEvents = events.filter(ev => ev.projectId === leadId);
+        if (projectEvents.length > 0) {
+          events = projectEvents;
+          for (const ev of projectEvents) teamAgentIds.add(ev.agentId);
+        }
+      }
+
+      if (teamAgentIds.size > 1) {
+        events = events.filter(ev => teamAgentIds.has(ev.agentId) || ev.projectId === leadId);
+      }
     }
 
     // Sort chronologically (oldest first)
@@ -231,11 +255,16 @@ export function coordinationRoutes(ctx: AppContext): Router {
     };
 
     // Find project context
+    // Find project context (live agent first, then infer from events)
     const resolvedLeadId = leadId || agentManager.getAll().find(a => a.role.id === 'lead' && !a.parentId)?.id;
     const leadAgent = resolvedLeadId ? agentManager.get(resolvedLeadId) : undefined;
-    const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
+    const project = leadAgent
+      ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id }
+      : leadId ? { projectId: leadId, leadId } : undefined;
 
-    return { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+    const result = { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+    _timelineCache = { key: cacheKey, data: result, ts: Date.now() };
+    return result;
   }
 
   router.get('/coordination/timeline', (req, res) => {

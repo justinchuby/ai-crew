@@ -54,6 +54,8 @@ export interface AgentJSON {
   outputTokens: number;
   contextWindowSize: number;
   contextWindowUsed: number;
+  contextBurnRate: number;
+  estimatedExhaustionMinutes: number | null;
   pendingMessages: number;
   isSubLead: boolean;
   hierarchyLevel: number;
@@ -95,9 +97,19 @@ export class Agent {
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
+  /** Whether real usage data has been received from ACP (vs. estimated) */
+  public hasRealUsageData = false;
+  /** Estimated output tokens from content length (~4 chars per token) */
+  private estimatedOutputTokens = 0;
   /** Context window info from ACP usage_update */
   public contextWindowSize = 0;
   public contextWindowUsed = 0;
+  /** Token usage history for burn rate calculation */
+  private tokenHistory: Array<{ timestamp: number; used: number }> = [];
+  private static MIN_SAMPLE_INTERVAL_MS = 10_000;   // 10s dedup between samples
+  private static MAX_WINDOW_AGE_MS = 600_000;        // 10min max window
+  private static MIN_POINTS_FOR_PREDICTION = 3;      // minimum data points
+  private static MIN_SPAN_MS = 30_000;               // minimum 30s span
   private terminated = false;
   /** Hash of the last CREW_UPDATE sent — used to skip duplicate updates */
   private lastUpdateHash: string = '';
@@ -107,6 +119,8 @@ export class Agent {
   private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
   private pendingMessages: PromptContent[] = [];
+  private pendingPriorityCount = 0;
+  private static readonly MAX_PENDING_MESSAGES = 200;
   private peers: AgentContextInfo[];
   private readonly events = new AgentEventEmitter();
 
@@ -160,6 +174,7 @@ export class Agent {
   /** @internal */ _drainOneMessage(): void {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
+      if (this.pendingPriorityCount > 0) this.pendingPriorityCount--;
       this.write(next);
     }
   }
@@ -363,12 +378,12 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     return true;
   }
 
-  write(data: PromptContent): void {
+  write(data: PromptContent, opts?: { priority?: boolean }): void {
     if (this.terminated) return;
     if (this.acpConnection?.isConnected) {
       this.status = 'running';
       this.events.notifyStatus(this.status);
-      this.acpConnection.prompt(data).catch((err) => {
+      this.acpConnection.prompt(data, opts).catch((err) => {
         logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
         // Reset status so agent doesn't get stuck as 'running'
         if (this.status === 'running') {
@@ -380,18 +395,38 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   }
 
   /** Send a message to this agent (used for inter-agent communication and completion callbacks) */
-  sendMessage(message: PromptContent): void {
-    this.write(message);
+  sendMessage(message: PromptContent, opts?: { priority?: boolean }): void {
+    this.write(message, opts);
   }
 
-  /** Queue a message — delivered after the agent finishes its current prompt */
-  queueMessage(message: PromptContent): void {
+  /**
+   * Queue a message for delivery after the agent finishes its current prompt.
+   * If `opts.priority` is true, the message is inserted after existing priority
+   * messages but before normal messages (FIFO within priority class).
+   * Queue is capped at MAX_PENDING_MESSAGES — excess non-priority messages are dropped with a warning.
+   * Priority messages (e.g. user messages) are NEVER dropped.
+   */
+  queueMessage(message: PromptContent, opts?: { priority?: boolean }): void {
     if (this.systemPaused) {
-      this.pendingMessages.push(message);
+      this.enqueueMessage(message, opts?.priority);
       return;
     }
     if (this.status === 'idle') {
-      this.write(message);
+      this.write(message, opts);
+    } else {
+      this.enqueueMessage(message, opts?.priority);
+    }
+  }
+
+  /** Internal: insert message into pendingMessages with FIFO priority ordering and rate limiting */
+  private enqueueMessage(message: PromptContent, priority?: boolean): void {
+    if (!priority && this.pendingMessages.length >= Agent.MAX_PENDING_MESSAGES) {
+      logger.warn('agent', `Message queue full (${Agent.MAX_PENDING_MESSAGES}) for ${this.role.name} (${this.id.slice(0, 8)}) — dropping non-priority message`);
+      return;
+    }
+    if (priority) {
+      this.pendingMessages.splice(this.pendingPriorityCount, 0, message);
+      this.pendingPriorityCount++;
     } else {
       this.pendingMessages.push(message);
     }
@@ -402,6 +437,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     if (this.acpConnection && this.status === 'running') {
       // Clear any queued messages — interrupt takes priority
       this.pendingMessages.length = 0;
+      this.pendingPriorityCount = 0;
       await this.acpConnection.cancel();
       // Small delay to let cancellation settle before sending new prompt
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -444,6 +480,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
     );
     this.pendingMessages.length = 0;
+    this.pendingPriorityCount = 0;
     return { count, previews };
   }
 
@@ -498,6 +535,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   dispose(): void {
     this.events.dispose();
     this.pendingMessages.length = 0;
+    this.pendingPriorityCount = 0;
     this.messages.length = 0;
     this.toolCalls.length = 0;
     this.lastUpdateHash = '';
@@ -541,6 +579,53 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     return result.length > maxChars ? result.slice(-maxChars) : result;
   }
 
+  // ── Burn Rate Tracking ────────────────────────────────────────────
+
+  /** Record a context window usage sample for burn rate calculation */
+  recordTokenSample(used: number): void {
+    const now = Date.now();
+    const last = this.tokenHistory[this.tokenHistory.length - 1];
+    if (last && now - last.timestamp < Agent.MIN_SAMPLE_INTERVAL_MS) return;
+    this.tokenHistory.push({ timestamp: now, used });
+    this.pruneTokenHistory();
+  }
+
+  private pruneTokenHistory(): void {
+    const cutoff = Date.now() - Agent.MAX_WINDOW_AGE_MS;
+    while (this.tokenHistory.length > 0 && this.tokenHistory[0].timestamp < cutoff) {
+      this.tokenHistory.shift();
+    }
+  }
+
+  /** Tokens per second burn rate based on the sliding window */
+  get contextBurnRate(): number {
+    this.pruneTokenHistory();
+    if (this.tokenHistory.length < Agent.MIN_POINTS_FOR_PREDICTION) return 0;
+    const first = this.tokenHistory[0];
+    const last = this.tokenHistory[this.tokenHistory.length - 1];
+    const dtMs = last.timestamp - first.timestamp;
+    if (dtMs < Agent.MIN_SPAN_MS) return 0;
+    const tokensConsumed = last.used - first.used;
+    if (tokensConsumed <= 0) return 0;
+    return tokensConsumed / (dtMs / 1000);
+  }
+
+  /** Estimated minutes until context window is exhausted, or null if unknown */
+  get estimatedExhaustionMinutes(): number | null {
+    if (this.contextBurnRate <= 0 || this.contextWindowSize <= 0) return null;
+    const remaining = this.contextWindowSize - this.contextWindowUsed;
+    if (remaining <= 0) return 0;
+    return remaining / this.contextBurnRate / 60;
+  }
+
+  /** Estimate tokens from content length when ACP doesn't provide usage events (~4 chars/token) */
+  estimateTokensFromContent(text: string): void {
+    if (this.hasRealUsageData) return;
+    const estimated = Math.ceil(text.length / 4);
+    this.estimatedOutputTokens += estimated;
+    this.outputTokens = this.estimatedOutputTokens;
+  }
+
   toJSON(): AgentJSON {
     return {
       id: this.id,
@@ -564,6 +649,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       outputTokens: this.outputTokens,
       contextWindowSize: this.contextWindowSize,
       contextWindowUsed: this.contextWindowUsed,
+      contextBurnRate: this.contextBurnRate,
+      estimatedExhaustionMinutes: this.estimatedExhaustionMinutes,
       pendingMessages: this.pendingMessageCount,
       isSubLead: this.role.id === 'lead' && !!this.parentId,
       hierarchyLevel: this.hierarchyLevel,

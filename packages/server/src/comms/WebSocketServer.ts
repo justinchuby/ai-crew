@@ -3,7 +3,7 @@ import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
-import type { DecisionLog } from '../coordination/DecisionLog.js';
+import type { DecisionLog, Decision } from '../coordination/DecisionLog.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
@@ -22,6 +22,14 @@ export class WebSocketServer {
   private eventCleanups: Array<() => void> = [];
   private agentManager: AgentManager;
   private lockRegistry: FileLockRegistry;
+  private decisionLog: DecisionLog;
+  private statusThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private statusPending = new Map<string, any>();
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  // agent:text batching — buffer per agent, flush every 100ms
+  private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
+  private textFlushTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly TEXT_FLUSH_MS = 100;
 
   constructor(
     server: HttpServer,
@@ -34,6 +42,7 @@ export class WebSocketServer {
     this.wss = new WsServer({ server, path: '/ws' });
     this.agentManager = agentManager;
     this.lockRegistry = lockRegistry;
+    this.decisionLog = decisionLog;
 
     // Prevent unhandled 'error' events from crashing the process.
     // EADDRINUSE is handled by listenWithRetry in index.ts (auto-port-finding);
@@ -99,6 +108,17 @@ export class WebSocketServer {
     this.wireCoordinationEvents(lockRegistry, activityLedger);
     this.wireDecisionEvents(decisionLog);
     this.wireGroupEvents(chatGroupRegistry);
+
+    // Ping/pong heartbeat every 30s to detect dead connections
+    this.heartbeatTimer = setInterval(() => {
+      for (const [id, client] of this.clients) {
+        if (client.ws.readyState === WebSocket.OPEN) {
+          client.ws.ping();
+        } else {
+          this.clients.delete(id);
+        }
+      }
+    }, 30_000);
   }
 
   /** Track an event listener so close() can remove it */
@@ -123,8 +143,21 @@ export class WebSocketServer {
     });
 
     this.track(agentManager, 'agent:status', (data: any) => {
-      const projectId = this.resolveAgentProjectId(data.agentId);
-      this.broadcastToProject({ type: 'agent:status', ...data }, projectId);
+      const agentId = data.agentId;
+      const projectId = this.resolveAgentProjectId(agentId);
+      // Throttle: buffer latest status per agent, flush every 500ms
+      this.statusPending.set(agentId, { type: 'agent:status', ...data, _projectId: projectId });
+      if (!this.statusThrottleTimers.has(agentId)) {
+        this.statusThrottleTimers.set(agentId, setTimeout(() => {
+          this.statusThrottleTimers.delete(agentId);
+          const pending = this.statusPending.get(agentId);
+          if (pending) {
+            this.statusPending.delete(agentId);
+            const { _projectId, ...msg } = pending;
+            this.broadcastToProject(msg, _projectId);
+          }
+        }, 500));
+      }
     });
 
     this.track(agentManager, 'agent:crashed', (data: any) => {
@@ -160,12 +193,16 @@ export class WebSocketServer {
     // Do NOT remove the '*' wildcard support — it is intentional for UI monitoring.
     this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       const projectId = this.resolveAgentProjectId(agentId);
-      this.broadcast(
-        { type: 'agent:text', agentId, text },
-        (c) =>
-          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
-          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
-      );
+      // Buffer text and flush in batches per TEXT_FLUSH_MS
+      const buf = this.textBuffer.get(agentId);
+      if (buf) {
+        buf.texts.push(text);
+      } else {
+        this.textBuffer.set(agentId, { texts: [text], projectId });
+      }
+      if (!this.textFlushTimer) {
+        this.textFlushTimer = setInterval(() => this.flushTextBuffer(), WebSocketServer.TEXT_FLUSH_MS);
+      }
     });
 
     this.track(agentManager, 'agent:content', (data: any) => {
@@ -266,6 +303,27 @@ export class WebSocketServer {
       const projectId = decision.projectId ?? this.resolveAgentProjectId(decision.agentId);
       this.broadcastToProject({ type: 'decision:rejected', decision }, projectId);
     });
+
+    this.track(decisionLog, 'decisions:batch_confirmed', (decisions: Decision[]) => {
+      if (decisions.length === 0) return;
+      const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
+      this.broadcastToProject({ type: 'decisions:batch', action: 'confirm', decisions }, projectId);
+    });
+
+    this.track(decisionLog, 'decisions:batch_rejected', (decisions: Decision[]) => {
+      if (decisions.length === 0) return;
+      const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
+      this.broadcastToProject({ type: 'decisions:batch', action: 'reject', decisions }, projectId);
+    });
+
+    this.track(decisionLog, 'intent:alert', (data: any) => {
+      const projectId = data.decision.projectId ?? this.resolveAgentProjectId(data.decision.agentId);
+      this.broadcastToProject({
+        type: 'intent:alert',
+        decision: data.decision,
+        rule: { pattern: data.rule.pattern, action: data.rule.action, label: data.rule.label },
+      }, projectId);
+    });
   }
 
   private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
@@ -342,7 +400,7 @@ export class WebSocketServer {
           const agent = this.agentManager.get(msg.agentId);
           if (agent) {
             logger.info('ws', `Input → ${agent.role.name} (${msg.agentId.slice(0, 8)}): "${(msg.text || '').slice(0, 80)}"`);
-            agent.write(msg.text);
+            agent.write(msg.text, { priority: true });
           } else {
             logger.warn('ws', `Input for unknown agent ${msg.agentId.slice(0, 8)}`);
           }
@@ -357,6 +415,16 @@ export class WebSocketServer {
         if (msg.agentId) {
           this.agentManager.resolvePermission(msg.agentId, msg.approved);
         }
+        break;
+
+      case 'queue_open':
+        // User opened the approval queue — pause auto-approve timers
+        this.decisionLog.pauseTimers();
+        break;
+
+      case 'queue_closed':
+        // User closed the approval queue — resume auto-approve timers
+        this.decisionLog.resumeTimers();
         break;
     }
   }
@@ -396,12 +464,51 @@ export class WebSocketServer {
     this.broadcastToProject(msg, projectId);
   }
 
+  /** Flush buffered agent:text events — coalesces rapid text chunks into single WS messages */
+  private flushTextBuffer(): void {
+    if (this.textBuffer.size === 0) {
+      if (this.textFlushTimer) {
+        clearInterval(this.textFlushTimer);
+        this.textFlushTimer = null;
+      }
+      return;
+    }
+    for (const [agentId, { texts, projectId }] of this.textBuffer) {
+      const merged = texts.join('');
+      this.broadcast(
+        { type: 'agent:text', agentId, text: merged },
+        (c) =>
+          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
+          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
+      );
+    }
+    this.textBuffer.clear();
+  }
+
   /** Remove all event listeners and close the WebSocket server */
   close(): void {
     for (const cleanup of this.eventCleanups) {
       cleanup();
     }
     this.eventCleanups.length = 0;
+
+    // Clean up throttle timers
+    for (const timer of this.statusThrottleTimers.values()) clearTimeout(timer);
+    this.statusThrottleTimers.clear();
+    this.statusPending.clear();
+
+    // Clean up text buffer
+    if (this.textFlushTimer) {
+      clearInterval(this.textFlushTimer);
+      this.textFlushTimer = null;
+    }
+    this.textBuffer.clear();
+
+    // Clean up heartbeat
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
 
     for (const client of this.clients.values()) {
       try { client.ws.close(1001, 'Server shutting down'); } catch { /* already closed */ }

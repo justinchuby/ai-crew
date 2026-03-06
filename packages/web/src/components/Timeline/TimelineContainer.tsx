@@ -212,9 +212,11 @@ interface TimelineContainerProps {
   liveMode?: boolean;
   onLiveModeChange?: (live: boolean) => void;
   lastSeenTimestamp?: Date;
+  /** Replay progress as fraction 0-1 for auto-panning. Undefined = no auto-pan. */
+  replayProgress?: number;
 }
 
-function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps & { width: number }) {
+function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp, replayProgress }: TimelineContainerProps & { width: number }) {
   // Persisted view state from Zustand store
   const selectedLeadId = useTimelineStore((s) => s.selectedLeadId);
   const expandedAgents = useTimelineStore((s) => s.expandedAgents[selectedLeadId ?? ''] ?? EMPTY_EXPANDED);
@@ -284,6 +286,14 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   // Keep the start anchored and only extend the end.
   const stableRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
+  // Reset range refs when project changes
+  useEffect(() => {
+    stableRangeRef.current = null;
+    userZoomedRef.current = false;
+  }, [selectedLeadId]);
+
+  const userZoomedRef = useRef(false);
+
   const fullRange = useMemo(() => {
     const newStart = new Date(data.timeRange.start);
     const newEnd = new Date(data.timeRange.end);
@@ -295,21 +305,113 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       return range;
     }
 
-    if (!liveMode) {
-      // When live mode is OFF, freeze the range completely
-      return prev;
-    }
-
-    // In live mode: keep earliest start, extend end only
+    // In both live and replay: keep earliest start, extend end
     const stableStart = newStart < prev.start ? newStart : prev.start;
     const stableEnd = newEnd > prev.end ? newEnd : prev.end;
     const range = { start: stableStart, end: stableEnd };
     stableRangeRef.current = range;
     return range;
-  }, [data.timeRange, liveMode]);
+  }, [data.timeRange]);
 
-  // Always show the full range — no zoom/pan
-  const visibleRange = fullRange;
+  // ── Zoom state ────────────────────────────────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = full range, higher = zoomed in
+  const [panOffset, setPanOffset] = useState(0); // 0-1, fraction of total range
+
+  const visibleRange = useMemo(() => {
+    if (zoomLevel <= 1) return fullRange;
+    const totalMs = fullRange.end.getTime() - fullRange.start.getTime();
+    const visibleMs = totalMs / zoomLevel;
+    const maxOffset = totalMs - visibleMs;
+    const offsetMs = maxOffset * panOffset;
+    return {
+      start: new Date(fullRange.start.getTime() + offsetMs),
+      end: new Date(fullRange.start.getTime() + offsetMs + visibleMs),
+    };
+  }, [fullRange, zoomLevel, panOffset]);
+
+  // Human-readable time window label (e.g., '2h', '15m', '30s')
+  const zoomWindowLabel = useMemo(() => {
+    const ms = visibleRange.end.getTime() - visibleRange.start.getTime();
+    if (ms >= 3_600_000) return `${(ms / 3_600_000).toFixed(ms >= 7_200_000 ? 0 : 1)}h`;
+    if (ms >= 60_000) return `${Math.round(ms / 60_000)}m`;
+    return `${Math.round(ms / 1000)}s`;
+  }, [visibleRange]);
+
+  // Auto-pan during replay: fixed ~5min window that follows replay progress
+  useEffect(() => {
+    if (replayProgress === undefined || liveMode) {
+      // Reset when leaving replay
+      if (userZoomedRef.current) userZoomedRef.current = false;
+      return;
+    }
+    // Don't auto-pan if user has manually zoomed
+    if (userZoomedRef.current) return;
+
+    const totalMs = fullRange.end.getTime() - fullRange.start.getTime();
+    if (totalMs <= 0) return;
+
+    // Target window: 5 minutes or 20% of session, whichever is larger
+    const targetWindowMs = Math.max(5 * 60_000, totalMs * 0.2);
+    const targetZoom = Math.max(1, totalMs / targetWindowMs);
+
+    setZoomLevel(targetZoom);
+    if (targetZoom > 1) {
+      // Pan so current replay position is at ~70% of visible window (leading space)
+      const visibleFraction = 1 / targetZoom;
+      const targetPan = Math.max(0, Math.min(1,
+        (replayProgress - visibleFraction * 0.7) / (1 - visibleFraction)
+      ));
+      setPanOffset(targetPan);
+    } else {
+      setPanOffset(0);
+    }
+  }, [replayProgress, fullRange, liveMode]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Ctrl+wheel or pinch = zoom (time axis)
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      userZoomedRef.current = true;
+      setZoomLevel((prev) => {
+        const next = e.deltaY < 0 ? prev * 1.15 : prev / 1.15;
+        return Math.max(1, Math.min(50, next));
+      });
+      return;
+    }
+
+    // Horizontal pan: Shift+wheel or trackpad horizontal gesture (deltaX)
+    if (zoomLevel > 1) {
+      const horizontalDelta = e.shiftKey ? e.deltaY : e.deltaX;
+      if (horizontalDelta !== 0) {
+        e.preventDefault();
+        userZoomedRef.current = true;
+        setPanOffset((prev) => Math.max(0, Math.min(1, prev + horizontalDelta * 0.002)));
+        return;
+      }
+    }
+
+    // Plain vertical scroll: let browser handle natively (no preventDefault)
+  }, [zoomLevel]);
+
+  // ── Drag-to-pan ──────────────────────────────────────────────────
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartOffsetRef = useRef(0);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(50, prev * 1.5));
+  }, []);
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => {
+      const next = prev / 1.5;
+      if (next <= 1.05) { setPanOffset(0); return 1; }
+      return next;
+    });
+  }, []);
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1);
+    setPanOffset(0);
+  }, []);
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
@@ -322,7 +424,37 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     return sortDirection === 'newest-first' ? sorted.reverse() : sorted;
   }, [data.agents, sortDirection]);
 
-  const chartWidth = Math.max(containerWidth - LABEL_WIDTH, 400);
+  // Minimum chart width: ensure time segments stay readable.
+  // Scale with agent count — more agents produce more events needing horizontal space.
+  const MIN_CHART_WIDTH = Math.max(600, sortedAgents.length * 80);
+  const chartWidth = Math.max(containerWidth - LABEL_WIDTH, MIN_CHART_WIDTH);
+
+  // Drag handlers must be after chartWidth for correct closure
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (zoomLevel <= 1) return;
+    if (e.button !== 0) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = e.clientX;
+    dragStartOffsetRef.current = panOffset;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  }, [zoomLevel, panOffset]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    const dx = dragStartXRef.current - e.clientX;
+    // Convert pixel delta to panOffset delta (0-1 range)
+    const totalMs = fullRange.end.getTime() - fullRange.start.getTime();
+    const visibleMs = totalMs / zoomLevel;
+    const maxOffsetMs = totalMs - visibleMs;
+    const msPerPx = visibleMs / chartWidth;
+    const offsetDelta = (dx * msPerPx) / maxOffsetMs;
+    setPanOffset(Math.max(0, Math.min(1, dragStartOffsetRef.current + offsetDelta)));
+  }, [chartWidth, zoomLevel, fullRange]);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
 
   // Lane heights and Y positions
   const laneLayout = useMemo(() => {
@@ -457,6 +589,29 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           {sortedAgents.length} agents · {data.communications.length} communications
         </span>
         <div className="flex items-center gap-2">
+          {zoomLevel > 1 && (
+            <button
+              className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+              onClick={handleZoomReset}
+              aria-label="Reset zoom"
+              title="Reset zoom to full view"
+            >⊞ Fit</button>
+          )}
+          <button
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            aria-label="Zoom out"
+            title="Zoom out (Ctrl+scroll down)"
+          >−</button>
+          <span className="text-[10px] text-th-text-muted font-mono w-14 text-center" title={`${zoomLevel.toFixed(1)}× zoom`}>{zoomLevel > 1 ? zoomWindowLabel : 'Full'}</span>
+          <button
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 50}
+            aria-label="Zoom in"
+            title="Zoom in (Ctrl+scroll up)"
+          >+</button>
           <button
             className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={() => setSortDirection(sortDirection === 'oldest-first' ? 'newest-first' : 'oldest-first')}
@@ -492,9 +647,14 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         {/* Scrollable timeline */}
         <div
           ref={timelineRef}
-          className="flex-1 overflow-auto"
-          style={{ position: 'relative' }}
+          className={`flex-1 overflow-auto${zoomLevel > 1 ? ' cursor-grab active:cursor-grabbing' : ''}`}
+          style={{ position: 'relative', touchAction: zoomLevel > 1 ? 'none' : 'auto' }}
           onScroll={() => { syncScroll('timeline'); hideTooltip(); }}
+          onWheel={handleWheel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         >
           <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`}>
             {/* Idle hatch pattern */}
@@ -616,11 +776,11 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   );
 }
 
-export function TimelineContainer({ data, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps) {
+export function TimelineContainer({ data, liveMode, onLiveModeChange, lastSeenTimestamp, replayProgress }: TimelineContainerProps) {
   return (
     <div className="bg-th-bg rounded-lg border border-th-border-muted min-h-[300px] flex flex-col flex-1 min-h-0">
       <ParentSize>
-        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} lastSeenTimestamp={lastSeenTimestamp} /> : null}
+        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} lastSeenTimestamp={lastSeenTimestamp} replayProgress={replayProgress} /> : null}
       </ParentSize>
     </div>
   );

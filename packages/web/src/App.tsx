@@ -5,36 +5,60 @@ import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
 import { CommandPalette } from './components/CommandPalette/CommandPalette';
-import { AgentDashboard } from './components/AgentDashboard/AgentDashboard';
+import { ContextualCoach } from './components/Onboarding';
+import { BottomTabBar } from './components/Layout/BottomTabBar';
+import { MobilePulse } from './components/Mobile';
+import { InstallPrompt } from './components/Mobile';
+import { OfflineBanner } from './components/Mobile';
 
-import { TaskQueuePanel } from './components/TaskQueue/TaskQueuePanel';
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
-import { SettingsPanel } from './components/Settings/SettingsPanel';
-import { DataBrowser } from './components/DataBrowser/DataBrowser';
 import { LeadDashboard } from './components/LeadDashboard';
-import { OrgChart } from './components/OrgChart/OrgChart';
-import { OverviewPage } from './components/OverviewPage/OverviewPage';
-import { GroupChat } from './components/GroupChat/GroupChat';
-import { TimelinePage } from './components/Timeline';
-import { MissionControlPage } from './components/MissionControl';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionBadge } from './components/VersionBadge';
+import { PulseStrip } from './components/Pulse';
+import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
+import { CatchUpBanner } from './components/CatchUp';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
 
+// Lazy-loaded route components (~40-50% initial bundle reduction)
+const AgentDashboard = lazy(() => import('./components/AgentDashboard/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
+const TaskQueuePanel = lazy(() => import('./components/TaskQueue/TaskQueuePanel').then(m => ({ default: m.TaskQueuePanel })));
+const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const DataBrowser = lazy(() => import('./components/DataBrowser/DataBrowser').then(m => ({ default: m.DataBrowser })));
+const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => ({ default: m.OrgChart })));
+const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
+const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
+const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
+const MissionControlPage = lazy(() => import('./components/MissionControl').then(m => ({ default: m.MissionControlPage })));
+const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
+const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
+const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
+
+function RouteSpinner() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
-  const { connected, agents, selectedAgentId, systemPaused } = useAppStore();
+  const connected = useAppStore((s) => s.connected);
+  const agents = useAppStore((s) => s.agents);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
+  const systemPaused = useAppStore((s) => s.systemPaused);
   const setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);
@@ -61,6 +85,19 @@ export function App() {
   const { shouldShow } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(shouldShow);
 
+  // Shift+A global shortcut to open approval queue
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'A' && e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        useAppStore.getState().setApprovalQueueOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
   useEffect(() => {
     const handler = (event: Event) => {
@@ -83,6 +120,9 @@ export function App() {
         } else if (e?.action === 'limit_change_requested') {
           addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
         }
+      } else if (msg.type === 'intent:alert') {
+        const label = msg.rule?.label || msg.decision?.title || 'Intent alert triggered';
+        addToast('info', `⚠️ Alert: ${label}`);
       }
     };
     window.addEventListener('ws-message', handler);
@@ -158,11 +198,21 @@ export function App() {
 
   return (
     <div className="flex h-screen bg-surface text-th-text-alt">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm">
+        Skip to content
+      </a>
       <Sidebar />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
             <div className="flex items-center gap-2">
+              {/* Flightdeck logo */}
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                <path d="M16 3C13 7 11 12 10.5 17L14 19.5V25L16 22L18 25V19.5L21.5 17C21 12 19 7 16 3Z" fill="currentColor" className="text-accent" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
+                <ellipse cx="16" cy="13" rx="2.2" ry="2.5" fill="currentColor" className="text-th-bg opacity-80"/>
+                <path d="M10.5 17L8 21L11.5 19Z" fill="currentColor" className="text-accent opacity-60"/>
+                <path d="M21.5 17L24 21L20.5 19Z" fill="currentColor" className="text-accent opacity-60"/>
+              </svg>
               <h1 className="text-lg font-semibold">Flightdeck</h1>
               <VersionBadge />
             </div>
@@ -179,7 +229,9 @@ export function App() {
                 {systemPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                 <span>{systemPaused ? 'Resume' : 'Pause'}</span>
               </button>
+              <span data-tour="approval-badge"><ApprovalBadge /></span>
               <button
+                data-tour="cmd-k"
                 onClick={openCmd}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
               >
@@ -197,7 +249,12 @@ export function App() {
             </div>
           </header>
 
+          <div data-tour="pulse-strip"><PulseStrip /></div>
+          <MobilePulse />
+
+          <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary>
+          <Suspense fallback={<RouteSpinner />}>
           <Routes>
             <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
             <Route path="/lead" element={<Navigate to="/" replace />} />
@@ -210,9 +267,14 @@ export function App() {
             <Route path="/data" element={<DataBrowser />} />
             <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
             <Route path="/mission-control" element={<MissionControlPage />} />
+            <Route path="/canvas" element={<CanvasPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/shared/:token" element={<SharedReplayViewer />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           </ErrorBoundary>
+          </main>
         </div>
 
         {selectedAgentId && (
@@ -223,9 +285,15 @@ export function App() {
       </div>
       <ToastContainer />
       <PermissionDialog />
+      <ApprovalSlideOver />
+      <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
+      <BottomTabBar />
+      <InstallPrompt />
+      <OfflineBanner />
     </div>
   );
 }

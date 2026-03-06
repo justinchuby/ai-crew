@@ -9,6 +9,7 @@ import { FileLockPanel } from './FileLockPanel';
 import { CommHeatmap } from './CommHeatmap';
 import type { HeatmapMessage } from './CommHeatmap';
 import type { AgentInfo } from '../../types';
+import { ProjectTabs } from '../ProjectTabs';
 
 interface CoordinationStatus {
   locks: FileLock[];
@@ -40,11 +41,27 @@ interface Props {
 }
 
 export function FleetOverview({ api, ws }: Props) {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [selectedLeadFilter, setSelectedLeadFilter] = useState<string | null>(null);
+
+  // Identify lead agents for project-level filtering
+  const leads = useMemo(
+    () => agents.filter((a) => a.role?.id === 'lead' && !a.parentId),
+    [agents],
+  );
+
+  // Auto-select first lead if none selected
+  const effectiveLeadId = selectedLeadFilter ?? (leads.length > 0 ? leads[0].id : null);
+
+  // Filter agents by selected project (lead + their children)
+  const projectAgents = useMemo(() => {
+    if (!effectiveLeadId || leads.length <= 1) return agents;
+    return agents.filter((a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId);
+  }, [agents, effectiveLeadId, leads.length]);
 
   const fetchCoordination = useCallback(async () => {
     try {
@@ -85,8 +102,8 @@ export function FleetOverview({ api, ws }: Props) {
   }, [fetchCoordination]);
 
   const filteredAgents: AgentInfo[] = selectedAgentFilter
-    ? agents.filter((a) => a.id === selectedAgentFilter)
-    : agents;
+    ? projectAgents.filter((a) => a.id === selectedAgentFilter)
+    : projectAgents;
 
   const filteredActivity = selectedAgentFilter
     ? activity.filter((a) => a.agentId === selectedAgentFilter)
@@ -105,12 +122,12 @@ export function FleetOverview({ api, ws }: Props) {
 
   const heatmapAgents = useMemo(
     () =>
-      agents.map((a) => ({
+      projectAgents.map((a) => ({
         id:   a.id,
         role: a.role.id,
         name: `${a.role.icon}${a.id.slice(0, 5)}`,
       })),
-    [agents],
+    [projectAgents],
   );
 
   const heatmapMessages: HeatmapMessage[] = useMemo(() => {
@@ -145,9 +162,16 @@ export function FleetOverview({ api, ws }: Props) {
 
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
+      {/* Project selection tabs (only when multiple leads exist) */}
+      {leads.length > 1 && (
+        <div className="border-b border-th-border">
+          <ProjectTabs activeId={effectiveLeadId} onChange={setSelectedLeadFilter} />
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Fleet Overview</h2>
-        {agents.length > 0 && (
+        {projectAgents.length > 0 && (
           <div className="flex items-center gap-2">
             <label className="text-xs text-th-text-muted">Filter:</label>
             <select
@@ -156,7 +180,7 @@ export function FleetOverview({ api, ws }: Props) {
               className="bg-surface-raised border border-th-border rounded px-2 py-1 text-xs text-th-text-alt"
             >
               <option value="">All agents</option>
-              {agents.map((a) => (
+              {projectAgents.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.role.icon} {a.role.name} ({a.id.slice(0, 8)})
                 </option>
@@ -166,12 +190,12 @@ export function FleetOverview({ api, ws }: Props) {
         )}
       </div>
 
-      <FleetStats agents={agents} locks={locks} />
+      <FleetStats agents={projectAgents} locks={locks} />
 
       <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} />
 
       {/* ── Communication Heatmap ── */}
-      {agents.length >= 2 && (
+      {projectAgents.length >= 2 && (
         <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
           <button
             className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-th-text hover:bg-th-bg-muted/30 transition-colors"
@@ -195,8 +219,8 @@ export function FleetOverview({ api, ws }: Props) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ActivityFeed activity={filteredActivity} agents={agents} />
-        <FileLockPanel locks={filteredLocks} agents={agents} />
+        <ActivityFeed activity={filteredActivity} agents={projectAgents} />
+        <FileLockPanel locks={filteredLocks} agents={projectAgents} />
       </div>
     </div>
   );

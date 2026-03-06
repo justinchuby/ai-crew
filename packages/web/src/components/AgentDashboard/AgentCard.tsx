@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { RefreshCw, Square, Terminal, Hand, Check, Play } from 'lucide-react';
+import { RefreshCw, Square, Terminal, Zap, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { DiffBadge } from '../DiffPreview';
 
 interface Props {
   agent: AgentInfo;
@@ -25,7 +26,8 @@ const AVAILABLE_MODELS = [
 ];
 
 export function AgentCard({ agent, api }: Props) {
-  const { setSelectedAgent, selectedAgentId } = useAppStore();
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const isSelected = selectedAgentId === agent.id;
   const [confirmKill, setConfirmKill] = useState(false);
 
@@ -42,7 +44,7 @@ export function AgentCard({ agent, api }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-lg">{agent.role.icon}</span>
           <div>
-            <h3 className="text-sm font-medium">{agent.role.name}</h3>
+            <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({agent.id.slice(0, 8)})</span></h3>
             <span className={`text-xs ${agentStatusText(agent.status)}`}>
               {agent.status}
             </span>
@@ -90,9 +92,9 @@ export function AgentCard({ agent, api }: Props) {
                 api.interruptAgent(agent.id);
               }}
               className="p-1 text-th-text-muted hover:text-orange-400"
-              title="Interrupt — cancel current work"
+              title="Interrupt agent"
             >
-              <Hand size={14} />
+              <Zap size={14} />
             </button>
           )}
           {(agent.status === 'running' || agent.status === 'idle') && (
@@ -209,6 +211,9 @@ export function AgentCard({ agent, api }: Props) {
             <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">
               autopilot
             </span>
+          )}
+          {(agent.status === 'running' || agent.status === 'idle') && (
+            <DiffBadge agentId={agent.id} />
           )}
         </div>
         <AgentIdBadge id={agent.id} />

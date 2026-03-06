@@ -1,0 +1,180 @@
+/* ── Motion System ─────────────────────────────────────────────────────
+ * Unified animation tokens for Flightdeck.
+ * Three tiers: micro (direct feedback), standard (view transitions),
+ * dramatic (moments of delight).
+ *
+ * Usage:
+ *   transition: opacity var(--motion-standard) var(--ease-default);
+ *   animation: fade-in var(--motion-standard) var(--ease-enter);
+ * ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Durations ──────────────────────────────────────────────────── */
+  --motion-micro: 120ms;
+  --motion-standard: 250ms;
+  --motion-dramatic: 450ms;
+
+  /* ── Easings ────────────────────────────────────────────────────── */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);   /* Material standard */
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);         /* Decelerate — entering */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);          /* Accelerate — leaving */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);     /* Overshoot — playful */
+
+  /* ── Stagger ────────────────────────────────────────────────────── */
+  --stagger-delay: 40ms;
+}
+
+/* ── Reduced Motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-micro: 0ms;
+    --motion-standard: 0ms;
+    --motion-dramatic: 0ms;
+  }
+}
+
+/* ── Keyframes ────────────────────────────────────────────────────── */
+
+/* Fade in — universal entry */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Fade out — universal exit */
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Slide in from left (entering content) */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Slide in from right (slide-overs, panels) */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Slide up from below (toasts, bottom sheets) */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide down from above (dropdowns, notifications) */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Scale in — canvas nodes, dramatic entrances */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Scale in with spring — playful node spawn */
+@keyframes scale-in-spring {
+  0%   { opacity: 0; transform: scale(0); }
+  60%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Subtle pulse — status indicators */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+/* Border pulse — attention-drawing ring */
+@keyframes pulse-border {
+  0%, 100% { border-color: rgba(99, 102, 241, 0.4); }
+  50%      { border-color: rgba(99, 102, 241, 0.7); }
+}
+
+/* Glow pulse — canvas node active state */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  50%      { box-shadow: 0 0 8px 2px rgba(99, 102, 241, 0.3); }
+}
+
+/* Stroke draw — edge/line appears by drawing itself */
+@keyframes stroke-draw {
+  from { stroke-dashoffset: 100%; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ── Utility Classes ──────────────────────────────────────────────── */
+
+/* Entry animations */
+.motion-fade-in {
+  animation: fade-in var(--motion-standard) var(--ease-enter);
+}
+
+.motion-slide-in {
+  animation: slide-in var(--motion-standard) var(--ease-enter);
+}
+
+.motion-slide-in-right {
+  animation: slide-in-right var(--motion-standard) var(--ease-enter);
+}
+
+.motion-slide-up {
+  animation: slide-up var(--motion-standard) var(--ease-enter);
+}
+
+.motion-slide-down {
+  animation: slide-down var(--motion-standard) var(--ease-enter);
+}
+
+.motion-scale-in {
+  animation: scale-in var(--motion-standard) var(--ease-enter);
+}
+
+.motion-scale-in-spring {
+  animation: scale-in-spring var(--motion-dramatic) var(--ease-spring);
+}
+
+/* Looping animations */
+.motion-pulse {
+  animation: pulse-subtle 2s var(--ease-default) infinite;
+}
+
+.motion-pulse-border {
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+.motion-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Exit animations (faster — micro tier) */
+.motion-fade-out {
+  animation: fade-out var(--motion-micro) var(--ease-exit);
+}
+
+/* Stagger helper — set --stagger-index via style or JS */
+.motion-stagger {
+  animation-delay: calc(var(--stagger-index, 0) * var(--stagger-delay));
+  animation-fill-mode: backwards;
+}
+
+/* Transition presets */
+.transition-micro {
+  transition-duration: var(--motion-micro);
+  transition-timing-function: var(--ease-default);
+}
+
+.transition-standard {
+  transition-duration: var(--motion-standard);
+  transition-timing-function: var(--ease-default);
+}
+
+.transition-dramatic {
+  transition-duration: var(--motion-dramatic);
+  transition-timing-function: var(--ease-spring);
+}

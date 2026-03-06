@@ -1,5 +1,41 @@
 @import "tailwindcss";
+@import "./styles/motion.css";
+@import "./styles/chart-theme.css";
 @config "../tailwind.config.js";
+
+/* ── Font: JetBrains Mono for monospace ─────────────────────────────── */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.font-mono {
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-variant-ligatures: common-ligatures contextual;
+}
 
 /* ── Theme custom properties ──────────────────────────────────────────── */
 
@@ -147,39 +183,17 @@ body {
   padding: 4px;
 }
 
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+/* ── Animation Utility Classes ─────────────────────────────────────────
+ * These map legacy class names to the unified motion system (motion.css).
+ * Keyframes are defined in styles/motion.css.
+ * ──────────────────────────────────────────────────────────────────── */
 
 .animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+  animation: slide-in var(--motion-standard) var(--ease-enter);
 }
 
-@keyframes pulse-border {
-  0%, 100% {
-    border-color: rgb(234 179 8 / 0.4);
-    background-color: rgb(113 63 18 / 0.2);
-  }
-  50% {
-    border-color: rgb(234 179 8 / 0.7);
-    background-color: rgb(113 63 18 / 0.35);
-  }
-}
-
-@keyframes pulse-slow {
-  0%, 100% {
-    border-color: rgb(234 179 8 / 0.5);
-  }
-  50% {
-    border-color: rgb(234 179 8 / 0.8);
-  }
+.animate-slide-in-right {
+  animation: slide-in-right var(--motion-standard) var(--ease-enter);
 }
 
 .animate-pulse-border {
@@ -187,7 +201,11 @@ body {
 }
 
 .animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up var(--motion-standard) var(--ease-enter);
 }
 
 /* ── Liquid Glass Toast (Apple-style glassmorphism) ───────────────────── */

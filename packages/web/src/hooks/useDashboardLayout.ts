@@ -22,6 +22,11 @@ export const DEFAULT_PANELS: PanelConfig[] = [
   { id: 'costs',      label: 'Cost Breakdown',   visible: false, order: 7 },
   { id: 'timers',     label: 'Agent Timers',     visible: false, order: 8 },
   { id: 'scorecards', label: 'Performance',      visible: false, order: 9 },
+  { id: 'commflow',   label: 'Comm Flow Graph',  visible: true,  order: 10 },
+  { id: 'diff',       label: 'Live Diffs',        visible: true,  order: 11 },
+  { id: 'debates',    label: 'Debates',           visible: true,  order: 12 },
+  { id: 'handoffs',   label: 'Handoff History',   visible: true,  order: 13 },
+  { id: 'github',      label: 'Pull Requests',    visible: true,  order: 14 },
 ];
 
 const STORAGE_KEY = 'dashboard-layout';
@@ -34,9 +39,10 @@ export function useDashboardLayout() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PanelConfig[];
-        // Merge with defaults to pick up any new panels added since last save
+        // Merge with defaults: add new panels, strip removed ones
+        const defaultIds = new Set(DEFAULT_PANELS.map((p) => p.id));
         const savedIds = new Set(parsed.map((p) => p.id));
-        const merged = [...parsed];
+        const merged = parsed.filter((p) => defaultIds.has(p.id));
         for (const def of DEFAULT_PANELS) {
           if (!savedIds.has(def.id)) merged.push(def);
         }

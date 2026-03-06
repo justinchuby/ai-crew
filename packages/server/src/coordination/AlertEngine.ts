@@ -10,6 +10,19 @@ import { logger } from '../utils/logger.js';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
+export interface AlertAction {
+  label: string;
+  description: string;
+  /** 'api_call' triggers a fetch; 'dismiss' is handled client-side only */
+  actionType: 'api_call' | 'dismiss';
+  /** Must start with '/api/' for api_call actions. Empty for dismiss. */
+  endpoint: string;
+  method: 'POST' | 'DELETE';
+  body?: Record<string, unknown>;
+  /** 0-100 display priority — higher means stronger recommendation. Frontend sorts descending. */
+  confidence?: number;
+}
+
 export interface Alert {
   id: number;
   type: string;
@@ -18,6 +31,7 @@ export interface Alert {
   timestamp: string;
   agentId?: string;
   projectId?: string;
+  actions?: AlertAction[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -26,7 +40,9 @@ const MAX_ALERTS = 100;
 const STUCK_AGENT_MS = 10 * 60 * 1000;       // 10 minutes
 const NEW_AGENT_GRACE_MS = 5 * 60 * 1000;   // 5 minutes grace for newly created agents
 const MAX_PROMPTING_MS = 30 * 60 * 1000;     // 30 minutes max before prompting is considered stuck
-const CONTEXT_PRESSURE_THRESHOLD = 0.85;       // 85%
+const CONTEXT_WARN_THRESHOLD = 0.70;            // 70% — first warning
+const CONTEXT_ALERT_THRESHOLD = 0.85;           // 85% — action needed
+const CONTEXT_CRITICAL_THRESHOLD = 0.95;        // 95% — imminent exhaustion
 const STALE_DECISION_MS = 10 * 60 * 1000;     // 10 minutes
 const CHECK_INTERVAL_MS = 60 * 1000;           // 1 minute
 
@@ -40,6 +56,7 @@ export class AlertEngine extends EventEmitter {
 
   // Track recent activity per agent to detect "stuck" state
   private lastActivityByAgent = new Map<string, number>();
+  private static readonly MAX_TRACKED_AGENTS = 500;
 
   constructor(
     private agentManager: AgentManager,
@@ -58,6 +75,15 @@ export class AlertEngine extends EventEmitter {
     // Subscribe to activity events to track last-activity timestamps
     this.boundActivityHandler = (entry: { agentId: string }) => {
       this.lastActivityByAgent.set(entry.agentId, Date.now());
+      // Evict oldest entries if map grows unbounded
+      if (this.lastActivityByAgent.size > AlertEngine.MAX_TRACKED_AGENTS) {
+        let oldestKey: string | null = null;
+        let oldestTime = Infinity;
+        for (const [key, time] of this.lastActivityByAgent) {
+          if (time < oldestTime) { oldestTime = time; oldestKey = key; }
+        }
+        if (oldestKey) this.lastActivityByAgent.delete(oldestKey);
+      }
     };
     this.activityLedger.on('activity', this.boundActivityHandler);
 
@@ -76,6 +102,7 @@ export class AlertEngine extends EventEmitter {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
     }
+    this.lastActivityByAgent.clear();
   }
 
   getAlerts(): Alert[] {
@@ -121,21 +148,56 @@ export class AlertEngine extends EventEmitter {
     }
   }
 
-  /** 2. Agent's context window usage > 85% */
+  /** 2. Agent's context window usage — tiered thresholds at 70/85/95% */
   private checkContextPressure(): void {
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running' && agent.status !== 'idle') continue;
       if (agent.contextWindowSize === 0) continue;
       const usage = agent.contextWindowUsed / agent.contextWindowSize;
-      if (usage > CONTEXT_PRESSURE_THRESHOLD) {
-        const pct = Math.round(usage * 100);
-        this.addAlert({
-          type: 'context_pressure',
-          severity: pct > 95 ? 'critical' : 'warning',
-          message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) context window at ${pct}% — quality may degrade`,
-          agentId: agent.id,
-        });
-      }
+      if (usage < CONTEXT_WARN_THRESHOLD) continue;
+
+      const pct = Math.round(usage * 100);
+      const exhaustionMin = agent.estimatedExhaustionMinutes;
+      const timeWarning = exhaustionMin != null ? ` (~${Math.round(exhaustionMin)} min remaining)` : '';
+
+      const severity: AlertSeverity = usage >= CONTEXT_CRITICAL_THRESHOLD ? 'critical'
+        : usage >= CONTEXT_ALERT_THRESHOLD ? 'warning'
+        : 'info';
+
+      const actions: AlertAction[] = [
+        {
+          label: 'Compact context',
+          description: 'Compress context to free space',
+          actionType: 'api_call',
+          endpoint: `/api/agents/${agent.id}/compact`,
+          method: 'POST',
+          confidence: usage >= CONTEXT_ALERT_THRESHOLD ? 90 : 60,
+        },
+        {
+          label: 'Restart agent',
+          description: 'Restart with full context handoff',
+          actionType: 'api_call',
+          endpoint: `/api/agents/${agent.id}/restart`,
+          method: 'POST',
+          confidence: usage >= CONTEXT_CRITICAL_THRESHOLD ? 95 : 50,
+        },
+        {
+          label: 'Dismiss',
+          description: 'Ignore this alert',
+          actionType: 'dismiss',
+          endpoint: '',
+          method: 'POST',
+          confidence: 10,
+        },
+      ];
+
+      this.addAlert({
+        type: 'context_pressure',
+        severity,
+        message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) context window at ${pct}%${timeWarning}${severity === 'critical' ? ' — imminent exhaustion' : severity === 'warning' ? ' — quality may degrade' : ' — approaching limit'}`,
+        agentId: agent.id,
+        actions,
+      });
     }
   }
 

@@ -12,6 +12,10 @@ import { AccessibilityAnnouncer } from './AccessibilityAnnouncer';
 import { useAccessibilityAnnouncements } from './useAccessibilityAnnouncements';
 import { useAppStore } from '../../stores/appStore';
 import { useTimelineStore } from '../../stores/timelineStore';
+import { ReplayScrubber } from '../SessionReplay';
+import { useSessionReplay } from '../../hooks/useSessionReplay';
+import { useProjects } from '../../hooks/useProjects';
+import { ProjectTabs } from '../ProjectTabs';
 import './timeline-a11y.css';
 
 interface Props {
@@ -117,36 +121,60 @@ export function TimelinePage({ api, ws }: Props) {
   const hiddenStatuses = useTimelineStore((s) => s.hiddenStatuses);
   const setHiddenStatuses = useTimelineStore((s) => s.setHiddenStatuses);
   const setCachedData = useTimelineStore((s) => s.setCachedData);
+
   const getCachedData = useTimelineStore((s) => s.getCachedData);
   const clearCachedData = useTimelineStore((s) => s.clearCachedData);
 
-  // Lead selection
+  // Lead selection — live agents and historical projects
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
+
+  // Fetch historical projects from shared hook
+  const { projects } = useProjects();
+
+  // Effective lead: live agents take priority, then project IDs
+  const effectiveLeadId = useMemo(() => {
+    if (selectedLead) return selectedLead;
+    if (leads.length > 0) return leads[0].id;
+    return projects.length > 0 ? projects[0].id : null;
+  }, [selectedLead, leads, projects]);
+
   // Auto-select first lead when agents arrive
   useEffect(() => {
     if (!selectedLead && leads.length > 0) {
       setSelectedLead(leads[0].id);
     }
   }, [leads, selectedLead, setSelectedLead]);
-  const { data: liveData, loading, error, refetch } = useTimelineData(selectedLead);
+
+  // Auto-switch to replay mode when no live agents (historical data only)
+  useEffect(() => {
+    if (leads.length === 0 && projects.length > 0 && liveMode) {
+      setLiveMode(false);
+    }
+  }, [leads.length, projects.length, liveMode, setLiveMode]);
+
+  const { data: liveData, loading, error, refetch } = useTimelineData(effectiveLeadId);
 
   // Cache data in store for persistence across tab switches
   useEffect(() => {
-    if (liveData && selectedLead) {
-      setCachedData(selectedLead, liveData);
+    if (liveData && effectiveLeadId) {
+      setCachedData(effectiveLeadId, liveData);
     }
-  }, [liveData, selectedLead, setCachedData]);
+  }, [liveData, effectiveLeadId, setCachedData]);
 
   // Use live data if available, fall back to cached data from store
-  const data = liveData ?? (selectedLead ? getCachedData(selectedLead) : null);
+  const data = liveData ?? (effectiveLeadId ? getCachedData(effectiveLeadId) : null);
+
+  // Session replay — lift state so we can filter timeline data during playback
+  // Always fetch keyframes so scrub bar works in both live and replay modes
+  const replay = useSessionReplay(effectiveLeadId);
 
   // Clear cached data and refetch fresh from SSE
   const handleClearTimeline = useCallback(() => {
-    if (selectedLead) {
-      clearCachedData(selectedLead);
+    if (effectiveLeadId) {
+      clearCachedData(effectiveLeadId);
     }
     refetch();
-  }, [selectedLead, clearCachedData, refetch]);
+  }, [effectiveLeadId, clearCachedData, refetch]);
 
   // Announce errors via assertive live region
   useEffect(() => {
@@ -172,6 +200,41 @@ export function TimelinePage({ api, ws }: Props) {
     if (!data) return null;
     return applyFilters(data, roleFilter, commFilter, hiddenStatuses);
   }, [data, roleFilter, commFilter, hiddenStatuses]);
+
+  // Clip timeline data to replay currentTime during playback
+  const displayData = useMemo(() => {
+    if (!filteredData) return null;
+    // Only clip when replay is active (has keyframes loaded) and not in live mode
+    if (!replay.keyframes.length || liveMode) return filteredData;
+    // When paused at the end (currentTime >= duration), show everything
+    if (!replay.playing && replay.currentTime >= replay.duration && replay.duration > 0) return filteredData;
+    // Calculate the absolute cutoff time
+    const sessionStart = new Date(replay.keyframes[0].timestamp).getTime();
+    const cutoffMs = sessionStart + replay.currentTime;
+    const cutoff = new Date(cutoffMs).toISOString();
+
+    return {
+      ...filteredData,
+      agents: filteredData.agents
+        .filter(a => new Date(a.createdAt).getTime() <= cutoffMs)
+        .map(a => ({
+          ...a,
+          segments: a.segments
+            .filter(s => new Date(s.startAt).getTime() <= cutoffMs)
+            .map(s => ({
+              ...s,
+              // Clip segment end to cutoff if it extends beyond
+              endAt: s.endAt && new Date(s.endAt).getTime() > cutoffMs ? cutoff : s.endAt,
+            })),
+        })),
+      communications: filteredData.communications
+        .filter(c => new Date(c.timestamp).getTime() <= cutoffMs),
+      locks: filteredData.locks
+        .filter(l => new Date(l.acquiredAt).getTime() <= cutoffMs),
+      // Keep full time range — auto-panning in TimelineContainer handles the visible window
+      timeRange: filteredData.timeRange,
+    };
+  }, [filteredData, replay.keyframes, replay.playing, replay.currentTime, replay.duration, liveMode]);
 
   const activeFilterCount =
     (ALL_ROLES.length - roleFilter.size) +
@@ -250,33 +313,19 @@ export function TimelinePage({ api, ws }: Props) {
       {/* ARIA live regions for screen reader announcements */}
       <AccessibilityAnnouncer announcements={announcements} />
 
-      {/* StatusBar — always shows UNFILTERED crew health */}
+      {/* Project tabs — select project before viewing project-specific status */}
+      <ProjectTabs
+        activeId={effectiveLeadId}
+        onChange={setSelectedLead}
+        className="px-6 pt-2 border-b border-th-border-muted timeline-lead-selector"
+      />
+
+      {/* StatusBar — shows UNFILTERED crew health for selected project */}
       <StatusBar
         data={data}
         newEventCount={newEventCount}
         onErrorClick={handleStatusBarErrorClick}
       />
-
-      {/* Project tabs — always visible as top-level navigation */}
-      {leads.length > 0 && (
-        <nav className="flex items-center gap-1 px-6 pt-2 overflow-x-auto border-b border-th-border-muted timeline-lead-selector" role="tablist" aria-label="Project selection">
-          {leads.map(lead => (
-            <button
-              key={lead.id}
-              onClick={() => setSelectedLead(lead.id)}
-              role="tab"
-              aria-selected={selectedLead === lead.id}
-              className={`px-4 py-2 text-xs whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                selectedLead === lead.id
-                  ? 'border-accent text-accent font-medium bg-th-bg'
-                  : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
-              }`}
-            >
-              {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
-            </button>
-          ))}
-        </nav>
-      )}
 
       <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
 
@@ -373,14 +422,14 @@ export function TimelinePage({ api, ws }: Props) {
         </div>
       )}
 
-      {!selectedLead && !loading && (
+      {!effectiveLeadId && !loading && (
         <EmptyState
           title="No active projects"
           description="Start a project to see your AI agents collaborate in real time. The timeline will populate as agents are created and begin working."
         />
       )}
 
-      {loading && !data && selectedLead && (
+      {loading && !data && effectiveLeadId && (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center" role="status" aria-label="Loading timeline data">
           <RefreshCw size={24} className="animate-spin motion-reduce:animate-none text-th-text-muted" aria-hidden="true" />
           <span className="sr-only">Loading timeline data…</span>
@@ -393,20 +442,39 @@ export function TimelinePage({ api, ws }: Props) {
         </div>
       )}
 
-      {filteredData && filteredData.agents.length === 0 && !loading && (
+      {displayData && displayData.agents.length === 0 && !loading && (
         <EmptyState />
       )}
 
-      {filteredData && filteredData.agents.length > 0 && (
-        <div className="flex-1 min-h-0 relative" id="timeline-main" ref={timelineMainRef}>
+      {displayData && displayData.agents.length > 0 && (
+        <div className="flex-1 min-h-0 relative overflow-y-auto" id="timeline-main" ref={timelineMainRef}>
           <ErrorBanner
             errors={errorEntries}
             onScrollToError={handleScrollToError}
           />
-          <TimelineContainer data={filteredData} liveMode={liveMode} onLiveModeChange={setLiveMode} />
+          <TimelineContainer
+            data={displayData}
+            liveMode={liveMode}
+            onLiveModeChange={setLiveMode}
+            replayProgress={!liveMode && replay.duration > 0 ? replay.currentTime / replay.duration : undefined}
+          />
         </div>
       )}
+
       </div>
+
+      {/* Session Replay Scrubber — always visible, sticky bottom */}
+      {effectiveLeadId && (
+        <div className="shrink-0 border-t border-th-border-muted bg-th-bg px-4 py-2">
+          <ReplayScrubber
+            leadId={effectiveLeadId}
+            replay={replay}
+            liveMode={liveMode}
+            onExitLive={() => setLiveMode(false)}
+            onGoLive={() => setLiveMode(true)}
+          />
+        </div>
+      )}
     </div>
   );
 }

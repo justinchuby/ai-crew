@@ -9,7 +9,9 @@ export default defineConfig({
     logo: '/logo.svg',
     nav: [
       { text: 'Guide', link: '/guide/' },
-      { text: 'Reference', link: '/reference/api' },
+      { text: 'Features', link: '/guide/features' },
+      { text: 'Design', link: '/design/docker-sandboxing' },
+      { text: 'Blog', link: '/blog/introducing-flightdeck' },
       { text: 'GitHub', link: 'https://github.com/justinchuby/flightdeck' },
     ],
     sidebar: {
@@ -19,6 +21,8 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/guide/' },
             { text: 'Quick Start', link: '/guide/quickstart' },
+            { text: 'Features Overview', link: '/guide/features' },
+            { text: 'Smart Onboarding', link: '/guide/onboarding' },
           ],
         },
         {
@@ -49,8 +53,20 @@ export default defineConfig({
           items: [
             { text: 'Lead Dashboard', link: '/guide/dashboard-lead' },
             { text: 'Agents View', link: '/guide/dashboard-agents' },
+            { text: 'Canvas View', link: '/guide/canvas-view' },
             { text: 'Settings', link: '/guide/dashboard-settings' },
             { text: 'UI Design', link: '/guide/ui-design' },
+          ],
+        },
+        {
+          text: 'Features',
+          items: [
+            { text: 'Command Palette', link: '/guide/command-palette' },
+            { text: 'Intent Rules', link: '/guide/intent-rules' },
+            { text: 'Data Management', link: '/guide/data-management' },
+            { text: 'GitHub Integration', link: '/guide/github-integration' },
+            { text: 'Playbooks & Roles', link: '/guide/playbooks' },
+            { text: 'Mobile PWA', link: '/guide/mobile' },
           ],
         },
         {
@@ -61,15 +77,67 @@ export default defineConfig({
             { text: 'Architecture', link: '/guide/timeline-architecture' },
           ],
         },
-      ],
-      '/reference/': [
         {
-          text: 'Reference',
+          text: 'Development',
+          items: [
+            { text: 'Developer Guide', link: '/guide/developer-guide' },
+            { text: 'Usage Tips & Use Cases', link: '/guide/usage-tips' },
+          ],
+        },
+        {
+          text: 'Internal — Contributors Only',
+          collapsed: true,
           items: [
             { text: 'REST API', link: '/reference/api' },
             { text: 'WebSocket Events', link: '/reference/websocket' },
             { text: 'Timeline Components', link: '/reference/timeline-api' },
             { text: 'Database Schema', link: '/reference/database' },
+            { text: 'NL Commands API', link: '/reference/nl-api' },
+            { text: 'GitHub & Conflicts API', link: '/reference/github-api' },
+            { text: 'Playbooks & Roles API', link: '/reference/playbooks-api' },
+            { text: 'Configuration', link: '/reference/configuration' },
+            { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
+            { text: 'Design Decisions', link: '/reference/design-decisions' },
+          ],
+        },
+      ],
+      '/design/': [
+        {
+          text: 'Design Documents',
+          items: [
+            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+          ],
+        },
+      ],
+      '/blog/': [
+        {
+          text: 'Blog',
+          items: [
+            { text: 'Introducing Flightdeck', link: '/blog/introducing-flightdeck' },
+          ],
+        },
+      ],
+      '/reference/': [
+        {
+          text: 'Core API',
+          items: [
+            { text: 'REST API', link: '/reference/api' },
+            { text: 'WebSocket Events', link: '/reference/websocket' },
+            { text: 'Timeline Components', link: '/reference/timeline-api' },
+            { text: 'Database Schema', link: '/reference/database' },
+          ],
+        },
+        {
+          text: 'Feature APIs',
+          items: [
+            { text: 'NL Commands', link: '/reference/nl-api' },
+            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
+            { text: 'Playbooks & Roles', link: '/reference/playbooks-api' },
+          ],
+        },
+        {
+          text: 'Architecture',
+          items: [
             { text: 'Configuration', link: '/reference/configuration' },
             { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
             { text: 'Design Decisions', link: '/reference/design-decisions' },

@@ -1,7 +1,9 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
+import { apiFetch } from '../../hooks/useApi';
+import { deriveAgentsFromKeyframes } from '../../hooks/useHistoricalAgents';
 import { HealthSummary } from './HealthSummary';
 import { AgentFleet } from './AgentFleet';
 import { DagMinimap } from './DagMinimap';
@@ -11,7 +13,15 @@ import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
 import { AlertsPanel } from './AlertsPanel';
 import { CommHeatmap } from '../FleetOverview/CommHeatmap';
+import { CommFlowGraph } from '../CommFlow';
+import { DiffPreview } from '../DiffPreview';
+import { DebatesPanel } from '../Debates';
+import { HandoffHistoryPanel } from '../Handoff';
+import { PRStatusPanel } from '../GitHub';
+import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
+import { useProjects } from '../../hooks/useProjects';
+import { ProjectTabs } from '../ProjectTabs';
 import type { PanelConfig } from '../../hooks/useDashboardLayout';
 
 // ── Panel renderer ────────────────────────────────────────────────────
@@ -23,13 +33,13 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
     case 'health':
       return <HealthSummary leadId={leadId} />;
     case 'tokens':
-      return <TokenEconomics />;
+      return <TokenEconomics agents={agents} />;
     case 'costs':
       return <CostBreakdown />;
     case 'timers':
       return <TimerDisplay />;
     case 'fleet':
-      return <AgentFleet leadId={leadId} />;
+      return <AgentFleet leadId={leadId} agents={agents} />;
     case 'dag':
       return <DagMinimap leadId={leadId} />;
     case 'activity':
@@ -85,9 +95,84 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
         </div>
       );
     }
+    case 'commflow':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">🔀 Communication Flow</h3>
+          <CommFlowGraph leadId={leadId} width={600} height={400} agents={agents} />
+        </div>
+      );
+    case 'diff':
+      return <AgentDiffPanel agents={agents} leadId={leadId} />;
+    case 'debates':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <DebatesPanel leadId={leadId} />
+        </div>
+      );
+    case 'handoffs':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <HandoffHistoryPanel />
+        </div>
+      );
+    case 'github':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <PRStatusPanel />
+        </div>
+      );
     default:
       return null;
   }
+}
+
+// ── Agent Diff Panel (uses useFocusAgent to show live diffs) ─────────
+
+function AgentDiffPanel({ agents, leadId }: { agents: any[]; leadId: string }) {
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const { data } = useFocusAgent(selectedAgentId);
+
+  const team = agents.filter((a) => a.parentId === leadId || a.id === leadId);
+  const agentsWithActivity = team.filter((a) => a.status === 'running' || a.status === 'idle');
+
+  return (
+    <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+      <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">📝 Live Diffs</h3>
+      {agentsWithActivity.length === 0 ? (
+        <p className="text-xs text-th-text-muted">No active agents with file changes.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {agentsWithActivity.map((a) => {
+              const roleName = typeof a.role === 'object' ? a.role.name : a.role;
+              const icon = typeof a.role === 'object' ? a.role.icon : '🤖';
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setSelectedAgentId(selectedAgentId === a.id ? null : a.id)}
+                  className={`px-2 py-1 text-[11px] rounded border transition-colors ${
+                    selectedAgentId === a.id
+                      ? 'bg-accent/15 border-accent/40 text-accent'
+                      : 'bg-th-bg-alt border-th-border text-th-text-muted hover:text-th-text-alt'
+                  }`}
+                >
+                  {icon} {roleName} ({a.id.slice(0, 8)})
+                </button>
+              );
+            })}
+          </div>
+          {data?.diff ? (
+            <DiffPreview diff={data.diff} />
+          ) : selectedAgentId ? (
+            <p className="text-xs text-th-text-muted">No file changes for this agent.</p>
+          ) : (
+            <p className="text-xs text-th-text-muted">Select an agent to view their diffs.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── MissionControlPage ───────────────────────────────────────────────
@@ -95,19 +180,63 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
 export function MissionControlPage() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const projects = useLeadStore((s) => s.projects);
-  const agents = useAppStore((s) => s.agents);
+  const liveAgents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
+
+  // Shared project data + local selection
+  const { projects: apiProjects } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
+  const fetchIdRef = useRef(0);
 
   const projectKeys = Object.keys(projects);
 
   // Auto-discover lead agents from appStore if leadStore has no projects yet
   const leadAgents = useMemo(
-    () => agents.filter((a) => a.role?.id === 'lead' && !a.parentId),
-    [agents],
+    () => liveAgents.filter((a) => a.role?.id === 'lead' && !a.parentId),
+    [liveAgents],
   );
 
-  // Auto-select: prefer selectedLeadId, then leadStore projects, then any live lead agent
-  const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? null;
+  // Priority: user-selected tab > sidebar > leadStore > live lead > API projects
+  const leadId = selectedProjectId ?? selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
+
+  // Derive agents from keyframes when no live agents exist
+  useEffect(() => {
+    if (liveAgents.length > 0 || !leadId) return;
+    const requestId = ++fetchIdRef.current;
+    apiFetch<{ keyframes: any[] }>(`/replay/${leadId}/keyframes`)
+      .then((data) => {
+        if (fetchIdRef.current !== requestId) return;
+        const kf = data?.keyframes ?? [];
+        const derived = deriveAgentsFromKeyframes(kf).map((a) => ({
+          ...a,
+          parentId: leadId,
+          model: undefined,
+          messages: [],
+        }));
+        if (derived.length > 0) {
+          // Add a synthetic lead agent entry
+          derived.unshift({
+            id: leadId,
+            parentId: null as any,
+            status: 'completed',
+            role: { id: 'lead', name: 'Lead', icon: '👑' },
+            model: undefined,
+            inputTokens: 0,
+            outputTokens: 0,
+            createdAt: undefined as any,
+            messages: [],
+            childIds: [] as never[],
+            contextWindowSize: 0,
+            contextWindowUsed: 0,
+            outputPreview: '',
+            autopilot: false,
+          });
+        }
+        setHistoricalAgents(derived);
+      })
+      .catch(() => {});
+  }, [liveAgents.length, leadId]);
 
   // Auto-register discovered leads into leadStore so panels can use them (run once per leadId)
   const registeredRef = useRef<string | null>(null);
@@ -119,10 +248,16 @@ export function MissionControlPage() {
     }
   }, [leadId, projects]);
 
+  // Use live agents or historical fallback
+  const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
+
   const teamAgents = useMemo(() => {
     if (!leadId) return [];
     return agents.filter((a) => a.parentId === leadId || a.id === leadId);
   }, [agents, leadId]);
+
+  // Find project name for display
+  const projectName = apiProjects.find((p) => p.id === leadId)?.name;
 
   if (!leadId) {
     return (
@@ -137,12 +272,24 @@ export function MissionControlPage() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
+    <div className="h-full flex flex-col overflow-y-auto">
+      {/* Project tabs */}
+      <ProjectTabs
+        activeId={leadId}
+        onChange={setSelectedProjectId}
+        className="px-4 pt-2 border-b border-th-border-muted shrink-0"
+      />
+
+      <div className="flex flex-col p-4 gap-4 flex-1">
       {/* Header */}
       <div className="flex items-center gap-3 shrink-0">
         <Activity size={20} className="text-th-text-muted" />
         <h1 className="text-lg font-semibold text-th-text-alt">Mission Control</h1>
-        <span className="text-xs text-th-text-muted font-mono">Lead: {leadId.slice(0, 8)}</span>
+        <span className="text-xs text-th-text-muted font-mono">
+          {projectName || `Lead: ${leadId.slice(0, 8)}`}
+          {teamAgents.length > 0 && ` · ${teamAgents.length} agents`}
+          {liveAgents.length === 0 && historicalAgents.length > 0 && ' (historical)'}
+        </span>
       </div>
 
       {/* Render all visible panels in user-defined order */}
@@ -151,6 +298,7 @@ export function MissionControlPage() {
           <PanelSlot panel={panel} leadId={leadId} agents={teamAgents} />
         </div>
       ))}
+      </div>
     </div>
   );
 }

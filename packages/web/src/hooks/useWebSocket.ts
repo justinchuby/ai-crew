@@ -6,14 +6,27 @@ import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
 
+// Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
+let globalWs: WebSocket | null = null;
+
+/** Send a WS message from any component (best-effort, no-op if not connected) */
+export function sendWsMessage(msg: Record<string, unknown>): void {
+  if (globalWs?.readyState === WebSocket.OPEN) {
+    globalWs.send(JSON.stringify(msg));
+  }
+}
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(true);
   // Track agents that had a tool call since their last text — next append needs a newline separator
   const pendingNewlineRef = useRef<Set<string>>(new Set());
-  const { setConnected, setAgents, addAgent, updateAgent, removeAgent } =
-    useAppStore();
+  const setConnected = useAppStore((s) => s.setConnected);
+  const setAgents = useAppStore((s) => s.setAgents);
+  const addAgent = useAppStore((s) => s.addAgent);
+  const updateAgent = useAppStore((s) => s.updateAgent);
+  const removeAgent = useAppStore((s) => s.removeAgent);
 
   const connect = useCallback(() => {
     // Close any existing connection first
@@ -30,6 +43,7 @@ export function useWebSocket() {
       : `${protocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    globalWs = ws;
 
     ws.onopen = () => {
       setConnected(true);
@@ -308,6 +322,40 @@ export function useWebSocket() {
           if (timerId) ts.removeTimer(timerId);
           break;
         }
+        // Track pending decisions globally for the approval queue badge
+        case 'lead:decision': {
+          if (msg.needsConfirmation && msg.id) {
+            useAppStore.getState().addPendingDecision({
+              id: msg.id,
+              agentId: msg.agentId,
+              agentRole: msg.agentRole || 'Unknown',
+              projectId: msg.projectId,
+              title: msg.title || 'Untitled decision',
+              rationale: msg.rationale || '',
+              needsConfirmation: true,
+              status: 'recorded',
+              category: msg.category,
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          }
+          break;
+        }
+        case 'decision:confirmed':
+        case 'decision:rejected': {
+          const decisionId = msg.decisionId ?? msg.id;
+          if (decisionId) {
+            useAppStore.getState().removePendingDecision(decisionId);
+          }
+          break;
+        }
+        case 'decisions:batch': {
+          // Batch resolve — remove all resolved decisions
+          const decisions = msg.decisions ?? [];
+          for (const d of decisions) {
+            if (d.id) useAppStore.getState().removePendingDecision(d.id);
+          }
+          break;
+        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);
@@ -328,6 +376,7 @@ export function useWebSocket() {
         wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
+        globalWs = null;
       }
     };
   }, [connect]);

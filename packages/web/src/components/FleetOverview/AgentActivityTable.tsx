@@ -1,9 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
-import { Square, RefreshCw, Terminal, Hand, Check, Play } from 'lucide-react';
-import { TokenSparkline } from './TokenSparkline';
+import { Square, RefreshCw, Terminal, Zap, Check, Play } from 'lucide-react';
+import { EmptyState } from '../Shared';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -123,39 +123,8 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   return { text: 'Idle' };
 }
 
-// ── Per-row token-history cell ────────────────────────────────────────────
-// Accumulates a rolling window of token readings in a ref so the sparkline
-// can show a trend without requiring a global store.
-
-const MAX_HISTORY = 20;
-
-function TokenHistoryCell({ totalTokens }: { agentId: string; totalTokens: number }) {
-  const historyRef = useRef<number[]>([]);
-  const prevRef    = useRef<number>(-1);
-
-  // Accumulate during render — safe for refs, deterministic.
-  if (totalTokens !== prevRef.current) {
-    prevRef.current = totalTokens;
-    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), totalTokens];
-  }
-
-  const fmt = (n: number) =>
-    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
-    n >= 1_000     ? `${(n / 1_000).toFixed(0)}k`     :
-    String(n);
-
-  return (
-    <div className="flex items-center gap-1.5" title={`${totalTokens.toLocaleString()} total tokens`}>
-      <TokenSparkline dataPoints={historyRef.current} width={56} height={18} />
-      {totalTokens > 0 && (
-        <span className="text-[10px] text-th-text-muted tabular-nums">{fmt(totalTokens)}</span>
-      )}
-    </div>
-  );
-}
-
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
-  const { setSelectedAgent } = useAppStore();
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
 
   const handleSelect = (id: string) => {
@@ -167,8 +136,8 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
 
   if (agents.length === 0) {
     return (
-      <div className="border border-th-border rounded-lg bg-surface-raised p-8 text-center text-th-text-muted">
-        <p>No agents to display</p>
+      <div className="border border-th-border rounded-lg bg-surface-raised p-8">
+        <EmptyState icon="👥" title="No agents to display" compact />
       </div>
     );
   }
@@ -217,12 +186,11 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                       <button
                         onClick={() => handleSelect(agent.id)}
                         className="font-medium text-th-text-alt text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
-                        title={`${agent.role.name} — click to open chat`}
+                        title={`${agent.role.name} (${agent.id.slice(0, 8)}) — click to open chat`}
                       >
-                        {agent.role.name}
+                        {agent.role.name} <span className="text-th-text-muted font-mono">({agent.id.slice(0, 8)})</span>
                       </button>
                       <div className="text-[10px] text-th-text-muted font-mono flex items-center gap-1 flex-wrap">
-                        {agent.id.slice(0, 8)}
                         {agent.childIds.length > 0 && (
                           <span className="text-[10px] px-1 py-px rounded bg-blue-500/15 text-blue-400 font-sans">
                             {agent.childIds.length} sub-agent{agent.childIds.length > 1 ? 's' : ''}
@@ -313,16 +281,9 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                   )}
                 </td>
 
-                {/* Token sparkline */}
+                {/* Token sparkline — hidden (issue #106) */}
                 <td className="px-3 py-2.5 hidden xl:table-cell">
-                  {(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0) > 0 ? (
-                    <TokenHistoryCell
-                      agentId={agent.id}
-                      totalTokens={(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0)}
-                    />
-                  ) : (
-                    <span className="text-xs text-th-text-muted">—</span>
-                  )}
+                  <span className="text-xs text-th-text-muted">—</span>
                 </td>
 
                 {/* Locks */}
@@ -392,9 +353,9 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                           api.interruptAgent(agent.id);
                         }}
                         className="p-1 text-th-text-muted hover:text-orange-400"
-                        title="Interrupt — cancel current work"
+                        title="Interrupt agent"
                       >
-                        <Hand size={14} />
+                        <Zap size={14} />
                       </button>
                     )}
                     {isActive && (

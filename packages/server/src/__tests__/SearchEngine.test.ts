@@ -35,6 +35,7 @@ function makeDecision(overrides: Partial<Decision> = {}): Decision {
     autoApproved: false,
     confirmedAt: null,
     timestamp: '2024-01-15T09:00:00.000Z',
+    category: 'general',
     ...overrides,
   };
 }

@@ -16,7 +16,38 @@ flightdeck
 
 Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents at the same time — a developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster delivery, higher quality, and built-in checks and balances.
 
-<img width="3164" height="1598" alt="Flightdeck dashboard showing multi-agent coordination" src="https://github.com/user-attachments/assets/bcf9bb15-be17-4f53-9347-d044dbc0871c" />
+### Screenshots
+
+<p align="center">
+  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
+  <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
+</p>
+
+<p align="center">
+  <img src="packages/docs/public/screenshots/timeline-live.png" alt="Timeline — zoom, scroll, and replay agent activity over time" width="720" />
+  <br /><em>Timeline — zoom, scroll, and replay agent activity with session scrubber</em>
+</p>
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+| Command Palette | Canvas View |
+|:-:|:-:|
+| <img src="docs/images/06-command-palette.png" alt="Command Palette with smart AI suggestions" width="400" /> | <img src="docs/images/03-canvas-with-panel.png" alt="Canvas with 7 agents and detail panel" width="400" /> |
+
+| Mission Control | Analytics |
+|:-:|:-:|
+| <img src="docs/images/04-mission-control.png" alt="Mission Control with token usage table" width="400" /> | <img src="docs/images/05-analytics.png" alt="Analytics with real session data" width="400" /> |
+
+| Timeline | Overview |
+|:-:|:-:|
+| <img src="packages/docs/public/screenshots/timeline.png" alt="Timeline with session replay playing" width="400" /> | <img src="docs/images/02-overview.png" alt="Overview dashboard" width="400" /> |
+
+| Batch Approval | New Project |
+|:-:|:-:|
+| <img src="docs/images/07-batch-approval.png" alt="Batch approval slide-over" width="400" /> | <img src="docs/images/00-new-project-dialog.png" alt="New project creation dialog" width="400" /> |
+
+</details>
 
 ## Quick Start
 
@@ -75,14 +106,16 @@ npm run dev
 - **Broadcasts** — Send a message to every active agent at once
 
 ### 📈 Visualization & Monitoring
+- **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, token usage curve, and progress indicators with unified project tabs
 - **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
-- **Timeline** — Swim-lane visualization of agent activity with role/status/comm-type filtering, brush time selector, keyboard navigation, live auto-scroll, and hover tooltips
-- **Org Chart** — Team hierarchy visualization with project tabs
+- **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
+- **Canvas** — Spatial agent graph with ReactFlow for visual crew topology and project tabs
 - **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
-- **Token Economics** — Per-agent token breakdown with context pressure warnings (80% yellow, 90% red)
-- **Proactive Alerts** — Auto-detects context pressure, duplicate file edits, idle agents with ready tasks, and stale decisions
-- **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed)
+- **Token Economics** — Per-agent token breakdown with estimation fallback (~4 chars/token from output preview), shown with `~` prefix and `(est.)` suffix
+- **The Pulse** — Persistent ambient status strip showing fleet health; empty indicators hidden, badges link to /agents
+- **Chat** — Virtual scrolling with `react-virtuoso`, pinned user message banner, grouped sequential messages, per-project group chat history
 - **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
+- **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
 
 ### ✅ Decision & Progress Tracking
 - **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
@@ -100,6 +133,7 @@ npm run dev
 - **Session Resume** — Resume from a previous Copilot session ID with full context recovery
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
+- **Data Retention** — Data management in Settings with storage stats and cleanup by age (7d/30d/90d/all)
 
 ## Architecture
 
@@ -151,7 +185,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **EagerScheduler** | Pre-assigns upcoming tasks to idle agents before they become active |
 | **TaskTemplates** | Reusable task templates with natural-language decomposition |
 | **SearchEngine** | Full-text search across messages, tasks, decisions, and activity |
-| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, cost efficiency |
+| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, token efficiency |
 | **DecisionRecords** | ADR-style structured decision records with status tracking |
 | **CoverageTracker** | Test coverage monitoring with regression detection and trend analysis |
 | **ComplexityMonitor** | File complexity analysis with 4-tier scoring and hotspot detection |

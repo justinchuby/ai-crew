@@ -1,0 +1,170 @@
+import { useState, useEffect, useRef } from 'react';
+import { apiFetch } from './useApi';
+import type { ReplayKeyframe } from './useSessionReplay';
+import type { Project } from '../types';
+
+/** Minimal agent shape derived from keyframe events */
+export interface DerivedAgent {
+  id: string;
+  status: string;
+  role: { id: string; name: string; icon: string };
+  inputTokens: number;
+  outputTokens: number;
+  createdAt?: string;
+  messages: never[];
+  childIds: never[];
+  contextWindowSize: number;
+  contextWindowUsed: number;
+  outputPreview: string;
+  autopilot: boolean;
+}
+
+const ROLE_ICONS: Record<string, string> = {
+  lead: '👑', developer: '💻', architect: '🏗️', designer: '🎨',
+  'code-reviewer': '🔍', 'qa-tester': '🧪', secretary: '📋',
+  'product-manager': '📊', 'tech-writer': '✍️',
+};
+
+/**
+ * Derives an agent roster from keyframe events when no live WebSocket
+ * agents are available. Fetches projects → keyframes → parses spawn/exit
+ * events to build a historical agent list.
+ *
+ * @param liveAgentCount - number of live agents from appStore. When > 0, skips fetch.
+ * @param projectId - optional specific project ID to fetch for. If omitted, uses most recent.
+ */
+export function useHistoricalAgents(liveAgentCount: number, projectId?: string | null) {
+  const [agents, setAgents] = useState<DerivedAgent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (liveAgentCount > 0) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      try {
+        // When no specific project requested, try /api/agents for global data
+        if (!projectId) {
+          const apiAgents = await apiFetch<any[]>('/agents').catch(() => []);
+          const arr = Array.isArray(apiAgents) ? apiAgents : [];
+          if (arr.length > 0) {
+            if (!cancelled && mountedRef.current) {
+              setAgents(arr.map(normalize));
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
+        // Derive from per-project keyframes
+        const id = projectId ?? await getFirstProjectId();
+        if (!id) { setLoading(false); return; }
+
+        const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(
+          `/replay/${id}/keyframes`,
+        ).catch(() => ({ keyframes: [] }));
+        const kf: ReplayKeyframe[] = kfData.keyframes ?? [];
+
+        if (!cancelled && mountedRef.current) {
+          setAgents(deriveAgentsFromKeyframes(kf));
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled && mountedRef.current) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [liveAgentCount, projectId]);
+
+  return { agents, loading };
+}
+
+/** Fetch the most recent project ID */
+async function getFirstProjectId(): Promise<string | null> {
+  try {
+    const ps = await apiFetch<Project[]>('/projects');
+    const active = Array.isArray(ps) ? ps.filter((p) => p.status !== 'archived') : [];
+    return active.length > 0 ? active[0].id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Normalize a raw API agent object to DerivedAgent shape */
+function normalize(a: any): DerivedAgent {
+  const roleId = a.role?.id ?? 'agent';
+  return {
+    id: a.id ?? 'unknown',
+    status: a.status ?? 'completed',
+    role: {
+      id: roleId,
+      name: a.role?.name ?? 'Agent',
+      icon: a.role?.icon ?? ROLE_ICONS[roleId] ?? '🤖',
+    },
+    inputTokens: a.inputTokens ?? 0,
+    outputTokens: a.outputTokens ?? 0,
+    createdAt: a.createdAt,
+    messages: [],
+    childIds: [],
+    contextWindowSize: a.contextWindowSize ?? 0,
+    contextWindowUsed: a.contextWindowUsed ?? 0,
+    outputPreview: a.outputPreview ?? '',
+    autopilot: a.autopilot ?? false,
+  };
+}
+
+/** Derive agent roster from spawn/exit keyframe events */
+export function deriveAgentsFromKeyframes(kf: ReplayKeyframe[]): DerivedAgent[] {
+  const agents: DerivedAgent[] = [];
+  const exitedRoles = new Map<string, number>(); // role → count of exits
+
+  // First pass: collect exits by role
+  for (const frame of kf) {
+    if (frame.type === 'agent_exit') {
+      const match = frame.label.match(/^Terminated\s+(.+?)(?:\s+\(|$)/);
+      const role = match?.[1] ?? '';
+      if (role) exitedRoles.set(role, (exitedRoles.get(role) ?? 0) + 1);
+    }
+  }
+
+  // Second pass: create agents from spawns
+  const roleExitCounts = new Map(exitedRoles);
+  for (const frame of kf) {
+    if (frame.type === 'spawn') {
+      const roleMatch = frame.label.match(/^Spawned\s+(.+?)(?::\s|$)/);
+      const roleName = roleMatch?.[1] ?? 'Agent';
+      const roleId = roleName.toLowerCase().replace(/\s+/g, '-');
+
+      // Check if this agent was later terminated
+      const remainingExits = roleExitCounts.get(roleName) ?? 0;
+      const status = remainingExits > 0 ? 'terminated' : 'idle';
+      if (remainingExits > 0) roleExitCounts.set(roleName, remainingExits - 1);
+
+      agents.push({
+        id: `kf-${agents.length}`,
+        status,
+        role: { id: roleId, name: roleName, icon: ROLE_ICONS[roleId] ?? '🤖' },
+        inputTokens: 0,
+        outputTokens: 0,
+        createdAt: frame.timestamp,
+        messages: [],
+        childIds: [],
+        contextWindowSize: 0,
+        contextWindowUsed: 0,
+        outputPreview: '',
+        autopilot: false,
+      });
+    }
+  }
+
+  return agents;
+}

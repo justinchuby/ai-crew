@@ -8,6 +8,7 @@
  * include a `type` field.
  */
 import { useMemo, useState } from 'react';
+import { EmptyState } from '../Shared';
 import type { CommType } from '../../stores/leadStore';
 
 export type { CommType };
@@ -109,11 +110,7 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
   }, [filteredMessages]);
 
   if (agents.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-6 text-th-text-muted text-sm">
-        No agents to display
-      </div>
-    );
+    return <EmptyState icon="🔥" title="No agents to display" compact />;
   }
 
   // Keep cells readable even for large fleets.

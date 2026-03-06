@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, and, desc, asc, sql, ne, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ne, inArray, lte } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { dagTasks, utcNow } from '../db/schema.js';
 
@@ -803,5 +803,30 @@ export class TaskDAG extends EventEmitter {
       .run();
     this.emit('dag:updated', { leadId });
     return tasks.length;
+  }
+
+  /** Get tasks as they existed at a given timestamp (for replay) */
+  getTasksAt(leadId: string, timestamp: string): DagTask[] {
+    return this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(and(eq(dagTasks.leadId, leadId), lte(dagTasks.createdAt, timestamp)))
+      .orderBy(desc(dagTasks.priority), asc(dagTasks.createdAt))
+      .all()
+      .map(rowToTask)
+      .map(task => ({
+        ...task,
+        dagStatus: this.reconstructStatusAt(task, timestamp),
+      }));
+  }
+
+  private reconstructStatusAt(task: DagTask, timestamp: string): DagTaskStatus {
+    if (task.completedAt && task.completedAt <= timestamp) {
+      return task.dagStatus === 'skipped' ? 'skipped'
+        : task.dagStatus === 'failed' ? 'failed'
+        : 'done';
+    }
+    if (task.startedAt && task.startedAt <= timestamp) return 'running';
+    return 'pending';
   }
 }

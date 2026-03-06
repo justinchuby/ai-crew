@@ -86,6 +86,8 @@ export interface AcpTextChunk {
   data?: string;
   /** URI for resource content */
   uri?: string;
+  /** Image attachments sent with a user message */
+  attachments?: Array<{ name: string; mimeType: string; thumbnailDataUrl?: string }>;
 }
 
 export interface AcpToolCall {
@@ -151,6 +153,8 @@ export interface AgentInfo {
   outputTokens?: number;
   contextWindowSize?: number;
   contextWindowUsed?: number;
+  contextBurnRate?: number;
+  estimatedExhaustionMinutes?: number | null;
 }
 
 export interface ServerConfig {
@@ -191,6 +195,7 @@ export interface Decision {
   status?: 'recorded' | 'confirmed' | 'rejected';
   autoApproved?: boolean;
   confirmedAt?: string | null;
+  category?: string;
   timestamp: string;
 }
 

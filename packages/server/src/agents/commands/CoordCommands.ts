@@ -142,6 +142,7 @@ function handleDecision(ctx: CommandHandlerContext, agent: Agent, data: string):
       rationale: decision.rationale,
       needsConfirmation,
       status: recorded.status,
+      category: recorded.category,
     });
   } catch (err) {
     logger.debug('command', 'Failed to parse DECISION command', { error: (err as Error).message });
@@ -181,6 +182,16 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
 
     logger.info('lead', `Progress update from ${agent.role.name} (${agent.id.slice(0, 8)})`, progress);
     ctx.emit('lead:progress', { agentId: agent.id, ...progress });
+
+    // Persist to activity ledger so it appears in keyframes/milestones
+    ctx.activityLedger.log(
+      agent.id,
+      agent.role?.id ?? 'unknown',
+      'progress_update' as any,
+      (progress.summary as string) ?? 'Progress update',
+      progress,
+      ctx.getProjectIdForAgent(agent.id) ?? '',
+    );
 
     const parentId = agent.parentId || agent.id;
     const secretaries = ctx.getAllAgents().filter(

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Database, Brain, MessageSquare, CheckCircle, Activity, Trash2, ChevronDown, ChevronRight, RefreshCw, BarChart3 } from 'lucide-react';
 import { decisionStatusText } from '../../utils/statusColors';
+import { SkeletonCard } from '../Shared';
 
 interface DbStats {
   memory: number;
@@ -83,7 +84,7 @@ export function DataBrowser() {
 /* ── Stats Overview ─────────────────────────────────────────────── */
 
 function StatsPanel({ stats }: { stats: DbStats | null }) {
-  if (!stats) return <div className="text-th-text-muted text-sm">Loading...</div>;
+  if (!stats) return <SkeletonCard lines={3} />;
 
   const cards = [
     { label: 'Memory Entries', value: stats.memory, icon: <Brain size={18} />, color: 'text-purple-400' },
@@ -343,7 +344,7 @@ function ActivityPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Shared Components ──────────────────────────────────────────── */
 
 function Loading() {
-  return <div className="flex items-center gap-2 text-sm text-th-text-muted py-8 justify-center"><RefreshCw size={14} className="animate-spin" /> Loading...</div>;
+  return <SkeletonCard lines={3} />;
 }
 
 function Empty({ label }: { label: string }) {
