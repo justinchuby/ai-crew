@@ -20,6 +20,7 @@ import { useLeadStore, type AgentComm } from '../../stores/leadStore';
 import { useCanvasLayout } from '../../hooks/useCanvasLayout';
 import { useCanvasGraph } from '../../hooks/useCanvasGraph';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
+import { ProjectTabs } from '../ProjectTabs';
 import { AgentNode } from './AgentNode';
 import { CommEdge } from './CommEdge';
 import { CanvasToolbar } from './CanvasToolbar';
@@ -37,17 +38,19 @@ const EMPTY_COMMS: AgentComm[] = [];
 function CanvasInner() {
   const liveAgents = useAppStore((s) => s.agents);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const effectiveLeadId = selectedProjectId ?? selectedLeadId ?? null;
   const project = useLeadStore((s) =>
-    selectedLeadId ? s.projects[selectedLeadId] : null,
+    effectiveLeadId ? s.projects[effectiveLeadId] : null,
   );
   const comms = project?.comms ?? EMPTY_COMMS;
 
   // Historical data fallback: derive agents from keyframes when no live agents
-  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(liveAgents.length, selectedLeadId);
+  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(liveAgents.length, effectiveLeadId);
 
   const agents = liveAgents.length > 0 ? liveAgents : (historicalAgents as any[]);
 
-  const [layout, updateLayout] = useCanvasLayout(selectedLeadId);
+  const [layout, updateLayout] = useCanvasLayout(effectiveLeadId);
   const { nodes: graphNodes, edges: graphEdges } = useCanvasGraph(agents, comms, layout);
 
   // Local state for ReactFlow
@@ -129,7 +132,12 @@ function CanvasInner() {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden" data-testid="canvas-page">
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="canvas-page">
+      <ProjectTabs
+        activeId={effectiveLeadId}
+        onChange={setSelectedProjectId}
+        className="px-4 pt-2 border-b border-th-border-muted shrink-0"
+      />
       <div className="flex-1 relative">
         <CanvasToolbar
           onAutoLayout={handleAutoLayout}

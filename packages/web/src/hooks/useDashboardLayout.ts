@@ -39,9 +39,10 @@ export function useDashboardLayout() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as PanelConfig[];
-        // Merge with defaults to pick up any new panels added since last save
+        // Merge with defaults: add new panels, strip removed ones
+        const defaultIds = new Set(DEFAULT_PANELS.map((p) => p.id));
         const savedIds = new Set(parsed.map((p) => p.id));
-        const merged = [...parsed];
+        const merged = parsed.filter((p) => defaultIds.has(p.id));
         for (const def of DEFAULT_PANELS) {
           if (!savedIds.has(def.id)) merged.push(def);
         }

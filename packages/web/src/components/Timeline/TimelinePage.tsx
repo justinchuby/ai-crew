@@ -13,8 +13,8 @@ import { useAccessibilityAnnouncements } from './useAccessibilityAnnouncements';
 import { useAppStore } from '../../stores/appStore';
 import { useTimelineStore } from '../../stores/timelineStore';
 import { ReplayScrubber, ShareDropdown } from '../SessionReplay';
-import { apiFetch } from '../../hooks/useApi';
-import type { Project } from '../../types';
+import { useProjects } from '../../hooks/useProjects';
+import { ProjectTabs } from '../ProjectTabs';
 import './timeline-a11y.css';
 
 interface Props {
@@ -130,15 +130,8 @@ export function TimelinePage({ api, ws }: Props) {
   // Lead selection — live agents and historical projects
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
 
-  // Fetch historical projects from REST API when no live agents exist
-  const [projects, setProjects] = useState<Project[]>([]);
-  useEffect(() => {
-    apiFetch<Project[]>('/projects')
-      .then((ps) => {
-        if (Array.isArray(ps)) setProjects(ps.filter((p) => p.status !== 'archived'));
-      })
-      .catch(() => {});
-  }, []);
+  // Fetch historical projects from shared hook
+  const { projects } = useProjects();
 
   // Effective lead: live agents take priority, then project IDs
   const effectiveLeadId = useMemo(() => {
@@ -282,40 +275,12 @@ export function TimelinePage({ api, ws }: Props) {
         onErrorClick={handleStatusBarErrorClick}
       />
 
-      {/* Project tabs — live agents or historical projects */}
-      {(leads.length > 0 || projects.length > 0) && (
-        <nav className="flex items-center gap-1 px-6 pt-2 overflow-x-auto border-b border-th-border-muted timeline-lead-selector" role="tablist" aria-label="Project selection">
-          {leads.length > 0 ? leads.map(lead => (
-            <button
-              key={lead.id}
-              onClick={() => setSelectedLead(lead.id)}
-              role="tab"
-              aria-selected={effectiveLeadId === lead.id}
-              className={`px-4 py-2 text-xs whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                effectiveLeadId === lead.id
-                  ? 'border-accent text-accent font-medium bg-th-bg'
-                  : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
-              }`}
-            >
-              {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
-            </button>
-          )) : projects.map(proj => (
-            <button
-              key={proj.id}
-              onClick={() => setSelectedLead(proj.id)}
-              role="tab"
-              aria-selected={effectiveLeadId === proj.id}
-              className={`px-4 py-2 text-xs whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                effectiveLeadId === proj.id
-                  ? 'border-accent text-accent font-medium bg-th-bg'
-                  : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
-              }`}
-            >
-              {proj.name || proj.id.slice(0, 8)}
-            </button>
-          ))}
-        </nav>
-      )}
+      {/* Project tabs — shared component */}
+      <ProjectTabs
+        activeId={effectiveLeadId}
+        onChange={setSelectedLead}
+        className="px-6 pt-2 border-b border-th-border-muted timeline-lead-selector"
+      />
 
       <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
 

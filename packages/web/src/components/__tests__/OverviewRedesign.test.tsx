@@ -134,16 +134,16 @@ describe('AgentHeatmap', () => {
 });
 
 describe('OverviewPage project selector', () => {
-  it('renders project selector when projects exist', async () => {
+  it('renders project tabs when projects exist', async () => {
     const { OverviewPage } = await import('../OverviewPage/OverviewPage');
     render(
       <MemoryRouter>
         <OverviewPage />
       </MemoryRouter>,
     );
-    // Wait for project fetch to resolve
-    const selector = await screen.findByTestId('overview-project-selector');
-    expect(selector).toBeTruthy();
+    // Wait for project fetch to resolve — now renders as tabs
+    const tabs = await screen.findByTestId('project-tabs');
+    expect(tabs).toBeTruthy();
     expect(screen.getByText('Test Project')).toBeTruthy();
   });
 });

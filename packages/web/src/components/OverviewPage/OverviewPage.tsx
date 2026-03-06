@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
+import { useProjects } from '../../hooks/useProjects';
 import { deriveAgentsFromKeyframes } from '../../hooks/useHistoricalAgents';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
+import { ProjectTabs } from '../ProjectTabs';
 import { ProgressTimeline } from './ProgressTimeline';
 import { CumulativeFlow } from './TaskBurndown';
 import { CostCurve } from './CostCurve';
@@ -15,7 +17,6 @@ import type { FlowPoint } from './TaskBurndown';
 import type { CostPoint } from './CostCurve';
 import type { HeatmapBucket } from './AgentHeatmap';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
-import type { Project } from '../../types';
 
 // ── Props (kept for backward compat with App.tsx route) ────────────
 
@@ -31,22 +32,8 @@ export function OverviewPage(_props: Props) {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
 
   // ── Project list for selector ───────────────────────────────────
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { projects } = useProjects();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<Project[]>('/projects')
-      .then((ps) => {
-        if (!Array.isArray(ps)) return;
-        const active = ps.filter((p) => p.status !== 'archived');
-        setProjects(active);
-        // Auto-select the most recent project if nothing else is selected
-        if (!selectedProjectId && !selectedLeadId && active.length > 0) {
-          setSelectedProjectId(active[0].id);
-        }
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive the effective ID used for data fetching.
   // Priority: user-picked project (explicit) > live lead agent > sidebar > first project
@@ -201,34 +188,15 @@ export function OverviewPage(_props: Props) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="overview-page">
-      {/* Project selector (shown when multiple projects exist or no live session) */}
-      {projects.length > 0 && (
-        <div className="flex items-center gap-3">
-          <label htmlFor="overview-project-select" className="text-xs text-th-text-muted font-medium">
-            Project:
-          </label>
-          <select
-            id="overview-project-select"
-            data-testid="overview-project-selector"
-            value={selectedProjectId ?? effectiveId ?? ''}
-            onChange={(e) => setSelectedProjectId(e.target.value || null)}
-            className="text-sm bg-th-bg-alt border border-th-border rounded px-2 py-1 text-th-text-alt focus:outline-none focus:ring-1 focus:ring-accent max-w-xs truncate"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name || p.id.slice(0, 8)} {p.status === 'active' ? '' : `(${p.status})`}
-              </option>
-            ))}
-          </select>
-          {activeProject && (
-            <span className="text-xs text-th-text-muted">
-              {keyframes.length} events · {totalTasks} tasks
-            </span>
-          )}
-        </div>
-      )}
+    <div className="flex-1 overflow-y-auto space-y-4" data-testid="overview-page">
+      {/* Project tabs */}
+      <ProjectTabs
+        activeId={effectiveId}
+        onChange={setSelectedProjectId}
+        className="px-4 pt-2 border-b border-th-border-muted"
+      />
 
+      <div className="px-4 space-y-4">
       {/* Hero: Progress Timeline */}
       <ProgressTimeline data={timelineData} width={800} height={240} />
 
@@ -244,6 +212,7 @@ export function OverviewPage(_props: Props) {
 
       {/* Milestones */}
       <MilestoneTimeline keyframes={keyframes} />
+      </div>
     </div>
   );
 }

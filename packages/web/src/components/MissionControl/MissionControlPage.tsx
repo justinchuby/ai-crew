@@ -20,8 +20,9 @@ import { HandoffHistoryPanel } from '../Handoff';
 import { PRStatusPanel } from '../GitHub';
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
+import { useProjects } from '../../hooks/useProjects';
+import { ProjectTabs } from '../ProjectTabs';
 import type { PanelConfig } from '../../hooks/useDashboardLayout';
-import type { Project } from '../../types';
 
 // ── Panel renderer ────────────────────────────────────────────────────
 
@@ -182,18 +183,11 @@ export function MissionControlPage() {
   const liveAgents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
 
-  // Fetch historical projects from REST API when no live data
-  const [apiProjects, setApiProjects] = useState<Project[]>([]);
+  // Shared project data + local selection
+  const { projects: apiProjects } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
   const fetchIdRef = useRef(0);
-
-  useEffect(() => {
-    apiFetch<Project[]>('/projects')
-      .then((ps) => {
-        if (Array.isArray(ps)) setApiProjects(ps.filter((p) => p.status !== 'archived'));
-      })
-      .catch(() => {});
-  }, []);
 
   const projectKeys = Object.keys(projects);
 
@@ -203,8 +197,8 @@ export function MissionControlPage() {
     [liveAgents],
   );
 
-  // Auto-select: prefer selectedLeadId, then leadStore, then live lead, then API projects
-  const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
+  // Priority: user-selected tab > sidebar > leadStore > live lead > API projects
+  const leadId = selectedProjectId ?? selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
 
   // Derive agents from keyframes when no live agents exist
   useEffect(() => {
@@ -278,7 +272,15 @@ export function MissionControlPage() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
+    <div className="h-full flex flex-col overflow-y-auto">
+      {/* Project tabs */}
+      <ProjectTabs
+        activeId={leadId}
+        onChange={setSelectedProjectId}
+        className="px-4 pt-2 border-b border-th-border-muted shrink-0"
+      />
+
+      <div className="flex flex-col p-4 gap-4 flex-1">
       {/* Header */}
       <div className="flex items-center gap-3 shrink-0">
         <Activity size={20} className="text-th-text-muted" />
@@ -296,6 +298,7 @@ export function MissionControlPage() {
           <PanelSlot panel={panel} leadId={leadId} agents={teamAgents} />
         </div>
       ))}
+      </div>
     </div>
   );
 }
