@@ -8,7 +8,6 @@ import { PlaybookLibrary } from '../Playbooks';
 import { IntentRulesDashboard } from '../IntentRules';
 import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
-import { PredictionSettingsPanel } from '../Predictions';
 import { WorkflowDashboard } from '../Workflow';
 import { GitHubSetup } from '../GitHub';
 import { ConflictSettingsPanel } from '../Conflicts';
@@ -203,11 +202,6 @@ export function SettingsPanel({ api }: Props) {
       {/* Workflow Automation */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <WorkflowDashboard />
-      </section>
-
-      {/* Prediction Settings */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <PredictionSettingsPanel />
       </section>
 
       {/* GitHub Integration */}

@@ -77,7 +77,7 @@ interface TokenEconomicsProps {
   agents?: AgentInfo[];
 }
 
-export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {}) {
+export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps) {
   const storeAgents = useAppStore((s) => s.agents);
   const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
 
