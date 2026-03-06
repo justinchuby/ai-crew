@@ -1,9 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal, Zap, Check, Play } from 'lucide-react';
-import { TokenSparkline } from './TokenSparkline';
 import { EmptyState } from '../Shared';
 
 function shortModelName(model?: string): string {
@@ -122,37 +121,6 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   if (agent.status === 'failed') return { text: 'Crashed' };
   if (agent.status === 'terminated') return { text: 'Terminated' };
   return { text: 'Idle' };
-}
-
-// ── Per-row token-history cell ────────────────────────────────────────────
-// Accumulates a rolling window of token readings in a ref so the sparkline
-// can show a trend without requiring a global store.
-
-const MAX_HISTORY = 20;
-
-function TokenHistoryCell({ totalTokens }: { agentId: string; totalTokens: number }) {
-  const historyRef = useRef<number[]>([]);
-  const prevRef    = useRef<number>(-1);
-
-  // Accumulate during render — safe for refs, deterministic.
-  if (totalTokens !== prevRef.current) {
-    prevRef.current = totalTokens;
-    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), totalTokens];
-  }
-
-  const fmt = (n: number) =>
-    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
-    n >= 1_000     ? `${(n / 1_000).toFixed(0)}k`     :
-    String(n);
-
-  return (
-    <div className="flex items-center gap-1.5" title={`${totalTokens.toLocaleString()} total tokens`}>
-      <TokenSparkline dataPoints={historyRef.current} width={56} height={18} />
-      {totalTokens > 0 && (
-        <span className="text-[10px] text-th-text-muted tabular-nums">{fmt(totalTokens)}</span>
-      )}
-    </div>
-  );
 }
 
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {

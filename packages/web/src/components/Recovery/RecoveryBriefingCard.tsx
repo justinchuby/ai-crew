@@ -50,9 +50,6 @@ export function RecoveryBriefingCard({ event, onApproved, onCancelled }: Recover
     finally { setLoading(false); }
   }, [event.id, narrative, onApproved]);
 
-  // Token estimate (~4 chars per token)
-  const estimatedTokens = Math.round(narrative.length / 4);
-
   return (
     <div
       className="border border-th-border border-l-4 border-l-blue-400 rounded-lg p-4 bg-surface-raised"

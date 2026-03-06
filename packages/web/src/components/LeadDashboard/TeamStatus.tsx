@@ -3,12 +3,6 @@ import type { AgentInfo, Delegation } from '../../types';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 interface Props {
   agents: AgentInfo[];
   delegations: Delegation[];

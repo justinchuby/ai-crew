@@ -1,17 +1,11 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Hash, Users, AlertCircle, Brain } from 'lucide-react';
+import { Users, AlertCircle, Brain } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import { PulseRecoveryIndicator } from '../Recovery';
 import { PulsePRIndicator } from '../GitHub';
 import { PulseConflictIndicator } from '../Conflicts';
-
-function formatTokensCompact(n: number): string {
-  if (n >= 1_000_000) return `~${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `~${(n / 1_000).toFixed(0)}k`;
-  return `~${n}`;
-}
 
 // ── Token pressure helpers ───────────────────────────────────────────
 

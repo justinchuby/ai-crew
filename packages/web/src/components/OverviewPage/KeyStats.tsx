@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CheckCircle2, Users, Hash, Clock } from 'lucide-react';
+import { CheckCircle2, Users, Clock } from 'lucide-react';
 import type { AgentInfo } from '../../types';
 
 interface KeyStatsProps {
