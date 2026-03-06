@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare } from 'lucide-react';
-import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { PromptNav, hasUserMention } from '../PromptNav';
-import { groupTimeline, type TimelineItem } from './groupTimeline';
+import { groupTimeline, type TimelineItem, type GroupedTimelineItem } from './groupTimeline';
 
 interface Props {
   agentId: string;
@@ -27,8 +27,9 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(true);
 
   const plan = agent?.plan ?? [];
   const messages = agent?.messages ?? [];
@@ -85,8 +86,6 @@ export function AcpOutput({ agentId }: Props) {
   // Group consecutive agent messages, collecting interleaved system events
   const groupedTimeline = groupTimeline(timeline);
 
-  useAutoScroll(containerRef, messagesEndRef, [messages], { resetKey: agentId });
-
   // Promote queued messages when agent responds (new agent message after queued user messages)
   useEffect(() => {
     if (!messages.some(m => m.queued)) return;
@@ -129,236 +128,246 @@ export function AcpOutput({ agentId }: Props) {
 
   return (
     <div className="flex-1 relative min-h-0">
-    <div ref={containerRef} className="absolute inset-0 overflow-y-auto p-3 space-y-3">
-      {/* Plan Section */}
-      {plan.length > 0 && (
-        <div className="border border-th-border rounded-lg bg-surface-raised">
-          <button
-            onClick={() => setPlanOpen(!planOpen)}
-            className="flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-th-text-alt"
-          >
-            {planOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            Plan ({plan.filter((e) => e.status === 'completed').length}/{plan.length})
-          </button>
-          {planOpen && (
-            <ul className="px-3 pb-2 space-y-1">
-              {plan.map((entry, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-th-text-alt">
-                  <span>{PLAN_ICON[entry.status]}</span>
-                  <span className="flex-1">{entry.content}</span>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${PRIORITY_BADGE[entry.priority]}`}>
-                    {entry.priority}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Messages + Activity Timeline */}
-      {groupedTimeline.length > 0 && (
-        <div className="space-y-1">
-          {groupedTimeline.map((item, i) => {
-            // Grouped agent messages — continuous block with collapsed system events
-            if (item.kind === 'agent-group') {
-              const group = item;
-              const lastMsg = group.messages[group.messages.length - 1];
-              const lastTs = lastMsg.msg.timestamp ? new Date(lastMsg.msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-              const hasMention = group.messages.some((m) => hasUserMention(typeof m.msg.text === 'string' ? m.msg.text : ''));
-              const mentionAttr = hasMention ? { 'data-user-prompt': group.messages[0].index } : {};
-
-              return (
-                <div key={`grp-${group.messages[0].index}`} className="py-1" {...mentionAttr}>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      {group.messages.map((m) => {
-                        const sender = m.msg.sender ?? 'agent';
-                        const text = typeof m.msg.text === 'string' ? m.msg.text : JSON.stringify(m.msg.text, null, 2);
-                        if (sender === 'thinking') {
-                          return (
-                            <div key={`msg-${m.index}`} className="font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
-                              {text}
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={`msg-${m.index}`} className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
-                            <AgentTextBlockSimple text={text} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{lastTs}</span>
-                  </div>
-                  {group.systemEvents.length > 0 && (
-                    <CollapsibleSystemEvents events={group.systemEvents} />
+    <div ref={containerRef} className="absolute inset-0">
+      <Virtuoso
+        ref={virtuosoRef}
+        data={groupedTimeline}
+        overscan={400}
+        atBottomThreshold={150}
+        atBottomStateChange={setAtBottom}
+        followOutput={atBottom ? 'smooth' : false}
+        initialTopMostItemIndex={groupedTimeline.length > 0 ? groupedTimeline.length - 1 : 0}
+        className="h-full"
+        components={{
+          Header: () => (
+            <div className="p-3 pb-0 space-y-3">
+              {plan.length > 0 && (
+                <div className="border border-th-border rounded-lg bg-surface-raised">
+                  <button
+                    onClick={() => setPlanOpen(!planOpen)}
+                    className="flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-th-text-alt"
+                  >
+                    {planOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    Plan ({plan.filter((e) => e.status === 'completed').length}/{plan.length})
+                  </button>
+                  {planOpen && (
+                    <ul className="px-3 pb-2 space-y-1">
+                      {plan.map((entry, i) => (
+                        <li key={i} className="flex items-center gap-2 text-xs text-th-text-alt">
+                          <span>{PLAN_ICON[entry.status]}</span>
+                          <span className="flex-1">{entry.content}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${PRIORITY_BADGE[entry.priority]}`}>
+                            {entry.priority}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              );
-            }
-
-            if (item.kind === 'activity') {
-              const evt = item.evt;
-              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              return (
-                <div key={`act-${evt.id}`} className="flex items-center gap-2 py-0.5 px-1">
-                  <span className="text-[10px] text-th-text-muted">{time}</span>
-                  <span className="text-[10px] text-th-text-muted italic">
-                    {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
-                    {' '}{evt.summary}
-                  </span>
-                </div>
-              );
-            }
-
-            // Message rendering (standalone items)
-            const msg = item.msg;
-            const sender = msg.sender ?? 'agent';
-            const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-
-            // User messages — right-aligned blue bubble
-            if (sender === 'user') {
-              const rawText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
-              // Incoming DMs from other agents — render as collapsible, collapsed by default
-              if (rawText.startsWith('📨')) {
-                return <CollapsibleIncomingMessage key={`msg-${item.index}`} text={rawText} timestamp={ts} />;
-              }
-              return (
-                <div key={`msg-${item.index}`} data-user-prompt={item.index} className="flex justify-end items-start gap-2 py-1">
-                  <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
-                  <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-                    <MentionText text={rawText} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                  </div>
-                </div>
-              );
-            }
-
-            // Thinking/reasoning — italic, lighter color (standalone, not in a group)
-            if (sender === 'thinking') {
-              const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
-              return (
-                <div key={`msg-${item.index}`} className="py-0.5">
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
-                      {text}
-                    </div>
-                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
-                  </div>
-                </div>
-              );
-            }
-
-            // System messages — centered, muted, smaller (standalone, not in a group)
-            if (sender === 'system') {
-              const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
-              // Hide outgoing DM notifications — redundant with command blocks
-              if (text.startsWith('📤')) return null;
-              if (text === '---') {
-                return <hr key={`msg-${item.index}`} className="border-th-border/50 my-1" />;
-              }
-              return (
-                <div key={`msg-${item.index}`} className="flex justify-center py-1">
-                  <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-th-bg-alt/60 border border-th-border/50 text-xs text-th-text-muted whitespace-pre-wrap">
-                    <MentionText text={text} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                  </div>
-                </div>
-              );
-            }
-
-            // Rich content (image, audio, resource)
-            if (msg.contentType && msg.contentType !== 'text') {
-              const mentionAttr = hasUserMention(typeof msg.text === 'string' ? msg.text : '') ? { 'data-user-prompt': item.index } : {};
-              return (
-                <div key={`msg-${item.index}`} className="py-1" {...mentionAttr}>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      {msg.contentType === 'image' && msg.data && (
-                        <div>
-                          <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-th-border" />
-                          {msg.uri && <p className="text-[10px] text-th-text-muted mt-1 font-mono">{msg.uri}</p>}
-                        </div>
-                      )}
-                      {msg.contentType === 'audio' && msg.data && (
-                        <audio controls className="max-w-full">
-                          <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
-                        </audio>
-                      )}
-                      {msg.contentType === 'resource' && (
-                        <div>
-                          {msg.uri && (
-                            <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
-                              <FolderOpen size={12} />
-                              <span className="font-mono">{msg.uri}</span>
-                            </div>
-                          )}
-                          {msg.text && (
-                            <pre className="text-xs font-mono text-th-text-alt bg-th-bg-alt border border-th-border rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
-                  </div>
-                </div>
-              );
-            }
-
-            // Agent messages — flowing text, no bubble (standalone, not grouped)
-            const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
-            const agentMentionAttr = hasUserMention(text) ? { 'data-user-prompt': item.index } : {};
-            return (
-              <div key={`msg-${item.index}`} className="py-1" {...agentMentionAttr}>
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
-                    <AgentTextBlockSimple text={text} />
-                  </div>
-                  <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
-      )}
-
-      {/* Queued messages — sent but not yet processed by agent */}
-      {messages.some((m) => m.queued) && (
-        <div className="border-t border-dashed border-th-border px-3 py-2 bg-th-bg-alt/50">
-          <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            Queued ({messages.filter((m) => m.queued).length})
-          </div>
-          {messages.filter((m) => m.queued).map((msg, i, arr) => (
-            <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                {i > 0 && (
-                  <button onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
-                    <ChevronUp className="w-3 h-3" />
-                  </button>
-                )}
-                {i < arr.length - 1 && (
-                  <button onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                )}
-                <button onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-              <span className="text-[10px] text-th-text-muted">
-                {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-              </span>
-              <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
-                {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
-              </div>
-              <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          ),
+          Footer: () => (
+            <>
+              {messages.some((m) => m.queued) && (
+                <div className="border-t border-dashed border-th-border px-3 py-2 bg-th-bg-alt/50 mx-3 mb-3">
+                  <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Queued ({messages.filter((m) => m.queued).length})
+                  </div>
+                  {messages.filter((m) => m.queued).map((msg, i, arr) => (
+                    <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        {i > 0 && (
+                          <button onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                        )}
+                        {i < arr.length - 1 && (
+                          <button onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        )}
+                        <button onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-th-text-muted">
+                        {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                      <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+                        {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
+                      </div>
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ),
+        }}
+        itemContent={(index, item) => (
+          <div className="px-3">
+            <TimelineRow item={item} />
+          </div>
+        )}
+      />
     </div>
     <PromptNav containerRef={containerRef} messages={messages} useOriginalIndices />
+    </div>
+  );
+}
+
+/** Renders a single grouped timeline item — extracted for Virtuoso itemContent */
+function TimelineRow({ item }: { item: GroupedTimelineItem }) {
+  if (item.kind === 'agent-group') {
+    const group = item;
+    const lastMsg = group.messages[group.messages.length - 1];
+    const lastTs = lastMsg.msg.timestamp ? new Date(lastMsg.msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const hasMention = group.messages.some((m) => hasUserMention(typeof m.msg.text === 'string' ? m.msg.text : ''));
+    const mentionAttr = hasMention ? { 'data-user-prompt': group.messages[0].index } : {};
+
+    return (
+      <div className="py-1" {...mentionAttr}>
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            {group.messages.map((m) => {
+              const sender = m.msg.sender ?? 'agent';
+              const text = typeof m.msg.text === 'string' ? m.msg.text : JSON.stringify(m.msg.text, null, 2);
+              if (sender === 'thinking') {
+                return (
+                  <div key={`msg-${m.index}`} className="font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
+                    {text}
+                  </div>
+                );
+              }
+              return (
+                <div key={`msg-${m.index}`} className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
+                  <AgentTextBlockSimple text={text} />
+                </div>
+              );
+            })}
+          </div>
+          <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{lastTs}</span>
+        </div>
+        {group.systemEvents.length > 0 && (
+          <CollapsibleSystemEvents events={group.systemEvents} />
+        )}
+      </div>
+    );
+  }
+
+  if (item.kind === 'activity') {
+    const evt = item.evt;
+    const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      <div className="flex items-center gap-2 py-0.5 px-1">
+        <span className="text-[10px] text-th-text-muted">{time}</span>
+        <span className="text-[10px] text-th-text-muted italic">
+          {evt.type === 'tool_call' ? '🔧' : evt.type === 'delegation' ? '📋' : evt.type === 'completion' ? '✅' : evt.type === 'message_sent' ? '💬' : '📊'}
+          {' '}{evt.summary}
+        </span>
+      </div>
+    );
+  }
+
+  // Standalone message rendering
+  const msg = item.msg;
+  const sender = msg.sender ?? 'agent';
+  const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+  if (sender === 'user') {
+    const rawText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+    if (rawText.startsWith('📨')) {
+      return <CollapsibleIncomingMessage text={rawText} timestamp={ts} />;
+    }
+    return (
+      <div data-user-prompt={item.index} className="flex justify-end items-start gap-2 py-1">
+        <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
+        <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
+          <MentionText text={rawText} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+        </div>
+      </div>
+    );
+  }
+
+  if (sender === 'thinking') {
+    const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+    return (
+      <div className="py-0.5">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
+            {text}
+          </div>
+          <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (sender === 'system') {
+    const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
+    if (text.startsWith('📤')) return null;
+    if (text === '---') {
+      return <hr className="border-th-border/50 my-1" />;
+    }
+    return (
+      <div className="flex justify-center py-1">
+        <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-th-bg-alt/60 border border-th-border/50 text-xs text-th-text-muted whitespace-pre-wrap">
+          <MentionText text={text} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.contentType && msg.contentType !== 'text') {
+    const mentionAttr = hasUserMention(typeof msg.text === 'string' ? msg.text : '') ? { 'data-user-prompt': item.index } : {};
+    return (
+      <div className="py-1" {...mentionAttr}>
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            {msg.contentType === 'image' && msg.data && (
+              <div>
+                <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-th-border" />
+                {msg.uri && <p className="text-[10px] text-th-text-muted mt-1 font-mono">{msg.uri}</p>}
+              </div>
+            )}
+            {msg.contentType === 'audio' && msg.data && (
+              <audio controls className="max-w-full">
+                <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
+              </audio>
+            )}
+            {msg.contentType === 'resource' && (
+              <div>
+                {msg.uri && (
+                  <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
+                    <FolderOpen size={12} />
+                    <span className="font-mono">{msg.uri}</span>
+                  </div>
+                )}
+                {msg.text && (
+                  <pre className="text-xs font-mono text-th-text-alt bg-th-bg-alt border border-th-border rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
+                )}
+              </div>
+            )}
+          </div>
+          <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Agent messages — flowing text, no bubble
+  const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
+  const agentMentionAttr = hasUserMention(text) ? { 'data-user-prompt': item.index } : {};
+  return (
+    <div className="py-1" {...agentMentionAttr}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
+          <AgentTextBlockSimple text={text} />
+        </div>
+        <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
+      </div>
     </div>
   );
 }
