@@ -97,7 +97,7 @@ export default defineConfig({
           text: 'Feature APIs',
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
-            { text: 'Data & Workflows', link: '/reference/data-api' },
+            { text: 'Data & Workflows', link: '/reference/predictions-api' },
             { text: 'GitHub & Conflicts', link: '/reference/github-api' },
             { text: 'Playbooks & Roles', link: '/reference/playbooks-api' },
           ],

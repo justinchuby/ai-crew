@@ -92,7 +92,7 @@ Three-layer onboarding system. QuickStart: playbook selection as first-run exper
 High-performance chat rendering using react-virtuoso. Only visible messages plus a small overscan buffer are rendered in the DOM, keeping the UI responsive even with 1000+ messages. Pinned user message banners ensure important messages from the user are never buried under agent responses.
 
 ### Workflow Automation
-'When X then Y' rule engine. 12 event triggers × 12 action types. Sentence builder UI. 12 pre-built templates in 4 categories. Dry Run testing. Activity log with one-click 'Disable rule' safety valve. Predictions can trigger workflow rules.
+'When X then Y' rule engine. 12 event triggers × 12 action types. Sentence builder UI. 12 pre-built templates in 4 categories. Dry Run testing. Activity log with one-click 'Disable rule' safety valve.
 
 → [Workflows Guide](/guide/workflows)
 

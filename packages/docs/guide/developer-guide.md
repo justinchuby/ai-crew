@@ -51,15 +51,10 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 | GET | `/onboarding/status` | Get mastery status |
 | POST | `/onboarding/progress` | Update progress |
 
-### Predictions
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/predictions` | Active predictions |
-| GET | `/predictions/history` | Prediction history |
-| GET | `/predictions/accuracy` | Accuracy metrics |
-| GET | `/predictions/config` | Get config |
-| PUT | `/predictions/config` | Update config |
-| POST | `/predictions/:id/dismiss` | Dismiss prediction |
+### Predictions (Removed)
+
+> **Note:** The Predictions API has been removed. The endpoints below are no longer active.
+> See [Removed Components](#removed-components) for details.
 
 ### Workflows
 | Method | Endpoint | Description |
@@ -165,7 +160,7 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 
 ## React Hooks
 
-All hooks are in `src/hooks/`. Import example: `import { usePredictions } from '../hooks/usePredictions';`
+All hooks are in `src/hooks/`. Import example: `import { useProjects } from '../hooks/useProjects';`
 
 ### Data Fetching Hooks
 
@@ -174,9 +169,8 @@ All hooks are in `src/hooks/`. Import example: `import { usePredictions } from '
 | `useApi()` | `{ spawnAgent, terminateAgent, updateConfig, createRole, ... }` | Core API client |
 | `useFocusAgent(agentId)` | `{ data, loading, error, refresh }` | Polls agent activity, diffs, decisions |
 | `useDiffSummary(agentId)` | `{ summary, loading }` | Lightweight diff stats |
-| `usePredictions()` | `{ predictions, loading, dismiss, refetch }` | Predictions with 30s polling |
-| `usePredictionAccuracy()` | `PredictionAccuracy \| null` | Accuracy metrics |
-| `usePredictionConfig()` | `{ config, saveConfig }` | Prediction settings |
+| `useProjects()` | `{ projects, loading }` | Fetch projects from REST API |
+| `useHistoricalAgents(projectId)` | `Agent[]` | Derive agent data from keyframes for historical sessions |
 | `useWorkflowRules()` | `{ rules, loading, createRule, updateRule, deleteRule, toggleRule, reorder, dryRun }` | Workflow CRUD |
 | `useWorkflowTemplates()` | `WorkflowTemplate[]` | Pre-built templates |
 | `useWorkflowActivity()` | `{ activity, loading }` | Firing event log |
@@ -225,10 +219,10 @@ Import: `import { EmptyState, SkeletonCard, SkeletonList, ErrorPage } from '../c
 
 ```tsx
 <EmptyState
-  icon="🔮"
-  title="No active predictions"
-  description="Predictions appear after agents accumulate enough data."
-  action={{ label: "Configure →", onClick: () => navigate('/settings') }}
+  icon="📊"
+  title="No active sessions"
+  description="Sessions appear when you create a project and agents start working."
+  action={{ label: "Create Project →", onClick: () => navigate('/') }}
 />
 // compact variant for inline use:
 <EmptyState icon="📋" title="No items" compact />
@@ -250,8 +244,8 @@ SkeletonList props: `count?: number`, `cardProps?: SkeletonCardProps`, `classNam
 
 ```tsx
 <ErrorPage
-  title="Failed to load predictions"
-  message="The prediction service is unavailable."
+  title="Failed to load agents"
+  message="The server is unavailable."
   detail="ECONNREFUSED localhost:3001"
   statusCode={503}
   onRetry={() => refetch()}
@@ -367,7 +361,7 @@ All variables use RGB triplets for opacity support: `rgba(var(--chart-1), 0.5)`.
 import { apiFetch } from '../hooks/useApi';
 
 // GET
-const data = await apiFetch<MyType[]>('/predictions');
+const data = await apiFetch<MyType[]>('/projects');
 
 // POST
 await apiFetch('/nl/execute', {

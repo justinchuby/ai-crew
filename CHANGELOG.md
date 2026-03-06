@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Token display** — Removed monetary cost estimates. Token counts shown as estimates with `~` prefix and `(est.)` suffix.
 - **Default replay speed** — Changed from 1× to 4× for faster session review.
 - **Milestone curation** — Filtered from all system events to meaningful progress markers only.
+- Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
+
+### Fixed
+
+- **Gantt chart vertical alignment** — fixed SVG viewBox stretching, time axis overlap with first task row, and container height formula for small task counts
+- **Array sanitization in Community Playbooks** — secrets inside arrays now detected and stripped
+- **PredictionService expired accuracy** — expired predictions marked instead of removed, counted correctly in accuracy stats
 
 ### Removed
 
@@ -43,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Role Contribution chart** — Removed from Analytics (not a meaningful metric).
 - **Predictions feature** — Removed from frontend (agent stall/cost/context handled automatically by the system).
 - **Cost estimates** — Removed dollar amounts from token display; token counts only.
+- Tool call activity cards from agent chat panel (redundant with inline activity messages)
+- `.flightdeck/port` file mechanism replaced with stdout-based port discovery
 
 ---
 
@@ -123,21 +132,6 @@ Ten features transforming Flightdeck into a full automation platform.
 - Phase 4 alone: 267 backend tests across 5 cycles
 
 ---
-
-### Changed
-
-- Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
-
-### Fixed
-
-- **Gantt chart vertical alignment** — fixed SVG viewBox stretching, time axis overlap with first task row, and container height formula for small task counts
-- **Array sanitization in Community Playbooks** — secrets inside arrays now detected and stripped
-- **PredictionService expired accuracy** — expired predictions marked instead of removed, counted correctly in accuracy stats
-
-### Removed
-
-- Tool call activity cards from agent chat panel (redundant with inline activity messages)
-- `.flightdeck/port` file mechanism replaced with stdout-based port discovery
 
 ## [0.2.0] - 2026-03-05
 

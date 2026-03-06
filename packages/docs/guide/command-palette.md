@@ -40,7 +40,7 @@ Type natural language directly into ⌘K to control your crew:
 | Scale up/down | "add 2 more developers" |
 | Emergency stop | "stop everything" |
 
-### Query Commands (10)
+### Query Commands (9)
 | Command | Example |
 |---------|---------|
 | Status check | "what's the status?" |
@@ -50,7 +50,6 @@ Type natural language directly into ⌘K to control your crew:
 | Show context | "which agents are running low on context?" |
 | Count agents | "how many agents are active?" |
 | Show errors | "any errors?" |
-| Show predictions | "what predictions are active?" |
 | Show conflicts | "are there any conflicts?" |
 | Show timeline | "show recent activity" |
 
