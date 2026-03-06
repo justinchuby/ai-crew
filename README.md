@@ -101,14 +101,16 @@ npm run dev
 - **Broadcasts** — Send a message to every active agent at once
 
 ### 📈 Visualization & Monitoring
+- **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, cost curve, and progress indicators with unified project tabs
 - **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
-- **Timeline** — Swim-lane visualization of agent activity with role/status/comm-type filtering, brush time selector, keyboard navigation, live auto-scroll, and hover tooltips
-- **Org Chart** — Team hierarchy visualization with project tabs
+- **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
+- **Canvas** — Spatial agent graph with ReactFlow for visual crew topology and project tabs
 - **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
-- **Token Economics** — Per-agent token breakdown with context pressure warnings (80% yellow, 90% red)
-- **Proactive Alerts** — Auto-detects context pressure, duplicate file edits, idle agents with ready tasks, and stale decisions
-- **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed)
+- **Token Economics** — Per-agent token breakdown with estimation fallback (~4 chars/token from output preview), shown with `~` prefix and `(est.)` suffix
+- **The Pulse** — Persistent ambient status strip showing fleet health; empty indicators hidden, badges link to /agents
+- **Chat** — Virtual scrolling with `react-virtuoso`, pinned user message banner, grouped sequential messages, per-project group chat history
 - **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
+- **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
 
 ### ✅ Decision & Progress Tracking
 - **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
@@ -126,6 +128,7 @@ npm run dev
 - **Session Resume** — Resume from a previous Copilot session ID with full context recovery
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
+- **Data Retention** — Data management in Settings with storage stats and cleanup by age (7d/30d/90d/all)
 
 ## Architecture
 

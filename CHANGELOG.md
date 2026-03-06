@@ -13,6 +13,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dynamic port allocation** — server auto-retries on EADDRINUSE (up to 10 ports), prints `FLIGHTDECK_PORT=NNNN` to stdout for discovery
 - **Sequential dev launcher** (`scripts/dev.mjs`) — `npm run dev` starts Express first, captures the actual port, then starts Vite with the correct proxy target; multiple instances can run simultaneously
 - **Commit sign-off convention** — all agent commits now include agent ID, role, and model name
+- **Historical data on all pages** — Overview, Timeline, Canvas, Mission Control, Agents, Dashboard, and Tasks now load data from REST API when no live WebSocket agents are present. No more empty states for existing projects.
+- **Unified project tabs** — Shared `<ProjectTabs>` component replaces inconsistent dropdowns/tabs. Used on Overview, Timeline, Canvas, and Mission Control with live-agent indicator dots.
+- **Cumulative Flow diagram** — Replaced Task Burndown chart with stacked area chart showing created/in-progress/completed task counts over time.
+- **Session Replay improvements** — Sticky scrubber bar (always visible at bottom), 4× default speed (was 1×), auto-switch to replay mode for historical sessions.
+- **Timeline zoom & scroll** — Decoupled vertical/horizontal scroll axes. Ctrl+wheel zooms time axis, Shift+wheel pans horizontally. Arrow keys navigate lanes. +/−/Fit zoom buttons.
+- **Timeline horizontal overflow** — Swim lanes scale with agent count (min 80px per lane). Horizontal scrollbar appears when agents exceed viewport width.
+- **Chat virtualization** — `react-virtuoso` virtual scrolling for large message histories. Pinned user message banner. Grouped sequential messages from same sender.
+- **PulseStrip polish** — Empty health indicators hidden. Badges link to /agents page. Client-side React Router navigation (no page reload).
+- **Milestone filtering** — Milestones panel shows only progress reports, task completions, decisions, commits, and errors. Filtered out agent spawn/termination/delegation noise.
+- **PROGRESS event pipeline** — Lead's PROGRESS reports now logged to activity ledger as `progress_update`, mapped to keyframes, and displayed in Milestones panel with 📊 icon.
+- **Token estimation fallback** — Token tab estimates usage from `outputPreview` text (~4 chars/token) when agents don't report actual token counts. Shown with `~` prefix and `(est.)` suffix.
+- **Milestone text wrapping** — Multi-line milestone labels with `line-clamp-2` and full-text tooltip. Removed backend 80-char truncation.
+- **Data retention settings** — Data Management section in Settings with storage stats and cleanup by age (7d/30d/90d/all).
+- **Group chat history** — Group chats persist per project and load from REST API for historical sessions.
+- **Skill reference files** — 5 `.copilot/skills/` files documenting dev patterns, common bugs, user preferences, infrastructure, and testing patterns.
+- **Comprehensive Timeline tests** — 45 tests covering scroll axis separation, zoom controls, drag-to-pan, horizontal overflow, keyboard navigation, lane layout, and replay controls.
+
+### Changed
+
+- **Token display** — Removed monetary cost estimates. Token counts shown as estimates with `~` prefix and `(est.)` suffix.
+- **Default replay speed** — Changed from 1× to 4× for faster session review.
+- **Milestone curation** — Filtered from all system events to meaningful progress markers only.
+
+### Removed
+
+- **Session score stars** — Removed subjective star ratings from Analytics session table.
+- **Model Effectiveness chart** — Removed from Analytics (can't fairly compare models across varying task sizes).
+- **Role Contribution chart** — Removed from Analytics (not a meaningful metric).
+- **Predictions feature** — Removed from frontend (agent stall/cost/context handled automatically by the system).
+- **Cost estimates** — Removed dollar amounts from token display; token counts only.
 
 ---
 

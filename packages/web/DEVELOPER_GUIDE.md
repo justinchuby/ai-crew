@@ -153,6 +153,15 @@ Quick reference for all APIs, hooks, components, and design tokens.
 | POST | `/notifications/settings` | Update preferences |
 | POST | `/handoffs/:recordId/deliver` | Deliver handoff |
 
+### Projects & Data
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects` | List all projects |
+| GET | `/projects/:id/dag` | Get project task DAG |
+| GET | `/projects/:id/groups` | Get project chat groups |
+| GET | `/data/stats` | Storage statistics |
+| POST | `/data/cleanup` | Cleanup data by age |
+
 ### Analytics & Costs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -185,7 +194,9 @@ All hooks are in `src/hooks/`. Import example: `import { usePredictions } from '
 | `useGitHubConnection()` | `{ connection, loading, connect, disconnect, testConnection }` | GitHub status |
 | `usePullRequests()` | `{ pulls, loading, createPR, markReady, refetch }` | PRs with 30s polling |
 | `useCommitLinks()` | `CommitTaskLink[]` | Commit-to-task links |
-| `useSessionReplay(leadId)` | `{ keyframes, worldState, playing, currentTime, seek, setSpeed, ... }` | Session replay |
+| `useSessionReplay(leadId)` | `{ keyframes, worldState, playing, currentTime, seek, setSpeed, ... }` | Session replay (default 4× speed) |
+| `useProjects()` | `{ projects, loading }` | Fetch projects from REST API |
+| `useHistoricalAgents(projectId)` | `Agent[]` | Derive agent data from keyframes for historical sessions |
 
 ### UI State Hooks
 
@@ -260,6 +271,55 @@ SkeletonList props: `count?: number`, `cardProps?: SkeletonCardProps`, `classNam
 ```
 
 Props: `title?: string`, `message?: string`, `detail?: string`, `statusCode?: number`, `onRetry?: () => void`, `onGoHome?: () => void`
+
+### ProjectTabs
+
+```tsx
+import { ProjectTabs } from '../components/ProjectTabs/ProjectTabs';
+
+<ProjectTabs
+  selectedProjectId={projectId}
+  onSelect={(id) => setProjectId(id)}
+/>
+```
+
+Shared project selector with live-agent indicator dots and deduplication. Used on Overview, Timeline, Canvas, and Mission Control.
+
+### CumulativeFlow
+
+```tsx
+import { CumulativeFlow } from '../components/OverviewPage/TaskBurndown';
+
+<CumulativeFlow data={flowData} />
+// flowData: Array<{ time: number; created: number; inProgress: number; completed: number }>
+```
+
+Stacked area chart replacing the old Task Burndown. Shows task counts over time.
+
+### DataManagement
+
+```tsx
+import { DataManagement } from '../components/Settings/DataManagement';
+```
+
+Settings panel for storage stats and data cleanup by age (7d/30d/90d/all). Uses `/data/stats` and `/data/cleanup` endpoints.
+
+### Removed Components
+
+The following components have been removed:
+- `SessionScoreBadge` — Subjective star ratings removed from Analytics
+- `ModelEffectivenessChart` — Removed (can't fairly compare across varying task sizes)
+- `RoleContributionChart` — Removed (not a meaningful metric)
+- `PredictionsPanel` / `PredictionCard` — Predictions feature removed from frontend
+
+### Utility: groupTimeline
+
+```tsx
+import { groupTimeline } from '../utils/groupTimeline';
+
+const grouped = groupTimeline(messages);
+// Batches sequential messages from the same sender into groups
+```
 
 ---
 
