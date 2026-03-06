@@ -637,7 +637,7 @@ export class ConflictDetectionEngine {
 
   /**
    * Check if two files in the same directory are likely import-related.
-   * Heuristic for V1 — will be replaced with AST analysis in V2.
+   * Heuristic — checks if two files in the same directory are likely import-related.
    */
   private areImportRelated(file1: string, file2: string): boolean {
     const base1 = path.basename(file1);

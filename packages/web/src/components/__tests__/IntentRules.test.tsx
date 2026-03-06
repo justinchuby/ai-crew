@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { IntentRule } from '../IntentRules/types';
@@ -200,6 +201,24 @@ describe('Intent Rules', () => {
       expect(container.querySelector('[data-testid="rule-row"]')?.className).toContain('opacity-50');
     });
 
+    it('shows green dot for allow action', () => {
+      render(<RuleRow rule={makeRule({ action: 'allow', enabled: true })} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      const dot = screen.getByLabelText('Disable rule');
+      expect(dot.className).toContain('bg-green-500');
+    });
+
+    it('shows yellow dot for alert action', () => {
+      render(<RuleRow rule={makeRule({ action: 'alert', enabled: true })} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      const dot = screen.getByLabelText('Disable rule');
+      expect(dot.className).toContain('bg-yellow-500');
+    });
+
+    it('shows red dot for require-review action', () => {
+      render(<RuleRow rule={makeRule({ action: 'require-review', enabled: true })} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      const dot = screen.getByLabelText('Disable rule');
+      expect(dot.className).toContain('bg-red-500');
+    });
+
     it('expands to show editor on click', () => {
       render(<RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
       fireEvent.click(screen.getByText('Allow style from devs'));
@@ -267,14 +286,6 @@ describe('Intent Rules', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={onCancel} />);
       fireEvent.click(screen.getByText('Cancel'));
       expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('can add and remove conditions', () => {
-      render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
-      fireEvent.click(screen.getByText('+ Add condition'));
-      expect(screen.getByDisplayValue('50')).toBeInTheDocument();
-      fireEvent.click(screen.getByText('✕'));
-      expect(screen.queryByDisplayValue('50')).not.toBeInTheDocument();
     });
 
     it('pre-fills when editing', () => {

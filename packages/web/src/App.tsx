@@ -4,7 +4,7 @@ import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
-import { CommandPaletteV2 } from './components/CommandPalette/CommandPaletteV2';
+import { CommandPalette } from './components/CommandPalette/CommandPalette';
 import { ContextualCoach } from './components/Onboarding';
 import { BottomTabBar } from './components/Layout/BottomTabBar';
 import { MobilePulse } from './components/Mobile';
@@ -288,7 +288,7 @@ export function App() {
       <ApprovalSlideOver />
       <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
-      {cmdOpen && <CommandPaletteV2 onClose={closeCmd} onOpenSearch={openSearch} />}
+      {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
       <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
       <BottomTabBar />

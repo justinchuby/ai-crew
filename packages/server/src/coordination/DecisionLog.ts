@@ -88,12 +88,12 @@ export const TRUST_PRESETS: Record<TrustPreset, { name: string; description: str
   },
   autonomous: {
     name: 'Autonomous',
-    description: 'Allow most categories. Alert on architecture and tool access.',
+    description: 'Trust the agents. Alert only on architecture and dependency changes.',
     rules: [
       { category: 'style', action: 'allow' },
       { category: 'testing', action: 'allow' },
-      { category: 'dependency', action: 'allow' },
-      { category: 'tool_access', action: 'alert' },
+      { category: 'dependency', action: 'alert' },
+      { category: 'tool_access', action: 'allow' },
       { category: 'architecture', action: 'alert' },
       { category: 'general', action: 'allow' },
     ],

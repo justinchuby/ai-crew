@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ACTION_DISPLAY, CONDITION_LABELS, CONDITION_UNITS, type IntentRule, type RuleAction, type IntentCondition, type ConditionType, type ConditionOp } from './types';
+import { ACTION_DISPLAY, type IntentRule, type RuleAction } from './types';
 import { CATEGORY_LABELS } from '../../constants/categories';
 
 interface RuleEditorProps {
@@ -10,7 +10,6 @@ interface RuleEditorProps {
 
 const ACTIONS: RuleAction[] = ['allow', 'alert', 'require-review'];
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS);
-const CONDITION_TYPES: ConditionType[] = ['file_count', 'cost_estimate', 'time_elapsed', 'context_usage'];
 
 export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
   const [action, setAction] = useState<RuleAction>(rule?.action ?? 'allow');
@@ -19,7 +18,6 @@ export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
     rule?.match.roles && rule.match.roles.length > 0 ? 'roles' : 'all',
   );
   const [roles, setRoles] = useState<string[]>(rule?.match.roles ?? []);
-  const [conditions, setConditions] = useState<IntentCondition[]>(rule?.conditions ?? []);
   const [name, setName] = useState(rule?.name ?? '');
 
   // Auto-generate name from selections
@@ -43,7 +41,7 @@ export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
         categories,
         roles: scopeType === 'roles' ? roles : undefined,
       },
-      conditions: conditions.length > 0 ? conditions : undefined,
+      conditions: undefined,
       metadata: rule?.metadata ?? {
         source: 'manual',
         matchCount: 0,
@@ -54,18 +52,6 @@ export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
       },
     };
     onSave(saved);
-  }
-
-  function addCondition() {
-    setConditions([...conditions, { type: 'file_count', operator: 'lt', value: 50 }]);
-  }
-
-  function removeCondition(index: number) {
-    setConditions(conditions.filter((_, i) => i !== index));
-  }
-
-  function updateCondition(index: number, patch: Partial<IntentCondition>) {
-    setConditions(conditions.map((c, i) => (i === index ? { ...c, ...patch } : c)));
   }
 
   function toggleCategory(cat: string) {
@@ -143,44 +129,6 @@ export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
             className="mt-1 w-full text-xs bg-th-bg-alt border border-th-border rounded-md px-2 py-1"
           />
         )}
-      </div>
-
-      {/* Conditions */}
-      <div>
-        <label className="text-[10px] text-th-text-muted">Conditions (optional)</label>
-        {conditions.map((cond, i) => (
-          <div key={i} className="flex items-center gap-1.5 mt-1">
-            <select
-              value={cond.type}
-              onChange={(e) => updateCondition(i, { type: e.target.value as ConditionType })}
-              className="text-[10px] bg-th-bg-alt border border-th-border rounded px-1.5 py-0.5"
-            >
-              {CONDITION_TYPES.map((t) => (
-                <option key={t} value={t}>{CONDITION_LABELS[t]}</option>
-              ))}
-            </select>
-            <select
-              value={cond.operator}
-              onChange={(e) => updateCondition(i, { operator: e.target.value as ConditionOp })}
-              className="text-[10px] bg-th-bg-alt border border-th-border rounded px-1.5 py-0.5"
-            >
-              <option value="lt">under</option>
-              <option value="gt">over</option>
-              <option value="between">between</option>
-            </select>
-            <input
-              type="number"
-              value={cond.value}
-              onChange={(e) => updateCondition(i, { value: Number(e.target.value) })}
-              className="w-16 text-[10px] bg-th-bg-alt border border-th-border rounded px-1.5 py-0.5"
-            />
-            <span className="text-[9px] text-th-text-muted">{CONDITION_UNITS[cond.type]}</span>
-            <button onClick={() => removeCondition(i)} className="text-red-400 text-[10px]">✕</button>
-          </div>
-        ))}
-        <button onClick={addCondition} className="text-[10px] text-accent hover:underline mt-1">
-          + Add condition
-        </button>
       </div>
 
       {/* Name */}

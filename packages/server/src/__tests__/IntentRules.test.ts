@@ -179,7 +179,7 @@ describe('Intent Rules', () => {
       expect(rules.filter(r => r.action === 'require-review')).toHaveLength(1);
     });
 
-    it('autonomous preset: allow most, alert on architecture + tool_access', () => {
+    it('autonomous preset: allow most, alert on architecture + dependency', () => {
       const rules = log.applyTrustPreset('autonomous');
       expect(rules).toHaveLength(6);
       const alert = rules.filter(r => r.action === 'alert');

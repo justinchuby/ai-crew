@@ -39,7 +39,13 @@ export function RuleRow({ rule, onToggle, onDelete, onSave }: RuleRowProps) {
         <button
           onClick={() => onToggle(rule.id, !rule.enabled)}
           className={`shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
-            rule.enabled ? 'bg-green-500 border-green-500' : 'border-th-border'
+            rule.enabled
+              ? rule.action === 'allow'
+                ? 'bg-green-500 border-green-500'
+                : rule.action === 'alert'
+                  ? 'bg-yellow-500 border-yellow-500'
+                  : 'bg-red-500 border-red-500'
+              : 'border-th-border'
           }`}
           aria-label={rule.enabled ? 'Disable rule' : 'Enable rule'}
         />

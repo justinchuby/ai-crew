@@ -459,7 +459,7 @@ export class PredictionService {
    * Requires FileLockRegistry integration for meaningful predictions.
    */
   private predictFileConflict(_agents: AgentSnapshot[]): Prediction[] {
-    // TODO: V2 — integrate with FileLockRegistry to detect overlapping file access patterns
+    // TODO: integrate with FileLockRegistry to detect overlapping file access patterns
     return [];
   }
 
