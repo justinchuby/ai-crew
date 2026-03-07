@@ -413,7 +413,7 @@ Create a new agent with a specific role and model (optionally assign a task imme
 
 **Link agents to DAG tasks:** When a DAG task already exists (from DECLARE_TASKS or ADD_TASK), ALWAYS include \`dagTaskId\` to explicitly bind the agent to that task:
 \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Extract RoPEConfig", "dagTaskId": "rope-config"} ⟧⟧\`
-This is strongly preferred over relying on fuzzy matching. Without \`dagTaskId\`, the system guesses which DAG task to link — this can cause mismatches or duplicate tasks. Always prefer creating a dagTaskId.
+Without \`dagTaskId\`, the system falls back to fuzzy matching which can mismatch or create duplicates. See AUTO-DAG FROM DELEGATIONS below for details.
 
 Delegate a task to an existing agent (use the agent's ID from QUERY_CREW or creation ACK):
 \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Fix the remaining test failures", "context": "See reviewer feedback above"} ⟧⟧\`
