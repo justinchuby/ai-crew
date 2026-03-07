@@ -45,6 +45,23 @@ Split the server into two processes:
 
 **Key insight:** `child_process.fork()` creates a Node process with a built-in IPC channel. `detached: true` ensures it survives parent exit. Node's IPC uses `process.send()` / `process.on('message')` — structured messaging with automatic serialization, cross-platform, zero dependencies.
 
+### Architectural Invariant: Agent Server is the SOLE Agent Owner
+
+The agent server is the **exclusive owner** of all agent lifecycles. The orchestration server NEVER launches, messages, or terminates agents directly. All agent operations go through the agent server:
+
+```
+✅ Orchestration → AgentServerClient.spawn() → IPC → Agent Server → subprocess
+❌ Orchestration → AcpAdapter.start() → subprocess (NEVER)
+```
+
+**Why no fallback to direct spawning?** If the agent server is down, the orchestration server does NOT silently fall back to spawning agents directly. Instead:
+
+1. **Agent operations fail with a clear error.** `AgentServerClient.spawn()` throws `AgentServerUnavailableError`.
+2. **The UI shows an error state.** Users see exactly what's wrong and what to do about it.
+3. **No silent degradation.** Silent fallback to direct spawning would mean agents survive restarts sometimes (agent server up) but not other times (agent server down). This inconsistency is worse than a clear error.
+
+This means the agent server is a **hard dependency** — if it's not running, no agents can be created. This is the correct design for a core infrastructure component.
+
 ## Transport Interface
 
 The transport layer is pluggable: Node IPC today, WebSocket tomorrow (for network separation, multi-machine, cloud).
@@ -1110,17 +1127,123 @@ Orchestration Server                  Agent Server
 
 The `EventBuffer` (reused from daemon, 169 LOC) handles this. The `lastSeenEventId` per agent is tracked by `AgentServerClient` automatically from the live event stream — no manual bookkeeping needed.
 
-## Error Handling and Graceful Degradation
+## Error Handling: Agent Server Failure = UI Error
+
+The agent server is a hard dependency. When it's unavailable, the orchestration server MUST surface a clear error to the user — never fail silently.
+
+### Health Check Heartbeat
+
+The orchestration server monitors the agent server's health via periodic pings:
+
+```typescript
+class AgentServerHealthMonitor {
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private missedHeartbeats = 0;
+  private _status: AgentServerStatus = 'connecting';
+
+  readonly HEARTBEAT_INTERVAL_MS = 10_000;  // 10 seconds
+  readonly MAX_MISSED_HEARTBEATS = 3;       // 30s before 'unreachable'
+  readonly HEARTBEAT_TIMEOUT_MS = 5_000;    // 5s per ping
+
+  constructor(
+    private client: AgentServerClient,
+    private onStatusChange: (status: AgentServerStatus) => void,
+  ) {}
+
+  start(): void {
+    this.heartbeatInterval = setInterval(() => this.ping(), this.HEARTBEAT_INTERVAL_MS);
+  }
+
+  private async ping(): Promise<void> {
+    try {
+      const start = Date.now();
+      await this.client.ping(this.HEARTBEAT_TIMEOUT_MS);
+      this.missedHeartbeats = 0;
+      this.setStatus('healthy', { latencyMs: Date.now() - start });
+    } catch {
+      this.missedHeartbeats++;
+      if (this.missedHeartbeats >= this.MAX_MISSED_HEARTBEATS) {
+        this.setStatus('unreachable');
+      } else {
+        this.setStatus('degraded', { missedHeartbeats: this.missedHeartbeats });
+      }
+    }
+  }
+
+  private setStatus(status: AgentServerStatus, meta?: Record<string, unknown>): void {
+    if (status !== this._status) {
+      this._status = status;
+      this.onStatusChange(status);
+    }
+  }
+}
+
+type AgentServerStatus = 'connecting' | 'healthy' | 'degraded' | 'unreachable' | 'crashed';
+```
+
+### Connection Status Tracking
+
+The orchestration server tracks the agent server connection state and pushes updates to the UI via WebSocket:
+
+```typescript
+// In container.ts — wire health monitor to WebSocket
+const healthMonitor = new AgentServerHealthMonitor(agentServerClient, (status) => {
+  // Persist status for API queries
+  container.internal.agentServerStatus = status;
+
+  // Push to all connected UI clients immediately
+  wsServer.broadcast({
+    type: 'agent_server:status',
+    status,
+    timestamp: Date.now(),
+    ...(status === 'crashed' ? { message: 'Agent server process exited unexpectedly' } : {}),
+    ...(status === 'unreachable' ? { message: `No heartbeat response for ${30}s` } : {}),
+  });
+});
+```
+
+### UI Error States
+
+The web UI reacts to `agent_server:status` WebSocket events with appropriate visual indicators:
+
+| Status | UI Treatment | User Action |
+|--------|-------------|-------------|
+| `connecting` | Spinner in header: "Connecting to agent server..." | Wait |
+| `healthy` | Green dot in header (same as current daemon dot) | None needed |
+| `degraded` | Amber dot + tooltip: "Agent server slow (1 missed heartbeat)" | Monitor |
+| `unreachable` | **Red banner across top:** "⚠️ Agent server unreachable — agents may be unresponsive" | Check logs, restart |
+| `crashed` | **Red overlay banner:** "🔴 Agent server crashed. All agents lost. [Restart Agent Server] [View Logs]" | Click restart or investigate |
+
+**Banner behavior:**
+- **Red banner (unreachable/crashed)** is non-dismissible — it stays until the agent server recovers
+- **[Restart Agent Server]** calls the API endpoint `POST /api/agent-server/restart` which re-forks a new agent server
+- **[View Logs]** opens the agent server's stderr output (captured by the orchestration server)
+- When status returns to `healthy`, the banner auto-dismisses with a green toast: "✅ Agent server reconnected"
 
 ### Agent Server Crashes
 
 If the agent server process dies (OOM, segfault, unhandled exception):
-1. ForkTransport detects child `'exit'` event
-2. All agents are lost (they were children of the agent server)
-3. Orchestration server falls back to Phase 1: SDK resume for all agents
-4. UI shows: "Agent server crashed. Resuming agents... (3/12 restored)"
 
-This is the same recovery path as "daemon crash" — SDK resume is the safety net.
+1. ForkTransport detects child `'exit'` event → status becomes `crashed`
+2. All agents are lost (they were children of the agent server)
+3. WebSocket pushes `agent_server:status = 'crashed'` to UI
+4. UI shows red overlay: "Agent server crashed. All agents lost. [Restart Agent Server]"
+5. **No silent fallback.** Spawn requests return `AgentServerUnavailableError` until agent server is restarted.
+6. On restart: orchestration server forks new agent server → status returns to `healthy` → SDK resume restores agents from roster
+
+```typescript
+// ForkTransport: detect crash
+this.child.on('exit', (code, signal) => {
+  this.setState('disconnected');
+  this.healthMonitor.setStatus('crashed');
+
+  // All pending requests fail immediately
+  for (const [id, pending] of this.pendingRequests) {
+    pending.reject(new AgentServerUnavailableError('Agent server crashed'));
+  }
+  this.pendingRequests.clear();
+});
+```
 
 ### Orchestration Server Crashes
 
@@ -1128,7 +1251,7 @@ If the orchestration server dies:
 1. Agent server detects IPC disconnect
 2. Agents keep running, events buffered
 3. tsx watch restarts orchestration server
-4. New server connects, subscribes, replays events
+4. New server connects, authenticates, subscribes, replays events
 5. Zero agent interruption — the core use case
 
 ### IPC Channel Corruption
@@ -1136,15 +1259,17 @@ If the orchestration server dies:
 If `process.send()` throws (channel destroyed, serialization error):
 1. Agent server catches the error
 2. Falls back to buffering mode (same as disconnect)
-3. Orchestration server reconnects via TCP fallback
+3. Orchestration server reconnects via TCP
 
 ### Agent Server Won't Start
 
-If fork fails or agent server crashes immediately:
+If fork fails or agent server crashes on startup:
 1. ForkTransport.connect() times out (10s default)
-2. Orchestration server falls back to direct ACP spawn (current behavior)
-3. No hot-reload protection, but everything else works
-4. UI shows warning: "Agent server unavailable — agents won't survive restarts"
+2. Status set to `crashed` → UI shows error banner
+3. **No agents can be created.** All spawn requests fail with `AgentServerUnavailableError`.
+4. UI shows: "🔴 Agent server failed to start. [Retry] [View Logs]"
+5. **[Retry]** attempts to fork again
+6. The orchestration server itself remains functional (UI, API, DAG viewing) — just no agent operations
 
 ## Lifecycle Modes
 
