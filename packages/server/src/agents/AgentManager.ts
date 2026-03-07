@@ -32,6 +32,8 @@ import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { runWithAgentContext } from '../middleware/requestContext.js';
+import type { AgentServerClient } from './AgentServerClient.js';
+import { startRemoteBridge } from './ServerClientBridge.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -107,6 +109,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private messageQueueStore?: MessageQueueStore;
   private agentRosterRepository?: AgentRosterRepository;
   private activeDelegationRepository?: ActiveDelegationRepository;
+  private agentServerClient?: AgentServerClient;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -120,7 +123,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, agentServerClient }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; agentServerClient?: AgentServerClient } = {},
   ) {
     super();
     this.config = config;
@@ -140,6 +143,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.messageQueueStore = messageQueueStore;
     this.agentRosterRepository = agentRosterRepository;
     this.activeDelegationRepository = activeDelegationRepository;
+    this.agentServerClient = agentServerClient;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -631,6 +635,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     };
 
+    // Helper: start the agent via remote bridge or local ACP
+    const startAgent = () => {
+      if (this.agentServerClient) {
+        const isResume = !!agent.resumeSessionId;
+        let initialPrompt: string | undefined;
+        if (!isResume) {
+          const contextManifest = agent.buildContextManifest(peers, agent.budget);
+          const taskAssignment = `You are acting as the "${effectiveRole.name}" role. ${task ? `Your assigned task is: ${task}` : 'Awaiting task assignment.'}`;
+          initialPrompt = `${effectiveRole.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+        }
+        startRemoteBridge(agent, this.agentServerClient, initialPrompt);
+      } else {
+        agent.start();
+      }
+    };
+
     // Create isolated worktree if manager is available (async — delays agent.start)
     if (this.worktreeManager && !cwd) {
       this.worktreeManager.create(agent.id)
@@ -642,11 +662,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           logger.warn({ module: 'files', msg: 'Worktree creation failed, using shared cwd', err: err.message });
         })
         .finally(() => {
-          agent.start();
+          startAgent();
           postSpawn();
         });
     } else {
-      agent.start();
+      startAgent();
       postSpawn();
     }
 
@@ -858,6 +878,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getRoleRegistry(): RoleRegistry {
     return this.roleRegistry;
+  }
+
+  /** Get the optional AgentServerClient (for remote agent spawning). */
+  getAgentServerClient(): AgentServerClient | undefined {
+    return this.agentServerClient;
+  }
+
+  /** Set or replace the AgentServerClient (for remote agent spawning). */
+  setAgentServerClient(client: AgentServerClient | undefined): void {
+    this.agentServerClient = client;
   }
 
   setAutoRestart(enabled: boolean): void {
