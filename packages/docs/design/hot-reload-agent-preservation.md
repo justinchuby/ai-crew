@@ -1202,26 +1202,25 @@ This is the same recovery path as "daemon crash → Phase 1 fallback" but with b
 #### Directory Structure Summary
 
 ```
-# Case 1: Inside a git repo (most common)
-<repo-root>/
-  .flightdeck/
-    project.yaml                        # Project metadata anchor
-    shared/                             # Shared workspace (already exists)
-
-# Case 2: No git repo (standalone directory)
-~/.flightdeck/projects/<project-id>/
-  project.yaml                          # Project metadata anchor
-  shared/                               # Shared workspace
-
-# Global (always present)
+# Default: Home directory storage (all projects)
 ~/.flightdeck/
-  projects.json                         # Global index: projectId → project root path
+  projects/
+    <project-id>/                       # e.g. flightdeck-a3f7/
+      project.yaml                      # Project metadata anchor
+      shared/                           # Shared workspace
+  projects.json                         # Global index: projectId → projectRoot path
   run/                                  # Daemon runtime (ephemeral)
     daemon.sock                         # IPC socket
     daemon.pid                          # PID file
     daemon.token                        # Auth token
     daemon-manifest.json                # Shutdown hint (written on graceful exit)
     EMERGENCY_STOP                      # Kill sentinel (created by user)
+
+# Opt-in: Repo-local storage (storage: repo)
+<git-repo-root>/
+  .flightdeck/
+    project.yaml                        # Project metadata anchor
+    shared/                             # Shared workspace
 
 flightdeck.db                           # SQLite (authoritative runtime state)
   → agentRoster table                   # NEW: active agent instances
@@ -1236,50 +1235,50 @@ flightdeck.db                           # SQLite (authoritative runtime state)
 
 #### Storage Location Rule
 
-The **default** location of `.flightdeck/` is determined by whether the project is inside a git repo, but the user can override:
+Project state lives in `~/.flightdeck/projects/<project-id>/` **by default**. This keeps project metadata out of the repo — important for multi-contributor repos where committing `.flightdeck/` would pollute the tree.
 
-| Condition | `.flightdeck/` location | Resolution |
-|-----------|------------------------|------------|
-| Inside a git repo (default) | `<git-repo-root>/.flightdeck/` | `git rev-parse --show-toplevel` |
-| No git repo | `~/.flightdeck/projects/<project-id>/` | Home directory fallback |
-| User override (`storage: home`) | `~/.flightdeck/projects/<project-id>/` | Explicit opt-out of repo storage |
+| Condition | `.flightdeck/` location | Notes |
+|-----------|------------------------|-------|
+| Default (always) | `~/.flightdeck/projects/<project-id>/` | Never pollutes the repo |
+| User opt-in (`storage: repo`) | `<git-repo-root>/.flightdeck/` | For solo projects where repo-local state is convenient |
 
-**Override:** Some users may not want `.flightdeck/` in their repo (e.g., monorepos with strict directory policies, repos they don't own, keeping project state private). They can override the default by setting `storage: home` in `project.yaml` or during project creation:
+**Opt-in to repo storage:** Solo developers who want `.flightdeck/` in their repo (discoverable, committable, colocated with code) can set `storage: repo` during project creation or in `project.yaml`:
 
 ```typescript
-// CLI: flightdeck init --storage home
-// API: ProjectRegistry.create({ title: 'My Project', storage: 'home' })
+// CLI: flightdeck init --storage repo
+// API: ProjectRegistry.create({ title: 'My Project', storage: 'repo' })
 
-function resolveProjectRoot(cwd: string, storage?: 'repo' | 'home'): { root: string; type: 'repo' | 'standalone' } {
-  if (storage === 'home') {
-    // User explicitly chose home directory — even inside a git repo
-    return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'standalone' };
+function resolveProjectRoot(cwd: string, projectId: string, storage?: 'home' | 'repo'): { root: string; type: 'home' | 'repo' } {
+  if (storage === 'repo') {
+    // User opted into repo-local storage
+    try {
+      const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'],
+        { cwd, encoding: 'utf8' }).trim();
+      return { root: repoRoot, type: 'repo' };
+    } catch {
+      // Not in a git repo — fall back to home even though user asked for repo
+      return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'home' };
+    }
   }
-  try {
-    const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'],
-      { cwd, encoding: 'utf8' }).trim();
-    return { root: repoRoot, type: 'repo' };
-  } catch {
-    // Not inside a git repo → use home directory
-    return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'standalone' };
-  }
+  // Default: home directory — never touches the repo
+  return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'home' };
 }
 ```
 
-**The default requires zero configuration.** Git repo root is the natural anchor for code projects (matches `.git/`, `.github/`, `.vscode/`). The override exists for edge cases — most users never touch it. The `storage` field is persisted in `project.yaml` so the choice is remembered across restarts.
+**Why home-first?** Multi-contributor repos shouldn't have one developer's Flightdeck state committed. The home directory default is safe for all workflows. Solo developers who want repo-local convenience opt in explicitly — they understand the tradeoff. The `storage` field is persisted in `project.yaml` so the choice is remembered across restarts.
 
 #### Project Metadata File (`project.yaml`)
 
-Each project has a `project.yaml` inside its `.flightdeck/` directory. The location is determined by the storage location rule above — either `<git-repo-root>/.flightdeck/project.yaml` or `~/.flightdeck/projects/<id>/project.yaml`. This file is the **anchor** that identifies a directory as a Flightdeck project.
+Each project has a `project.yaml` inside its `.flightdeck/` directory. By default this is at `~/.flightdeck/projects/<id>/project.yaml`. If the user opted into repo storage, it's at `<git-repo-root>/.flightdeck/project.yaml`. This file is the **anchor** that identifies a Flightdeck project.
 
 ```yaml
-# Git repo example: /Users/justinc/Documents/GitHub/ai-crew/.flightdeck/project.yaml
+# Default (home): ~/.flightdeck/projects/flightdeck-a3f7/project.yaml
+# Repo opt-in:    /Users/justinc/Documents/GitHub/ai-crew/.flightdeck/project.yaml
 id: flightdeck-a3f7
 name: Flightdeck
 description: AI crew orchestration platform
-projectRoot: /Users/justinc/Documents/GitHub/ai-crew   # Resolved root (git repo root or standalone dir)
-storage: repo                                           # 'repo' (default) or 'home' (override)
-type: repo                                              # 'repo' or 'standalone' (derived from storage + git presence)
+projectRoot: /Users/justinc/Documents/GitHub/ai-crew   # Working directory (git repo root or standalone dir)
+storage: home                                           # 'home' (default) or 'repo' (opt-in)
 status: active
 createdAt: "2026-03-07T14:00:00.000Z"
 updatedAt: "2026-03-07T17:30:00.000Z"
@@ -1287,13 +1286,13 @@ updatedAt: "2026-03-07T17:30:00.000Z"
 
 **Location resolution** uses the storage location rule above:
 ```typescript
-const { root, type } = resolveProjectRoot(process.cwd(), existingProject?.storage);
+const { root, type } = resolveProjectRoot(process.cwd(), projectId, existingProject?.storage);
 const projectYaml = path.join(root, '.flightdeck', 'project.yaml');
 ```
 
 **Why a file at the repo root, not just SQLite?**
 
-1. **Project discovery without a running server.** CLI tools (`flightdeck list`, `flightdeck status`) can find the project by looking for `.flightdeck/project.yaml` in the current repo or home directory — no server or SQLite needed. Similar to how `.git/` identifies a git repo.
+1. **Project discovery without a running server.** CLI tools (`flightdeck list`, `flightdeck status`) can find the project via `~/.flightdeck/projects.json` — no server or SQLite needed. For repo-storage projects, `.flightdeck/project.yaml` in the repo also works, similar to how `.git/` identifies a git repo.
 
 2. **Anchors project to its root.** The `projectRoot` field is the resolved root (git repo root or standalone directory). All relative paths in the project (agent cwd, worktrees, shared workspace) resolve from this root. If the directory moves, the server detects the mismatch and updates the field.
 
@@ -1301,7 +1300,7 @@ const projectYaml = path.join(root, '.flightdeck', 'project.yaml');
 
 4. **Survives database reset.** If the user deletes `flightdeck.db` to start fresh, the project metadata survives in the repo. The server re-imports from `project.yaml` on next startup.
 
-5. **Committable (repo projects).** For git repo projects, the `project.yaml` (minus machine-specific fields like `projectRoot`) can be committed to the repo, allowing team members to share project configuration. Standalone projects keep it in the home directory.
+5. **Committable (repo-storage opt-in).** When `storage: repo`, the `project.yaml` (minus machine-specific fields like `projectRoot`) can be committed to the repo, allowing team members to share project configuration. Home-storage projects keep it private by default.
 
 **Global project registry:** The server also maintains `~/.flightdeck/projects.json` — a lightweight index mapping project IDs to project root paths for cross-project discovery:
 
