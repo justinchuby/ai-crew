@@ -916,7 +916,7 @@ Three implementations: `LinuxTransport`, `DarwinTransport`, `WindowsTransport`. 
 | Concern | Linux | macOS | Windows |
 |---------|-------|-------|---------|
 | **IPC mechanism** | Unix domain socket | Unix domain socket | Named pipe |
-| **Socket/pipe path** | `$XDG_RUNTIME_DIR/flightdeck/daemon.sock` | `$TMPDIR/flightdeck/daemon.sock` | `\\.\pipe\flightdeck-daemon-{uid}` |
+| **Socket/pipe path** | `$XDG_RUNTIME_DIR/flightdeck/daemon.sock` | `$TMPDIR/flightdeck/daemon.sock` | `\\.\pipe\flightdeck-daemon-{username}` |
 | **File permissions** | `umask(0o177)` before `listen()` | `umask(0o177)` before `listen()` | Named pipe default DACL + token auth |
 | **Token file location** | `$XDG_RUNTIME_DIR/flightdeck/daemon.token` | `$TMPDIR/flightdeck/daemon.token` | `%LOCALAPPDATA%\flightdeck\daemon.token` |
 | **Token file permissions** | `open(path, 'w', 0o600)` | `open(path, 'w', 0o600)` | NTFS ACL (owner-only) via `icacls` |
@@ -975,7 +975,7 @@ Windows named pipes are the native IPC mechanism — stable, well-tested, and na
 
 ```typescript
 // Windows named pipe path
-const pipeName = `\\\\.\\pipe\\flightdeck-daemon-${process.getuid?.() ?? process.pid}`;
+const pipeName = `\\\\.\\pipe\\flightdeck-daemon-${os.userInfo().username}`;
 
 // Same API as Unix domain sockets:
 const server = net.createServer(handler);
@@ -997,24 +997,38 @@ Windows named pipes use ACLs (Access Control Lists) instead of Unix file permiss
 
 1. **Token authentication (primary):** Same per-session 256-bit token as Unix. The token file is stored in `%LOCALAPPDATA%\flightdeck\daemon.token` with restricted NTFS ACL. Token is required for all daemon operations. This is the primary security boundary on Windows.
 
-2. **Token file ACL:** On daemon startup, restrict the token file to owner-only access:
+2. **Directory DACL restriction (before pipe creation):** Mirror the Unix `umask` pattern — restrict the token directory's DACL before creating any files or pipes inside it. This prevents TOCTOU races where another process accesses files between creation and ACL application:
    ```typescript
-   // After writing token file on Windows:
-   import { execSync } from 'child_process';
-   execSync(`icacls "${tokenPath}" /inheritance:r /grant:r "%USERNAME%:R"`);
+   // Restrict directory FIRST (equivalent to umask(0o177) + mkdir(0o700) on Unix):
+   import { execFileSync } from 'child_process';
+   const tokenDir = path.join(process.env.LOCALAPPDATA!, 'flightdeck');
+   fs.mkdirSync(tokenDir, { recursive: true });
+   execFileSync('icacls', [tokenDir, '/inheritance:r', '/grant:r', `${os.userInfo().username}:(OI)(CI)F`]);
+   // Now all files created inside tokenDir inherit the restricted DACL
    ```
-   This is the Windows equivalent of `chmod 0600`. It removes inherited permissions and grants read-only to the current user.
 
-3. **Pipe name includes user identifier:** `\\.\pipe\flightdeck-daemon-{uid}` — prevents accidental cross-user collisions. Not a security boundary (pipe names are globally visible), but reduces attack surface.
+3. **Token file ACL:** On daemon startup, restrict the token file to owner-only access:
+   ```typescript
+   // Use execFileSync with array args — NOT execSync with string interpolation
+   // (prevents shell injection if tokenPath contains special characters):
+   import { execFileSync } from 'child_process';
+   execFileSync('icacls', [tokenPath, '/inheritance:r', '/grant:r', `${os.userInfo().username}:R`]);
+   ```
+   This is the Windows equivalent of `chmod 0600`. It removes inherited permissions and grants read-only to the current user. **Note:** `execFileSync` with array arguments bypasses the shell entirely, preventing injection via crafted file paths.
 
-4. **Named pipe ACL (optional hardening):** For full 0600 equivalence, the pipe itself needs a restricted ACL. This requires native code (`CreateNamedPipe` with custom `SECURITY_ATTRIBUTES`). Deferred to Phase 2 hardening — token auth is sufficient for development use.
+4. **Pipe name includes username:** `\\.\pipe\flightdeck-daemon-{username}` — prevents accidental cross-user collisions. Not a security boundary (pipe names are globally visible), but reduces attack surface.
+
+5. **Named pipe ACL (optional hardening):** For full 0600 equivalence, the pipe itself needs a restricted ACL. This requires native code (`CreateNamedPipe` with custom `SECURITY_ATTRIBUTES`). Deferred to Phase 2 hardening — token auth is sufficient for development use.
 
 **Threat comparison — Windows vs Unix:**
 
+> **⚠️ Windows security is strictly weaker than Unix.** On Unix, the socket file's `0600` permissions prevent unauthorized users from even attempting a connection — the kernel rejects `connect()` before our code runs. On Windows, any local user can enumerate pipe names (via `\\.\pipe\` listing) and attempt a connection. **Token authentication is the sole barrier** preventing unauthorized access on Windows. This is acceptable for a development tool but should be documented clearly for users running in shared/multi-user environments.
+
 | Threat | Unix Mitigation | Windows Mitigation |
 |--------|----------------|-------------------|
-| Unauthorized connection | Socket file perms (0600) + token | Token auth (primary) + pipe name obscurity |
-| Token file theft | File perms (0600) + `fdatasync` | NTFS ACL via `icacls` |
+| Unauthorized connection | Socket file perms (0600) + token | **Token auth only** (pipe has no ACL by default) |
+| Pipe/socket discovery | Socket path not enumerable | ⚠️ Pipe names globally enumerable via `\\.\pipe\` |
+| Token file theft | File perms (0600) + `fdatasync` | NTFS directory DACL + `icacls` on file |
 | Eavesdropping | Socket is local-only (kernel) | Pipe is local-only (kernel) |
 | Impersonation | Socket directory perms (0700) | Token `timingSafeEqual` |
 | Stale socket/pipe | `connect()` probe + `unlink()` | Auto-cleanup (pipes vanish when daemon dies) |
