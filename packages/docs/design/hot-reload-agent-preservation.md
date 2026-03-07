@@ -318,12 +318,27 @@ This is a **local privilege boundary** problem, not a network security problem. 
 $XDG_RUNTIME_DIR/flightdeck/     # typically /run/user/<uid>/flightdeck/
 ├── agent-host.sock               # mode 0600 (owner rw only)
 ├── agent-host.token              # mode 0600 (per-session auth token)
-└── agent-host.pid                # mode 0644 (daemon PID for health checks)
+└── agent-host.pid                # mode 0644 (informational only — see A2 note below)
 ```
 
+**A2: PID file is informational, not a security check.** PID files are unreliable for daemon liveness detection because of process ID recycling — after a daemon crash, the OS may assign the same PID to an unrelated process. Instead of checking `kill(pid, 0)` against the PID file, the launcher (`dev.mjs`) should:
+1. **Attempt a socket connect** to `agent-host.sock`
+2. **Send auth handshake** with the token from `agent-host.token`
+3. **If connect fails or auth is rejected:** daemon is dead or stale → unlink socket, start fresh daemon
+4. **If connect + auth succeeds:** daemon is alive → proceed to start API server
+
+This connect-test approach is immune to PID recycling and also validates the auth layer end-to-end. The PID file is retained for human debugging only (e.g., `cat agent-host.pid` to find the daemon in `ps`).
+
 **Fallback chain** (for systems without `XDG_RUNTIME_DIR`):
-1. `$XDG_RUNTIME_DIR/flightdeck/` — Linux with systemd (per-user tmpfs, correct permissions)
-2. `~/.flightdeck/run/` — macOS, older Linux (user home, always available)
+1. `$XDG_RUNTIME_DIR/flightdeck/` — Linux with systemd (per-user tmpfs, correct permissions, auto-cleaned on logout)
+2. `$TMPDIR/flightdeck-$UID/` — macOS (see security note below)
+3. `~/.flightdeck/run/` — last resort (older Linux, non-standard setups)
+
+**⚠️ macOS fallback security note (S3):** On macOS, `$TMPDIR` resolves to a per-user path like `/var/folders/xx/.../T/` which is not a tmpfs — files persist to disk and may be captured by Time Machine backups. This means the per-session token could be backed up and theoretically recovered later. Mitigations:
+- The token is regenerated on every daemon startup, so backed-up tokens are always stale/useless
+- The fallback directory is still created with mode `0700` and token with `0600`
+- For security-sensitive deployments, set `XDG_RUNTIME_DIR` explicitly on macOS (e.g., `export XDG_RUNTIME_DIR=$(mktemp -d)` in shell profile) to use a true temporary path
+- Alternatively, add `$TMPDIR/flightdeck-*` to Time Machine exclusions
 
 The directory is created with mode `0700` (owner-only access). The socket file is created with mode `0600`. These two permission checks mean only processes running as the daemon's UID can even attempt to connect.
 
@@ -333,18 +348,29 @@ The directory is created with mode `0700` (owner-only access). The socket file i
 
 The socket file's `0600` mode means the kernel rejects `connect()` from any process not running as the socket's owner UID. This is the primary security boundary — it's enforced at the syscall level with zero overhead.
 
+**TOCTOU prevention:** Setting `umask(0o177)` before `listen()` ensures the socket is created with `0600` atomically. A naive `listen()` + `chmod()` sequence leaves the socket world-accessible for a brief window between the two syscalls — a local attacker could race to connect during that gap.
+
 ```typescript
 // In AgentHostDaemon.ts
 import { createServer } from 'net';
-import { mkdirSync, chmodSync } from 'fs';
+import { mkdirSync, unlinkSync, existsSync } from 'fs';
 
 const socketDir = getSocketDir();  // XDG_RUNTIME_DIR or ~/.flightdeck/run
 mkdirSync(socketDir, { recursive: true, mode: 0o700 });
 
-const server = createServer();
 const socketPath = join(socketDir, 'agent-host.sock');
+
+// Clean up stale socket from previous crash
+if (existsSync(socketPath)) unlinkSync(socketPath);
+
+const server = createServer();
+
+// Set restrictive umask BEFORE listen() so the socket is born with 0600.
+// listen() creates the socket file — umask(0o177) masks out group+other rw.
+// This eliminates the TOCTOU race of listen→chmod.
+const previousUmask = process.umask(0o177);
 server.listen(socketPath, () => {
-  chmodSync(socketPath, 0o600);  // owner rw only
+  process.umask(previousUmask);  // restore immediately after socket creation
 });
 ```
 
@@ -357,9 +383,17 @@ Even with correct file permissions, defense in depth requires a second factor. T
 ```typescript
 // Daemon startup — generate and persist token
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { openSync, writeSync, closeSync, fdatasyncSync } from 'fs';
 
 const sessionToken = randomBytes(32).toString('hex');  // 256-bit
-writeFileSync(join(socketDir, 'agent-host.token'), sessionToken, { mode: 0o600 });
+
+// Write token file atomically with correct permissions from the start.
+// Using open()+write() with mode avoids the TOCTOU race of writeFile()+chmod().
+const tokenPath = join(socketDir, 'agent-host.token');
+const fd = openSync(tokenPath, 'w', 0o600);  // created with 0600 — no chmod needed
+writeSync(fd, sessionToken);
+fdatasyncSync(fd);  // ensure token is flushed to disk before daemon accepts connections
+closeSync(fd);
 
 // On client connection — require auth as first message
 socket.once('data', (data) => {
@@ -391,7 +425,8 @@ socket.write(JSON.stringify({
 
 **Token lifecycle:**
 - Generated fresh on each daemon startup (not reusable across sessions)
-- Stored in `agent-host.token` with mode `0600` (same as socket)
+- Written via `open()` with mode `0o600` — no TOCTOU window (permissions set at file creation, not after)
+- `fdatasync` ensures token is on-disk before daemon accepts connections
 - `timingSafeEqual` prevents timing side-channel attacks
 - Connection rejected immediately on auth failure (no retry, no error details)
 
@@ -407,15 +442,20 @@ Once authenticated, the server has full daemon access. No per-operation ACLs are
 
 | Threat | Mitigation | Layer |
 |--------|-----------|-------|
-| Rogue local process connects to socket | Socket file mode `0600` — kernel rejects `connect()` | Filesystem |
+| Rogue local process connects to socket | Socket file mode `0600` via umask — kernel rejects `connect()` | Filesystem |
+| TOCTOU race on socket creation | `umask(0o177)` set before `listen()` — socket born with `0600`, no `chmod()` gap | Filesystem |
+| TOCTOU race on token file creation | `open(path, 'w', 0o600)` + `fdatasync` — permissions set at file creation via fd | Filesystem |
 | Socket directory traversal / symlink attack | Directory mode `0700` in user-private path (not `/tmp/`) | Filesystem |
 | Docker/NFS permission bypass | Per-session token required as first message | Application |
 | Token file read by other user | Token file mode `0600` in `0700` directory | Filesystem |
-| Daemon impersonation (fake daemon) | Client verifies `agent-host.pid` matches socket peer | Application |
+| macOS token persistence (Time Machine) | Token regenerated per session (stale tokens useless); document XDG_RUNTIME_DIR override | Operational |
+| Daemon impersonation (fake daemon) | Client verifies socket liveness via connect test + token auth (not PID file — see below) | Application |
 | Man-in-the-middle / network sniffing | Unix socket = no network exposure, local-only by definition | Transport |
 | Timing side-channel on token comparison | `crypto.timingSafeEqual()` | Application |
-| Stale socket from crashed daemon | `dev.mjs` checks PID file liveness before connecting | Launcher |
+| Stale socket from crashed daemon | `dev.mjs` attempts connect + token auth; on failure, unlinks stale socket and starts fresh daemon | Launcher |
+| PID file recycling (false liveness) | PID file is informational only; liveness checked via socket connect + auth handshake | Launcher |
 | Replay attack on auth token | Token is per-session; persistent connection (not per-request auth) | Protocol |
+| Daemon crash kills agents | Graceful degradation to Phase 1 auto-resume; periodic roster snapshots limit data loss to 30s | Recovery |
 
 ### What We Explicitly Don't Need
 
@@ -424,6 +464,41 @@ Once authenticated, the server has full daemon access. No per-operation ACLs are
 - **Rate limiting:** Trusted client over local IPC. No abuse vector.
 - **Per-agent ACLs:** Single-user system. If you authenticated, you own everything.
 - **Encryption at rest for token:** The token file has the same permissions as the socket file. If an attacker can read one, they can read the other. The security boundary is the filesystem permissions, not encryption.
+
+### Daemon Crash Recovery
+
+**What happens to agents if the daemon dies?**
+
+If the daemon process crashes or is killed, all child agent processes die with it (OS SIGHUP propagation — same problem the daemon was designed to solve for the server). This is an inherent limitation of the Unix process model: stdio-pipe-connected children cannot outlive their parent.
+
+**Recovery strategy: Graceful degradation to Phase 1 auto-resume.**
+
+```
+Daemon running → Daemon crashes
+                    │
+                    ├── Agent processes die (SIGHUP from OS)
+                    ├── Server detects socket EOF → enters "daemon-lost" state
+                    ├── Server logs warning, UI shows "⚠️ Daemon connection lost"
+                    │
+                    ├── dev.mjs detects daemon exit → restarts daemon
+                    ├── Server reconnects to new daemon via socket
+                    └── Server auto-resumes agents using Phase 1 roster persistence
+                        (roster was persisted to SQLite periodically, not just at shutdown)
+```
+
+**Key design decisions:**
+
+1. **Periodic roster snapshots:** The server writes the agent roster to SQLite every 30s (not just on graceful shutdown). This limits data loss to the last 30s of agent activity on unexpected daemon death.
+
+2. **Daemon health heartbeat:** The server sends a `ping` JSON-RPC message every 10s. If 3 consecutive pings fail (30s), the server proactively enters "daemon-lost" mode rather than waiting for socket EOF (which may not fire promptly in all failure modes).
+
+3. **Automatic daemon restart:** `dev.mjs` monitors the daemon process. On unexpected exit, it restarts the daemon and the server reconnects automatically. The user may see a brief "Resuming agents..." phase but no manual intervention is needed.
+
+4. **No orphan agents:** Because agents are children of the daemon process, they cannot be orphaned. This is actually simpler than the alternative (detached agents that outlive everything) — we never have to find and clean up zombie agent processes.
+
+**What about double-fault (daemon + server both crash)?**
+
+Same as today: SQLite has the roster, file locks, DAG state. On next `npm run dev`, everything recovers via Phase 1 auto-resume. The daemon adds zero new failure modes beyond what already exists — it only adds a new recovery path (reconnect without re-spawn) for the common case (server restart, not daemon death).
 
 ---
 
@@ -466,9 +541,9 @@ Already a small task. Three agents in parallel:
 
 **Critical path:** 3 hours. All three workstreams are independent.
 
-### Phase 2: Agent Host Daemon — 3-5 days
+### Phase 2: Agent Host Daemon — 4-6 days
 
-The daemon has ~8 independent workstreams, most parallelizable after a short shared-protocol design phase:
+The daemon has ~8 independent workstreams, most parallelizable after a short shared-protocol design phase. The extra day (vs a minimal estimate) accounts for integration testing complexity — the daemon↔server↔agent pipeline has multiple async failure modes that require careful end-to-end validation.
 
 #### Day 1: Protocol Design + Foundation (3-4 agents)
 
@@ -492,7 +567,7 @@ The daemon has ~8 independent workstreams, most parallelizable after a short sha
 | QA Tester A | Unit tests: daemon protocol, auth, spawn/terminate |
 | QA Tester B | Unit tests: client reconnect, event streaming |
 
-#### Day 4-5: Integration + Polish (4-6 agents)
+#### Day 4-6: Integration + Polish (4-6 agents)
 
 | Agent | Task |
 |-------|------|
@@ -503,14 +578,14 @@ The daemon has ~8 independent workstreams, most parallelizable after a short sha
 | Tech Writer | Update README, add `docs/daemon-architecture.md` |
 | Code Reviewer | Review all daemon PRs before merge |
 
-**Critical path:** 5 days (protocol → daemon core → integration testing). Most work parallelizes after the Day 1 protocol design.
+**Critical path:** 6 days (protocol → daemon core → integration testing → edge case hardening). Most work parallelizes after the Day 1 protocol design. Integration testing gets an extra day because the daemon↔server reconnect flow and daemon crash recovery need thorough async testing.
 
 ### Phase Comparison
 
 | | Single Developer | 12 AI Agents | Speedup |
 |---|---|---|---|
 | Phase 1 | 1-2 days | 0.5 days | 2-4x |
-| Phase 2 | 2-3 weeks | 3-5 days | 3-5x |
-| **Total** | **2.5-3.5 weeks** | **3.5-5.5 days** | **~4x** |
+| Phase 2 | 2-3 weeks | 4-6 days | 2.5-4x |
+| **Total** | **2.5-3.5 weeks** | **4.5-6.5 days** | **~3.5x** |
 
-**Why not faster?** The critical path is constrained by integration dependencies (protocol types must land before daemon/client, daemon/client must work before AgentManager refactor). Parallelism helps within phases but can't eliminate sequential dependencies between phases.
+**Why not faster?** The critical path is constrained by integration dependencies (protocol types must land before daemon/client, daemon/client must work before AgentManager refactor, integration tests must cover daemon crash recovery and reconnect). Parallelism helps within phases but can't eliminate sequential dependencies between phases.
