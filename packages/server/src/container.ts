@@ -24,6 +24,9 @@ import { ProjectRegistry } from './projects/ProjectRegistry.js';
 import { TimerRegistry } from './coordination/scheduling/TimerRegistry.js';
 import { CostTracker } from './agents/CostTracker.js';
 import { MessageQueueStore } from './persistence/MessageQueueStore.js';
+import { AgentRosterRepository } from './db/AgentRosterRepository.js';
+import { ActiveDelegationRepository } from './db/ActiveDelegationRepository.js';
+import { StorageManager } from './storage/StorageManager.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';
@@ -63,6 +66,7 @@ import { AgentMatcher } from './coordination/agents/AgentMatcher.js';
 import { SessionRetro } from './coordination/sessions/SessionRetro.js';
 import { SessionExporter } from './coordination/sessions/SessionExporter.js';
 import { PerformanceTracker } from './coordination/reporting/PerformanceScorecard.js';
+import { SessionResumeManager } from './agents/SessionResumeManager.js';
 
 // ── Imports: Tier 6 (HTTP/WS) ──────────────────────────────
 import { WebSocketServer } from './comms/WebSocketServer.js';
@@ -99,6 +103,7 @@ export interface ServiceContainer extends AppContext {
     costTracker: CostTracker;
     configStore: ConfigStore;
     messageQueueStore: MessageQueueStore;
+    sessionResumeManager: SessionResumeManager;
   };
 }
 
@@ -151,9 +156,12 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const taskDAG = new TaskDAG(db);
   const deferredIssueRegistry = new DeferredIssueRegistry(db);
   const projectRegistry = new ProjectRegistry(db);
+  const storageManager = new StorageManager();
   const timerRegistry = new TimerRegistry(db.drizzle);
   const costTracker = new CostTracker(db);
   const messageQueueStore = new MessageQueueStore(db);
+  const agentRosterRepository = new AgentRosterRepository(db);
+  const activeDelegationRepository = new ActiveDelegationRepository(db);
 
   // ── Tier 2: Stateless Services ─────────────────────────
   const messageBus = new MessageBus();
@@ -223,11 +231,15 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     taskDAG, {
       db, deferredIssueRegistry, timerRegistry, capabilityInjector,
       taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker,
-      governancePipeline,
+      governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository,
     },
   );
   agentManager.setProjectRegistry(projectRegistry);
   onShutdown('agentManager', () => agentManager.shutdownAll());
+
+  // SessionResumeManager: persists agent roster on lifecycle events, handles resume on startup
+  const sessionResumeManager = new SessionResumeManager(agentManager, agentRosterRepository, activeDelegationRepository, roleRegistry);
+  onShutdown('sessionResumeManager', () => sessionResumeManager.dispose());
 
   // ── Tier 5: AgentManager-dependent services ────────────
   const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
@@ -319,6 +331,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     knowledgeTransfer,
     eventPipeline,
     costTracker,
+    storageManager,
 
     // Lifecycle
     async shutdown() {
@@ -347,6 +360,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       costTracker,
       configStore,
       messageQueueStore,
+      sessionResumeManager,
     },
   };
 

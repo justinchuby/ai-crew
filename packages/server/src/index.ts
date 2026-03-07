@@ -115,6 +115,15 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   }
   container.internal.contextRefresher.start();
   container.escalationManager!.start();
+
+  // Attempt to resume agents from previous session (async, non-blocking)
+  container.internal.sessionResumeManager.resumeAll().then((result) => {
+    if (result.total > 0) {
+      console.log(`🔄 Agent resume: ${result.succeeded}/${result.total} resumed, ${result.failed} failed, ${result.skipped} skipped`);
+    }
+  }).catch((err) => {
+    console.warn(`⚠️  Agent resume failed: ${err.message}`);
+  });
 }).catch((err) => {
   console.error(`❌ Failed to start server: ${err.message}`);
   if (err.message.includes('No available port')) {
