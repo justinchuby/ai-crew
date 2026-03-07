@@ -318,11 +318,12 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         this.emit('usage', { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
       }
 
-      this.emit('prompt_complete', result.stopReason);
+      this.emit('prompt_complete', translateStopReason(result.stopReason));
       this.drainQueue();
 
+      const translated = translateStopReason(result.stopReason);
       return {
-        stopReason: translateStopReason(result.stopReason),
+        stopReason: translated,
         usage: usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : undefined,
       };
     } catch (err) {
@@ -359,6 +360,8 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       this.prompt(merged).catch((err: Error) => {
         logger.error('acp', `Drained prompt failed: ${err?.message || err}`);
       });
+    } else {
+      this.emit('idle');
     }
   }
 
