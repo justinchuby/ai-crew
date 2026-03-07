@@ -1234,19 +1234,27 @@ flightdeck.db                           # SQLite (authoritative runtime state)
 
 **Design principle: SQLite is the single source of truth** for runtime state. The `project.yaml` files are the anchor for project discovery and link projects to their working directories. The daemon manifest is a performance hint for faster resume.
 
-#### Storage Location Rule (Deterministic, No User Choice)
+#### Storage Location Rule
 
-The location of `.flightdeck/` is **automatic** — determined entirely by whether the project is inside a git repo:
+The **default** location of `.flightdeck/` is determined by whether the project is inside a git repo, but the user can override:
 
 | Condition | `.flightdeck/` location | Resolution |
 |-----------|------------------------|------------|
-| Inside a git repo | `<git-repo-root>/.flightdeck/` | `git rev-parse --show-toplevel` |
+| Inside a git repo (default) | `<git-repo-root>/.flightdeck/` | `git rev-parse --show-toplevel` |
 | No git repo | `~/.flightdeck/projects/<project-id>/` | Home directory fallback |
+| User override (`storage: home`) | `~/.flightdeck/projects/<project-id>/` | Explicit opt-out of repo storage |
 
-There is no user choice, no configuration, no modes. The rule is deterministic:
+**Override:** Some users may not want `.flightdeck/` in their repo (e.g., monorepos with strict directory policies, repos they don't own, keeping project state private). They can override the default by setting `storage: home` in `project.yaml` or during project creation:
 
 ```typescript
-function resolveProjectRoot(cwd: string): { root: string; type: 'repo' | 'standalone' } {
+// CLI: flightdeck init --storage home
+// API: ProjectRegistry.create({ title: 'My Project', storage: 'home' })
+
+function resolveProjectRoot(cwd: string, storage?: 'repo' | 'home'): { root: string; type: 'repo' | 'standalone' } {
+  if (storage === 'home') {
+    // User explicitly chose home directory — even inside a git repo
+    return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'standalone' };
+  }
   try {
     const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'],
       { cwd, encoding: 'utf8' }).trim();
@@ -1256,13 +1264,9 @@ function resolveProjectRoot(cwd: string): { root: string; type: 'repo' | 'standa
     return { root: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'standalone' };
   }
 }
-
-const { root, type } = resolveProjectRoot(process.cwd());
-const flightdeckDir = path.join(root, '.flightdeck');
-const projectYaml = path.join(flightdeckDir, 'project.yaml');
 ```
 
-**Why no choice?** Configuration means decisions. Decisions mean mistakes. The git repo root is the natural anchor for code projects (matches `.git/`, `.github/`, `.vscode/`). For the rare non-git case, the home directory fallback is predictable. One rule, zero configuration.
+**The default requires zero configuration.** Git repo root is the natural anchor for code projects (matches `.git/`, `.github/`, `.vscode/`). The override exists for edge cases — most users never touch it. The `storage` field is persisted in `project.yaml` so the choice is remembered across restarts.
 
 #### Project Metadata File (`project.yaml`)
 
@@ -1274,15 +1278,16 @@ id: flightdeck-a3f7
 name: Flightdeck
 description: AI crew orchestration platform
 projectRoot: /Users/justinc/Documents/GitHub/ai-crew   # Resolved root (git repo root or standalone dir)
-type: repo                                              # 'repo' or 'standalone'
+storage: repo                                           # 'repo' (default) or 'home' (override)
+type: repo                                              # 'repo' or 'standalone' (derived from storage + git presence)
 status: active
 createdAt: "2026-03-07T14:00:00.000Z"
 updatedAt: "2026-03-07T17:30:00.000Z"
 ```
 
-**Location resolution** uses the deterministic rule from above — no user input needed:
+**Location resolution** uses the storage location rule above:
 ```typescript
-const { root, type } = resolveProjectRoot(process.cwd());
+const { root, type } = resolveProjectRoot(process.cwd(), existingProject?.storage);
 const projectYaml = path.join(root, '.flightdeck', 'project.yaml');
 ```
 
