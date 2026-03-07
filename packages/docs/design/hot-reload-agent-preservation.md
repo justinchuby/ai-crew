@@ -1216,7 +1216,7 @@ This is the same recovery path as "daemon crash → Phase 1 fallback" but with b
     daemon-manifest.json                # Shutdown hint (written on graceful exit)
     EMERGENCY_STOP                      # Kill sentinel (created by user)
 
-# Opt-in: Repo-local storage (storage: repo) — supports multiple projects per repo
+# Opt-in: Local storage (storage: local) — supports multiple projects per repo
 <git-repo-root>/
   .flightdeck/
     projects/
@@ -1242,32 +1242,32 @@ Project state lives in `~/.flightdeck/projects/<project-id>/` **by default**. Th
 | Condition | `.flightdeck/` location | Notes |
 |-----------|------------------------|-------|
 | Default (always) | `~/.flightdeck/projects/<project-id>/` | Never pollutes the repo |
-| User opt-in (`storage: repo`) | `<git-repo-root>/.flightdeck/projects/<project-id>/` | For solo projects; supports monorepos with multiple projects |
+| User opt-in (`storage: local`) | `<git-repo-root>/.flightdeck/projects/<project-id>/` | For solo projects; supports monorepos with multiple projects |
 
-**Opt-in to repo storage:** Solo developers who want `.flightdeck/` in their repo (discoverable, committable, colocated with code) can set `storage: repo` during project creation or in `project.yaml`:
+**Opt-in to local storage:** Solo developers who want `.flightdeck/` in their project directory (discoverable, committable, colocated with code) can set `storage: local` during project creation or in `project.yaml`:
 
 ```typescript
-// CLI: flightdeck init --storage repo
-// API: ProjectRegistry.create({ title: 'My Project', storage: 'repo' })
+// CLI: flightdeck init --storage local
+// API: ProjectRegistry.create({ title: 'My Project', storage: 'local' })
 
-function resolveProjectDir(cwd: string, projectId: string, storage?: 'home' | 'repo'): { dir: string; type: 'home' | 'repo' } {
-  if (storage === 'repo') {
-    // User opted into repo-local storage — .flightdeck/projects/<id>/ at git root
+function resolveProjectDir(cwd: string, projectId: string, storage?: 'user' | 'local'): { dir: string; type: 'user' | 'local' } {
+  if (storage === 'local') {
+    // User opted into local storage — .flightdeck/projects/<id>/ at git root
     try {
       const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'],
         { cwd, encoding: 'utf8' }).trim();
-      return { dir: path.join(repoRoot, '.flightdeck', 'projects', projectId), type: 'repo' };
+      return { dir: path.join(repoRoot, '.flightdeck', 'projects', projectId), type: 'local' };
     } catch {
-      // Not in a git repo — fall back to home even though user asked for repo
-      return { dir: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'home' };
+      // Not in a git repo — fall back to user dir even though user asked for local
+      return { dir: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'user' };
     }
   }
-  // Default: home directory — never touches the repo
-  return { dir: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'home' };
+  // Default: user directory — never touches the project tree
+  return { dir: path.join(os.homedir(), '.flightdeck', 'projects', projectId), type: 'user' };
 }
 ```
 
-**Why home-first?** Multi-contributor repos shouldn't have one developer's Flightdeck state committed. The home directory default is safe for all workflows. Solo developers who want repo-local convenience opt in explicitly — they understand the tradeoff. The `storage` field is persisted in `project.yaml` so the choice is remembered across restarts.
+**Why user-dir-first?** Multi-contributor repos shouldn't have one developer's Flightdeck state committed. The user directory default is safe for all workflows and OS-neutral (`os.homedir()` works on Windows, macOS, and Linux). Solo developers who want project-local convenience opt in explicitly — they understand the tradeoff. The `storage` field is persisted in `project.yaml` so the choice is remembered across restarts.
 
 #### Project Metadata File (`project.yaml`)
 
@@ -1280,7 +1280,7 @@ id: flightdeck-a3f7
 name: Flightdeck
 description: AI crew orchestration platform
 workingDir: /Users/justinc/Documents/GitHub/ai-crew   # Where agents run (git repo root or standalone dir)
-storage: home                                           # 'home' (default) or 'repo' (opt-in)
+storage: user                                           # 'user' (default) or 'local' (opt-in)
 status: active
 createdAt: "2026-03-07T14:00:00.000Z"
 updatedAt: "2026-03-07T17:30:00.000Z"
@@ -1302,7 +1302,7 @@ const projectYaml = path.join(dir, 'project.yaml');
 
 4. **Survives database reset.** If the user deletes `flightdeck.db` to start fresh, the project metadata survives in the repo. The server re-imports from `project.yaml` on next startup.
 
-5. **Committable (repo-storage opt-in).** When `storage: repo`, the `project.yaml` (minus machine-specific fields like `workingDir`) can be committed to the repo, allowing team members to share project configuration. Home-storage projects keep it private by default.
+5. **Committable (local-storage opt-in).** When `storage: local`, the `project.yaml` (minus machine-specific fields like `workingDir`) can be committed to the repo, allowing team members to share project configuration. User-storage projects keep it private by default.
 
 **Global project registry:** The server also maintains `~/.flightdeck/projects.json` — a lightweight index mapping project IDs to project root paths for cross-project discovery:
 
