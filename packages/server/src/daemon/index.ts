@@ -1,12 +1,23 @@
 /**
  * Daemon module barrel export.
  *
- * Provides the daemon process, client, protocol types, and event buffer
- * for agent lifecycle management across server restarts.
+ * Provides the daemon process, client, protocol types, event buffer,
+ * and cross-platform utilities for agent lifecycle management across
+ * server restarts.
  */
 export { DaemonProcess, type DaemonProcessOptions } from './DaemonProcess.js';
 export { DaemonClient, type DaemonClientOptions, type DaemonClientEvents } from './DaemonClient.js';
 export { EventBuffer, type EventBufferOptions } from './EventBuffer.js';
+export {
+  // Cross-platform utilities
+  createTransport,
+  detectPlatform,
+  isWindows,
+  isMacOS,
+  isLinux,
+  type TransportAdapter,
+  type Platform,
+} from './platform.js';
 export {
   // Protocol types
   type JsonRpcRequest,
@@ -46,3 +57,11 @@ export {
   isNotification,
   getSocketDir,
 } from './DaemonProtocol.js';
+export {
+  MassFailureDetector,
+  detectCause,
+  type ExitRecord,
+  type MassFailureConfig,
+  type MassFailureCallback,
+  type MassFailureCause,
+} from './MassFailureDetector.js';

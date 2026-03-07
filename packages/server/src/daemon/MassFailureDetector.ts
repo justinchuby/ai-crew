@@ -44,6 +44,33 @@ export type MassFailureCause = MassFailureData['likelyCause'];
 
 const MAX_EXIT_HISTORY = 50;
 
+// ── Bounds for configuration values ─────────────────────────────────
+
+const MIN_THRESHOLD = 1;
+const MAX_THRESHOLD = 100;
+const MIN_WINDOW_MS = 1_000;       // 1 second
+const MAX_WINDOW_MS = 600_000;     // 10 minutes
+const MIN_COOLDOWN_MS = 1_000;     // 1 second
+const MAX_COOLDOWN_MS = 3_600_000; // 1 hour
+
+function validateConfig(opts: MassFailureConfig): void {
+  if (opts.threshold !== undefined) {
+    if (!Number.isFinite(opts.threshold) || opts.threshold < MIN_THRESHOLD || opts.threshold > MAX_THRESHOLD) {
+      throw new RangeError(`threshold must be between ${MIN_THRESHOLD} and ${MAX_THRESHOLD}, got ${opts.threshold}`);
+    }
+  }
+  if (opts.windowMs !== undefined) {
+    if (!Number.isFinite(opts.windowMs) || opts.windowMs < MIN_WINDOW_MS || opts.windowMs > MAX_WINDOW_MS) {
+      throw new RangeError(`windowMs must be between ${MIN_WINDOW_MS} and ${MAX_WINDOW_MS}, got ${opts.windowMs}`);
+    }
+  }
+  if (opts.cooldownMs !== undefined) {
+    if (!Number.isFinite(opts.cooldownMs) || opts.cooldownMs < MIN_COOLDOWN_MS || opts.cooldownMs > MAX_COOLDOWN_MS) {
+      throw new RangeError(`cooldownMs must be between ${MIN_COOLDOWN_MS} and ${MAX_COOLDOWN_MS}, got ${opts.cooldownMs}`);
+    }
+  }
+}
+
 // ── MassFailureDetector ─────────────────────────────────────────────
 
 export class MassFailureDetector {
@@ -58,6 +85,7 @@ export class MassFailureDetector {
   private cooldownMs: number;
 
   constructor(config: MassFailureConfig = {}) {
+    validateConfig(config);
     this.threshold = config.threshold ?? 3;
     this.windowMs = config.windowMs ?? 60_000;
     this.cooldownMs = config.cooldownMs ?? 120_000;
@@ -167,6 +195,7 @@ export class MassFailureDetector {
 
   /** Update configuration at runtime. */
   configure(opts: MassFailureConfig): void {
+    validateConfig(opts);
     if (opts.threshold !== undefined) this.threshold = opts.threshold;
     if (opts.windowMs !== undefined) this.windowMs = opts.windowMs;
     if (opts.cooldownMs !== undefined) this.cooldownMs = opts.cooldownMs;

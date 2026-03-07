@@ -380,6 +380,59 @@ describe('MassFailureDetector', () => {
         cooldownMs: 120_000,
       });
     });
+
+    it('rejects threshold of 0', () => {
+      expect(() => detector.configure({ threshold: 0 })).toThrow(RangeError);
+    });
+
+    it('rejects negative threshold', () => {
+      expect(() => detector.configure({ threshold: -1 })).toThrow(RangeError);
+    });
+
+    it('rejects threshold above 100', () => {
+      expect(() => detector.configure({ threshold: 101 })).toThrow(RangeError);
+    });
+
+    it('rejects windowMs below 1 second', () => {
+      expect(() => detector.configure({ windowMs: 500 })).toThrow(RangeError);
+    });
+
+    it('rejects windowMs above 10 minutes', () => {
+      expect(() => detector.configure({ windowMs: 700_000 })).toThrow(RangeError);
+    });
+
+    it('rejects cooldownMs above 1 hour', () => {
+      expect(() => detector.configure({ cooldownMs: 3_700_000 })).toThrow(RangeError);
+    });
+
+    it('rejects Infinity values', () => {
+      expect(() => detector.configure({ cooldownMs: Infinity })).toThrow(RangeError);
+      expect(() => detector.configure({ windowMs: Infinity })).toThrow(RangeError);
+      expect(() => detector.configure({ threshold: Infinity })).toThrow(RangeError);
+    });
+
+    it('rejects NaN values', () => {
+      expect(() => detector.configure({ threshold: NaN })).toThrow(RangeError);
+    });
+
+    it('does not apply partial config when validation fails', () => {
+      const before = detector.getConfig();
+      expect(() => detector.configure({ threshold: 0 })).toThrow();
+      expect(detector.getConfig()).toEqual(before);
+    });
+  });
+
+  describe('constructor validation', () => {
+    it('rejects invalid config in constructor', () => {
+      expect(() => new MassFailureDetector({ threshold: 0 })).toThrow(RangeError);
+      expect(() => new MassFailureDetector({ cooldownMs: Infinity })).toThrow(RangeError);
+    });
+
+    it('accepts valid boundary values', () => {
+      const d = new MassFailureDetector({ threshold: 1, windowMs: 1_000, cooldownMs: 3_600_000 });
+      expect(d.getConfig()).toEqual({ threshold: 1, windowMs: 1_000, cooldownMs: 3_600_000 });
+      d.dispose();
+    });
   });
 
   // ---------------------------------------------------------------------------
