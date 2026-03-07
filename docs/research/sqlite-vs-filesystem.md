@@ -317,9 +317,10 @@ You are a security-focused code reviewer. Your primary responsibility is...
                              │
                     ┌────────▼──────────────────────────────┐
                     │         Filesystem Mirror              │
-                    │  $(git rev-parse --show-toplevel)/     │
-                    │    .flightdeck/                        │
-                    │  Fallback: ~/.flightdeck/projects/id/  │
+                    │  ~/.flightdeck/projects/<id>/          │
+                    │  (default — always)                    │
+                    │  OR <git-root>/.flightdeck/projects/   │
+                    │     <id>/ (opt-in repo mode)           │
                     │                                        │
                     │  Human-readable · git-committable      │
                     │  User-editable · IDE-browsable         │
@@ -361,7 +362,7 @@ Tables that benefit most from the mirror:
 ### Filesystem Mirror Structure
 
 ```
-.flightdeck/                     # At git repo root (automatic) or ~/.flightdeck/projects/<id>/ if no git
+.flightdeck/projects/<project-id>/   # Under git root (repo mode) or ~/.flightdeck/ (home mode)
 ├── project.yaml                 # Project metadata, sync state, schema version
 │
 ├── agents/                      # Agent roster and per-agent state
@@ -426,11 +427,11 @@ Tables that benefit most from the mirror:
 
 ### Storage Location
 
-Default to home dir. User can opt in to repo storage for solo projects:
+Default to home dir. User can opt in to repo storage. Both modes use `projects/<id>/` namespacing to support **multiple Flightdeck projects per git repo** (monorepo scenario).
 
 ```
 if (user chose 'repo' at project creation):
-  mirrorRoot = <git-root>/.flightdeck/
+  mirrorRoot = <git-root>/.flightdeck/projects/<project-id>/
 else:
   mirrorRoot = ~/.flightdeck/projects/<project-id>/   # always the default
 ```
@@ -438,9 +439,11 @@ else:
 | Scenario | Location | Git-trackable? |
 |----------|---------|----------------|
 | Default (always) | `~/.flightdeck/projects/<id>/` | ❌ No |
-| User opts in to repo storage | `<git-root>/.flightdeck/` | ✅ Yes |
+| User opts in to repo storage | `<git-root>/.flightdeck/projects/<id>/` | ✅ Yes |
 
 **Rationale**: Don't pollute multi-contributor repos with `.flightdeck/` by default. The user explicitly opts in to repo storage (e.g., solo projects where they want to commit project config).
+
+**Monorepo support**: Project identity is NOT 1:1 with a git repo. Multiple Flightdeck projects can exist in the same repo. The `projects/<id>/` directory under `.flightdeck/` prevents collisions. Project discovery scans for all `project.yaml` files under `<git-root>/.flightdeck/projects/*/` (repo mode) and `~/.flightdeck/projects/*/` (home mode) to find projects linked to the current repo.
 
 The choice is stored in `project.yaml` (`storageLocation: 'home' | 'repo'`, default `'home'`). One location per project — no coexistence.
 
@@ -1107,5 +1110,5 @@ function safeReadYaml<T>(path: string, schema: z.ZodSchema<T>, fallback: T): T {
 ### D9: Schema version in every file, lazy migration on read
 **Why**: Files only get rewritten when Flightdeck actually changes them — preserves user formatting, avoids noisy diffs, respects file ownership. Explicit `flightdeck migrate-files` command available for users who want clean files.
 
-### D10: Home dir by default, repo storage opt-in
-**Why**: `~/.flightdeck/projects/<id>/` is always the default — don't pollute multi-contributor repos with `.flightdeck/`. User can opt in to `<git-root>/.flightdeck/` for solo projects where they want to commit config. Choice stored in `project.yaml`.
+### D10: Home dir by default, repo storage opt-in, monorepo-safe
+**Why**: `~/.flightdeck/projects/<id>/` is always the default — don't pollute multi-contributor repos. User can opt in to `<git-root>/.flightdeck/projects/<id>/`. Both modes use `projects/<id>/` namespacing so multiple Flightdeck projects can share one git repo without collision.
