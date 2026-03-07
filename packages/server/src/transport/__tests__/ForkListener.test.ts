@@ -103,6 +103,21 @@ function tcpRead(socket: Socket): Promise<object> {
   });
 }
 
+/** Read the auth token from the token file in the temp dir. */
+function readToken(dir: string, tokenFileName = 'agent-server.token'): string {
+  return readFileSync(join(dir, tokenFileName), 'utf-8').trim();
+}
+
+/** Authenticate a TCP socket: send AuthenticateMessage, wait for auth_result. */
+async function tcpAuth(socket: Socket, token: string): Promise<void> {
+  const authMsg = { type: 'authenticate', requestId: 'auth-test', token };
+  tcpSend(socket, authMsg);
+  const reply = await tcpRead(socket) as Record<string, unknown>;
+  if (reply.type !== 'auth_result' || reply.success !== true) {
+    throw new Error(`Auth failed: ${JSON.stringify(reply)}`);
+  }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────
 
 describe('ForkListener', () => {
@@ -372,6 +387,9 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
+
         await vi.waitFor(() => expect(connections).toHaveLength(1), { timeout: 2000 });
 
         expect(connections[0].id).toMatch(/^tcp-/);
@@ -392,7 +410,8 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
-        await vi.waitFor(() => expect(listener.connectionCount).toBeGreaterThan(0), { timeout: 2000 });
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
 
         tcpSend(socket, spawnMsg('tcp-req-1'));
 
@@ -413,6 +432,8 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
         await vi.waitFor(() => expect(conn).not.toBeNull(), { timeout: 2000 });
 
         const msg: AgentServerMessage = { type: 'pong', requestId: 'r1', timestamp: 123 };
@@ -435,6 +456,9 @@ describe('ForkListener', () => {
       await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
 
       const socket = await tcpConnect(listener.port!);
+      const token = readToken(tmpDir);
+      await tcpAuth(socket, token);
+
       await vi.waitFor(() => expect(listener.connectionCount).toBeGreaterThan(0), { timeout: 2000 });
 
       socket.destroy();
@@ -448,10 +472,14 @@ describe('ForkListener', () => {
       listener.listen();
 
       await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+      const token = readToken(tmpDir);
 
       const s1 = await tcpConnect(listener.port!);
       const s2 = await tcpConnect(listener.port!);
       try {
+        await tcpAuth(s1, token);
+        await tcpAuth(s2, token);
+
         await vi.waitFor(() => expect(connections).toHaveLength(2), { timeout: 2000 });
 
         expect(connections[0].id).not.toBe(connections[1].id);
@@ -473,7 +501,8 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
-        await vi.waitFor(() => expect(listener.connectionCount).toBeGreaterThan(0), { timeout: 2000 });
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
 
         socket.write('not json\n');
         socket.write('{"also": "invalid"}\n');
@@ -506,6 +535,8 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
         await vi.waitFor(() => expect(conn).not.toBeNull(), { timeout: 2000 });
 
         conn!.close();
@@ -546,9 +577,12 @@ describe('ForkListener', () => {
       // Wait for TCP server
       await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
 
-      // TCP connection
+      // TCP connection (auth required)
       const socket = await tcpConnect(listener.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
+
         await vi.waitFor(() => expect(connections).toHaveLength(2), { timeout: 2000 });
 
         expect(connections[1].id).toMatch(/^tcp-/);
@@ -576,6 +610,8 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(listener.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
         await vi.waitFor(() => expect(tcpConn).not.toBeNull(), { timeout: 2000 });
 
         // IPC message
@@ -590,6 +626,139 @@ describe('ForkListener', () => {
       } finally {
         socket.destroy();
       }
+    });
+  });
+
+  // ── TCP Auth ───────────────────────────────────────────────────
+
+  describe('TCP auth', () => {
+    let listener: ForkListener;
+
+    beforeEach(() => {
+      const noIpcProc: ForkProcess = { on: vi.fn(), off: vi.fn() };
+      listener = new ForkListener({
+        process: noIpcProc,
+        portFileDir: tmpDir,
+        portFileName: 'auth-test.port',
+        authTimeoutMs: 1000,
+      });
+    });
+
+    afterEach(() => {
+      listener.close();
+    });
+
+    it('writes token file with restrictive permissions on listen', async () => {
+      listener.listen();
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const tokenFile = join(tmpDir, 'agent-server.token');
+      expect(existsSync(tokenFile)).toBe(true);
+      const token = readFileSync(tokenFile, 'utf-8');
+      expect(token).toHaveLength(64); // 32 bytes hex-encoded
+    });
+
+    it('removes token file on close', async () => {
+      listener.listen();
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const tokenFile = join(tmpDir, 'agent-server.token');
+      expect(existsSync(tokenFile)).toBe(true);
+
+      listener.close();
+      expect(existsSync(tokenFile)).toBe(false);
+    });
+
+    it('rejects connections with wrong token', async () => {
+      listener.listen();
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const socket = await tcpConnect(listener.port!);
+      try {
+        const authMsg = { type: 'authenticate', requestId: 'auth-bad', token: 'wrong-token' };
+        tcpSend(socket, authMsg);
+        const reply = await tcpRead(socket) as Record<string, unknown>;
+
+        expect(reply.type).toBe('auth_result');
+        expect(reply.success).toBe(false);
+      } finally {
+        socket.destroy();
+      }
+    });
+
+    it('rejects connections that send non-auth message first', async () => {
+      listener.listen();
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const socket = await tcpConnect(listener.port!);
+      try {
+        tcpSend(socket, spawnMsg('bad-first'));
+        const reply = await tcpRead(socket) as Record<string, unknown>;
+
+        expect(reply.type).toBe('error');
+        expect(reply.code).toBe('AUTH_REQUIRED');
+      } finally {
+        socket.destroy();
+      }
+    });
+
+    it('rejects connections that time out without auth', async () => {
+      const connections: TransportConnection[] = [];
+      listener.onConnection(conn => connections.push(conn));
+      listener.listen();
+
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const socket = await tcpConnect(listener.port!);
+      try {
+        // Don't send anything — wait for timeout
+        const reply = await tcpRead(socket) as Record<string, unknown>;
+
+        expect(reply.type).toBe('error');
+        expect(reply.code).toBe('AUTH_REQUIRED');
+        // Connection should NOT have been emitted
+        expect(connections).toHaveLength(0);
+      } finally {
+        socket.destroy();
+      }
+    });
+
+    it('accepts connections with correct token', async () => {
+      const connections: TransportConnection[] = [];
+      listener.onConnection(conn => connections.push(conn));
+      listener.listen();
+
+      await vi.waitFor(() => expect(listener.port).not.toBeNull(), { timeout: 2000 });
+
+      const socket = await tcpConnect(listener.port!);
+      try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
+
+        expect(connections).toHaveLength(1);
+        expect(connections[0].isConnected).toBe(true);
+      } finally {
+        socket.destroy();
+      }
+    });
+
+    it('IPC connections skip auth', () => {
+      const proc = createMockProcess();
+      const l = new ForkListener({
+        process: proc,
+        portFileDir: tmpDir,
+      });
+
+      const connections: TransportConnection[] = [];
+      l.onConnection(conn => connections.push(conn));
+      l.listen();
+
+      // IPC connection emitted immediately — no auth needed
+      expect(connections).toHaveLength(1);
+      expect(connections[0].id).toMatch(/^ipc-/);
+      expect(connections[0].isConnected).toBe(true);
+
+      l.close();
     });
   });
 
@@ -626,6 +795,9 @@ describe('ForkListener', () => {
 
       const socket = await tcpConnect(l.port!);
       try {
+        const token = readToken(tmpDir);
+        await tcpAuth(socket, token);
+
         await vi.waitFor(() => expect(l.connectionCount).toBe(2), { timeout: 2000 });
 
         l.close();
