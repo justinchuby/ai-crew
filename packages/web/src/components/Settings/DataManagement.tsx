@@ -223,15 +223,17 @@ export function DataManagement() {
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
             <div className="flex items-center gap-2 text-xs font-medium text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5" />
-              {preview.sessionsDeleted === 0
-                ? 'No sessions found older than the selected period.'
-                : `${preview.sessionsDeleted} session(s) and ${preview.totalDeleted.toLocaleString()} total records will be permanently deleted.`
+              {preview.totalDeleted === 0
+                ? (selectedDays === 0 ? 'No data found.' : 'No sessions found older than the selected period.')
+                : selectedDays === 0
+                  ? `${preview.totalDeleted.toLocaleString()} total records will be permanently deleted.`
+                  : `${preview.sessionsDeleted} session(s) and ${preview.totalDeleted.toLocaleString()} total records will be permanently deleted.`
               }
             </div>
-            {preview.sessionsDeleted > 0 && (
+            {preview.totalDeleted > 0 && (
               <>
                 <div className="text-[10px] text-th-text-muted">
-                  {selectedDays === 0 ? 'All data will be purged' : `Cutoff: ${formatDate(preview.cutoffDate)}`} • Only completed sessions are affected.
+                  {selectedDays === 0 ? 'All data will be purged.' : `Cutoff: ${formatDate(preview.cutoffDate)} • Only completed sessions are affected.`}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
                   {Object.entries(preview.deleted)
