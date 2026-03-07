@@ -311,3 +311,57 @@ export const timers = sqliteTable('timers', {
   index('idx_timers_agent').on(table.agentId),
   index('idx_timers_status').on(table.status),
 ]);
+
+// ── Message Queue (crash-safe write-on-enqueue) ─────────────────────
+
+export const messageQueue = sqliteTable('message_queue', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  targetAgentId: text('target_agent_id').notNull(),
+  sourceAgentId: text('source_agent_id'),
+  messageType: text('message_type').notNull(), // 'agent_message' | 'delegation_result' | 'broadcast' | 'system'
+  payload: text('payload').notNull(),           // JSON-encoded PromptContent
+  status: text('status').notNull().default('queued'), // 'queued' | 'delivered' | 'expired'
+  attempts: integer('attempts').notNull().default(0),
+  createdAt: text('created_at').default(utcNow),
+  deliveredAt: text('delivered_at'),
+  projectId: text('project_id'),
+}, (table) => [
+  index('idx_mq_target_status').on(table.targetAgentId, table.status),
+  index('idx_mq_project').on(table.projectId),
+]);
+
+// ── Agent Roster (persisted agent state for restart recovery) ────────
+
+export const agentRoster = sqliteTable('agent_roster', {
+  agentId: text('agent_id').primaryKey(),
+  role: text('role').notNull(),
+  model: text('model').notNull(),
+  status: text('status').notNull().default('idle'), // 'idle' | 'busy' | 'terminated'
+  sessionId: text('session_id'),
+  projectId: text('project_id'),
+  createdAt: text('created_at').notNull().default(utcNow),
+  updatedAt: text('updated_at').notNull().default(utcNow),
+  lastTaskSummary: text('last_task_summary'),
+  metadata: text('metadata'), // JSON blob for extensible data
+}, (table) => [
+  index('idx_agent_roster_status').on(table.status),
+  index('idx_agent_roster_project').on(table.projectId),
+]);
+
+// ── Active Delegations (in-flight task assignments) ─────────────────
+
+export const activeDelegations = sqliteTable('active_delegations', {
+  delegationId: text('delegation_id').primaryKey(),
+  agentId: text('agent_id').notNull().references(() => agentRoster.agentId),
+  task: text('task').notNull(),
+  context: text('context'),
+  dagTaskId: text('dag_task_id'),
+  status: text('status').notNull().default('active'), // 'active' | 'completed' | 'failed' | 'cancelled'
+  createdAt: text('created_at').notNull().default(utcNow),
+  completedAt: text('completed_at'),
+  result: text('result'), // JSON blob with completion result
+}, (table) => [
+  index('idx_ad_agent').on(table.agentId, table.status),
+  index('idx_ad_status').on(table.status),
+  index('idx_ad_dag_task').on(table.dagTaskId),
+]);

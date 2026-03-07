@@ -23,6 +23,7 @@ import { DeferredIssueRegistry } from './tasks/DeferredIssueRegistry.js';
 import { ProjectRegistry } from './projects/ProjectRegistry.js';
 import { TimerRegistry } from './coordination/scheduling/TimerRegistry.js';
 import { CostTracker } from './agents/CostTracker.js';
+import { MessageQueueStore } from './persistence/MessageQueueStore.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';
@@ -97,6 +98,7 @@ export interface ServiceContainer extends AppContext {
     timerRegistry: TimerRegistry;
     costTracker: CostTracker;
     configStore: ConfigStore;
+    messageQueueStore: MessageQueueStore;
   };
 }
 
@@ -151,6 +153,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const projectRegistry = new ProjectRegistry(db);
   const timerRegistry = new TimerRegistry(db.drizzle);
   const costTracker = new CostTracker(db);
+  const messageQueueStore = new MessageQueueStore(db);
 
   // ── Tier 2: Stateless Services ─────────────────────────
   const messageBus = new MessageBus();
@@ -266,6 +269,14 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       }
     },
   });
+  scheduler.register({
+    id: 'message-queue-cleanup',
+    interval: 3_600_000, // 1 hour
+    run: () => {
+      messageQueueStore.cleanup(7);   // Remove delivered messages older than 7 days
+      messageQueueStore.expireStale(3); // Expire queued messages older than 3 days
+    },
+  });
   onShutdown('scheduler', () => scheduler.stop());
 
   onShutdown('escalationManager', () => escalationManager.stop());
@@ -335,6 +346,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       timerRegistry,
       costTracker,
       configStore,
+      messageQueueStore,
     },
   };
 
@@ -471,6 +483,7 @@ export async function createTestContainer(
       host: '127.0.0.1',
       cliCommand: 'copilot',
       cliArgs: [],
+      provider: 'copilot',
       maxConcurrentAgents: 10,
       dbPath: ':memory:',
       ...overrides.config,
