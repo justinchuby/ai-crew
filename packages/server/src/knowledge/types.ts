@@ -164,3 +164,46 @@ export interface TrainingSummary {
   agentStats: AgentTrainingStats[];
 }
 
+// ── Session Knowledge Extraction ────────────────────────────────────
+
+/** A message from a completed session, used for knowledge extraction. */
+export interface SessionMessage {
+  sender: string;
+  content: string;
+  timestamp?: string;
+}
+
+/** Data about a completed session to extract knowledge from. */
+export interface SessionData {
+  sessionId: string;
+  projectId: string;
+  task?: string;
+  role?: string;
+  agentId?: string;
+  messages: SessionMessage[];
+  /** Summary provided by the agent on task completion */
+  completionSummary?: string;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+/** A piece of extracted knowledge before storage. */
+export interface ExtractedKnowledge {
+  category: KnowledgeCategory;
+  key: string;
+  content: string;
+  metadata: KnowledgeMetadata;
+}
+
+/** Result of session knowledge extraction. */
+export interface ExtractionResult {
+  /** Number of knowledge entries stored */
+  entriesStored: number;
+  /** Extracted entries by category */
+  decisions: ExtractedKnowledge[];
+  patterns: ExtractedKnowledge[];
+  errors: ExtractedKnowledge[];
+  summary: ExtractedKnowledge | null;
+}
+
+
