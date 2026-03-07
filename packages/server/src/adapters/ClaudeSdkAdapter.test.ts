@@ -122,8 +122,8 @@ describe('ClaudeSdkAdapter', () => {
       expect(adapter.currentSessionId).toBeNull();
     });
 
-    it('reports supportsImages = true', () => {
-      expect(adapter.supportsImages).toBe(true);
+    it('reports supportsImages = false (images not yet wired in prompt())', () => {
+      expect(adapter.supportsImages).toBe(false);
     });
 
     it('uses default model when not provided', () => {

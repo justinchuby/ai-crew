@@ -85,6 +85,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   private pendingPermission: {
     resolve: (result: { allow: boolean }) => void;
   } | null = null;
+  private permissionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
@@ -101,7 +102,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   get isPrompting(): boolean { return this._isPrompting; }
   get promptingStartedAt(): number | null { return this._promptingStartedAt; }
   get currentSessionId(): string | null { return this.flightdeckSessionId; }
-  get supportsImages(): boolean { return true; }
+  get supportsImages(): boolean { return false; } // Images not yet supported in prompt()
 
   /** The underlying SDK session ID (may differ from currentSessionId) */
   get sdkSession(): string | null { return this.sdkSessionId; }
@@ -295,6 +296,10 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
     if (this.pendingPermission) {
       const { resolve } = this.pendingPermission;
       this.pendingPermission = null;
+      if (this.permissionTimeout) {
+        clearTimeout(this.permissionTimeout);
+        this.permissionTimeout = null;
+      }
       resolve({ allow: approved });
     }
   }
@@ -311,6 +316,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
     return new Promise<{ result: 'allow' | 'deny'; reason?: string }>((resolve) => {
       this.pendingPermission = {
         resolve: ({ allow }) => {
+          this.permissionTimeout = null;
           resolve({
             result: allow ? 'allow' : 'deny',
             reason: allow ? undefined : 'User denied',
@@ -325,10 +331,11 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
         timestamp: new Date().toISOString(),
       } satisfies PermissionRequest);
 
-      // Auto-deny after 60s timeout
-      setTimeout(() => {
+      // Auto-deny after 60s timeout (ref stored for cleanup on terminate)
+      this.permissionTimeout = setTimeout(() => {
         if (this.pendingPermission) {
           this.pendingPermission = null;
+          this.permissionTimeout = null;
           resolve({ result: 'deny', reason: 'Permission timeout' });
         }
       }, 60_000);
@@ -349,6 +356,11 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
       this.activeQuery.close();
       this.activeQuery = null;
     }
+    if (this.permissionTimeout) {
+      clearTimeout(this.permissionTimeout);
+      this.permissionTimeout = null;
+    }
+    this.pendingPermission = null;
     this._isConnected = false;
     this._isPrompting = false;
     this._promptingStartedAt = null;
