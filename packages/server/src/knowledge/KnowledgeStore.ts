@@ -310,12 +310,15 @@ function sanitizeFts5Query(query: string): string {
   return terms.join(' ') || '""';
 }
 
+/** Allowlist regex for knowledge keys — safe as filenames on all platforms. */
+const VALID_KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_. -]*$/;
+
 /**
  * Validate that a knowledge key is safe for use as a filename in sync paths.
- * Rejects path separators and traversal patterns.
+ * Uses an allowlist approach — only alphanumeric, underscores, dots, hyphens, spaces.
  */
 function validateKey(key: string): void {
-  if (!key || /[/\\]/.test(key) || key === '..' || key === '.') {
-    throw new Error(`Invalid knowledge key '${key}': must not contain path separators or be '.' / '..'`);
+  if (!key || !VALID_KEY_RE.test(key)) {
+    throw new Error(`Invalid knowledge key '${key}': must match ${VALID_KEY_RE} (alphanumeric, _, ., -, space)`);
   }
 }
