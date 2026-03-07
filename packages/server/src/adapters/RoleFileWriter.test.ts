@@ -476,6 +476,129 @@ describe('OpenCodeRoleFileWriter', () => {
   });
 });
 
+// ── Security: Path Traversal ────────────────────────────────────────
+
+describe('Path traversal prevention', () => {
+  const providers = ['copilot', 'claude', 'gemini', 'cursor', 'codex', 'opencode'];
+
+  const maliciousRoles: RoleDefinition[] = [
+    {
+      role: '../../.git/hooks/post-commit' as string,
+      description: 'Malicious role',
+      instructions: 'Payload',
+    },
+  ];
+
+  for (const provider of providers) {
+    it(`${provider}: rejects path traversal in role name`, async () => {
+      const writer = createRoleFileWriter(provider);
+      await expect(writer.writeRoleFiles(maliciousRoles, tempDir)).rejects.toThrow(
+        /Invalid role name/,
+      );
+    });
+  }
+
+  it('rejects role names with dots', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      { role: 'my.role', description: 'test', instructions: 'test' },
+    ];
+    await expect(writer.writeRoleFiles(roles, tempDir)).rejects.toThrow(/Invalid role name/);
+  });
+
+  it('rejects role names with slashes', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      { role: 'a/b', description: 'test', instructions: 'test' },
+    ];
+    await expect(writer.writeRoleFiles(roles, tempDir)).rejects.toThrow(/Invalid role name/);
+  });
+
+  it('rejects role names with spaces', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      { role: 'my role', description: 'test', instructions: 'test' },
+    ];
+    await expect(writer.writeRoleFiles(roles, tempDir)).rejects.toThrow(/Invalid role name/);
+  });
+
+  it('rejects role names starting with hyphen', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      { role: '-admin', description: 'test', instructions: 'test' },
+    ];
+    await expect(writer.writeRoleFiles(roles, tempDir)).rejects.toThrow(/Invalid role name/);
+  });
+
+  it('accepts valid role names', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      { role: 'my-role-123', description: 'test', instructions: 'test' },
+    ];
+    await expect(writer.writeRoleFiles(roles, tempDir)).resolves.toHaveLength(1);
+  });
+});
+
+// ── Security: YAML Injection ────────────────────────────────────────
+
+describe('YAML injection prevention', () => {
+  it('escapes newlines in description to prevent key injection', async () => {
+    const writer = createRoleFileWriter('copilot');
+    const roles: RoleDefinition[] = [
+      {
+        role: 'tester',
+        description: 'legit\nmalicious_key: injected_value',
+        instructions: 'test',
+      },
+    ];
+    await writer.writeRoleFiles(roles, tempDir);
+    const content = await readFile(
+      join(tempDir, '.github', 'agents', 'flightdeck-tester.agent.md'),
+      'utf-8',
+    );
+
+    // The newline should be escaped, not literal
+    expect(content).toContain('legit\\nmalicious_key: injected_value');
+    expect(content).not.toContain('malicious_key: injected_value\n');
+  });
+
+  it('escapes carriage returns in description', async () => {
+    const writer = createRoleFileWriter('claude');
+    const roles: RoleDefinition[] = [
+      {
+        role: 'tester',
+        description: 'legit\r\ninjected: value',
+        instructions: 'test',
+      },
+    ];
+    await writer.writeRoleFiles(roles, tempDir);
+    const content = await readFile(
+      join(tempDir, '.claude', 'agents', 'flightdeck-tester.md'),
+      'utf-8',
+    );
+
+    expect(content).toContain('legit\\r\\ninjected: value');
+  });
+
+  it('escapes tabs in description', async () => {
+    const writer = createRoleFileWriter('cursor');
+    const roles: RoleDefinition[] = [
+      {
+        role: 'tester',
+        description: 'legit\tinjected',
+        instructions: 'test',
+      },
+    ];
+    await writer.writeRoleFiles(roles, tempDir);
+    const content = await readFile(
+      join(tempDir, '.cursor', 'rules', 'flightdeck-tester.mdc'),
+      'utf-8',
+    );
+
+    expect(content).toContain('legit\\tinjected');
+  });
+});
+
 // ── Factory ─────────────────────────────────────────────────────────
 
 describe('createRoleFileWriter', () => {
