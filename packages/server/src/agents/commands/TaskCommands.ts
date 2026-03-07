@@ -21,6 +21,29 @@ import {
 } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
 
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+/** Mark active delegations for an agent as completed/cancelled. */
+function markAgentDelegations(
+  ctx: CommandHandlerContext,
+  agentId: string,
+  match: 'to' | 'from',
+  status: 'completed' | 'cancelled',
+  result?: string,
+): number {
+  let count = 0;
+  for (const [, del] of ctx.delegations) {
+    const matchId = match === 'to' ? del.toAgentId : del.fromAgentId;
+    if (matchId === agentId && del.status === 'active') {
+      del.status = status;
+      del.completedAt = new Date().toISOString();
+      if (result !== undefined) del.result = result;
+      count++;
+    }
+  }
+  return count;
+}
+
 // ── Regex patterns ────────────────────────────────────────────────────
 
 const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*(\{.*?\})\s*⟧⟧/s;
@@ -222,13 +245,7 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
           skippedAgent.sendMessage(`[System] Task "${req.taskId}" was skipped by the Project Lead. Please stop working on it.`);
         }
         ctx.lockRegistry.releaseAll(result.skippedAgentId);
-        // Cancel the active delegation to the orphaned agent
-        for (const [, del] of ctx.delegations) {
-          if (del.toAgentId === result.skippedAgentId && del.status === 'active') {
-            del.status = 'cancelled';
-            del.completedAt = new Date().toISOString();
-          }
-        }
+        markAgentDelegations(ctx, result.skippedAgentId, 'to', 'cancelled');
       }
       agent.sendMessage(`[System] Task "${req.taskId}" skipped. Dependents may now be ready. Use TASK_STATUS to check.`);
     } else {
@@ -269,15 +286,7 @@ function handleCancelTask(ctx: CommandHandlerContext, agent: Agent, data: string
 function handleResetDAG(ctx: CommandHandlerContext, agent: Agent, _data: string): void {
   if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reset the DAG.'); return; }
   const count = ctx.taskDAG.resetDAG(agent.id);
-  // Cancel all active delegations for this lead so heartbeat doesn't show stale counts
-  let cancelledDelegations = 0;
-  for (const [, del] of ctx.delegations) {
-    if (del.fromAgentId === agent.id && del.status === 'active') {
-      del.status = 'cancelled';
-      del.completedAt = new Date().toISOString();
-      cancelledDelegations++;
-    }
-  }
+  const cancelledDelegations = markAgentDelegations(ctx, agent.id, 'from', 'cancelled');
   if (count > 0) {
     const delNote = cancelledDelegations > 0 ? ` ${cancelledDelegations} delegation(s) cancelled.` : '';
     agent.sendMessage(`[System] DAG reset: ${count} task(s) removed.${delNote} You can now DECLARE_TASKS again.`);
@@ -365,13 +374,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
-        // Mark delegation as completed so heartbeat doesn't show stale counts
-        for (const [, del] of ctx.delegations) {
-          if (del.toAgentId === agent.id && del.status === 'active') {
-            del.status = 'completed';
-            del.completedAt = new Date().toISOString();
-          }
-        }
+        markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         ctx.emit('dag:updated', { leadId: agent.parentId });
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
@@ -386,13 +389,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
-        // Mark delegation as completed so heartbeat doesn't show stale counts
-        for (const [, del] of ctx.delegations) {
-          if (del.toAgentId === agent.id && del.status === 'active') {
-            del.status = 'completed';
-            del.completedAt = new Date().toISOString();
-          }
-        }
+        markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
       return;
