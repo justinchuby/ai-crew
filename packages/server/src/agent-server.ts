@@ -90,6 +90,7 @@ import type {
   AgentServerMessage,
   AgentEventType,
   AgentStatus,
+  MessageScope,
   SpawnAgentMessage,
   SendMessageMessage,
   TerminateAgentMessage,
@@ -97,6 +98,7 @@ import type {
   SubscribeMessage,
   ErrorCode,
 } from './transport/types.js';
+import { hasScope, isValidScope } from './transport/types.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -111,6 +113,10 @@ export interface ManagedAgent {
   sessionId?: string;
   startedAt: number;
   cleanups: Array<() => void>;
+  /** Project this agent belongs to. */
+  projectId: string;
+  /** Team this agent belongs to. */
+  teamId: string;
 }
 
 export interface AgentServerOptions {
@@ -137,6 +143,42 @@ export interface AgentServerPersistence {
 
 const DEFAULT_ORPHAN_TIMEOUT_MS = 12 * 60 * 60 * 1000; // 12 hours
 const PID_FILENAME = 'agent-server.pid';
+const DEFAULT_PROJECT_ID = 'default';
+const DEFAULT_TEAM_ID = 'default';
+
+/** A connection bound to a (projectId, teamId) scope. */
+interface ScopedConnection {
+  conn: TransportConnection;
+  scope: MessageScope;
+}
+
+/** Build the scope key used for agent indexing. */
+function scopeKey(projectId: string, teamId: string): string {
+  return `${projectId}:${teamId}`;
+}
+
+/**
+ * Verify that a message's scope matches the connection's scope.
+ * Throws a user-facing error message on mismatch.
+ */
+function enforceScope(msg: OrchestratorMessage, connScope: MessageScope): void {
+  if (!hasScope(msg)) return; // Unscoped messages (ping, authenticate) are always allowed
+  const msgScope = (msg as OrchestratorMessage & { scope: MessageScope }).scope;
+  if (msgScope.projectId !== connScope.projectId || msgScope.teamId !== connScope.teamId) {
+    throw new ScopeMismatchError(connScope, msgScope);
+  }
+}
+
+class ScopeMismatchError extends Error {
+  readonly code = 'SCOPE_MISMATCH' as const;
+  constructor(expected: MessageScope, received: MessageScope) {
+    super(
+      `Scope mismatch: connection bound to (${expected.projectId}, ${expected.teamId}) ` +
+      `but message targets (${received.projectId}, ${received.teamId})`
+    );
+    this.name = 'ScopeMismatchError';
+  }
+}
 
 // ── AgentServer ─────────────────────────────────────────────────────
 
@@ -146,11 +188,15 @@ export class AgentServer {
   private readonly orphanTimeoutMs: number;
   private readonly runtimeDir: string;
   private readonly agents = new Map<string, ManagedAgent>();
+  /** Secondary index: "projectId:teamId" → Set of agentIds. */
+  private readonly projectTeamIndex = new Map<string, Set<string>>();
   private readonly eventBuffer: EventBuffer;
   private readonly massFailure: MassFailureDetector;
   private readonly persistence: AgentServerPersistence | undefined;
 
   private connection: TransportConnection | null = null;
+  /** Scope declared by the current connection (set at first scoped message). */
+  private connectionScope: MessageScope | null = null;
   private orphanTimer: ReturnType<typeof setTimeout> | null = null;
   private listenerCleanup: (() => void) | null = null;
   private massFailureCleanup: (() => void) | null = null;
@@ -174,9 +220,17 @@ export class AgentServer {
   get agentCount(): number { return this.agents.size; }
   get hasConnection(): boolean { return this.connection?.isConnected === true; }
   get isSpawningPaused(): boolean { return this.massFailure.isPaused; }
+  /** The scope of the current connection, or null if none. */
+  get currentScope(): MessageScope | null { return this.connectionScope; }
 
   getAgent(id: string): ManagedAgent | undefined { return this.agents.get(id); }
-  listAgents(): ManagedAgent[] { return [...this.agents.values()]; }
+  listAgents(scope?: MessageScope): ManagedAgent[] {
+    if (!scope) return [...this.agents.values()];
+    const key = scopeKey(scope.projectId, scope.teamId);
+    const ids = this.projectTeamIndex.get(key);
+    if (!ids) return [];
+    return [...ids].map(id => this.agents.get(id)!).filter(Boolean);
+  }
 
   // ── Lifecycle ───────────────────────────────────────────────────
 
@@ -229,6 +283,7 @@ export class AgentServer {
 
     await Promise.all(terminatePromises);
     this.agents.clear();
+    this.projectTeamIndex.clear();
 
     this.connection?.close();
     this.connection = null;
@@ -246,6 +301,7 @@ export class AgentServer {
     }
 
     this.connection = conn;
+    this.connectionScope = null; // Scope is set on first scoped message
     this.clearOrphanTimer();
     this.eventBuffer.stopBuffering();
 
@@ -253,6 +309,7 @@ export class AgentServer {
     conn.onDisconnect(() => {
       if (this.connection === conn) {
         this.connection = null;
+        this.connectionScope = null;
         this.eventBuffer.startBuffering();
         this.startOrphanTimer();
       }
@@ -262,6 +319,30 @@ export class AgentServer {
   // ── Message Dispatch ──────────────────────────────────────────
 
   private dispatchMessage(msg: OrchestratorMessage, conn: TransportConnection): void {
+    // Bind connection scope from first scoped message
+    if (!this.connectionScope && 'scope' in msg) {
+      const rawScope = (msg as any).scope;
+      if (rawScope && typeof rawScope === 'object') {
+        this.connectionScope = {
+          projectId: (typeof rawScope.projectId === 'string' && rawScope.projectId) || DEFAULT_PROJECT_ID,
+          teamId: (typeof rawScope.teamId === 'string' && rawScope.teamId) || DEFAULT_TEAM_ID,
+        };
+      }
+    }
+
+    // Enforce scope on all scoped messages
+    if (this.connectionScope) {
+      try {
+        enforceScope(msg, this.connectionScope);
+      } catch (err) {
+        if (err instanceof ScopeMismatchError) {
+          this.sendError(conn, 'INVALID_MESSAGE', err.message, (msg as any).requestId);
+          return;
+        }
+        throw err;
+      }
+    }
+
     switch (msg.type) {
       case 'spawn_agent':     return this.handleSpawn(msg, conn);
       case 'send_message':    return this.handleSendMessage(msg, conn);
@@ -307,10 +388,13 @@ export class AgentServer {
       status: 'starting',
       pid: null,
       task: msg.task,
+      projectId: msg.scope?.projectId || DEFAULT_PROJECT_ID,
+      teamId: msg.scope?.teamId || DEFAULT_TEAM_ID,
       startedAt: Date.now(),
       cleanups: [],
     };
     this.agents.set(agentId, agent);
+    this.addToIndex(agent);
     this.persistence?.onAgentSpawned?.(agentId, msg.role, msg.model);
 
     // Wire adapter events
@@ -341,6 +425,10 @@ export class AgentServer {
       this.sendError(conn, 'AGENT_NOT_FOUND', `Agent ${msg.agentId} not found`, msg.requestId);
       return;
     }
+    if (!this.agentMatchesScope(agent)) {
+      this.sendError(conn, 'AGENT_NOT_FOUND', `Agent ${msg.agentId} not found in current scope`, msg.requestId);
+      return;
+    }
 
     agent.adapter.prompt(msg.content).catch((err) => {
       this.sendError(conn, 'SEND_FAILED', `Prompt failed: ${(err as Error).message}`, msg.requestId);
@@ -351,6 +439,10 @@ export class AgentServer {
     const agent = this.agents.get(msg.agentId);
     if (!agent) {
       this.sendError(conn, 'AGENT_NOT_FOUND', `Agent ${msg.agentId} not found`, msg.requestId);
+      return;
+    }
+    if (!this.agentMatchesScope(agent)) {
+      this.sendError(conn, 'AGENT_NOT_FOUND', `Agent ${msg.agentId} not found in current scope`, msg.requestId);
       return;
     }
 
@@ -369,7 +461,12 @@ export class AgentServer {
   }
 
   private handleListAgents(msg: ListAgentsMessage, conn: TransportConnection): void {
-    const agents = [...this.agents.values()].map((a) => ({
+    // Filter agents by connection scope
+    const scopedAgents = this.connectionScope
+      ? this.getScopedAgents(this.connectionScope)
+      : [...this.agents.values()];
+
+    const agents = scopedAgents.map((a) => ({
       agentId: a.id,
       role: a.role,
       model: a.model,
@@ -453,9 +550,10 @@ export class AgentServer {
       };
       this.bufferOrSend(exitMsg);
 
-      // Clean up: remove event listeners and agent from map
+      // Clean up: remove event listeners and agent from map and index
       agent.cleanups.forEach((fn) => fn());
       agent.cleanups.length = 0;
+      this.removeFromIndex(agent);
       this.agents.delete(agent.id);
     });
 
@@ -485,6 +583,42 @@ export class AgentServer {
 
   private sendError(conn: TransportConnection, code: ErrorCode, message: string, requestId?: string): void {
     conn.send({ type: 'error', code, message, requestId });
+  }
+
+  // ── Scope Index ──────────────────────────────────────────────
+
+  private addToIndex(agent: ManagedAgent): void {
+    const key = scopeKey(agent.projectId, agent.teamId);
+    let set = this.projectTeamIndex.get(key);
+    if (!set) {
+      set = new Set();
+      this.projectTeamIndex.set(key, set);
+    }
+    set.add(agent.id);
+  }
+
+  private removeFromIndex(agent: ManagedAgent): void {
+    const key = scopeKey(agent.projectId, agent.teamId);
+    const set = this.projectTeamIndex.get(key);
+    if (set) {
+      set.delete(agent.id);
+      if (set.size === 0) this.projectTeamIndex.delete(key);
+    }
+  }
+
+  /** Get all agents matching a scope. */
+  private getScopedAgents(scope: MessageScope): ManagedAgent[] {
+    const key = scopeKey(scope.projectId, scope.teamId);
+    const ids = this.projectTeamIndex.get(key);
+    if (!ids) return [];
+    return [...ids].map(id => this.agents.get(id)!).filter(Boolean);
+  }
+
+  /** Check if an agent belongs to the current connection's scope. */
+  private agentMatchesScope(agent: ManagedAgent): boolean {
+    if (!this.connectionScope) return true; // No scope bound yet — allow all
+    return agent.projectId === this.connectionScope.projectId
+      && agent.teamId === this.connectionScope.teamId;
   }
 
   // ── Orphan Timer ──────────────────────────────────────────────

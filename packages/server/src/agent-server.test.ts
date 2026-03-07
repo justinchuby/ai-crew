@@ -676,4 +676,412 @@ describe('AgentServer', () => {
       expect(server.isSpawningPaused).toBe(false);
     });
   });
+
+  // ── AS7: Enhanced wiring ────────────────────────────────────────
+
+  describe('AS7 — enhanced adapter wiring', () => {
+    let adapter: ReturnType<typeof createMockAdapter>;
+    let conn: ReturnType<typeof createMockConnection>;
+
+    beforeEach(() => {
+      adapter = createMockAdapter();
+      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'mock', fallback: false });
+      server.start();
+      conn = createMockConnection();
+      listener.simulateConnection(conn);
+    });
+
+    async function spawnAgent() {
+      conn.simulateMessage(SPAWN_MSG);
+      await vi.waitFor(() => {
+        const agents = server.listAgents();
+        return agents.length > 0 && agents[0].status === 'running';
+      });
+      return server.listAgents()[0];
+    }
+
+    it('stores projectId and teamId from spawn scope', async () => {
+      const agent = await spawnAgent();
+      expect(agent.projectId).toBe('proj-1');
+      expect(agent.teamId).toBe('team-1');
+    });
+
+    it('removes agent from map on exit', async () => {
+      await spawnAgent();
+      expect(server.agentCount).toBe(1);
+
+      adapter.emit('exit', 0);
+      expect(server.agentCount).toBe(0);
+    });
+
+    it('calls cleanups on exit', async () => {
+      const agent = await spawnAgent();
+      // cleanups include removeListener calls — verify adapter listeners are cleaned
+      const listenerCount = adapter.listenerCount('text');
+      expect(listenerCount).toBeGreaterThan(0);
+
+      adapter.emit('exit', 0);
+      expect(adapter.listenerCount('text')).toBe(0);
+    });
+
+    it('relays prompting events as status_change', async () => {
+      await spawnAgent();
+      adapter.emit('prompting', true);
+
+      const statusEvents = conn._sentMessages.filter(
+        (m) => m.type === 'agent_event' && (m as any).eventType === 'status_change',
+      );
+      expect(statusEvents).toHaveLength(1);
+      expect((statusEvents[0] as any).data).toEqual({ status: 'running', prompting: true });
+    });
+
+    it('updates agent status on prompting events', async () => {
+      const agent = await spawnAgent();
+
+      adapter.emit('prompting', true);
+      expect(agent.status).toBe('running');
+
+      adapter.emit('prompting', false);
+      expect(agent.status).toBe('idle');
+    });
+
+    it('captures session ID from connected event', async () => {
+      const agent = await spawnAgent();
+
+      adapter.emit('connected', 'real-session-456');
+      expect(agent.sessionId).toBe('real-session-456');
+    });
+
+    it('tries cancel before terminate when agent is prompting', async () => {
+      await spawnAgent();
+      adapter.isPrompting = true;
+
+      conn.simulateMessage({
+        type: 'terminate_agent',
+        requestId: 'req-term',
+        scope: { projectId: 'proj-1', teamId: 'team-1' },
+        agentId: server.listAgents()[0].id,
+      } as OrchestratorMessage);
+
+      expect(adapter.cancel).toHaveBeenCalled();
+      // terminate happens after cancel completes (async)
+      await vi.waitFor(() => expect(adapter.terminate).toHaveBeenCalled());
+    });
+
+    it('terminates directly when agent is not prompting', async () => {
+      await spawnAgent();
+      adapter.isPrompting = false;
+
+      conn.simulateMessage({
+        type: 'terminate_agent',
+        requestId: 'req-term',
+        scope: { projectId: 'proj-1', teamId: 'team-1' },
+        agentId: server.listAgents()[0].id,
+      } as OrchestratorMessage);
+
+      expect(adapter.cancel).not.toHaveBeenCalled();
+      expect(adapter.terminate).toHaveBeenCalled();
+    });
+
+    it('calls persistence callbacks on spawn', async () => {
+      const persistence = {
+        onAgentSpawned: vi.fn(),
+        onAgentTerminated: vi.fn(),
+        onAgentExited: vi.fn(),
+        onStatusChanged: vi.fn(),
+      };
+
+      // Create new server with persistence
+      const pServer = new AgentServer({
+        listener,
+        runtimeDir,
+        persistence,
+      });
+      pServer.start();
+
+      const pConn = createMockConnection();
+      listener.simulateConnection(pConn);
+
+      pConn.simulateMessage(SPAWN_MSG);
+      await vi.waitFor(() => pServer.agentCount > 0);
+
+      expect(persistence.onAgentSpawned).toHaveBeenCalledWith(
+        expect.any(String),
+        'developer',
+        'gpt-4',
+      );
+
+      await pServer.stop();
+    });
+
+    it('calls persistence callbacks on exit', async () => {
+      const persistence = {
+        onAgentExited: vi.fn(),
+      };
+
+      const pServer = new AgentServer({
+        listener,
+        runtimeDir,
+        persistence,
+      });
+      pServer.start();
+
+      const pConn = createMockConnection();
+      listener.simulateConnection(pConn);
+
+      pConn.simulateMessage(SPAWN_MSG);
+      await vi.waitFor(() => pServer.agentCount > 0);
+
+      const agentId = pServer.listAgents()[0].id;
+      adapter.emit('exit', 1);
+
+      expect(persistence.onAgentExited).toHaveBeenCalledWith(agentId, 1);
+
+      await pServer.stop();
+    });
+  });
+
+  // ── AS22: Scope Enforcement ──────────────────────────────────────
+
+  describe('AS22 — scope enforcement', () => {
+    let adapter: ReturnType<typeof createMockAdapter>;
+
+    beforeEach(() => {
+      adapter = createMockAdapter();
+      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'mock', fallback: false });
+      server.start();
+      listener.simulateConnection(conn);
+    });
+
+    async function spawnAgent(scope = { projectId: 'proj-1', teamId: 'team-1' }) {
+      const msg: OrchestratorMessage = {
+        type: 'spawn_agent',
+        requestId: `spawn-${Date.now()}`,
+        scope,
+        role: 'developer',
+        model: 'fast',
+      };
+      conn.simulateMessage(msg);
+      await vi.advanceTimersByTimeAsync(0);
+      return server.listAgents(scope)[0];
+    }
+
+    describe('scope binding', () => {
+      it('binds connection scope from first scoped message', async () => {
+        expect(server.currentScope).toBeNull();
+        await spawnAgent();
+        expect(server.currentScope).toEqual({ projectId: 'proj-1', teamId: 'team-1' });
+      });
+
+      it('resets scope when connection disconnects', async () => {
+        await spawnAgent();
+        expect(server.currentScope).toEqual({ projectId: 'proj-1', teamId: 'team-1' });
+
+        conn.simulateDisconnect('test');
+        expect(server.currentScope).toBeNull();
+      });
+
+      it('resets scope when new connection replaces old one', async () => {
+        await spawnAgent();
+        expect(server.currentScope).not.toBeNull();
+
+        const conn2 = createMockConnection();
+        listener.simulateConnection(conn2);
+        expect(server.currentScope).toBeNull();
+      });
+
+      it('uses default scope values for empty strings', async () => {
+        conn.simulateMessage({
+          type: 'list_agents',
+          requestId: 'list-1',
+          scope: { projectId: '', teamId: '' },
+        });
+        expect(server.currentScope).toEqual({ projectId: 'default', teamId: 'default' });
+      });
+    });
+
+    describe('scope mismatch rejection', () => {
+      it('rejects spawn_agent with mismatched projectId', async () => {
+        // Bind scope
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        conn._sentMessages.length = 0;
+
+        // Try spawning with different project
+        conn.simulateMessage({
+          type: 'spawn_agent',
+          requestId: 'spawn-cross',
+          scope: { projectId: 'proj-2', teamId: 'team-1' },
+          role: 'developer',
+          model: 'fast',
+        });
+
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe('INVALID_MESSAGE');
+        expect((error as any).message).toContain('Scope mismatch');
+      });
+
+      it('rejects send_message with mismatched teamId', async () => {
+        const agent = await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        conn._sentMessages.length = 0;
+
+        conn.simulateMessage({
+          type: 'send_message',
+          requestId: 'msg-cross',
+          scope: { projectId: 'proj-1', teamId: 'team-2' },
+          agentId: agent.id,
+          content: 'hello',
+        });
+
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe('INVALID_MESSAGE');
+        expect((error as any).message).toContain('Scope mismatch');
+      });
+
+      it('rejects terminate_agent with mismatched scope', async () => {
+        const agent = await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        conn._sentMessages.length = 0;
+
+        conn.simulateMessage({
+          type: 'terminate_agent',
+          requestId: 'term-cross',
+          scope: { projectId: 'proj-2', teamId: 'team-2' },
+          agentId: agent.id,
+        });
+
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe('INVALID_MESSAGE');
+      });
+
+      it('allows ping without scope (unscoped message)', async () => {
+        await spawnAgent();
+        conn._sentMessages.length = 0;
+
+        conn.simulateMessage({ type: 'ping', requestId: 'hb-1' });
+
+        const pong = conn._sentMessages.find((m) => m.type === 'pong');
+        expect(pong).toBeDefined();
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeUndefined();
+      });
+    });
+
+    describe('scoped listing', () => {
+      it('list_agents returns only agents in connection scope', async () => {
+        // Spawn in scope proj-1:team-1
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+
+        // Manually add an agent with a different scope (simulating a prior connection)
+        const otherAgent: any = {
+          id: 'other-agent-123',
+          role: 'qa',
+          model: 'fast',
+          adapter: createMockAdapter(),
+          status: 'running',
+          pid: null,
+          startedAt: Date.now(),
+          cleanups: [],
+          projectId: 'proj-2',
+          teamId: 'team-2',
+        };
+        (server as any).agents.set(otherAgent.id, otherAgent);
+        // Don't add to index — simulates cross-scope agent
+
+        conn._sentMessages.length = 0;
+        conn.simulateMessage({
+          type: 'list_agents',
+          requestId: 'list-scoped',
+          scope: { projectId: 'proj-1', teamId: 'team-1' },
+        });
+
+        const list = conn._sentMessages.find((m) => m.type === 'agent_list');
+        expect((list as any).agents).toHaveLength(1);
+        expect((list as any).agents[0].role).toBe('developer');
+      });
+
+      it('listAgents() with scope parameter filters correctly', async () => {
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+
+        const all = server.listAgents();
+        expect(all).toHaveLength(1);
+
+        const scoped = server.listAgents({ projectId: 'proj-1', teamId: 'team-1' });
+        expect(scoped).toHaveLength(1);
+
+        const other = server.listAgents({ projectId: 'proj-2', teamId: 'team-2' });
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    describe('scope index maintenance', () => {
+      it('adds agent to index on spawn', async () => {
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        const index = (server as any).projectTeamIndex as Map<string, Set<string>>;
+        expect(index.get('proj-1:team-1')?.size).toBe(1);
+      });
+
+      it('removes agent from index on exit', async () => {
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        const index = (server as any).projectTeamIndex as Map<string, Set<string>>;
+        expect(index.get('proj-1:team-1')?.size).toBe(1);
+
+        adapter.emit('exit', 0);
+        expect(index.has('proj-1:team-1')).toBe(false);
+      });
+
+      it('clears index on server stop', async () => {
+        await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+        const index = (server as any).projectTeamIndex as Map<string, Set<string>>;
+        expect(index.size).toBeGreaterThan(0);
+
+        await server.stop();
+        expect(index.size).toBe(0);
+      });
+    });
+
+    describe('cross-scope agent isolation', () => {
+      it('send_message rejects agent from different scope', async () => {
+        const agent = await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+
+        // Manually change agent scope to simulate cross-scope
+        (agent as any).projectId = 'proj-other';
+        (agent as any).teamId = 'team-other';
+
+        conn._sentMessages.length = 0;
+        conn.simulateMessage({
+          type: 'send_message',
+          requestId: 'msg-isolated',
+          scope: { projectId: 'proj-1', teamId: 'team-1' },
+          agentId: agent.id,
+          content: 'hello',
+        });
+
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe('AGENT_NOT_FOUND');
+        expect((error as any).message).toContain('not found in current scope');
+      });
+
+      it('terminate_agent rejects agent from different scope', async () => {
+        const agent = await spawnAgent({ projectId: 'proj-1', teamId: 'team-1' });
+
+        // Manually change agent scope
+        (agent as any).projectId = 'proj-other';
+
+        conn._sentMessages.length = 0;
+        conn.simulateMessage({
+          type: 'terminate_agent',
+          requestId: 'term-isolated',
+          scope: { projectId: 'proj-1', teamId: 'team-1' },
+          agentId: agent.id,
+        });
+
+        const error = conn._sentMessages.find((m) => m.type === 'error');
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe('AGENT_NOT_FOUND');
+      });
+    });
+  });
 });

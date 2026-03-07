@@ -103,7 +103,7 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
 }
 
 /** Wire ACP protocol events to Agent state and listeners. */
-function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
+export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   const withCtx = <T>(fn: () => T): T =>
     runWithAgentContext(agent.id, agent.role.name, agent.projectId, fn);
 

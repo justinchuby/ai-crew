@@ -109,6 +109,13 @@ export interface ListAgentsMessage {
   scope: MessageScope;
 }
 
+export interface CancelAgentMessage {
+  type: 'cancel_agent';
+  requestId: string;
+  scope: MessageScope;
+  agentId: string;
+}
+
 export interface SubscribeMessage {
   type: 'subscribe';
   requestId: string;
@@ -133,6 +140,7 @@ export type OrchestratorMessage =
   | SpawnAgentMessage
   | SendMessageMessage
   | TerminateAgentMessage
+  | CancelAgentMessage
   | ListAgentsMessage
   | SubscribeMessage
   | PingMessage
@@ -167,6 +175,8 @@ export type AgentEventType =
   | 'usage'
   | 'usage_update'
   | 'prompt_complete'
+  | 'prompting'
+  | 'response_start'
   | 'permission_request'
   | 'status_change';
 
@@ -286,6 +296,7 @@ const ORCHESTRATOR_TYPES = new Set<string>([
   'spawn_agent',
   'send_message',
   'terminate_agent',
+  'cancel_agent',
   'list_agents',
   'subscribe',
   'ping',

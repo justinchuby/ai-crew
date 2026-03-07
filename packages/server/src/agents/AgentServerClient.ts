@@ -213,6 +213,18 @@ export class AgentServerClient extends EventEmitter {
   }
 
   /**
+   * Cancel an agent's current prompt (interrupt without terminating).
+   */
+  async cancel(agentId: string): Promise<void> {
+    this.send({
+      type: 'cancel_agent',
+      requestId: randomUUID(),
+      scope: this.scope,
+      agentId,
+    });
+  }
+
+  /**
    * List all agents on the server.
    */
   async list(): Promise<AgentInfo[]> {
