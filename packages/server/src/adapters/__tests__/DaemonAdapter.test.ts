@@ -267,20 +267,17 @@ describe('DaemonAdapter', () => {
   // ── cancel() ───────────────────────────────────────────────────
 
   describe('cancel', () => {
-    it('sends Ctrl+C to agent via daemon', async () => {
+    it('rejects the pending prompt promise with cancellation error', async () => {
       await adapter.start(START_OPTS);
 
-      // Start a prompt
       const promptPromise = adapter.prompt('test');
+      // Let sendMessage resolve so the inner promise (with _cancelPrompt) is created
+      await new Promise(r => setTimeout(r, 0));
       await adapter.cancel();
 
+      await expect(promptPromise).rejects.toThrow('Prompt cancelled');
       expect(client.sendMessage).toHaveBeenCalledWith('test-agent-001', '\x03');
       expect(adapter.isPrompting).toBe(false);
-
-      // The prompt will hang since we cancelled — clean up
-      client.emit('event', makeEvent('agent:output', { type: 'prompt_complete', reason: 'end_turn' }));
-      // Ignore rejection since we cancelled
-      await promptPromise.catch(() => {});
     });
 
     it('is a no-op if not prompting', async () => {
@@ -290,10 +287,27 @@ describe('DaemonAdapter', () => {
 
     it('ignores errors from cancel message', async () => {
       await adapter.start(START_OPTS);
-      adapter.prompt('test').catch(() => {}); // ignore — will never resolve in this test
+      const promptPromise = adapter.prompt('test');
+      await new Promise(r => setTimeout(r, 0));
 
-      client.sendMessage.mockRejectedValueOnce(new Error('cancelled')).mockResolvedValue({ sent: true });
+      // Next sendMessage call (the cancel Ctrl+C) fails
+      client.sendMessage.mockRejectedValueOnce(new Error('send failed'));
+
       await adapter.cancel(); // should not throw
+      await expect(promptPromise).rejects.toThrow('Prompt cancelled');
+    });
+
+    it('cleans up listeners after cancel', async () => {
+      await adapter.start(START_OPTS);
+
+      const promptPromise = adapter.prompt('test');
+      await new Promise(r => setTimeout(r, 0));
+      await adapter.cancel();
+      await promptPromise.catch(() => {});
+
+      // Verify no dangling listeners for prompt_complete, exit, daemon_error
+      expect(adapter.listenerCount('prompt_complete')).toBe(0);
+      expect(adapter.listenerCount('daemon_error')).toBe(0);
     });
   });
 

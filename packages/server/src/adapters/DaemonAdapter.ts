@@ -45,8 +45,6 @@ export interface DaemonAdapterOptions {
   role?: string;
   /** Whether the daemon should auto-approve tool calls. */
   autopilot?: boolean;
-  /** Timeout for spawn requests in ms (default: 60000). */
-  spawnTimeoutMs?: number;
   /** Timeout for terminate requests in ms (default: 15000). */
   terminateTimeoutMs?: number;
 }
@@ -68,12 +66,13 @@ export class DaemonAdapter extends EventEmitter implements AgentAdapter {
   private _agentPid: number | null = null;
   private _terminated = false;
   private _lastStatus: DaemonAgentStatus | null = null;
+  /** Rejects the pending prompt promise on cancel. */
+  private _cancelPrompt: (() => void) | null = null;
 
   private readonly client: DaemonClient;
   private readonly agentId: string;
   private readonly role: string;
   private readonly autopilot: boolean;
-  private readonly spawnTimeoutMs: number;
   private readonly terminateTimeoutMs: number;
 
   /** Bound handler references for cleanup. */
@@ -88,7 +87,6 @@ export class DaemonAdapter extends EventEmitter implements AgentAdapter {
     this.agentId = options.agentId;
     this.role = options.role ?? 'developer';
     this.autopilot = options.autopilot ?? false;
-    this.spawnTimeoutMs = options.spawnTimeoutMs ?? 60_000;
     this.terminateTimeoutMs = options.terminateTimeoutMs ?? 15_000;
 
     // Bind handlers so we can remove them later
@@ -244,10 +242,17 @@ export class DaemonAdapter extends EventEmitter implements AgentAdapter {
         const cleanup = () => {
           this._isPrompting = false;
           this._promptingStartedAt = null;
+          this._cancelPrompt = null;
           this.emit('prompting', false);
           this.removeListener('prompt_complete', onComplete);
           this.removeListener('exit', onExit);
           this.removeListener('daemon_error', onError);
+        };
+
+        // Store cancel hook so cancel() can reject this promise
+        this._cancelPrompt = () => {
+          cleanup();
+          reject(new Error('Prompt cancelled'));
         };
 
         this.on('prompt_complete', onComplete);
@@ -268,9 +273,15 @@ export class DaemonAdapter extends EventEmitter implements AgentAdapter {
   async cancel(): Promise<void> {
     if (!this._isPrompting) return;
 
-    this._isPrompting = false;
-    this._promptingStartedAt = null;
-    this.emit('prompting', false);
+    // Reject the pending prompt promise and clean up listeners
+    if (this._cancelPrompt) {
+      this._cancelPrompt();
+      this._cancelPrompt = null;
+    } else {
+      this._isPrompting = false;
+      this._promptingStartedAt = null;
+      this.emit('prompting', false);
+    }
 
     // Best-effort cancel via daemon. If the daemon doesn't support
     // explicit cancel, the agent will finish its current turn naturally.
