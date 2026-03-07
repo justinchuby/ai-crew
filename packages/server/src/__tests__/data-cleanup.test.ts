@@ -27,34 +27,9 @@ import { sql } from 'drizzle-orm';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 
-/** All 19 data tables (excludes config: roles, settings) */
-const DATA_TABLES = [
-  projects, projectSessions, activityLog, dagTasks, chatGroups,
-  chatGroupMembers, chatGroupMessages, conversations, messages,
-  agentMemory, decisions, fileLocks, agentFileHistory,
-  collectiveMemory, taskCostRecords, sessionRetros, timers,
-  deferredIssues, agentPlans,
-];
-
-function countAll(db: Database): Record<string, number> {
-  const counts: Record<string, number> = {};
-  const tableNames = [
-    'projects', 'project_sessions', 'activity_log', 'dag_tasks', 'chat_groups',
-    'chat_group_members', 'chat_group_messages', 'conversations', 'messages',
-    'agent_memory', 'decisions', 'file_locks', 'agent_file_history',
-    'collective_memory', 'task_cost_records', 'session_retros', 'timers',
-    'deferred_issues', 'agent_plans',
-  ];
-  for (const name of tableNames) {
-    const row = db.drizzle.run(sql.raw(`SELECT count(*) as cnt FROM ${name}`)) as any;
-    counts[name] = Number(row?.rows?.[0]?.[0] ?? 0);
-  }
-  return counts;
-}
-
 function countTable(db: Database, tableName: string): number {
-  const row = db.drizzle.all(sql.raw(`SELECT count(*) as cnt FROM ${tableName}`)) as any;
-  return Number(row?.[0]?.cnt ?? 0);
+  const rows = db.drizzle.all<{ cnt: number }>(sql.raw(`SELECT count(*) as cnt FROM ${tableName}`));
+  return Number(rows[0]?.cnt ?? 0);
 }
 
 const LEAD_ID = 'lead-001';
@@ -343,6 +318,103 @@ describe('POST /data/cleanup', () => {
     it('rejects negative olderThanDays', async () => {
       const { status } = await cleanup({ olderThanDays: -1 });
       expect(status).toBe(400);
+    });
+  });
+
+  // ── Nullable leadId handling ──────────────────────────────────────
+
+  describe('nullable leadId columns', () => {
+    it('selective purge deletes rows with NULL leadId (decisions, agentPlans, timers)', async () => {
+      const d = db.drizzle;
+      const pastDate = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+      // Set up a session so selective purge has something to work with
+      d.insert(projects).values({ id: PROJECT_ID, name: 'Test' }).run();
+      d.insert(projectSessions).values({
+        projectId: PROJECT_ID, leadId: LEAD_ID,
+        status: 'completed', startedAt: pastDate, endedAt: pastDate,
+      }).run();
+      d.insert(activityLog).values({
+        agentId: LEAD_ID, agentRole: 'Lead', actionType: 'start',
+        summary: 'Started', projectId: PROJECT_ID,
+      }).run();
+
+      // Insert rows with NULL leadId — these should still be cleaned up
+      d.insert(decisions).values({ id: 'dec-null', agentId: 'agent-x', agentRole: 'Dev', title: 'Null lead decision' }).run();
+      d.insert(agentPlans).values({ agentId: 'agent-x', planJson: '[]' }).run();
+      d.insert(timers).values({
+        id: 'timer-null', agentId: 'agent-x', agentRole: 'Dev',
+        label: 'check', message: 'msg', delaySeconds: 60, fireAt: pastDate,
+      }).run();
+
+      // Also insert rows WITH leadId for comparison
+      d.insert(decisions).values({ id: 'dec-lead', agentId: 'agent-y', agentRole: 'Dev', leadId: LEAD_ID, title: 'Has lead' }).run();
+
+      expect(countTable(db, 'decisions')).toBe(2);
+      expect(countTable(db, 'agent_plans')).toBe(1);
+      expect(countTable(db, 'timers')).toBe(1);
+
+      const { body } = await cleanup({ olderThanDays: 7 });
+
+      // Both NULL and matching leadId rows should be deleted
+      expect(countTable(db, 'decisions')).toBe(0);
+      expect(countTable(db, 'agent_plans')).toBe(0);
+      expect(countTable(db, 'timers')).toBe(0);
+      expect(body.deleted.decisions).toBe(2);
+      expect(body.deleted.agent_plans).toBe(1);
+      expect(body.deleted.timers).toBe(1);
+    });
+
+    it('dry-run counts include NULL leadId rows', async () => {
+      const d = db.drizzle;
+      const pastDate = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+      d.insert(projects).values({ id: PROJECT_ID, name: 'Test' }).run();
+      d.insert(projectSessions).values({
+        projectId: PROJECT_ID, leadId: LEAD_ID,
+        status: 'completed', startedAt: pastDate, endedAt: pastDate,
+      }).run();
+      d.insert(activityLog).values({
+        agentId: LEAD_ID, agentRole: 'Lead', actionType: 'start',
+        summary: 'Started', projectId: PROJECT_ID,
+      }).run();
+
+      // NULL leadId rows
+      d.insert(decisions).values({ id: 'dec-null', agentId: 'a', agentRole: 'Dev', title: 'Orphan' }).run();
+      d.insert(timers).values({
+        id: 'timer-null', agentId: 'a', agentRole: 'Dev',
+        label: 'x', message: 'm', delaySeconds: 60, fireAt: pastDate,
+      }).run();
+
+      const { body } = await cleanup({ olderThanDays: 7, dryRun: true });
+
+      expect(body.deleted.decisions).toBe(1);
+      expect(body.deleted.timers).toBe(1);
+    });
+  });
+
+  // ── Edge cases ────────────────────────────────────────────────────
+
+  describe('edge cases', () => {
+    it('purge-all on empty database returns zero counts', async () => {
+      const { status, body } = await cleanup({ olderThanDays: 0, dryRun: true });
+
+      expect(status).toBe(200);
+      expect(body.totalDeleted).toBe(0);
+      expect(body.sessionsDeleted).toBe(0);
+
+      // All table counts should be 0
+      for (const count of Object.values(body.deleted)) {
+        expect(count).toBe(0);
+      }
+    });
+
+    it('purge-all on empty database actually runs without error', async () => {
+      const { status, body } = await cleanup({ olderThanDays: 0 });
+
+      expect(status).toBe(200);
+      expect(body.dryRun).toBe(false);
+      expect(body.totalDeleted).toBe(0);
     });
   });
 });
