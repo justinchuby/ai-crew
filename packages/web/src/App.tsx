@@ -43,6 +43,7 @@ const MissionControlPage = lazy(() => import('./components/MissionControl').then
 const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
+const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 
 function RouteSpinner() {
   return (
@@ -269,6 +270,7 @@ export function App() {
             <Route path="/mission-control" element={<MissionControlPage />} />
             <Route path="/canvas" element={<CanvasPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/projects" element={<ProjectsPanel />} />
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

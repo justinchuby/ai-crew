@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Settings, Crown, ListChecks, LayoutDashboard, GanttChart, Activity, MessageSquare, Network, Database, MoreHorizontal, ChevronDown, ChevronRight, Workflow, BarChart3 } from 'lucide-react';
+import { Users, Settings, Crown, ListChecks, LayoutDashboard, GanttChart, Activity, MessageSquare, Network, Database, MoreHorizontal, ChevronDown, ChevronRight, Workflow, BarChart3, FolderOpen } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 
 const primaryLinks = [
@@ -14,6 +14,7 @@ const primaryLinks = [
 ];
 
 const moreLinks = [
+  { to: '/projects', icon: FolderOpen, label: 'Projects' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/groups', icon: MessageSquare, label: 'Groups' },
   { to: '/org', icon: Network, label: 'Org Chart' },

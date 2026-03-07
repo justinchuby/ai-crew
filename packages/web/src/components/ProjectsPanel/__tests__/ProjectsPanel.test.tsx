@@ -28,7 +28,6 @@ const sampleProjects = [
     updatedAt: '2026-03-07T14:00:00Z',
     activeAgentCount: 3,
     storageMode: 'user' as const,
-    storageDir: '/home/user/.flightdeck/projects/proj-1',
   },
   {
     id: 'proj-2',
@@ -40,7 +39,6 @@ const sampleProjects = [
     updatedAt: '2026-02-15T12:00:00Z',
     activeAgentCount: 0,
     storageMode: 'local' as const,
-    storageDir: '/repo/.flightdeck/projects/proj-2',
   },
 ];
 
@@ -181,9 +179,49 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Delete')).toBeTruthy();
     });
 
+    // Click Delete — should show confirmation, NOT delete immediately
     fireEvent.click(screen.getByText('Delete'));
     await waitFor(() => {
+      expect(screen.getByText(/This cannot be undone/)).toBeTruthy();
+    });
+
+    // Click the confirm Delete button
+    const confirmBtn = screen.getAllByText('Delete').find(
+      (el) => el.classList.contains('bg-red-500')
+    );
+    expect(confirmBtn).toBeTruthy();
+    fireEvent.click(confirmBtn!);
+    await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/projects/proj-1', { method: 'DELETE' });
+    });
+  });
+
+  it('cancels delete when Cancel is clicked in confirmation', async () => {
+    mockApiFetch.mockImplementation((path: string, opts?: any) => {
+      if (path === '/projects' && !opts) return Promise.resolve(sampleProjects);
+      if (path === `/projects/${sampleProjects[0].id}` && !opts) return Promise.resolve(sampleProjects[0]);
+      return Promise.resolve([]);
+    });
+
+    render(<ProjectsPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('Alpha Project')).toBeTruthy();
+    });
+
+    // Expand and click Delete
+    fireEvent.click(screen.getByText('Alpha Project'));
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('Delete'));
+    await waitFor(() => {
+      expect(screen.getByText(/This cannot be undone/)).toBeTruthy();
+    });
+
+    // Click Cancel
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => {
+      expect(screen.queryByText(/This cannot be undone/)).toBeNull();
     });
   });
 

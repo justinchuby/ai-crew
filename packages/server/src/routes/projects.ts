@@ -6,7 +6,7 @@ import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateMod
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -14,7 +14,21 @@ export function projectsRoutes(ctx: AppContext): Router {
   router.get('/projects', (_req, res) => {
     if (!projectRegistry) return res.json([]);
     const status = typeof _req.query.status === 'string' ? _req.query.status : undefined;
-    res.json(projectRegistry.list(status));
+    const projects = projectRegistry.list(status);
+
+    // Enrich with storage info and active agent counts
+    const allAgents = agentManager.getAll();
+    const enriched = projects.map((p) => {
+      const activeAgents = allAgents.filter(
+        (a) => a.projectId === p.id && (a.status === 'running' || a.status === 'idle')
+      );
+      return {
+        ...p,
+        activeAgentCount: activeAgents.length,
+        storageMode: storageManager?.getStorageMode(p.id) ?? 'user',
+      };
+    });
+    res.json(enriched);
   });
 
   router.get('/projects/:id', (req, res) => {
@@ -24,7 +38,17 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
-    res.json({ ...project, sessions, activeLeadId });
+    const allAgents = agentManager.getAll();
+    const activeAgents = allAgents.filter(
+      (a) => a.projectId === project.id && (a.status === 'running' || a.status === 'idle')
+    );
+    res.json({
+      ...project,
+      sessions,
+      activeLeadId,
+      activeAgentCount: activeAgents.length,
+      storageMode: storageManager?.getStorageMode(project.id) ?? 'user',
+    });
   });
 
   // Historical DAG tasks for a project (from database)

@@ -15,6 +15,7 @@ import type { DecisionRecordStore } from '../coordination/decisions/DecisionReco
 import type { ModelSelector } from '../agents/ModelSelector.js';
 import type { TokenBudgetOptimizer } from '../agents/TokenBudgetOptimizer.js';
 import type { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
+import type { StorageManager } from '../storage/StorageManager.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { execSync } from 'node:child_process';
 
@@ -54,6 +55,7 @@ export interface AppContext {
   knowledgeTransfer?: import('../coordination/knowledge/KnowledgeTransfer.js').KnowledgeTransfer;
   eventPipeline?: import('../coordination/events/EventPipeline.js').EventPipeline;
   costTracker?: import('../agents/CostTracker.js').CostTracker;
+  storageManager?: StorageManager;
 }
 
 // Rate limiters for expensive operations
