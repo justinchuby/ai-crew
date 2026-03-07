@@ -90,6 +90,7 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
   private _disposed = false;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _activeReconnect: Promise<ReconciliationResult> | null = null;
+  private _sleepReject: ((err: Error) => void) | null = null;
 
   /** Per-agent checkpoint for event replay. */
   private lastSeenEventIds = new Map<string, string>();
@@ -204,14 +205,16 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
    * If a reconnect is already in progress, returns the existing promise.
    * Resolves when reconnected and reconciled, or rejects if all attempts fail.
    */
-  async reconnect(adapterReconnector?: AdapterReconnector): Promise<ReconciliationResult> {
-    if (this._disposed) throw new Error('ReconnectProtocol has been disposed');
+  reconnect(adapterReconnector?: AdapterReconnector): Promise<ReconciliationResult> {
+    if (this._disposed) return Promise.reject(new Error('ReconnectProtocol has been disposed'));
     if (this._activeReconnect) return this._activeReconnect;
     this.cancelPendingReconnect();
-    this._activeReconnect = this.doReconnectLoop(adapterReconnector).finally(() => {
-      this._activeReconnect = null;
-    });
-    return this._activeReconnect;
+    const promise = this.doReconnectLoop(adapterReconnector);
+    this._activeReconnect = promise;
+    // Cleanup: clear _activeReconnect when done (catch prevents unhandled rejection on the cleanup chain)
+    const cleanup = () => { this._activeReconnect = null; };
+    promise.then(cleanup, cleanup);
+    return promise;
   }
 
   /**
@@ -266,16 +269,14 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
 
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
-      if (this._activeReconnect) return; // guard against race
-      this._activeReconnect = this.doReconnectLoop().finally(() => {
+      if (this._activeReconnect) return;
+      const promise = this.doReconnectLoop();
+      // Store with cleanup + catch so the promise never goes unhandled
+      this._activeReconnect = promise;
+      promise.catch(() => {
+        // Swallowed — reconnect_failed event already emitted by doReconnectLoop
+      }).finally(() => {
         this._activeReconnect = null;
-      });
-      this._activeReconnect.catch(err => {
-        logger.error({
-          module: 'reconnect-protocol',
-          msg: 'Reconnect loop failed',
-          error: String(err),
-        });
       });
     }, this.opts.reconnectGraceMs);
   }
@@ -329,7 +330,12 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
         });
 
         // Wait before next attempt (exponential backoff + jitter)
-        await this.sleep(delay);
+        try {
+          await this.sleep(delay);
+        } catch {
+          // Sleep was cancelled (dispose or new reconnect call) — exit loop
+          break;
+        }
         delay = this.nextDelay(delay);
       }
     }
@@ -413,9 +419,11 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
+      this._sleepReject = reject;
       this._reconnectTimer = setTimeout(() => {
         this._reconnectTimer = null;
+        this._sleepReject = null;
         resolve();
       }, ms);
     });
@@ -425,6 +433,10 @@ export class ReconnectProtocol extends TypedEmitter<ReconnectProtocolEvents> {
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
+    }
+    if (this._sleepReject) {
+      this._sleepReject(new Error('Reconnect cancelled'));
+      this._sleepReject = null;
     }
   }
 

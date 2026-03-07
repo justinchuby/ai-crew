@@ -343,10 +343,11 @@ describe('ReconnectProtocol', () => {
 
       const p1 = protocol.reconnect();
       const p2 = protocol.reconnect();
+      // Must be the exact same promise object
+      expect(p1).toBe(p2);
 
       const [r1, r2] = await Promise.all([p1, p2]);
-      // Both resolve to the same reconciliation result
-      expect(r1).toEqual(r2);
+      expect(r1).toBe(r2);
       // Only one actual connect attempt
       expect(client.connect).toHaveBeenCalledTimes(1);
     });
@@ -624,6 +625,21 @@ describe('ReconnectProtocol', () => {
     it('prevents reconnect after disposal', async () => {
       protocol.dispose();
       await expect(protocol.reconnect()).rejects.toThrow('disposed');
+    });
+
+    it('does not hang when disposed during backoff sleep', async () => {
+      // Connect always fails to force backoff sleep
+      client.connect = vi.fn(async () => { throw new Error('ECONNREFUSED'); });
+
+      const reconnectPromise = protocol.reconnect();
+
+      // Let the first attempt fail and enter sleep
+      await vi.advanceTimersByTimeAsync(50);
+
+      // Dispose during sleep — should cancel the sleep and let the promise settle
+      protocol.dispose();
+
+      await expect(reconnectPromise).rejects.toThrow('disposed');
     });
   });
 
