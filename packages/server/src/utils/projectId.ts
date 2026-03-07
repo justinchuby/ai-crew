@@ -6,6 +6,9 @@ const MAX_SLUG_LENGTH = 40;
 /** Default slug when title produces no usable characters */
 const DEFAULT_SLUG = 'project';
 
+/** Windows reserved device names that cannot be used as directory/file names */
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
 /**
  * Convert a title string to a URL-safe slug.
  * - Lowercases
@@ -24,6 +27,9 @@ export function slugify(title: string): string {
     .replace(/^-|-$/g, '');          // trim leading/trailing hyphens
 
   if (!slug) return DEFAULT_SLUG;
+
+  // Prevent Windows reserved device names (CON, NUL, PRN, AUX, COM1-9, LPT1-9)
+  if (WINDOWS_RESERVED.test(slug)) slug = `p-${slug}`;
 
   // Truncate to max length, but don't cut in the middle of a word if possible
   if (slug.length > MAX_SLUG_LENGTH) {

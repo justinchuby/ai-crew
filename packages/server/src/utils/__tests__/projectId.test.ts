@@ -58,6 +58,21 @@ describe('slugify', () => {
   it('handles numbers', () => {
     expect(slugify('Project v2.0')).toBe('project-v2-0');
   });
+
+  it('prefixes Windows reserved device names', () => {
+    expect(slugify('CON')).toBe('p-con');
+    expect(slugify('nul')).toBe('p-nul');
+    expect(slugify('PRN')).toBe('p-prn');
+    expect(slugify('AUX')).toBe('p-aux');
+    expect(slugify('COM1')).toBe('p-com1');
+    expect(slugify('LPT9')).toBe('p-lpt9');
+  });
+
+  it('does not prefix non-reserved names containing reserved words', () => {
+    expect(slugify('console')).toBe('console');
+    expect(slugify('null-project')).toBe('null-project');
+    expect(slugify('auxiliary')).toBe('auxiliary');
+  });
 });
 
 describe('generateProjectId', () => {
