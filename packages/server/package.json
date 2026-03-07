@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@flightdeck/shared": "*",
     "@agentclientprotocol/sdk": "^0.14.1",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",

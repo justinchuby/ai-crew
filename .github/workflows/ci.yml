@@ -32,9 +32,20 @@ jobs:
       - name: Check for type drift
         run: |
           # Ensure no server/web file re-defines types that should come from @flightdeck/shared
-          ! grep -rn "export type AgentStatus = " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "from '@flightdeck/shared'" | grep -v "node_modules" || { echo "ERROR: AgentStatus defined outside @flightdeck/shared"; exit 1; }
-          ! grep -rn "export type DagTaskStatus = " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "from '@flightdeck/shared'" | grep -v "node_modules" || { echo "ERROR: DagTaskStatus defined outside @flightdeck/shared"; exit 1; }
-          ! grep -rn "export type DelegationStatus = " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "from '@flightdeck/shared'" | grep -v "node_modules" || { echo "ERROR: DelegationStatus defined outside @flightdeck/shared"; exit 1; }
+          DRIFT=0
+          for TYPE in AgentStatus DagTaskStatus DelegationStatus DecisionStatus DecisionCategory TimerStatus AlertSeverity ActionType; do
+            if grep -rn "export type $TYPE = " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "from '@flightdeck/shared'" | grep -v "node_modules"; then
+              echo "ERROR: $TYPE defined outside @flightdeck/shared"
+              DRIFT=1
+            fi
+          done
+          for IFACE in Role DagTask Delegation ChatGroup GroupMessage Decision Timer Project ProjectSession ActivityEntry Alert FileLock; do
+            if grep -rn "export interface $IFACE " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "node_modules" | grep -v "extends"; then
+              echo "ERROR: $IFACE interface defined outside @flightdeck/shared"
+              DRIFT=1
+            fi
+          done
+          exit $DRIFT
 
       - name: Unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
