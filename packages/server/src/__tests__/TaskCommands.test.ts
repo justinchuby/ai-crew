@@ -815,7 +815,7 @@ describe('REASSIGN_TASK', () => {
   });
 });
 
-describe('Fix 2: UX Message for already-done tasks', () => {
+describe('Already-done task returns friendly message', () => {
   it('lead gets friendly message when completing an already-done task', () => {
     const ctx = makeCtx({
       taskDAG: {
@@ -850,7 +850,7 @@ describe('Fix 2: UX Message for already-done tasks', () => {
   });
 });
 
-describe('Fix 6: Coverage metric in TASK_STATUS', () => {
+describe('TASK_STATUS includes DAG coverage metric', () => {
   it('includes coverage metric when active agents exist', () => {
     const ctx = makeCtx({
       getAllAgents: vi.fn().mockReturnValue([

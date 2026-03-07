@@ -947,7 +947,7 @@ describe('maybeSuggestDagGroup', () => {
   });
 });
 
-describe('Fix 1: Duplicate detection role filter', () => {
+describe('Duplicate detection applies role filter', () => {
   it('does not flag as duplicate when roles differ', () => {
     const child = makeChildAgent('lead-001');
     const ctx = makeCtx({ spawnAgent: vi.fn().mockReturnValue(child) });
@@ -998,7 +998,7 @@ describe('Fix 1: Duplicate detection role filter', () => {
   });
 });
 
-describe('Fix 3: dagTaskId warning', () => {
+describe('Missing dagTaskId emits warning when DAG exists', () => {
   it('warns when DELEGATE without dagTaskId and DAG exists', () => {
     const child = makeChildAgent('lead-001');
     const ctx = makeCtx({ spawnAgent: vi.fn().mockReturnValue(child) });
@@ -1036,7 +1036,7 @@ describe('Fix 3: dagTaskId warning', () => {
   });
 });
 
-describe('Fix 5: Multi-dependency inference', () => {
+describe('Review dependency inference finds all matching tasks', () => {
   it('finds ALL tasks matching reviewed role (Strategy 3)', () => {
     const ctx = makeCtx();
     // Set up multiple developer tasks

@@ -73,6 +73,9 @@ const MIN_DESCRIPTION_MATCH_THRESHOLD = 0.2;
  */
 const MIN_SCORE_GAP = 0.15;
 
+/** Threshold for declareTaskBatch auto-DAG dedup (matching declared tasks to auto-created) */
+const DECLARE_BATCH_DEDUP_THRESHOLD = 0.85;
+
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'to', 'of', 'in', 'for', 'on',
   'and', 'or', 'with', 'that', 'this', 'it', 'from', 'by', 'as', 'at',
@@ -185,7 +188,7 @@ export class TaskDAG extends EventEmitter {
       const autoMatch = existingAutoTasks.find(auto =>
         !linkedAutoIds.has(auto.id)
         && auto.role === task.role
-        && descriptionSimilarity(task.description || '', auto.description, auto.title) > 0.85
+        && descriptionSimilarity(task.description || '', auto.description, auto.title) > DECLARE_BATCH_DEDUP_THRESHOLD
       );
 
       if (autoMatch) {
