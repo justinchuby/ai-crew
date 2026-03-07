@@ -64,9 +64,26 @@ export function handleAgentText(msg: any, ctx: HandlerContext): void {
       appendIdx = i;
       break;
     }
-    // User messages, separators, and thinking blocks break the append chain
-    if (sender === 'user' || sender === 'thinking' || m.text === '---') break;
+    // DM notifications (📨) have sender='user' but should not break the chain
+    if (sender === 'user') {
+      if (typeof m.text === 'string' && m.text.startsWith('📨')) continue;
+      break;
+    }
+    // Separators and thinking blocks break the append chain
+    if (sender === 'thinking' || m.text === '---') break;
     // System messages that are DM/group notifications are transparent — keep searching
+  }
+
+  // Fallback: if backward search broke on a non-DM boundary but there's an unclosed
+  // command block in a recent agent message, append there to avoid splitting the command.
+  if (appendIdx === -1) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      if ((m.sender ?? 'agent') === 'agent' && hasUnclosedCommandBlock(m.text ?? '')) {
+        appendIdx = i;
+        break;
+      }
+    }
   }
 
   const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;

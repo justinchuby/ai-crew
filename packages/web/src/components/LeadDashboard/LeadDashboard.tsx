@@ -1640,11 +1640,26 @@ export function LeadDashboard({ api, ws }: Props) {
                 }
 
                 // Agent (lead) messages: no bubble, just flowing text
-                // Only show timestamp on the first message in a consecutive agent run
+                // Merge consecutive agent text messages so split command blocks render correctly.
+                // Only the first message in a run gets the timestamp and renders the merged text.
                 const prevMsg = i > 0 ? filtered[i - 1] : null;
                 const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued;
                 const agentTs = isFirstInRun ? ts : '';
 
+                if (!isFirstInRun && (!msg.contentType || msg.contentType === 'text')) {
+                  // Skip — this message's text was merged into the first message of the run
+                  return null;
+                }
+
+                // Collect all consecutive agent text messages in this run
+                let mergedText = msg.text;
+                if (isFirstInRun && (!msg.contentType || msg.contentType === 'text')) {
+                  for (let j = i + 1; j < filtered.length; j++) {
+                    const next = filtered[j];
+                    if (next.sender !== 'agent' || next.queued || (next.contentType && next.contentType !== 'text')) break;
+                    mergedText += next.text;
+                  }
+                }
 
                 if (msg.contentType && msg.contentType !== 'text') {
                   return (
@@ -1662,7 +1677,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div key={i} className="py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
                     <div className="flex items-start gap-2">
                       <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
-                        <AgentTextBlock text={msg.text} />
+                        <AgentTextBlock text={mergedText} />
                       </div>
                       {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                     </div>

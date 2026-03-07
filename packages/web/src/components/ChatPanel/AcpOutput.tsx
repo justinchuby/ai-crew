@@ -332,22 +332,38 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
       <div className="py-1" {...mentionAttr}>
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            {group.messages.map((m) => {
-              const sender = m.msg.sender ?? 'agent';
-              const text = typeof m.msg.text === 'string' ? m.msg.text : JSON.stringify(m.msg.text, null, 2);
-              if (sender === 'thinking') {
+            {/* Merge adjacent agent text messages so split command blocks render correctly */}
+            {(() => {
+              const runs: { kind: 'agent' | 'thinking'; text: string; key: string }[] = [];
+              for (const m of group.messages) {
+                const sender = m.msg.sender ?? 'agent';
+                const text = typeof m.msg.text === 'string' ? m.msg.text : JSON.stringify(m.msg.text, null, 2);
+                if (sender === 'thinking') {
+                  runs.push({ kind: 'thinking', text, key: `msg-${m.index}` });
+                } else {
+                  const last = runs[runs.length - 1];
+                  if (last?.kind === 'agent') {
+                    last.text += text;
+                  } else {
+                    runs.push({ kind: 'agent', text, key: `msg-${m.index}` });
+                  }
+                }
+              }
+              return runs.map((run) => {
+                if (run.kind === 'thinking') {
+                  return (
+                    <div key={run.key} className="font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
+                      {run.text}
+                    </div>
+                  );
+                }
                 return (
-                  <div key={`msg-${m.index}`} className="font-mono text-xs text-th-text-muted italic whitespace-pre-wrap min-w-0">
-                    {text}
+                  <div key={run.key} className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
+                    <AgentTextBlockSimple text={run.text} />
                   </div>
                 );
-              }
-              return (
-                <div key={`msg-${m.index}`} className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
-                  <AgentTextBlockSimple text={text} />
-                </div>
-              );
-            })}
+              });
+            })()}
           </div>
           <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{lastTs}</span>
         </div>
