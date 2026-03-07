@@ -343,12 +343,11 @@ export function LeadDashboard({ api, ws }: Props) {
     }).catch(() => {});
   }, [selectedLeadId, isActiveAgent]);
 
-  // Fetch DAG status for selected lead — use projectId for the API call and store under both keys
+  // Fetch DAG status for selected lead — always use agent UUID for /api/lead/:id/dag
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
-    const dagId = historicalProjectId ?? selectedLeadId;
     const fetchDag = () => {
-      fetch(`/api/lead/${dagId}/dag`).then((r) => r.json()).then((data: any) => {
+      fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
         if (data && data.tasks) {
           const store = useLeadStore.getState();
           store.setDagStatus(selectedLeadId, data as DagStatus);
@@ -594,8 +593,7 @@ export function LeadDashboard({ api, ws }: Props) {
 
       // DAG status updates
       if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
-        const dagId = historicalProjectId ?? selectedLeadId;
-        fetch(`/api/lead/${dagId}/dag`).then((r) => r.json()).then((data: any) => {
+        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
           if (data && data.tasks) {
             store.setDagStatus(selectedLeadId!, data as DagStatus);
             if (historicalProjectId && historicalProjectId !== selectedLeadId) {
