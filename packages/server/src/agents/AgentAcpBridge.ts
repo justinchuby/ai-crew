@@ -6,6 +6,8 @@ import { mkdirSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
 import { AcpAdapter } from '../adapters/AcpAdapter.js';
 import { getPreset } from '../adapters/presets.js';
+import { resolveModel } from '../adapters/ModelResolver.js';
+import type { ProviderId } from '../adapters/presets.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -48,12 +50,25 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
   wireAcpEvents(agent, conn);
 
   // Resolve provider preset for CLI-specific spawn args
-  const preset = getPreset(config.provider || 'copilot');
+  const providerId = (config.provider || 'copilot') as ProviderId;
+  const preset = getPreset(providerId);
+
+  // Resolve model through cross-CLI model resolver
+  const rawModel = agent.model || agent.role.model;
+  const resolution = resolveModel(rawModel, providerId);
+
+  if (resolution?.translated && resolution.reason) {
+    logger.info({
+      module: 'agents',
+      msg: `Model resolved for ${agent.role.id}: ${resolution.reason}`,
+      agentId: agent.id,
+    });
+  }
 
   const cliArgs = [
     ...config.cliArgs,
     `--agent=${agentFlagForRole(agent.role.id)}`,
-    ...(agent.model || agent.role.model ? ['--model', agent.model || agent.role.model!] : []),
+    ...(resolution ? ['--model', resolution.model] : []),
     ...(agent.resumeSessionId ? ['--resume', agent.resumeSessionId] : []),
   ];
 
