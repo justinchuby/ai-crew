@@ -323,7 +323,7 @@ tsx watch detects file change → sends SIGTERM to server
 
 **Detection:** Dev mode is activated when the server detects it was started by `tsx watch` (via `process.env.TSX_WATCH` or similar). In dev mode, `gracefulShutdown()` simply closes the daemon socket without sending a shutdown message. The daemon interprets a bare socket close (no `daemon.shutdown` received) as "server restarting, keep agents alive."
 
-**Auto-shutdown safety net:** If no server reconnects within the timeout (5 min with no agents, 30 min with active agents), the daemon terminates itself. This prevents orphaned daemons consuming resources if the developer walks away.
+**Auto-shutdown safety net:** If no server reconnects within the timeout (5 min with no agents, 30 min with active agents), the daemon terminates itself. Hard maximum of **12 hours** regardless of state — the ultimate safety net against forgotten orphaned daemons.
 
 ### Protocol: Shutdown vs Disconnect
 
@@ -907,13 +907,15 @@ This mirrors `AcpAdapter.terminate()` (line ~370 in AcpAdapter.ts) which already
 
 #### Auto-Shutdown Timer
 
-If the developer closes their terminal or the server crashes hard (SIGKILL, OOM), the daemon keeps running with potentially orphaned agents consuming resources. The daemon implements an auto-shutdown timer:
+If the developer closes their terminal or the server crashes hard (SIGKILL, OOM), the daemon keeps running with potentially orphaned agents consuming resources. The daemon implements a tiered auto-shutdown:
 
 - **No server connected + no running agents:** Auto-shutdown after **5 minutes**
 - **No server connected + agents still running:** Auto-shutdown after **30 minutes** (developer may be restarting their environment)
-- **Server connected:** Timer is cancelled/not started
+- **Hard maximum: 12 hours** — regardless of agent state, the daemon terminates itself and all agents if no server has reconnected within 12 hours. This is the ultimate safety net against forgotten orphaned daemons. Non-configurable (or configurable with 12h as the minimum).
+- **Warning at 11 hours:** Daemon logs: `"Daemon will auto-terminate in 1 hour if no server reconnects"`
+- **Server connected:** All timers are cancelled/not started
 
-The countdown is written to a status file so `flightdeck daemon status` can display: `Auto-shutdown in 4m23s (no server connected, 3 agents running)`.
+The countdown is written to a status file so `flightdeck daemon status` can display: `Auto-shutdown in 4m23s (no server connected, 3 agents running)` or `Hard limit in 11h 42m`.
 
 The daemon also watches for its parent process (`dev.mjs`) — if the parent exits, start the countdown immediately.
 
