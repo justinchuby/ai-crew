@@ -21,6 +21,8 @@ import type { CapabilityInjector } from '../capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../../tasks/TaskDecomposer.js';
 import type { GovernancePipeline } from '../../governance/GovernancePipeline.js';
+import type { ActiveDelegationRepository } from '../../db/ActiveDelegationRepository.js';
+import type { AgentRosterRepository } from '../../db/AgentRosterRepository.js';
 
 // ── Delegation record ────────────────────────────────────────────────
 
@@ -54,6 +56,8 @@ export interface CommandContext {
   maxConcurrent: number;
   markHumanInterrupt(agentId: string): void;
   governancePipeline?: GovernancePipeline;
+  activeDelegationRepository?: ActiveDelegationRepository;
+  agentRosterRepository?: AgentRosterRepository;
 }
 
 // ── CommandHandlerContext — CommandContext + shared mutable state ──────

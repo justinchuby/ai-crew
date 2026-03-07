@@ -19,6 +19,9 @@ import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
 import type { WorktreeManager } from '../coordination/files/WorktreeManager.js';
 import type { CostTracker } from './CostTracker.js';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
+import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
+import type { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -101,6 +104,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
   private costTracker?: CostTracker;
+  private messageQueueStore?: MessageQueueStore;
+  private agentRosterRepository?: AgentRosterRepository;
+  private activeDelegationRepository?: ActiveDelegationRepository;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -114,7 +120,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository } = {},
   ) {
     super();
     this.config = config;
@@ -131,6 +137,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.capabilityInjector = capabilityInjector;
     this.worktreeManager = worktreeManager;
     this.costTracker = costTracker;
+    this.messageQueueStore = messageQueueStore;
+    this.agentRosterRepository = agentRosterRepository;
+    this.activeDelegationRepository = activeDelegationRepository;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -164,6 +173,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
       governancePipeline,
+      activeDelegationRepository,
+      agentRosterRepository,
     });
 
     // Start heartbeat monitor to detect stalled teams
@@ -326,6 +337,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this._systemPaused) {
       agent.systemPaused = true;
     }
+    if (this.messageQueueStore) {
+      agent.setMessageQueueStore(this.messageQueueStore);
+    }
 
     // Track parent-child relationship (deduplicate for restart with same ID)
     if (parentId) {
@@ -351,6 +365,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     this.agents.set(agent.id, agent);
+
+    // Persist agent to roster DB for crash recovery
+    if (this.agentRosterRepository) {
+      try {
+        this.agentRosterRepository.upsertAgent(
+          agent.id, role.id, effectiveModel || 'default', 'idle',
+          undefined, agent.projectId,
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'agent', msg: 'Failed to persist agent to roster', agentId: agent.id, error: err.message });
+      }
+    }
 
     // Create a conversation thread for this agent (for persistent message history)
     if (this.conversationStore) {
@@ -460,6 +486,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         if (status === 'idle' || isTerminalStatus(status)) {
           this.flushAgentMessage(agent.id);
+        }
+
+        // Persist status to roster DB
+        if (this.agentRosterRepository) {
+          const rosterStatus = status === 'running' ? 'busy' : status === 'idle' ? 'idle' : undefined;
+          if (rosterStatus) {
+            try { this.agentRosterRepository.updateStatus(agent.id, rosterStatus); } catch { /* non-critical */ }
+          }
         }
 
         if (agent.role.id === 'lead') {
@@ -672,6 +706,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.terminate();
     this.emit('agent:terminated', id);
+
+    // Persist terminated status to roster DB
+    if (this.agentRosterRepository) {
+      try { this.agentRosterRepository.updateStatus(id, 'terminated'); } catch { /* non-critical */ }
+    }
 
     // Clean up agent timers
     if (this.timerRegistry) this.timerRegistry.clearAgent(id);

@@ -13,6 +13,7 @@ import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
 import type { AgentStatus } from '@flightdeck/shared';
 export type { AgentStatus } from '@flightdeck/shared';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
 
 export function isTerminalStatus(status: AgentStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'terminated';
@@ -122,11 +123,14 @@ export class Agent {
 
   private acpConnection: AgentAdapter | null = null;
   private config: ServerConfig;
-  private pendingMessages: PromptContent[] = [];
+  /** Each pending message tracks its optional DB row ID for crash-safe delivery */
+  private pendingMessages: Array<{ content: PromptContent; mqId?: number }> = [];
   private pendingPriorityCount = 0;
   private static readonly MAX_PENDING_MESSAGES = 200;
   private peers: AgentContextInfo[];
   private readonly events = new AgentEventEmitter();
+  /** Optional crash-safe message persistence (write-on-enqueue pattern) */
+  private messageQueueStore?: MessageQueueStore;
 
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
@@ -180,7 +184,10 @@ export class Agent {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
       if (this.pendingPriorityCount > 0) this.pendingPriorityCount--;
-      this.write(next);
+      this.write(next.content);
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -410,6 +417,11 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     this.write(message, opts);
   }
 
+  /** Inject the crash-safe message queue store (called by AgentManager after construction) */
+  setMessageQueueStore(store: MessageQueueStore): void {
+    this.messageQueueStore = store;
+  }
+
   /**
    * Queue a message for delivery after the agent finishes its current prompt.
    * If `opts.priority` is true, the message is inserted after existing priority
@@ -418,28 +430,44 @@ When you discover something important about the codebase, a pattern, a gotcha, o
    * Priority messages (e.g. user messages) are NEVER dropped.
    */
   queueMessage(message: PromptContent, opts?: { priority?: boolean }): void {
+    // Write to DB FIRST for crash safety (write-on-enqueue pattern)
+    let mqId: number | undefined;
+    if (this.messageQueueStore) {
+      try {
+        const payload = typeof message === 'string' ? message : JSON.stringify(message);
+        mqId = this.messageQueueStore.enqueue(this.id, 'agent_message', payload);
+      } catch (err: any) {
+        logger.warn({ module: 'comms', msg: 'Failed to persist message to queue', agentId: this.id, error: err.message });
+      }
+    }
+
     if (this.systemPaused) {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
       return;
     }
     if (this.status === 'idle') {
       this.write(message, opts);
+      // Mark delivered immediately since we wrote directly
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
     } else {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
     }
   }
 
   /** Internal: insert message into pendingMessages with FIFO priority ordering and rate limiting */
-  private enqueueMessage(message: PromptContent, priority?: boolean): void {
+  private enqueueMessage(message: PromptContent, priority?: boolean, mqId?: number): void {
     if (!priority && this.pendingMessages.length >= Agent.MAX_PENDING_MESSAGES) {
       logger.warn({ module: 'agent', msg: 'Message queue full — dropping non-priority message', role: this.role.name, maxMessages: Agent.MAX_PENDING_MESSAGES });
       return;
     }
+    const entry = { content: message, mqId };
     if (priority) {
-      this.pendingMessages.splice(this.pendingPriorityCount, 0, message);
+      this.pendingMessages.splice(this.pendingPriorityCount, 0, entry);
       this.pendingPriorityCount++;
     } else {
-      this.pendingMessages.push(message);
+      this.pendingMessages.push(entry);
     }
   }
 
@@ -480,15 +508,19 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   drainPendingMessages(): void {
     if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
       const next = this.pendingMessages.shift()!;
-      this.write(next);
+      this.write(next.content);
+      // Mark delivered in DB after successful write
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
   /** Clear all pending (queued, not yet started) messages. Returns the count and previews of cleared messages. */
   clearPendingMessages(): { count: number; previews: string[] } {
     const count = this.pendingMessages.length;
-    const previews = this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    const previews = this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
     this.pendingMessages.length = 0;
     this.pendingPriorityCount = 0;
@@ -497,8 +529,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   /** Get summaries of pending messages for queue visibility (first 100 chars each) */
   getPendingMessageSummaries(): string[] {
-    return this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    return this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
   }
 

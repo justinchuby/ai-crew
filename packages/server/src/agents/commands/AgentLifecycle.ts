@@ -216,6 +216,18 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     };
     ctx.delegations.set(delegation.id, delegation);
 
+    // Persist delegation to DB for crash recovery
+    if (ctx.activeDelegationRepository) {
+      try {
+        ctx.activeDelegationRepository.create(
+          delegation.id, child.id, req.task, req.context,
+          undefined, // dagTaskId set below after linkDelegationToDag
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'delegation', msg: 'Failed to persist delegation', delegationId: delegation.id, error: err.message });
+      }
+    }
+
     child.task = req.task;
     child.taskOutputStartIndex = child.messages?.length ?? 0;
 
@@ -349,6 +361,10 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
           del.status = 'cancelled';
           del.completedAt = new Date().toISOString();
           cancelledCount++;
+          // Persist cancellation to DB
+          if (ctx.activeDelegationRepository) {
+            try { ctx.activeDelegationRepository.cancel(del.id); } catch { /* non-critical */ }
+          }
         }
       }
 
@@ -383,6 +399,11 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
 
       del.status = 'cancelled';
       del.completedAt = new Date().toISOString();
+
+      // Persist cancellation to DB
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.cancel(req.delegationId); } catch { /* non-critical */ }
+      }
 
       const targetAgent = ctx.getAgent(del.toAgentId);
       const cleared = targetAgent ? targetAgent.clearPendingMessages() : { count: 0, previews: [] };

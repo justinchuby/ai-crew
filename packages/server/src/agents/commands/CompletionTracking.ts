@@ -62,6 +62,10 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
       del.status = 'completed';
       del.completedAt = new Date().toISOString();
       del.result = redact(agent.getTaskOutput(16000)).text;
+      // Persist completion to DB
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.complete(del.id); } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -133,6 +137,12 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
         del.result = redact(agent.getTaskOutput(16000)).text;
+        if (ctx.activeDelegationRepository) {
+          try {
+            if (del.status === 'completed') ctx.activeDelegationRepository.complete(del.id);
+            else ctx.activeDelegationRepository.fail(del.id);
+          } catch { /* non-critical */ }
+        }
       }
     }
     return;
@@ -143,6 +153,12 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       del.status = exitCode === 0 ? 'completed' : 'failed';
       del.completedAt = new Date().toISOString();
       del.result = redact(agent.getTaskOutput(16000)).text;
+      if (ctx.activeDelegationRepository) {
+        try {
+          if (del.status === 'completed') ctx.activeDelegationRepository.complete(del.id);
+          else ctx.activeDelegationRepository.fail(del.id);
+        } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -224,6 +240,9 @@ export function completeDelegationsForAgent(ctx: CommandHandlerContext, agentId:
   for (const [, del] of ctx.delegations) {
     if (del.status === 'active' && del.toAgentId === agentId) {
       del.status = 'failed';
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.fail(del.id); } catch { /* non-critical */ }
+      }
     }
   }
 }
