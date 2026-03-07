@@ -10,6 +10,7 @@
  * thing, entries are merged (confidence boosted, contributors accumulated).
  */
 import type { KnowledgeStore } from './KnowledgeStore.js';
+import { sanitizeContent } from './KnowledgeInjector.js';
 import type {
   KnowledgeEntry,
   KnowledgeCategory,
@@ -103,6 +104,7 @@ export class SharedMemory {
 
     for (const entry of entries) {
       const key = sharedKey(entry.key);
+      const sanitized = sanitizeContent(entry.content);
       const existing = this.store.get(projectId, entry.category, key);
 
       if (existing) {
@@ -120,7 +122,7 @@ export class SharedMemory {
           ...(entry.tags ?? []),
         ]));
 
-        const updated = this.store.put(projectId, entry.category, key, entry.content, {
+        const updated = this.store.put(projectId, entry.category, key, sanitized, {
           ...existing.metadata,
           source: existing.metadata?.source ?? agentId,
           contributors,
@@ -132,7 +134,7 @@ export class SharedMemory {
         merged++;
       } else {
         // New entry
-        const created_entry = this.store.put(projectId, entry.category, key, entry.content, {
+        const created_entry = this.store.put(projectId, entry.category, key, sanitized, {
           source: agentId,
           contributors: [agentId],
           confidence: entry.confidence ?? 0.5,
