@@ -216,18 +216,6 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     };
     ctx.delegations.set(delegation.id, delegation);
 
-    // Persist delegation to DB for crash recovery
-    if (ctx.activeDelegationRepository) {
-      try {
-        ctx.activeDelegationRepository.create(
-          delegation.id, child.id, req.task, req.context,
-          undefined, // dagTaskId set below after linkDelegationToDag
-        );
-      } catch (err: any) {
-        logger.warn({ module: 'delegation', msg: 'Failed to persist delegation', delegationId: delegation.id, error: err.message });
-      }
-    }
-
     child.task = req.task;
     child.taskOutputStartIndex = child.messages?.length ?? 0;
 
@@ -237,6 +225,17 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       const dagLink = linkDelegationToDag(ctx, agent.id, child.role.id, req.task, child.id, 'DELEGATE', req.dagTaskId, req.dependsOn);
       dagNote = dagLink.dagNote;
       if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
+    }
+
+    // Persist delegation to DB AFTER DAG linking so dagTaskId is resolved
+    if (ctx.activeDelegationRepository) {
+      try {
+        ctx.activeDelegationRepository.create(
+          delegation.id, child.id, req.task, req.context, child.dagTaskId,
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'delegation', msg: 'Failed to persist delegation', delegationId: delegation.id, error: err.message });
+      }
     }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
     if (req.context) ctx.agentMemory.store(agent.id, child.id, 'context', req.context.slice(0, 200));

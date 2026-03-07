@@ -460,6 +460,10 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   private enqueueMessage(message: PromptContent, priority?: boolean, mqId?: number): void {
     if (!priority && this.pendingMessages.length >= Agent.MAX_PENDING_MESSAGES) {
       logger.warn({ module: 'agent', msg: 'Message queue full — dropping non-priority message', role: this.role.name, maxMessages: Agent.MAX_PENDING_MESSAGES });
+      // Bug fix: mark the DB row as delivered so it doesn't replay on restart
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
       return;
     }
     const entry = { content: message, mqId };
@@ -474,11 +478,17 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   /** Interrupt current work, then send message */
   async interruptWithMessage(message: PromptContent): Promise<void> {
     if (this.acpConnection && this.status === 'running') {
-      // Clear any queued messages — interrupt takes priority
+      // Mark cleared messages as delivered in DB before discarding
+      if (this.messageQueueStore) {
+        for (const { mqId } of this.pendingMessages) {
+          if (mqId) {
+            try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+          }
+        }
+      }
       this.pendingMessages.length = 0;
       this.pendingPriorityCount = 0;
       await this.acpConnection.cancel();
-      // Small delay to let cancellation settle before sending new prompt
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     this.write(message);
@@ -522,6 +532,14 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     const previews = this.pendingMessages.map(({ content }) =>
       typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
+    // Mark all DB rows as delivered so they don't replay on restart
+    if (this.messageQueueStore) {
+      for (const { mqId } of this.pendingMessages) {
+        if (mqId) {
+          try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+        }
+      }
+    }
     this.pendingMessages.length = 0;
     this.pendingPriorityCount = 0;
     return { count, previews };
