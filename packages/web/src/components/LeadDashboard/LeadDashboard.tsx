@@ -343,18 +343,26 @@ export function LeadDashboard({ api, ws }: Props) {
     }).catch(() => {});
   }, [selectedLeadId, isActiveAgent]);
 
-  // Fetch DAG status for selected lead
+  // Fetch DAG status for selected lead — use projectId for the API call and store under both keys
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
+    const dagId = historicalProjectId ?? selectedLeadId;
     const fetchDag = () => {
-      fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-        if (data && data.tasks) useLeadStore.getState().setDagStatus(selectedLeadId, data as DagStatus);
+      fetch(`/api/lead/${dagId}/dag`).then((r) => r.json()).then((data: any) => {
+        if (data && data.tasks) {
+          const store = useLeadStore.getState();
+          store.setDagStatus(selectedLeadId, data as DagStatus);
+          // Also store under projectId so DagMinimap can find it by either key
+          if (historicalProjectId && historicalProjectId !== selectedLeadId) {
+            store.setDagStatus(historicalProjectId, data as DagStatus);
+          }
+        }
       }).catch(() => {});
     };
     fetchDag();
     const interval = setInterval(fetchDag, 10000);
     return () => clearInterval(interval);
-  }, [selectedLeadId, isActiveAgent]);
+  }, [selectedLeadId, historicalProjectId, isActiveAgent]);
 
   // Listen for lead-specific WebSocket events
   useEffect(() => {
@@ -586,8 +594,14 @@ export function LeadDashboard({ api, ws }: Props) {
 
       // DAG status updates
       if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
-        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-          if (data && data.tasks) store.setDagStatus(selectedLeadId!, data as DagStatus);
+        const dagId = historicalProjectId ?? selectedLeadId;
+        fetch(`/api/lead/${dagId}/dag`).then((r) => r.json()).then((data: any) => {
+          if (data && data.tasks) {
+            store.setDagStatus(selectedLeadId!, data as DagStatus);
+            if (historicalProjectId && historicalProjectId !== selectedLeadId) {
+              store.setDagStatus(historicalProjectId, data as DagStatus);
+            }
+          }
         }).catch(() => {});
       }
 
