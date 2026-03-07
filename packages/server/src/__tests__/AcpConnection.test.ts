@@ -134,9 +134,12 @@ describe('AcpConnection', () => {
       await startPromise.catch(() => {});
 
       expect(logger.error).toHaveBeenCalledWith(
-        'acp',
-        expect.stringContaining('Spawn error for "copilot"'),
-        expect.objectContaining({ code: 'ENOENT', command: 'copilot' }),
+        expect.objectContaining({
+          module: 'acp',
+          msg: 'Spawn error',
+          cliCommand: 'copilot',
+          code: 'ENOENT',
+        }),
       );
       expect(exitEvents).toContain(1);
     });
@@ -208,8 +211,11 @@ describe('AcpConnection', () => {
 
       expect(exitEvents).toEqual([1]);
       expect(logger.warn).toHaveBeenCalledWith(
-        'acp',
-        expect.stringContaining('signal "SIGTERM"'),
+        expect.objectContaining({
+          module: 'acp',
+          msg: 'Process exited via signal',
+          signal: 'SIGTERM',
+        }),
       );
     });
 
