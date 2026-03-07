@@ -48,6 +48,8 @@ import { TaskDecomposer } from './tasks/TaskDecomposer.js';
 import { FileDependencyGraph } from './coordination/files/FileDependencyGraph.js';
 import { WorktreeManager } from './coordination/files/WorktreeManager.js';
 import { EscalationManager } from './coordination/alerts/EscalationManager.js';
+import { GovernancePipeline } from './governance/GovernancePipeline.js';
+import { createPermissionHook, createRateLimitHook, createCommitMessageValidationHook, createFileWriteGuardHook, createShellCommandBlocklistHook, createApprovalGateHook } from './governance/hooks/index.js';
 import { EagerScheduler } from './tasks/EagerScheduler.js';
 import { SearchEngine } from './coordination/knowledge/SearchEngine.js';
 
@@ -188,6 +190,28 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
 
   const searchEngine = new SearchEngine(activityLedger, decisionLog);
 
+  // GovernancePipeline (Tier 3 — depends on config, not on AgentManager)
+  const governancePipeline = new GovernancePipeline({ enabled: true });
+  // Register built-in hooks with sensible defaults
+  governancePipeline.registerPreHook(createShellCommandBlocklistHook());
+  governancePipeline.registerPreHook(createPermissionHook({
+    hasCapability: (agentId, cmd) => capabilityInjector.hasCommand(agentId, cmd),
+  }));
+  governancePipeline.registerPreHook(createCommitMessageValidationHook());
+  governancePipeline.registerPreHook(createRateLimitHook());
+  governancePipeline.registerPreHook(createFileWriteGuardHook());
+  governancePipeline.registerPreHook(createApprovalGateHook({
+    onGate: (action, reason) => {
+      decisionLog.add(
+        action.agent.id,
+        action.agent.roleName,
+        `Governance gate: ${action.commandName}`,
+        reason,
+        true, // needsConfirmation
+      );
+    },
+  }));
+
   // ── Tier 4: AgentManager ───────────────────────────────
   const agentManager = new AgentManager(
     effectiveConfig, roleRegistry, lockRegistry, activityLedger,
@@ -195,6 +219,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     taskDAG, {
       db, deferredIssueRegistry, timerRegistry, capabilityInjector,
       taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker,
+      governancePipeline,
     },
   );
   agentManager.setProjectRegistry(projectRegistry);
