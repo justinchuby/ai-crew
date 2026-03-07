@@ -32,6 +32,7 @@ export class KnowledgeStore {
     metadata?: KnowledgeMetadata,
   ): KnowledgeEntry {
     this.validateCategory(category);
+    validateKey(key);
 
     const metadataJson = metadata ? JSON.stringify(metadata) : null;
     const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -115,6 +116,7 @@ export class KnowledgeStore {
    * Returns entries ranked by relevance (BM25 scoring).
    */
   search(projectId: string, query: string, options?: SearchOptions): KnowledgeEntry[] {
+    if (!query.trim()) return [];
     const limit = options?.limit ?? 20;
     const category = options?.category;
     const ftsQuery = sanitizeFts5Query(query);
@@ -168,6 +170,7 @@ export class KnowledgeStore {
    * Lower BM25 score = more relevant (SQLite FTS5 convention).
    */
   searchWithScores(projectId: string, query: string, options?: SearchOptions): ScoredKnowledgeEntry[] {
+    if (!query.trim()) return [];
     const limit = options?.limit ?? 20;
     const category = options?.category;
     const ftsQuery = sanitizeFts5Query(query);
@@ -305,4 +308,14 @@ function sanitizeFts5Query(query: string): string {
     .filter(Boolean)
     .map((term) => `"${term.replace(/"/g, '""')}"`)
   return terms.join(' ') || '""';
+}
+
+/**
+ * Validate that a knowledge key is safe for use as a filename in sync paths.
+ * Rejects path separators and traversal patterns.
+ */
+function validateKey(key: string): void {
+  if (!key || /[/\\]/.test(key) || key === '..' || key === '.') {
+    throw new Error(`Invalid knowledge key '${key}': must not contain path separators or be '.' / '..'`);
+  }
 }

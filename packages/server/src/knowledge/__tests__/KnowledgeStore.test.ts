@@ -57,6 +57,21 @@ describe('KnowledgeStore', () => {
         /Invalid knowledge category/,
       );
     });
+
+    it('rejects keys with path separators', () => {
+      expect(() => store.put(projectId, 'core', '../escape', 'x')).toThrow(/Invalid knowledge key/);
+      expect(() => store.put(projectId, 'core', 'foo/bar', 'x')).toThrow(/Invalid knowledge key/);
+      expect(() => store.put(projectId, 'core', 'foo\\bar', 'x')).toThrow(/Invalid knowledge key/);
+    });
+
+    it('rejects "." and ".." as keys', () => {
+      expect(() => store.put(projectId, 'core', '..', 'x')).toThrow(/Invalid knowledge key/);
+      expect(() => store.put(projectId, 'core', '.', 'x')).toThrow(/Invalid knowledge key/);
+    });
+
+    it('rejects empty keys', () => {
+      expect(() => store.put(projectId, 'core', '', 'x')).toThrow(/Invalid knowledge key/);
+    });
   });
 
   describe('get', () => {
@@ -195,6 +210,12 @@ describe('KnowledgeStore', () => {
     it('returns empty array for no matches', () => {
       const results = store.search(projectId, 'Haskell');
       expect(results).toHaveLength(0);
+    });
+
+    it('returns empty for empty or whitespace-only queries', () => {
+      expect(store.search(projectId, '')).toEqual([]);
+      expect(store.search(projectId, '   ')).toEqual([]);
+      expect(store.searchWithScores(projectId, '')).toEqual([]);
     });
 
     it('does not return results from other projects', () => {
