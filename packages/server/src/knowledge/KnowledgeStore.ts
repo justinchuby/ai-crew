@@ -1,7 +1,7 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { knowledge } from '../db/schema.js';
-import type { KnowledgeEntry, KnowledgeCategory, KnowledgeMetadata, SearchOptions } from './types.js';
+import type { KnowledgeEntry, KnowledgeCategory, KnowledgeMetadata, SearchOptions, ScoredKnowledgeEntry } from './types.js';
 import { KNOWLEDGE_CATEGORIES } from './types.js';
 import { logger } from '../utils/logger.js';
 
@@ -163,6 +163,64 @@ export class KnowledgeStore {
     // Preserve FTS5 rank ordering
     const rowMap = new Map(rows.map((r) => [r.id, r]));
     return ids.map((id) => rowMap.get(id)).filter(Boolean).map((r) => this.rowToEntry(r!));
+  }
+
+  /**
+   * Full-text search returning entries with BM25 scores.
+   * Lower BM25 score = more relevant (SQLite FTS5 convention).
+   */
+  searchWithScores(projectId: string, query: string, options?: SearchOptions): ScoredKnowledgeEntry[] {
+    const limit = options?.limit ?? 20;
+    const category = options?.category;
+    const safeQuery = query.replace(/"/g, '""');
+
+    let results: Array<{ id: number; score: number }>;
+    if (category) {
+      results = this.db.all<{ id: number; score: number }>(
+        `SELECT k.id, bm25(knowledge_fts) AS score FROM knowledge k
+         JOIN knowledge_fts fts ON k.id = fts.rowid
+         WHERE knowledge_fts MATCH ?
+           AND k.project_id = ?
+           AND k.category = ?
+         ORDER BY bm25(knowledge_fts)
+         LIMIT ?`,
+        [`"${safeQuery}"`, projectId, category, limit],
+      );
+    } else {
+      results = this.db.all<{ id: number; score: number }>(
+        `SELECT k.id, bm25(knowledge_fts) AS score FROM knowledge k
+         JOIN knowledge_fts fts ON k.id = fts.rowid
+         WHERE knowledge_fts MATCH ?
+           AND k.project_id = ?
+         ORDER BY bm25(knowledge_fts)
+         LIMIT ?`,
+        [`"${safeQuery}"`, projectId, limit],
+      );
+    }
+
+    if (results.length === 0) return [];
+
+    const scoreMap = new Map(results.map((r) => [r.id, r.score]));
+    const ids = results.map((r) => r.id);
+    const rows = this.db.drizzle
+      .select()
+      .from(knowledge)
+      .where(
+        and(
+          eq(knowledge.projectId, projectId),
+          sql`${knowledge.id} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+        ),
+      )
+      .all();
+
+    const rowMap = new Map(rows.map((r) => [r.id, r]));
+    return ids
+      .map((id) => {
+        const row = rowMap.get(id);
+        if (!row) return null;
+        return { ...this.rowToEntry(row), score: scoreMap.get(id) ?? 0 };
+      })
+      .filter(Boolean) as ScoredKnowledgeEntry[];
   }
 
   /** Delete a specific knowledge entry. Returns true if an entry was deleted. */
