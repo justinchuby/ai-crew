@@ -47,6 +47,8 @@ const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const DaemonPanel = lazy(() => import('./components/DaemonPanel').then(m => ({ default: m.DaemonPanel })));
+const TeamHealthPage = lazy(() => import('./pages/TeamHealth').then(m => ({ default: m.TeamHealth })));
+const TeamRoster = lazy(() => import('./components/TeamRoster').then(m => ({ default: m.TeamRoster })));
 
 function RouteSpinner() {
   return (
@@ -277,6 +279,8 @@ export function App() {
             <Route path="/projects" element={<ProjectsPanel />} />
             <Route path="/knowledge" element={<KnowledgePanel />} />
             <Route path="/daemon" element={<DaemonPanel />} />
+            <Route path="/team" element={<TeamRoster />} />
+            <Route path="/team/health" element={<TeamHealthPage />} />
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

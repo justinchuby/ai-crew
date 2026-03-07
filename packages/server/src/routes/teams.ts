@@ -30,7 +30,7 @@ function paramStr(val: string | string[] | undefined): string {
 // ── Routes ──────────────────────────────────────────────────────────
 
 export function teamsRoutes(ctx: AppContext): Router {
-  const { teamExporter, knowledgeStore, trainingCapture, agentRoster, agentManager } = ctx;
+  const { teamExporter, teamImporter, knowledgeStore, trainingCapture, agentRoster, agentManager } = ctx;
   const router = Router();
 
   // ── POST /teams/:teamId/export ──────────────────────────────────
@@ -89,9 +89,40 @@ export function teamsRoutes(ctx: AppContext): Router {
 
   // ── POST /teams/import ──────────────────────────────────────────
 
-  router.post('/teams/import', writeLimiter, (_req, res) => {
-    // Stub — will be wired when TeamImporter (AS25) lands
-    res.status(501).json({ error: 'Team import not yet implemented. Pending AS25 (TeamImporter).' });
+  router.post('/teams/import', writeLimiter, (req, res) => {
+    if (!teamImporter) {
+      return res.status(503).json({ error: 'Team importer not available' });
+    }
+
+    const { bundle, projectId, teamId, agentConflict, knowledgeConflict, dryRun } = req.body ?? {};
+
+    if (!bundle || typeof bundle !== 'object') {
+      return res.status(400).json({ error: 'Request body must include a "bundle" object' });
+    }
+    if (!projectId || typeof projectId !== 'string') {
+      return res.status(400).json({ error: '"projectId" is required' });
+    }
+
+    try {
+      const report = teamImporter.import(bundle, {
+        projectId,
+        teamId,
+        agentConflict: agentConflict ?? 'skip',
+        knowledgeConflict: knowledgeConflict ?? 'prefer_existing',
+        dryRun: dryRun === true,
+      });
+
+      if (!report.success) {
+        logger.warn({ module: 'teams', msg: 'Team import validation failed', projectId, issues: report.validation.issues.length });
+        return res.status(422).json({ success: false, report });
+      }
+
+      logger.info({ module: 'teams', msg: 'Team imported', projectId, teamId: report.teamId, dryRun });
+      res.json({ success: true, report });
+    } catch (err: any) {
+      logger.error({ module: 'teams', msg: 'Team import failed', projectId, err: err.message });
+      res.status(500).json({ error: `Import failed: ${err.message}` });
+    }
   });
 
   // ── GET /teams ──────────────────────────────────────────────────
@@ -238,6 +269,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     // Live agent info
     const live = agentManager.getAll().find(l => l.id === agentId);
+    const liveJson = live?.toJSON();
 
     // Knowledge count for this agent's project
     let knowledgeCount = 0;
@@ -252,18 +284,18 @@ export function teamsRoutes(ctx: AppContext): Router {
       role: agent.role,
       model: agent.model,
       status: agent.status,
-      liveStatus: live?.status ?? null,
+      liveStatus: liveJson?.status ?? null,
       teamId: agent.teamId,
       projectId: agent.projectId ?? null,
       lastTaskSummary: agent.lastTaskSummary ?? null,
       createdAt: agent.createdAt,
       updatedAt: agent.updatedAt,
       knowledgeCount,
-      live: live ? {
-        task: live.task ?? null,
-        outputPreview: live.outputPreview ?? null,
-        autopilot: live.autopilot ?? false,
-        model: live.model ?? null,
+      live: liveJson ? {
+        task: liveJson.task ?? null,
+        outputPreview: liveJson.outputPreview ?? null,
+        autopilot: liveJson.autopilot ?? false,
+        model: liveJson.model ?? null,
       } : null,
     });
   });
@@ -302,7 +334,7 @@ export function teamsRoutes(ctx: AppContext): Router {
       });
 
       // Mass failure status from context (if available)
-      const massFailurePaused = ctx.massFailureDetector?.isTriggered() ?? false;
+      const massFailurePaused = ctx.massFailureDetector?.isPaused ?? false;
 
       res.json({
         teamId,
