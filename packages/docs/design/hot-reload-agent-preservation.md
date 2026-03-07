@@ -1104,7 +1104,7 @@ With SDK `--resume`, the product positioning shifts:
 
 3. **Security framing (@bb14c13b, @a6fa6770):** Phase 1 does NOT remove any security boundary — it IS the current security model (agents are child processes of the server). Every Copilot CLI user today runs in this model. Phase 2 ADDS process isolation as a security bonus (UDS + token + umask). Frame as: "Phase 2 adds defense-in-depth" rather than "Phase 1 is insecure." The threat model for Phase 1: if the server is compromised, agents are too — but that's already true today.
 
-**Recommendation:** Ship Phase 1 with `--resume` support as the default. Make Phase 2 daemon available via config flag (`daemon.enabled: true` in `flightdeck.config.yaml`). The daemon auto-starts when enabled but everything works without it.
+**Recommendation:** Ship Phase 1 with `--resume` support as the default. Make Phase 2 daemon available via config flag (`daemon.enabled: true` in `flightdeck.config.yaml`). The daemon auto-starts when enabled but everything works without it. When a user first enables this flag, the UI shows a one-time onboarding tooltip: *"Agent host daemon enabled — your agents will now survive server restarts with zero downtime."*
 
 #### Phase 1 Polish Priorities
 
