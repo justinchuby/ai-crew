@@ -41,6 +41,8 @@ function makeManagedAgent(overrides: Partial<ManagedAgent> = {}): ManagedAgent {
     pid: overrides.pid ?? 1234,
     task: overrides.task ?? 'implement feature',
     sessionId: overrides.sessionId,
+    projectId: overrides.projectId ?? 'test-project',
+    teamId: overrides.teamId ?? 'test-team',
     startedAt: overrides.startedAt ?? Date.now(),
     cleanups: [],
   };
