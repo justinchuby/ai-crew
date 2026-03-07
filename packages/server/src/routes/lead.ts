@@ -250,7 +250,15 @@ export function leadRoutes(ctx: AppContext): Router {
   });
 
   router.get('/lead/:id/dag', (req, res) => {
-    const agent = agentManager.get(req.params.id);
+    const rawId = req.params.id;
+    // Strip 'project:' prefix and resolve lead agent
+    const cleanId = rawId.startsWith('project:') ? rawId.slice(8) : rawId;
+    let agent = agentManager.get(cleanId);
+    // If cleanId is a projectId rather than an agentId, find the lead for that project
+    if (!agent) {
+      const allAgents = agentManager.getAll();
+      agent = allAgents.find(a => a.role.id === 'lead' && a.projectId === cleanId);
+    }
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
     const status = agentManager.getTaskDAG().getStatus(agent.id);
     res.json(status);
