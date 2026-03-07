@@ -40,7 +40,7 @@ import { randomUUID } from 'node:crypto';
 import { ForkTransport } from './transport/ForkTransport.js';
 import { AgentServerClient } from './agents/AgentServerClient.js';
 import { AgentServerHealth } from './agents/AgentServerHealth.js';
-import { MassFailureDetector } from './daemon/MassFailureDetector.js';
+import { MassFailureDetector } from './transport/MassFailureDetector.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';

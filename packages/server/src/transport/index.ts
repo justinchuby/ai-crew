@@ -15,6 +15,7 @@ export type {
   SpawnAgentMessage,
   SendMessageMessage,
   TerminateAgentMessage,
+  CancelAgentMessage,
   ListAgentsMessage,
   SubscribeMessage,
   PingMessage,
@@ -60,3 +61,14 @@ export {
   type AgentServerHealthOptions,
   type PingSender,
 } from '../agents/AgentServerHealth.js';
+
+export { EventBuffer, type EventBufferOptions, type BufferedEvent, type BufferedEventType } from './EventBuffer.js';
+export {
+  MassFailureDetector,
+  detectCause,
+  type ExitRecord,
+  type MassFailureConfig,
+  type MassFailureCallback,
+  type MassFailureCause,
+  type MassFailureData,
+} from './MassFailureDetector.js';

@@ -13,7 +13,6 @@
 import { AcpAdapter } from './AcpAdapter.js';
 import { ClaudeSdkAdapter } from './ClaudeSdkAdapter.js';
 import { MockAdapter } from './MockAdapter.js';
-import { DaemonAdapter, type DaemonAdapterOptions } from './DaemonAdapter.js';
 import { getPreset } from './presets.js';
 import { resolveModel } from './ModelResolver.js';
 import type { ProviderId } from './presets.js';
@@ -35,14 +34,6 @@ export interface AdapterConfig {
   autopilot?: boolean;
   /** Model name or tier alias */
   model?: string;
-
-  // ── Daemon-specific fields ──
-  /** Path to daemon IPC socket. When set, resolveBackend returns 'daemon'. */
-  daemonSocketPath?: string;
-  /** Auth token for daemon connection. */
-  daemonToken?: string;
-  /** Pre-configured DaemonAdapter options (for advanced use). */
-  daemonAdapterOptions?: DaemonAdapterOptions;
 
   // ── ACP-specific fields (subprocess adapters) ──
   /** Override the preset binary path */
@@ -70,15 +61,14 @@ export interface AdapterResult {
 
 // ── Backend Resolution ──────────────────────────────────────
 
-export type BackendType = 'acp' | 'claude-sdk' | 'daemon' | 'mock';
+export type BackendType = 'acp' | 'claude-sdk' | 'mock';
 
 /**
  * Determine which backend to use based on provider and config.
  * Pure function — no side effects, safe to call for inspection.
  */
-export function resolveBackend(provider: string, sdkMode?: boolean, daemonSocketPath?: string): BackendType {
+export function resolveBackend(provider: string, sdkMode?: boolean): BackendType {
   if (provider === 'mock') return 'mock';
-  if (daemonSocketPath) return 'daemon';
   if (provider === 'claude' && sdkMode) return 'claude-sdk';
   return 'acp';
 }
@@ -154,44 +144,10 @@ export function buildStartOptions(
  * - Logging of backend decisions
  */
 export function createAdapterForProvider(config: AdapterConfig): AdapterResult {
-  const preferredBackend = resolveBackend(config.provider, config.sdkMode, config.daemonSocketPath);
+  const preferredBackend = resolveBackend(config.provider, config.sdkMode);
 
   if (preferredBackend === 'mock') {
     return { adapter: new MockAdapter(), backend: 'mock', fallback: false };
-  }
-
-  if (preferredBackend === 'daemon') {
-    if (!config.daemonAdapterOptions) {
-      // Daemon requested but no adapter options provided — fall back to ACP
-      const reason = 'Daemon socket path set but no DaemonAdapterOptions provided';
-      logger.warn({
-        module: 'adapter-factory',
-        msg: `Daemon fallback: ${reason}. Using ACP adapter instead.`,
-        provider: config.provider,
-      });
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
-      return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
-    }
-
-    try {
-      const adapter = new DaemonAdapter(config.daemonAdapterOptions);
-      logger.info({
-        module: 'adapter-factory',
-        msg: 'Created DaemonAdapter (IPC proxy mode)',
-        provider: config.provider,
-        agentId: config.daemonAdapterOptions.agentId,
-      });
-      return { adapter, backend: 'daemon', fallback: false };
-    } catch (err) {
-      const reason = `Daemon adapter creation failed: ${(err as Error)?.message || String(err)}`;
-      logger.warn({
-        module: 'adapter-factory',
-        msg: `Daemon fallback: ${reason}. Using ACP adapter instead.`,
-        provider: config.provider,
-      });
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
-      return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
-    }
   }
 
   if (preferredBackend === 'claude-sdk') {

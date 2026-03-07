@@ -2,8 +2,8 @@
  * MassFailureDetector — detects when multiple agents fail in rapid succession
  * and triggers emergency response (spawn pausing).
  *
- * Standalone module extracted from DaemonProcess for independent testability
- * and reuse. Uses a sliding window to count agent exits and triggers a
+ * Standalone module extracted for independent testability and reuse by the
+ * agent server. Uses a sliding window to count agent exits and triggers a
  * mass failure event when the threshold is reached.
  *
  * Usage:
@@ -11,7 +11,24 @@
  *   detector.onMassFailure((data) => { ... });
  *   detector.recordExit({ agentId, exitCode, signal, error });
  */
-import type { MassFailureData } from './DaemonProtocol.js';
+
+// ── Mass Failure Event Data ─────────────────────────────────────────
+
+export type MassFailureCause = 'auth_failure' | 'rate_limit' | 'model_unavailable' | 'resource_exhaustion' | 'unknown';
+
+export interface MassFailureData {
+  exitCount: number;
+  windowSeconds: number;
+  recentExits: Array<{
+    agentId: string;
+    exitCode: number | null;
+    signal: string | null;
+    error: string | null;
+    timestamp: string;
+  }>;
+  pausedUntil: string;
+  likelyCause: MassFailureCause;
+}
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -36,9 +53,6 @@ export interface MassFailureConfig {
 
 /** Callback signature for mass failure events. */
 export type MassFailureCallback = (data: MassFailureData) => void;
-
-/** The likely cause categories for mass failures. */
-export type MassFailureCause = MassFailureData['likelyCause'];
 
 // ── Maximum exit history buffer size ────────────────────────────────
 

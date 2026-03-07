@@ -20,7 +20,7 @@ import type { KnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import type { HybridSearchEngine } from '../knowledge/HybridSearchEngine.js';
 import type { MemoryCategoryManager } from '../knowledge/MemoryCategoryManager.js';
 import type { TrainingCapture } from '../knowledge/TrainingCapture.js';
-import type { MassFailureDetector } from '../daemon/MassFailureDetector.js';
+import type { MassFailureDetector } from '../transport/MassFailureDetector.js';
 import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 import type { AgentServerClient } from '../agents/AgentServerClient.js';
 import type { AgentServerHealth } from '../agents/AgentServerHealth.js';
@@ -73,12 +73,6 @@ export interface AppContext {
   agentServerClient?: AgentServerClient;
   agentServerHealth?: AgentServerHealth;
   massFailureDetector?: MassFailureDetector;
-  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
-  daemonProcess?: import('../daemon/DaemonProcess.js').DaemonProcess;
-  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
-  daemonClient?: import('../daemon/DaemonClient.js').DaemonClient;
-  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
-  reconnectProtocol?: import('../daemon/ReconnectProtocol.js').ReconnectProtocol;
   teamExporter?: TeamExporter;
   teamImporter?: TeamImporter;
   agentRoster?: AgentRosterRepository;

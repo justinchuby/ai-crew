@@ -1,64 +1,13 @@
 /**
- * Daemon module barrel export.
+ * Daemon module barrel — DEPRECATED.
  *
- * Provides the daemon process, client, protocol types, event buffer,
- * and cross-platform utilities for agent lifecycle management across
- * server restarts.
+ * The daemon code has been replaced by the agent server architecture.
+ * EventBuffer and MassFailureDetector have moved to transport/.
+ * These re-exports exist only for backward compatibility.
  */
-export { DaemonProcess, type DaemonProcessOptions } from './DaemonProcess.js';
-export { DaemonClient, type DaemonClientOptions, type DaemonClientEvents } from './DaemonClient.js';
-export { EventBuffer, type EventBufferOptions } from './EventBuffer.js';
-export {
-  // Cross-platform utilities
-  createTransport,
-  detectPlatform,
-  isWindows,
-  isMacOS,
-  isLinux,
-  type TransportAdapter,
-  type Platform,
-  type ListenOptions,
-} from './platform.js';
-export {
-  // Protocol types
-  type JsonRpcRequest,
-  type JsonRpcResponse,
-  type JsonRpcNotification,
-  type JsonRpcError,
-  type JsonRpcMessage,
-  type DaemonEvent,
-  type DaemonEventType,
-  type DaemonAgentStatus,
-  type DaemonLifecycleMode,
-  type AgentDescriptor,
-  type MassFailureData,
-  // Param types
-  type AuthParams,
-  type SpawnParams,
-  type TerminateParams,
-  type SendParams,
-  type SubscribeParams,
-  type ShutdownParams,
-  type ConfigureParams,
-  // Result types
-  type AuthResult,
-  type SpawnResult,
-  type ListResult,
-  type SubscribeResult,
-  // Constants
-  RPC_ERRORS,
-  // Utilities
-  serializeMessage,
-  parseNdjsonBuffer,
-  createRequest,
-  createResponse,
-  createErrorResponse,
-  createNotification,
-  isRequest,
-  isResponse,
-  isNotification,
-  getSocketDir,
-} from './DaemonProtocol.js';
+export { EventBuffer, type EventBufferOptions, type BufferedEvent, type BufferedEventType } from '../transport/EventBuffer.js';
+// Backward compat aliases
+export type { BufferedEvent as DaemonEvent, BufferedEventType as DaemonEventType } from '../transport/EventBuffer.js';
 export {
   MassFailureDetector,
   detectCause,
@@ -66,13 +15,5 @@ export {
   type MassFailureConfig,
   type MassFailureCallback,
   type MassFailureCause,
-} from './MassFailureDetector.js';
-export {
-  ReconnectProtocol,
-  type ReconnectProtocolOptions,
-  type ReconnectProtocolEvents,
-  type ConnectionState,
-  type ReconciliationResult,
-  type ReconciledAgent,
-  type AdapterReconnector,
-} from './ReconnectProtocol.js';
+  type MassFailureData,
+} from '../transport/MassFailureDetector.js';

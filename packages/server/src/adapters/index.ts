@@ -24,8 +24,6 @@ export type {
 export { AcpAdapter } from './AcpAdapter.js';
 export { MockAdapter } from './MockAdapter.js';
 export { ClaudeSdkAdapter } from './ClaudeSdkAdapter.js';
-export { DaemonAdapter } from './DaemonAdapter.js';
-export type { DaemonAdapterOptions } from './DaemonAdapter.js';
 export type {
   SdkQuery,
   SdkMessage,

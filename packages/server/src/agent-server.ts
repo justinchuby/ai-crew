@@ -10,8 +10,8 @@
 import { randomUUID } from 'node:crypto';
 import { writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { EventBuffer } from './daemon/EventBuffer.js';
-import { MassFailureDetector } from './daemon/MassFailureDetector.js';
+import { EventBuffer } from './transport/EventBuffer.js';
+import { MassFailureDetector } from './transport/MassFailureDetector.js';
 import { createAdapterForProvider, buildStartOptions } from './adapters/AdapterFactory.js';
 import type { AdapterConfig } from './adapters/AdapterFactory.js';
 import type { AgentAdapter } from './adapters/types.js';
@@ -23,8 +23,6 @@ import type { AgentAdapter } from './adapters/types.js';
 // Adapter implementations
 export { AcpAdapter } from './adapters/AcpAdapter.js';
 export { ClaudeSdkAdapter } from './adapters/ClaudeSdkAdapter.js';
-export { DaemonAdapter } from './adapters/DaemonAdapter.js';
-export type { DaemonAdapterOptions } from './adapters/DaemonAdapter.js';
 export { MockAdapter } from './adapters/MockAdapter.js';
 
 // Factory

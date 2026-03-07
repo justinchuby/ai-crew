@@ -1,17 +1,42 @@
 /**
- * Bounded event buffer for the daemon.
+ * Bounded event buffer for the agent server.
  *
- * Buffers agent events while the server is disconnected. On reconnect,
+ * Buffers agent events while the orchestrator is disconnected. On reconnect,
  * events are replayed in order. The buffer is bounded per-agent with
  * configurable limits on count and age.
  *
- * Design: docs/design/hot-reload-agent-preservation.md
+ * Design: docs/design/agent-server-architecture.md
  *   - Max 100 events per agent, or 30 seconds' worth, whichever is smaller
  *   - FIFO overflow (oldest dropped)
  *   - Start buffering on server disconnect, drain on reconnect
  */
 import { randomBytes } from 'node:crypto';
-import type { DaemonEvent, DaemonEventType } from './DaemonProtocol.js';
+
+// ── Event Types (previously in DaemonProtocol.ts) ───────────────────
+
+export interface BufferedEvent {
+  eventId: string;
+  timestamp: string;
+  type: BufferedEventType;
+  agentId?: string;
+  data: Record<string, unknown>;
+}
+
+export type BufferedEventType =
+  | 'agent:spawned'
+  | 'agent:exit'
+  | 'agent:output'
+  | 'agent:status'
+  | 'server:shutting_down'
+  | 'server:mass_failure'
+  | 'server:client_connected'
+  | 'server:client_disconnected'
+  | 'server:error';
+
+/** @deprecated Use BufferedEvent instead. Alias for backward compatibility. */
+export type DaemonEvent = BufferedEvent;
+/** @deprecated Use BufferedEventType instead. Alias for backward compatibility. */
+export type DaemonEventType = BufferedEventType;
 
 export interface EventBufferOptions {
   /** Maximum events per agent (default: 100) */
@@ -29,8 +54,8 @@ const DEFAULT_OPTIONS: EventBufferOptions = {
 };
 
 export class EventBuffer {
-  private buffers = new Map<string, DaemonEvent[]>();
-  private globalBuffer: DaemonEvent[] = [];
+  private buffers = new Map<string, BufferedEvent[]>();
+  private globalBuffer: BufferedEvent[] = [];
   private buffering = false;
   private readonly options: EventBufferOptions;
 
@@ -57,7 +82,7 @@ export class EventBuffer {
    * Push an event into the buffer. Only stores if buffering is active.
    * Returns true if the event was stored, false if discarded or not buffering.
    */
-  push(event: DaemonEvent): boolean {
+  push(event: BufferedEvent): boolean {
     if (!this.buffering) return false;
 
     const agentId = event.agentId ?? '__global__';
@@ -96,9 +121,9 @@ export class EventBuffer {
    * Drain all buffered events for an agent, optionally filtering by lastSeenEventId.
    * Returns events in chronological order. Removes them from the buffer.
    */
-  drain(agentId?: string, lastSeenEventId?: string): DaemonEvent[] {
+  drain(agentId?: string, lastSeenEventId?: string): BufferedEvent[] {
     const now = Date.now();
-    let events: DaemonEvent[];
+    let events: BufferedEvent[];
 
     if (agentId) {
       events = this.buffers.get(agentId) ?? [];
@@ -152,12 +177,12 @@ export class EventBuffer {
     return `evt-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
   }
 
-  /** Create a DaemonEvent with auto-generated ID and timestamp. */
+  /** Create a BufferedEvent with auto-generated ID and timestamp. */
   static createEvent(
-    type: DaemonEventType,
+    type: BufferedEventType,
     data: Record<string, unknown>,
     agentId?: string,
-  ): DaemonEvent {
+  ): BufferedEvent {
     return {
       eventId: EventBuffer.generateEventId(),
       timestamp: new Date().toISOString(),

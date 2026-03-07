@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventBuffer } from '../daemon/EventBuffer.js';
-import type { DaemonEvent } from '../daemon/DaemonProtocol.js';
+import { EventBuffer } from '../transport/EventBuffer.js';
+import type { BufferedEvent } from '../transport/EventBuffer.js';
 
-function makeEvent(overrides: Partial<DaemonEvent> = {}): DaemonEvent {
+function makeEvent(overrides: Partial<BufferedEvent> = {}): BufferedEvent {
   return {
     eventId: EventBuffer.generateEventId(),
     timestamp: new Date().toISOString(),
@@ -195,7 +195,7 @@ describe('EventBuffer', () => {
   });
 
   it('creates events without agentId', () => {
-    const event = EventBuffer.createEvent('daemon:shutting_down', { persist: true });
+    const event = EventBuffer.createEvent('server:shutting_down', { persist: true });
     expect(event.agentId).toBeUndefined();
   });
 
