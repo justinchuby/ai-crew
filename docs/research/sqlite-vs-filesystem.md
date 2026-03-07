@@ -317,8 +317,9 @@ You are a security-focused code reviewer. Your primary responsibility is...
                              │
                     ┌────────▼──────────────────────────────┐
                     │         Filesystem Mirror              │
-                    │  <git-root>/.flightdeck/               │
-                    │  OR ~/.flightdeck/projects/<pid>/      │
+                    │  $(git rev-parse --show-toplevel)/     │
+                    │    .flightdeck/                        │
+                    │  Fallback: ~/.flightdeck/projects/id/  │
                     │                                        │
                     │  Human-readable · git-committable      │
                     │  User-editable · IDE-browsable         │
@@ -360,7 +361,7 @@ Tables that benefit most from the mirror:
 ### Filesystem Mirror Structure
 
 ```
-<git-root>/.flightdeck/          # Project-scoped (or ~/.flightdeck/projects/<pid>/)
+.flightdeck/                     # At git repo root (automatic) or ~/.flightdeck/projects/<id>/ if no git
 ├── project.yaml                 # Project metadata, sync state, schema version
 │
 ├── agents/                      # Agent roster and per-agent state
@@ -423,16 +424,23 @@ Tables that benefit most from the mirror:
 └── .gitattributes               # Git merge strategies for YAML files
 ```
 
-### Storage Location Choice
+### Storage Location (Deterministic)
 
-The user confirmed: filesystem mirror can live in either location:
+No user choice needed. Automatic detection:
 
-| Location | When to Use | Gitcommittable? |
-|----------|------------|-----------------|
-| `<git-root>/.flightdeck/` | Default for project-scoped state | ✅ Yes (team sharing) |
-| `~/.flightdeck/projects/<pid>/` | User-private state, or no git repo | ❌ Not in repo |
+```
+if (git rev-parse --show-toplevel succeeds):
+  mirrorRoot = <git-root>/.flightdeck/
+else:
+  mirrorRoot = ~/.flightdeck/projects/<project-id>/
+```
 
-Both can coexist: `.flightdeck/` for shared team knowledge, `~/.flightdeck/` for personal training/preferences.
+| Condition | Location | Git-trackable? |
+|-----------|---------|----------------|
+| Inside a git repo | `<git-root>/.flightdeck/` | ✅ Yes |
+| Not in a git repo | `~/.flightdeck/projects/<id>/` | ❌ No (fallback) |
+
+One location per project. No "choose your mode." No coexistence complexity.
 
 ---
 
@@ -528,19 +536,21 @@ Session End:
 ### Sharing Model
 
 ```
-In-repo (team-shared, git-committable):
-  <git-root>/.flightdeck/knowledge/     ← Team knowledge base
-  <git-root>/.flightdeck/training/      ← Team conventions, domain terms
-  <git-root>/.flightdeck/skills/        ← Team skill files
-  <git-root>/.flightdeck/dag/           ← Inspectable task state
-  <git-root>/.flightdeck/agents/        ← Agent roster, roles
+Inside git repo (the common case):
+  .flightdeck/                           ← Everything lives here
+  .flightdeck/knowledge/                 ← Commit to git → team-shared
+  .flightdeck/training/                  ← Commit to git → team conventions
+  .flightdeck/agents/                    ← Commit to git → team roles
+  .flightdeck/dag/                       ← Usually .gitignore'd (ephemeral)
+  .flightdeck/sessions/                  ← Usually .gitignore'd (ephemeral)
 
-Private (user-only):
-  ~/.flightdeck/projects/<pid>/         ← Personal preferences, private corrections
+Recommended .gitignore:
+  .flightdeck/sessions/
+  .flightdeck/dag/
+  .flightdeck/project.yaml
 
-Merge strategy:
-  Team knowledge + personal training = merged context at session start
-  Conflicts: personal overrides team (user's corrections > team defaults)
+Team shares: knowledge/, training/, skills/, agents/ (roles)
+User keeps private: sessions/, dag/ (ephemeral operational state)
 ```
 
 ---
@@ -1095,5 +1105,5 @@ function safeReadYaml<T>(path: string, schema: z.ZodSchema<T>, fallback: T): T {
 ### D9: Schema version in every file, lazy migration on read
 **Why**: Files only get rewritten when Flightdeck actually changes them — preserves user formatting, avoids noisy diffs, respects file ownership. Explicit `flightdeck migrate-files` command available for users who want clean files.
 
-### D10: Two storage locations, user's choice
-**Why**: `<git-root>/.flightdeck/` for team-shared state (committed to git). `~/.flightdeck/projects/<pid>/` for private state (personal preferences, training). Both can coexist.
+### D10: Deterministic storage location, no user choice
+**Why**: In a git repo → `<git-root>/.flightdeck/`. Not in git → `~/.flightdeck/projects/<id>/`. Automatic detection via `git rev-parse --show-toplevel`. One rule, no configuration, no coexistence complexity. Team sharing handled via `.gitignore` (commit knowledge/training, ignore sessions/dag).
