@@ -1121,6 +1121,119 @@ flightdeck.db                           # SQLite (authoritative state)
 
 **Design principle: SQLite is the single source of truth.** The filesystem manifest is a performance optimization for faster resume. The SDK session files are managed by the CLI, not by Flightdeck. The daemon's only filesystem state is runtime artifacts (socket, PID, token) that are ephemeral by nature.
 
+### Human-Readable Project IDs
+
+Project IDs appear in filesystem paths, UI, API responses, logs, and agent context. UUIDs (`8e0f22ff-a4e7-4142-853b-527735bd3adb`) are unreadable in all of these contexts. Project IDs should be human-readable slugs.
+
+#### Generation
+
+```typescript
+import { randomBytes } from 'crypto';
+
+function generateProjectId(title: string): string {
+  const slug = slugify(title);
+  const suffix = randomBytes(2).toString('hex');  // 4 hex chars = 65,536 possibilities
+  return `${slug}-${suffix}`;
+}
+
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')   // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, '')        // Trim leading/trailing hyphens
+    .slice(0, 40);                   // Max 40 chars for the slug portion
+}
+```
+
+**Examples:**
+| Project Title | Generated ID |
+|--------------|-------------|
+| Flightdeck | `flightdeck-a3f7` |
+| AI Crew Platform | `ai-crew-platform-b2e1` |
+| My Test Project!! | `my-test-project-9c4d` |
+| 日本語プロジェクト | `-f8a2` (non-Latin chars stripped; suffix only) |
+
+**Constraints:**
+- Max total length: 45 characters (40 slug + 1 hyphen + 4 suffix)
+- Suffix: 4 hex characters (65,536 possibilities per slug). Sufficient for a local dev tool.
+- Collision handling: On `UNIQUE` constraint violation in SQLite, regenerate with new random suffix. Retry up to 3 times.
+- Empty slug (all special characters): Fall back to `project-{suffix}`.
+
+#### Where Project IDs Appear
+
+| Context | Current (UUID) | New (slug) | Impact |
+|---------|---------------|------------|--------|
+| Filesystem | `~/.flightdeck/projects/8e0f22ff.../` | `~/.flightdeck/projects/flightdeck-a3f7/` | ✅ Readable in terminal |
+| UI display | Truncated or hidden | Shown directly | ✅ User can identify projects at a glance |
+| API responses | `{ projectId: "8e0f22ff..." }` | `{ projectId: "flightdeck-a3f7" }` | ✅ Readable in curl/logs |
+| Log correlation | `project=8e0f22ff...` | `project=flightdeck-a3f7` | ✅ Grep-friendly |
+| SQLite `projects.id` | UUID text | Slug text | ✅ Same column type (TEXT) |
+| Foreign keys | 7 tables reference `projects.id` | No schema change needed | ✅ TEXT → TEXT |
+
+#### Migration Path
+
+The `projects.id` column is `TEXT` (not a UUID type), so the migration is a data update, not a schema change:
+
+```typescript
+// Migration: generate slug IDs for existing projects
+function migrateProjectIds(db: Database): void {
+  const existing = db.drizzle.select().from(projects).all();
+  for (const project of existing) {
+    if (isUUID(project.id)) {
+      const newId = generateProjectId(project.name);
+      // Update all tables that reference this project ID
+      db.drizzle.transaction((tx) => {
+        tx.update(projects).set({ id: newId }).where(eq(projects.id, project.id)).run();
+        tx.update(projectSessions).set({ projectId: newId }).where(eq(projectSessions.projectId, project.id)).run();
+        tx.update(dagTasks).set({ projectId: newId }).where(eq(dagTasks.projectId, project.id)).run();
+        tx.update(fileLocks).set({ projectId: newId }).where(eq(fileLocks.projectId, project.id)).run();
+        tx.update(activityLog).set({ projectId: newId }).where(eq(activityLog.projectId, project.id)).run();
+        tx.update(decisions).set({ projectId: newId }).where(eq(decisions.projectId, project.id)).run();
+        tx.update(chatGroups).set({ projectId: newId }).where(eq(chatGroups.projectId, project.id)).run();
+        tx.update(collectiveMemory).set({ projectId: newId }).where(eq(collectiveMemory.projectId, project.id)).run();
+        // NEW tables (if they exist):
+        tx.update(agentRoster).set({ projectId: newId }).where(eq(agentRoster.projectId, project.id)).run();
+        tx.update(activeDelegations).set({ /* no direct projectId */ }).run();
+      });
+    }
+  }
+}
+
+function isUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+```
+
+**Migration is safe:** All foreign key references use the same TEXT type. The transaction ensures atomicity — either all tables update or none do. The `isUUID()` check makes the migration idempotent (skip already-migrated projects).
+
+#### ProjectRegistry Update
+
+```typescript
+// packages/server/src/projects/ProjectRegistry.ts
+create(name: string, description?: string, cwd?: string): Project {
+  const id = generateProjectId(name);  // Was: randomUUID()
+  const now = new Date().toISOString();
+  try {
+    this.db.drizzle.insert(projects).values({ id, name, description, cwd, status: 'active', createdAt: now, updatedAt: now }).run();
+  } catch (err: any) {
+    if (err.message?.includes('UNIQUE constraint')) {
+      // Collision — regenerate (up to 3 retries)
+      return this.create(name, description, cwd);
+    }
+    throw err;
+  }
+  return { id, name, description: description ?? '', cwd: cwd ?? null, status: 'active', createdAt: now, updatedAt: now };
+}
+```
+
+#### UI Display
+
+The project ID should be visible in:
+- **Header bar:** Next to the project name, in a muted font: `Flightdeck (flightdeck-a3f7)`
+- **Project list:** As a secondary label under the project name
+- **API responses:** Always included in project objects
+- **Agent context:** Agents see their `projectId` for log correlation and file path construction
+
 ### SDK Resume Analysis: Copilot, Claude, and Impact on Daemon Architecture
 
 Both major CLI SDKs now support native session resume. This section analyzes the implications for the daemon design.
