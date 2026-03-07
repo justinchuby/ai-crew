@@ -5,6 +5,39 @@
 > **Supersedes:** Daemon design (D2-D7) from hot-reload-agent-preservation.md  
 > **Context:** User approved process isolation via `fork()` + Node IPC after architectural assessment found ~48% of daemon code was over-engineered for a local dev tool.
 
+## Table of Contents
+
+1. [Problem](#problem)
+2. [Solution: Two-Process Architecture](#solution-two-process-architecture)
+3. [Transport Interface](#transport-interface)
+   - [ForkTransport](#forktransport-default--node-ipc) · [ForkListener](#forklistener-agent-server-side) · [Future: WebSocketTransport](#future-websockettransport)
+4. [Message Protocol](#message-protocol)
+5. [Agent Server Entry Point](#agent-server-entry-point)
+6. [Orchestration Server Client](#orchestration-server-client)
+7. [How Hot-Reload Works](#how-hot-reload-works)
+   - [Startup Sequence](#startup-sequence) · [Hot-Reload Cycle](#hot-reload-cycle-developer-saves-a-file) · [The Reconnect Problem](#the-reconnect-problem-fork-ipc-and-detached-processes)
+8. [Discovery, Authentication, and Reconnection](#discovery-authentication-and-reconnection)
+   - [Authentication Handshake](#authentication-handshake) · [Security Properties](#security-properties) · [Discovery Flow](#discovery-flow)
+9. [Event Replay on Reconnect](#event-replay-on-reconnect)
+10. [Error Handling: Agent Server Failure = UI Error](#error-handling-agent-server-failure--ui-error)
+    - [Health Check](#health-check-heartbeat) · [Connection Status](#connection-status-tracking) · [UI Error States](#ui-error-states)
+11. [Lifecycle Modes](#lifecycle-modes)
+12. [Integration with dev.mjs](#integration-with-devmjs)
+13. [State Persistence Ownership](#state-persistence-ownership)
+    - [Write-on-Mutation](#principle-write-on-mutation-not-write-on-shutdown) · [Shared Database](#shared-database-with-ownership-boundaries) · [Multi-Orchestrator Write Contention](#multi-orchestrator-write-contention-sqlite_busy) · [Filesystem Mirroring](#filesystem-mirroring-ownership)
+14. [Recovery Responsibilities](#recovery-responsibilities)
+    - [Who Restarts What](#who-restarts-what) · [Agent Server Self-Recovery](#agent-server-self-recovery-on-startup) · [Orchestration Server Reconciliation](#orchestration-server-reconciliation)
+15. [Multi-Team, Multi-Project Model](#multi-team-multi-project-model)
+    - [Team Identity](#team-identity) · [Scoping Hierarchy](#scoping-hierarchy) · [Data Ownership](#data-ownership-with-multi-team) · [Scenarios](#scenarios) · [API Changes](#agent-server-api-changes) · [Database Schema](#database-schema-changes) · [Security: Team Isolation](#security-team-isolation) · [Filesystem Mirroring](#filesystem-mirroring-with-multi-team) · [Shared Service](#agent-server-as-shared-service)
+16. [Portable Teams (Export/Import)](#portable-teams-exportimport)
+    - [Bundle Format](#bundle-format-typescript) · [REST API](#rest-api-endpoints) · [Import Validation](#import-validation-steps) · [Conflict Resolution](#import-conflict-resolution) · [CLI Commands](#cli-commands)
+17. [Migration from Daemon Code](#migration-from-daemon-code)
+18. [Comparison: Daemon vs Two-Process vs Hybrid](#comparison-daemon-vs-two-process-vs-hybrid)
+19. [Future: WebSocket Transport for Network Separation](#future-websocket-transport-for-network-separation)
+20. [Team Management UI](#team-management-ui)
+    - [Team Roster](#1-team-roster-view-team) · [Agent Profiles](#2-agent-profiles-teamagentid) · [Team Composition](#3-team-composition-teamcompose) · [Knowledge Management](#4-knowledge-management-per-agent) · [Health Dashboard](#5-team-health-dashboard-teamhealth) · [Cross-Project View](#6-cross-project-view-teamprojects) · [Agent Lifecycle](#7-agent-lifecycle-management) · [Data Model Extensions](#data-model-extensions) · [WebSocket Events](#websocket-events-for-team-management) · [Integration with Existing Panels](#integration-with-existing-panels) · [API Endpoints](#api-endpoints)
+21. [Open Questions](#open-questions)
+
 ## Problem
 
 When the Flightdeck orchestration server restarts (tsx watch, code change, crash), all agent subprocesses die because they're children of the server process. A 12-agent AI crew developing Flightdeck itself loses all in-flight work on every save.
@@ -474,7 +507,7 @@ interface ErrorMessage {
 
 // ─── Shared ─────────────────────────────────────────────────
 
-type AgentServerMessage = OrchestrationMessage | AgentServerMessage;
+type TransportMessage = OrchestrationMessage | AgentServerResponse;
 
 /** Generate monotonic event IDs */
 function nextEventId(): string {
@@ -1533,7 +1566,7 @@ class OrchestrationDbClient {
 
 | Table | Scope | Write Trigger |
 |-------|-------|---------------|
-| `dagTasks` | `(projectId, leadId=teamId)` | DAG mutations |
+| `dagTasks` | `(projectId, teamId)` | DAG mutations |
 | `projects` | global | Project CRUD |
 | `messageQueue` | `(projectId, teamId)` | Agent messaging |
 | `knowledge` | `(projectId)` — shared across teams | Knowledge operations |
@@ -1803,7 +1836,7 @@ The compound key `(projectId, teamId)` is the primary scoping mechanism. Differe
 
 | Table | Scope | Key Columns | Write Trigger |
 |-------|-------|-------------|---------------|
-| `dagTasks` | `(projectId, teamId)` | id, **leadId** (=teamId), **projectId** | DAG mutations |
+| `dagTasks` | `(projectId, teamId)` | id, **teamId**, **projectId**, leadId | DAG mutations |
 | `knowledge` | `(projectId)` | id, **projectId**, category, key | Knowledge operations |
 | `messageQueue` | `(projectId, teamId)` | id, agentId, **projectId**, **teamId** | Agent messaging |
 | `fileLocks` | `(projectId)` | filePath, agentId, **projectId** | Lock/unlock |
@@ -2116,20 +2149,38 @@ export const activeDelegations = sqliteTable('active_delegations', {
 // Indexes: (agentId + status), status, dagTaskId, (projectId + teamId)
 ```
 
-#### `dagTasks` — Already has `leadId` ≈ `teamId`
+#### `dagTasks` — Migration from `leadId` to `teamId` Scoping
 
-The `dagTasks` table already has `leadId` as part of its compound primary key. In the multi-team model, `leadId` IS the `teamId`:
+The `dagTasks` table currently uses `leadId` as part of its compound primary key (`id + leadId`). In the multi-team model, `leadId` and `teamId` have **different lifecycles** (see "Team Identity" section):
+
+- **`teamId`**: Stable, persists across sessions. Used for scoping — "which team owns this task."
+- **`leadId`**: Ephemeral, changes on each lead restart. Used for tracking — "which lead instance is running this DAG."
+
+**Migration:** Add a `teamId` column, migrate scoping from `leadId` to `teamId`, but retain `leadId` for operational tracking.
+
+```sql
+-- Migration: add teamId to dagTasks, shift scoping from leadId
+ALTER TABLE dag_tasks ADD COLUMN team_id TEXT NOT NULL DEFAULT 'default';
+
+-- Backfill: existing rows get teamId from their leadId (one-time migration)
+-- After backfill, new rows always set teamId explicitly.
+UPDATE dag_tasks SET team_id = lead_id WHERE team_id = 'default' AND lead_id IS NOT NULL;
+
+-- New compound key for scoping (id + teamId replaces id + leadId)
+CREATE UNIQUE INDEX idx_dag_tasks_id_team ON dag_tasks(id, team_id);
+CREATE INDEX idx_dag_tasks_team ON dag_tasks(team_id);
+```
 
 ```typescript
-// Existing — no migration needed for dagTasks
 export const dagTasks = sqliteTable('dag_tasks', {
   id: text('id').notNull(),
-  leadId: text('lead_id').notNull(),     // This IS the teamId
+  teamId: text('team_id').notNull(),       // ← Scoping key (stable)
+  leadId: text('lead_id').notNull(),       // ← Operational tracking (ephemeral)
   projectId: text('project_id'),
   // ... rest unchanged
 });
-// Primary key: (id, leadId)
-// leadId = teamId — same identity, already in place
+// Unique index: (id, teamId) — scoping
+// Retained index: (leadId) — for "which lead is running this task"
 ```
 
 #### `messageQueue` — Add `teamId`
