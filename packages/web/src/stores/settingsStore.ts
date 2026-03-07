@@ -30,7 +30,7 @@ function loadThemeMode(): ThemeMode {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
   } catch {}
-  return 'dark';
+  return 'system';
 }
 
 function resolveTheme(mode: ThemeMode): 'dark' | 'light' {
