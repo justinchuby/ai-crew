@@ -31,6 +31,8 @@ import { KnowledgeStore } from './knowledge/KnowledgeStore.js';
 import { HybridSearchEngine } from './knowledge/HybridSearchEngine.js';
 import { MemoryCategoryManager } from './knowledge/MemoryCategoryManager.js';
 import { TrainingCapture } from './knowledge/TrainingCapture.js';
+import { TeamExporter } from './teams/TeamExporter.js';
+import { TeamImporter } from './teams/TeamImporter.js';
 
 import { randomUUID } from 'node:crypto';
 
@@ -194,6 +196,11 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const messageQueueStore = new MessageQueueStore(db);
   const agentRosterRepository = new AgentRosterRepository(db);
   const activeDelegationRepository = new ActiveDelegationRepository(db);
+
+  // ── Team Export/Import ──────────────────────────────────
+  const teamExporterDeps = { agentRoster: agentRosterRepository, knowledgeStore, trainingCapture };
+  const teamExporter = new TeamExporter(teamExporterDeps);
+  const teamImporter = new TeamImporter({ agentRoster: agentRosterRepository, knowledgeStore, trainingCapture });
 
   // ── Tier 2: Stateless Services ─────────────────────────
   const messageBus = new MessageBus();
@@ -373,6 +380,8 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     agentServerHealth,
     massFailureDetector,
     agentRoster: agentRosterRepository,
+    teamExporter,
+    teamImporter,
 
     // Lifecycle
     async shutdown() {
