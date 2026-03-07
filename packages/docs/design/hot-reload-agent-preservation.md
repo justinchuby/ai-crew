@@ -1420,13 +1420,13 @@ Agents:     Cards removed or dimmed with "Session ended" state
 User action: Next session start → daemon auto-starts again
 ```
 
-#### State: Fallback Mode (no daemon)
+#### State: Fallback Mode (daemon failed to start)
 
 ```
-UI shows:   Info toast (auto-dismiss 5s): "Running without daemon — 
-            agents will restart on code changes."
-Header dot: Gray (not amber or red — this is expected, not an error)
-User action: None needed. Enable daemon via config if zero-downtime desired.
+UI shows:   Warning toast: "⚠️ Daemon unavailable — agents will restart 
+            on code changes. Run 'flightdeck daemon start' to fix."
+Header dot: Red (daemon should always be running in dev mode)
+User action: Check daemon logs, restart daemon. Agents continue via SDK resume in the meantime.
 ```
 
 ### Agent Status Model
