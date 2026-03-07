@@ -216,8 +216,9 @@ export function redactWsMessage(msg: Record<string, unknown>): Record<string, un
       return msg;
 
     case 'agent:content':
-      if (typeof msg.text === 'string') {
-        return { ...msg, text: redact(msg.text).text };
+    case 'agent:message_sent':
+      if (typeof msg.content === 'string') {
+        return { ...msg, content: redact(msg.content).text };
       }
       return msg;
 

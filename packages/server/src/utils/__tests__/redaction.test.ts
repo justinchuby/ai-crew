@@ -235,6 +235,28 @@ describe('redactWsMessage()', () => {
     expect(entry.summary).toContain('AKIA***REDACTED***');
   });
 
+  it('redacts agent:content messages using content field', () => {
+    const msg = { type: 'agent:content', agentId: 'a1', content: 'Key is AKIA1234567890ABCDEF' };
+    const result = redactWsMessage(msg);
+    expect(result.content).toContain('AKIA***REDACTED***');
+    expect(result).not.toHaveProperty('text');
+  });
+
+  it('redacts agent:message_sent messages', () => {
+    const msg = {
+      type: 'agent:message_sent',
+      from: 'agent-1',
+      fromRole: 'developer',
+      to: 'agent-2',
+      toRole: 'lead',
+      content: 'Token: ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd',
+    };
+    const result = redactWsMessage(msg);
+    expect(result.content).toContain('***GITHUB_TOKEN_REDACTED***');
+    expect(result.from).toBe('agent-1');
+    expect(result.to).toBe('agent-2');
+  });
+
   it('handles messages without type field', () => {
     const msg = { data: 'something' };
     const result = redactWsMessage(msg);
