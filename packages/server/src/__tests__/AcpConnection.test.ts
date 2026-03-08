@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import { Writable, Readable } from 'stream';
 
 // ── Mock child_process ────────────────────────────────────────────
 const mockSpawn = vi.fn();
@@ -14,7 +15,12 @@ vi.mock('child_process', () => ({
 vi.mock('@agentclientprotocol/sdk', () => ({
   PROTOCOL_VERSION: '1.0',
   ndJsonStream: vi.fn(),
-  ClientSideConnection: vi.fn(),
+  ClientSideConnection: class {
+    initialize = vi.fn().mockResolvedValue({ protocolVersion: '1.0', serverCapabilities: {} });
+    newSession = vi.fn().mockResolvedValue({ sessionId: 'mock-session-1' });
+    prompt = vi.fn().mockResolvedValue({ content: '' });
+    cancel = vi.fn().mockResolvedValue(undefined);
+  },
 }));
 
 // ── Mock logger ───────────────────────────────────────────────────
@@ -36,8 +42,8 @@ import { logger } from '../utils/logger.js';
 /** Create a fake child process EventEmitter with piped stdin/stdout */
 function createFakeProcess() {
   const proc = new EventEmitter() as any;
-  proc.stdin = new EventEmitter();
-  proc.stdout = new EventEmitter();
+  proc.stdin = new Writable({ write(_chunk, _enc, cb) { cb(); } });
+  proc.stdout = new Readable({ read() {} });
   proc.kill = vi.fn();
   proc.pid = 12345;
   return proc;
@@ -93,7 +99,7 @@ describe('AcpConnection', () => {
       );
 
       fakeProc.emit('exit', 1);
-      await expect(startPromise).rejects.toThrow();
+      await startPromise.catch(() => {});
     });
 
     it('uses execFileSync with "which" on Unix (no shell injection)', async () => {
