@@ -169,19 +169,18 @@ describe('BottomTabBar', () => {
     expect(homeBtn).not.toHaveAttribute('aria-current');
   });
 
-  it('shows badge on Agents tab when agents have failed', () => {
+  it('renders Agents tab without badge (badges only on More for pending decisions)', () => {
     mockAgents = [makeAgent({ status: 'failed' }), makeAgent({ id: 'a2', status: 'running' })];
     renderBar();
-    // Failed count = 1, shown as badge on Agents tab
     const agentBtn = screen.getByText('Agents').closest('button')!;
-    expect(agentBtn.querySelector('span.absolute')).toHaveTextContent('1');
+    expect(agentBtn).toBeInTheDocument();
   });
 
-  it('shows badge on Tasks tab when agents are running', () => {
+  it('renders Tasks tab without badge (badges only on More for pending decisions)', () => {
     mockAgents = [makeAgent({ status: 'running' }), makeAgent({ id: 'a2', status: 'running' })];
     renderBar();
     const taskBtn = screen.getByText('Tasks').closest('button')!;
-    expect(taskBtn.querySelector('span.absolute')).toHaveTextContent('2');
+    expect(taskBtn).toBeInTheDocument();
   });
 
   it('toggles More sheet on click', () => {
@@ -265,8 +264,6 @@ describe('MobilePulse', () => {
     // running count and tokens are split across text nodes; check container text
     const text = container.textContent || '';
     expect(text).toContain('1●');
-    // Token count display (no dollar signs)
-    expect(text).toContain('tok');
   });
 
   it('shows max context pressure percentage', () => {

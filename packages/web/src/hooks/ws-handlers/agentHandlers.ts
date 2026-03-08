@@ -1,5 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import { useToastStore } from '../../components/Toast';
+import { shouldNotify } from '../../stores/settingsStore';
 import { hasUnclosedCommandBlock } from '../../utils/commandParser';
 import type { HandlerContext } from './index';
 
@@ -161,9 +162,12 @@ export function handleAgentPlan(msg: any, ctx: HandlerContext): void {
 
 export function handleAgentPermissionRequest(msg: any, ctx: HandlerContext): void {
   ctx.updateAgent(msg.agentId, { pendingPermission: msg.request });
-  const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-  const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
-  useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+  // Permission requests are exceptions — gate on oversight level (AC-16.5)
+  if (shouldNotify('exception')) {
+    const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+    const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
+    useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+  }
 }
 
 export function handleAgentSessionReady(msg: any, ctx: HandlerContext): void {

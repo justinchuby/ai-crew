@@ -351,11 +351,14 @@ export function useWebSocket() {
               id: msg.id,
               agentId: msg.agentId,
               agentRole: msg.agentRole || 'Unknown',
-              projectId: msg.projectId,
+              leadId: msg.leadId ?? null,
+              projectId: msg.projectId ?? null,
               title: msg.title || 'Untitled decision',
               rationale: msg.rationale || '',
               needsConfirmation: true,
               status: 'recorded',
+              autoApproved: msg.autoApproved ?? false,
+              confirmedAt: msg.confirmedAt ?? null,
               category: msg.category,
               timestamp: msg.timestamp || new Date().toISOString(),
             });
@@ -377,6 +380,10 @@ export function useWebSocket() {
           for (const d of decisions) {
             if (d.id) useAppStore.getState().removePendingDecision(d.id);
           }
+          break;
+        }
+        case 'attention:changed': {
+          window.dispatchEvent(new CustomEvent('attention:changed'));
           break;
         }
       }

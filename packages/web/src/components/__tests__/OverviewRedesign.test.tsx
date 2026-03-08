@@ -47,29 +47,29 @@ const mockAgents: AgentInfo[] = [
 // ── Tests ──────────────────────────────────────────────────────────
 
 describe('KeyStats', () => {
-  it('renders stats card', () => {
+  it('renders stats card with agents, duration, and completed', () => {
     render(<KeyStats agents={mockAgents} />);
     expect(screen.getByTestId('key-stats')).toBeTruthy();
     expect(screen.getByText('Key Stats')).toBeTruthy();
     expect(screen.getByText('1 active / 3 total')).toBeTruthy();
-    // No token data on mock agents → tokens shows N/A
-    expect(screen.getByText('N/A')).toBeTruthy();
+    expect(screen.getByText('Agents')).toBeTruthy();
+    expect(screen.getByText('Duration')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
-  it('shows tokens when token data available', () => {
-    const agentsWithTokens = mockAgents.map((a, i) =>
-      i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
-    );
-    render(<KeyStats agents={agentsWithTokens} totalTokens={1500} />);
-    expect(screen.getByText('~2k total')).toBeTruthy();
+  it('shows completed count for agents with completed status', () => {
+    render(<KeyStats agents={mockAgents} />);
+    // 1 completed agent in mockAgents (a3)
+    expect(screen.getByText('1 agent')).toBeTruthy();
   });
 
-  it('shows token count when token data available', () => {
-    const agentsWithTokens = mockAgents.map((a, i) =>
-      i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
-    );
-    render(<KeyStats agents={agentsWithTokens} totalTokens={150000} />);
-    expect(screen.getByText('~150k total')).toBeTruthy();
+  it('shows active count reflecting running agents', () => {
+    const moreAgents = [
+      ...mockAgents,
+      { id: 'a4', role: { id: 'dev', name: 'Developer' } as any, status: 'running', model: 'claude' } as any,
+    ];
+    render(<KeyStats agents={moreAgents} />);
+    expect(screen.getByText('2 active / 4 total')).toBeTruthy();
   });
 });
 

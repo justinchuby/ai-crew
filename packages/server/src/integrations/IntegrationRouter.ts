@@ -1,0 +1,515 @@
+// packages/server/src/integrations/IntegrationRouter.ts
+// Deterministic message router — NOT an LLM-powered agent.
+// Routes inbound messages from messaging platforms to the correct
+// project lead, and formats outbound responses.
+
+import { randomInt } from 'node:crypto';
+import { logger } from '../utils/logger.js';
+import type { AgentManager } from '../agents/AgentManager.js';
+import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
+import type {
+  InboundMessage,
+  OutboundMessage,
+  ChatSession,
+  MessagingAdapter,
+  TelegramConfig,
+} from './types.js';
+import { TelegramAdapter } from './TelegramAdapter.js';
+import { NotificationBatcher } from './NotificationBatcher.js';
+import type { ConfigStore } from '../config/ConfigStore.js';
+
+/** Session TTL: 1 hour. */
+const SESSION_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * IntegrationRouter — Layer 2 of the 3-layer messaging architecture.
+ *
+ * Architecture: TelegramAdapter (Layer 1: transport) → IntegrationRouter (Layer 2: routing)
+ *               → NotificationBatcher (Layer 3: event aggregation & delivery)
+ *
+ * IntegrationRouter is a deterministic router (no LLM) that:
+ * 1. Manages platform adapters (Telegram, future: Slack)
+ * 2. Routes inbound messages to the correct project lead
+ * 3. Maintains chat ↔ project session bindings (in-memory, 1h TTL)
+ * 4. Registers command handlers on adapters (/status, /projects, /agents, /help)
+ * 5. Coordinates with NotificationBatcher for outbound event delivery
+ */
+export interface PendingChallenge {
+  code: string;
+  chatId: string;
+  platform: 'telegram' | 'slack';
+  projectId: string;
+  boundBy: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+/** Challenge TTL: 5 minutes. */
+const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+export class IntegrationRouter {
+  private adapters: Map<string, MessagingAdapter> = new Map();
+  private sessions: Map<string, ChatSession> = new Map(); // chatId → session
+  private pendingChallenges: Map<string, PendingChallenge> = new Map(); // chatId → challenge
+  private notificationBatcher: NotificationBatcher;
+  private agentManager: AgentManager;
+  private projectRegistry: ProjectRegistry | undefined;
+  private configStore: ConfigStore;
+  private sessionCleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    agentManager: AgentManager,
+    projectRegistry: ProjectRegistry | undefined,
+    configStore: ConfigStore,
+    notificationBatcher: NotificationBatcher,
+  ) {
+    this.agentManager = agentManager;
+    this.projectRegistry = projectRegistry;
+    this.configStore = configStore;
+    this.notificationBatcher = notificationBatcher;
+  }
+
+  /** Initialize and start all configured adapters. */
+  async start(): Promise<void> {
+    const config = this.configStore.current;
+    const telegramConfig = config.telegram;
+
+    if (telegramConfig?.enabled && telegramConfig.botToken) {
+      const tgConfig = {
+        ...telegramConfig,
+        // Prefer env var over config file for the bot token
+        botToken: process.env.TELEGRAM_BOT_TOKEN || telegramConfig.botToken,
+      };
+      await this.startTelegram(tgConfig);
+    }
+
+    // Start session cleanup timer
+    this.sessionCleanupTimer = setInterval(() => this.cleanExpiredSessions(), 60_000);
+    this.sessionCleanupTimer.unref();
+
+    // Wire NotificationBatcher to AgentManager
+    this.notificationBatcher.wire(this.agentManager);
+
+    // Listen for config changes to enable/disable integrations dynamically
+    this.configStore.on('config:reloaded', () => {
+      this.handleConfigChange();
+    });
+
+    logger.info({ module: 'integration-router', msg: 'IntegrationRouter started' });
+  }
+
+  /** Stop all adapters and clean up. */
+  async stop(): Promise<void> {
+    if (this.sessionCleanupTimer) {
+      clearInterval(this.sessionCleanupTimer);
+      this.sessionCleanupTimer = null;
+    }
+
+    this.notificationBatcher.flushAll();
+    this.notificationBatcher.stop();
+
+    for (const [name, adapter] of this.adapters) {
+      try {
+        await adapter.stop();
+        logger.info({ module: 'integration-router', msg: `Stopped adapter: ${name}` });
+      } catch (err) {
+        logger.warn({ module: 'integration-router', msg: `Error stopping adapter: ${name}`, error: (err as Error).message });
+      }
+    }
+    this.adapters.clear();
+    this.sessions.clear();
+  }
+
+  /** Get a specific adapter by platform name. */
+  getAdapter(platform: string): MessagingAdapter | undefined {
+    return this.adapters.get(platform);
+  }
+
+  /** Get the NotificationBatcher instance. */
+  getBatcher(): NotificationBatcher {
+    return this.notificationBatcher;
+  }
+
+  /** Bind a chat to a project. */
+  bindSession(chatId: string, platform: 'telegram' | 'slack', projectId: string, boundBy: string): ChatSession {
+    const session: ChatSession = {
+      chatId,
+      platform,
+      projectId,
+      boundBy,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + SESSION_TTL_MS,
+    };
+    this.sessions.set(chatId, session);
+
+    // Also subscribe to notifications for this project
+    this.notificationBatcher.subscribe(chatId, projectId);
+
+    logger.info({ module: 'integration-router', msg: 'Chat session bound', chatId, projectId });
+    return session;
+  }
+
+  /** Get the session for a chat, if it exists and isn't expired. */
+  getSession(chatId: string): ChatSession | undefined {
+    const session = this.sessions.get(chatId);
+    if (!session) return undefined;
+    if (session.expiresAt <= Date.now()) {
+      this.sessions.delete(chatId);
+      this.notificationBatcher.unsubscribe(chatId, session.projectId);
+      return undefined;
+    }
+    // Refresh TTL on access
+    session.expiresAt = Date.now() + SESSION_TTL_MS;
+    return session;
+  }
+
+  /** Get all active sessions. */
+  getAllSessions(): ChatSession[] {
+    const now = Date.now();
+    const result: ChatSession[] = [];
+    for (const [chatId, session] of this.sessions) {
+      if (session.expiresAt <= now) {
+        this.sessions.delete(chatId);
+        this.notificationBatcher.unsubscribe(chatId, session.projectId);
+      } else {
+        result.push(session);
+      }
+    }
+    return result;
+  }
+
+  // ── Challenge-response for session binding (B-1 / C-2) ────────────
+
+  /**
+   * Initiate a challenge: generate a 6-digit code, send it to the chat,
+   * and store it as a pending challenge. Returns the challenge metadata
+   * (without the code — the code is only sent to the chat).
+   */
+  async createChallenge(
+    chatId: string,
+    platform: 'telegram' | 'slack',
+    projectId: string,
+    boundBy: string,
+  ): Promise<{ chatId: string; expiresAt: number }> {
+    const adapter = this.adapters.get(platform);
+    if (!adapter) throw new Error(`No adapter for platform: ${platform}`);
+
+    const code = String(randomInt(100000, 999999));
+    const challenge: PendingChallenge = {
+      code,
+      chatId,
+      platform,
+      projectId,
+      boundBy,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    };
+    this.pendingChallenges.set(chatId, challenge);
+
+    // Send the verification code to the Telegram chat
+    await adapter.sendMessage({
+      platform,
+      chatId,
+      text: `🔐 Flightdeck verification code: ${code}\nEnter this code in the Flightdeck UI to bind this chat. Expires in 5 minutes.`,
+    });
+
+    logger.info({ module: 'integration-router', msg: 'Challenge issued', chatId, projectId });
+    return { chatId, expiresAt: challenge.expiresAt };
+  }
+
+  /**
+   * Verify a challenge code. If correct, binds the session and clears
+   * the pending challenge. Returns the session on success, null on failure.
+   */
+  verifyChallenge(chatId: string, code: string): ChatSession | null {
+    const challenge = this.pendingChallenges.get(chatId);
+    if (!challenge) return null;
+
+    // Expired?
+    if (challenge.expiresAt <= Date.now()) {
+      this.pendingChallenges.delete(chatId);
+      return null;
+    }
+
+    // Wrong code? (constant-time comparison not critical for 6-digit codes, but log attempt)
+    if (challenge.code !== code) {
+      logger.warn({ module: 'integration-router', msg: 'Challenge verification failed', chatId });
+      return null;
+    }
+
+    // Success — bind the session
+    this.pendingChallenges.delete(chatId);
+    return this.bindSession(chatId, challenge.platform, challenge.projectId, challenge.boundBy);
+  }
+
+  /** Get pending challenge for a chat (for testing/status). */
+  getPendingChallenge(chatId: string): PendingChallenge | undefined {
+    const challenge = this.pendingChallenges.get(chatId);
+    if (challenge && challenge.expiresAt <= Date.now()) {
+      this.pendingChallenges.delete(chatId);
+      return undefined;
+    }
+    return challenge;
+  }
+
+  // ── Private ──────────────────────────────────────────────
+
+  private async startTelegram(config: TelegramConfig): Promise<void> {
+    const adapter = new TelegramAdapter(config);
+
+    // Register command handlers
+    adapter.registerCommand('status', async () => {
+      return this.handleStatusCommand();
+    });
+
+    adapter.registerCommand('projects', async () => {
+      return this.handleProjectsCommand();
+    });
+
+    adapter.registerCommand('agents', async () => {
+      return this.handleAgentsCommand();
+    });
+
+    // Register inbound message handler
+    adapter.onMessage((msg) => this.handleInboundMessage(msg));
+
+    // Register adapter with NotificationBatcher
+    this.notificationBatcher.addAdapter(adapter);
+
+    try {
+      await adapter.start();
+      this.adapters.set('telegram', adapter);
+    } catch (err) {
+      logger.error({ module: 'integration-router', msg: 'Failed to start Telegram adapter', error: (err as Error).message });
+    }
+  }
+
+  /** Handle inbound messages — route to project lead if session exists. */
+  private handleInboundMessage(msg: InboundMessage): void {
+    // Sanitize ALL user-controlled fields (text, displayName, chatId, userId)
+    const sanitizedMsg: InboundMessage = {
+      ...msg,
+      text: sanitizeInput(msg.text),
+      displayName: sanitizeInput(msg.displayName ?? 'Unknown'),
+      chatId: sanitizeInput(msg.chatId),
+      userId: sanitizeInput(msg.userId),
+    };
+
+    // Check bind command FIRST — it works even without an existing session
+    if (sanitizedMsg.text.startsWith('bind ')) {
+      const projectId = sanitizedMsg.text.slice(5).trim();
+      if (!projectId) {
+        const adapter = this.adapters.get(msg.platform);
+        adapter?.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: '⚠️ Usage: bind <project-id>',
+        }).catch(() => {});
+        return;
+      }
+      this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
+      const adapter = this.adapters.get(msg.platform);
+      if (adapter) {
+        adapter.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: `✅ Chat bound to project: ${projectId}`,
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    const session = this.getSession(msg.chatId);
+
+    if (!session) {
+      // No active session — suggest binding
+      const adapter = this.adapters.get(msg.platform);
+      if (adapter) {
+        adapter.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: 'No active project session. Use /projects to see available projects, then send "bind <project-id>" to connect this chat.',
+        }).catch(() => { /* swallowed — adapter handles logging */ });
+      }
+      return;
+    }
+
+    // Route to project lead via AgentManager
+    try {
+      const leadAgent = this.agentManager.getByProject(session.projectId)
+        .find(a => a.role.id === 'lead' && (a.status === 'running' || a.status === 'idle'));
+
+      if (leadAgent) {
+        // Use structured JSON — never interpolate user input into prompt strings
+        leadAgent.sendMessage(JSON.stringify({
+          source: 'telegram',
+          chatId: sanitizedMsg.chatId,
+          userId: sanitizedMsg.userId,
+          displayName: sanitizedMsg.displayName,
+          text: sanitizedMsg.text,
+          receivedAt: sanitizedMsg.receivedAt,
+        }));
+      } else {
+        const adapter = this.adapters.get(msg.platform);
+        adapter?.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: '⚠️ No active project lead found for this project. The lead may have exited.',
+        }).catch(() => {});
+      }
+    } catch (err) {
+      logger.warn({
+        module: 'integration-router',
+        msg: 'Failed to route message to lead',
+        projectId: session.projectId,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  private handleStatusCommand(): string {
+    const agents = this.agentManager.getAll();
+    const running = agents.filter(a => a.status === 'running').length;
+    const total = agents.length;
+    const sessions = this.getAllSessions();
+
+    const lines = [
+      '🛩️ *Flightdeck Status*',
+      '',
+      `Agents: ${running} running / ${total} total`,
+      `Active sessions: ${sessions.length}`,
+    ];
+
+    if (sessions.length > 0) {
+      lines.push('', '*Bound projects:*');
+      for (const s of sessions) {
+        lines.push(`• \`${s.projectId}\``);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  private handleProjectsCommand(): string {
+    if (!this.projectRegistry) {
+      return 'Project registry not available.';
+    }
+
+    try {
+      const projects = this.projectRegistry.list();
+      if (projects.length === 0) {
+        return 'No projects found.';
+      }
+
+      const lines = ['📁 *Projects*', ''];
+      for (const p of projects.slice(0, 20)) {
+        const status = (p as any).status ?? 'unknown';
+        lines.push(`• \`${p.id}\` — ${p.name ?? 'Unnamed'} (${status})`);
+      }
+
+      if (projects.length > 20) {
+        lines.push(`\n_...and ${projects.length - 20} more_`);
+      }
+
+      return lines.join('\n');
+    } catch {
+      return 'Failed to retrieve projects.';
+    }
+  }
+
+  private handleAgentsCommand(): string {
+    const agents = this.agentManager.getAll();
+    if (agents.length === 0) {
+      return 'No agents currently active.';
+    }
+
+    const lines = ['🤖 *Active Agents*', ''];
+    for (const a of agents.slice(0, 30)) {
+      const roleStr = typeof a.role === 'string' ? a.role : a.role?.id ?? 'unknown';
+      const statusEmoji = a.status === 'running' ? '🟢' : a.status === 'idle' ? '🟡' : '⚪';
+      lines.push(`${statusEmoji} \`${a.id.slice(0, 8)}\` — ${roleStr} (${a.status})`);
+    }
+
+    if (agents.length > 30) {
+      lines.push(`\n_...and ${agents.length - 30} more_`);
+    }
+
+    return lines.join('\n');
+  }
+
+  private cleanExpiredSessions(): void {
+    const now = Date.now();
+    for (const [chatId, session] of this.sessions) {
+      if (session.expiresAt <= now) {
+        this.sessions.delete(chatId);
+        this.notificationBatcher.unsubscribe(chatId, session.projectId);
+      }
+    }
+  }
+
+  private handleConfigChange(): void {
+    const config = this.configStore.current;
+    const telegramConfig = config.telegram;
+
+    const hasTelegram = this.adapters.has('telegram');
+    const effectiveToken = process.env.TELEGRAM_BOT_TOKEN || telegramConfig.botToken;
+
+    if (telegramConfig.enabled && effectiveToken && !hasTelegram) {
+      // Enable Telegram
+      this.startTelegram({ ...telegramConfig, botToken: effectiveToken }).catch(err => {
+        logger.warn({ module: 'integration-router', msg: 'Failed to start Telegram on config change', error: (err as Error).message });
+      });
+    } else if ((!telegramConfig.enabled || !effectiveToken) && hasTelegram) {
+      // Disable Telegram
+      const adapter = this.adapters.get('telegram');
+      if (adapter) {
+        adapter.stop().catch(() => {});
+        this.adapters.delete('telegram');
+      }
+    }
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+const MAX_INPUT_LENGTH = 4000;
+
+/**
+ * Prompt-injection patterns (adopted from knowledge pipeline's 4-layer sanitization).
+ * Matched case-insensitively against all user-controlled input.
+ */
+const INJECTION_PATTERNS: RegExp[] = [
+  /ignore\s+(all\s+)?previous\s+instructions/i,
+  /ignore\s+(all\s+)?prior\s+instructions/i,
+  /disregard\s+(all\s+)?previous/i,
+  /override\s+(system|previous)\s+(prompt|instructions)/i,
+  /you\s+are\s+now\s+a/i,
+  /new\s+instructions?\s*:/i,
+  /system\s*:\s*you/i,
+  /\bdo\s+not\s+follow\b.*\binstructions\b/i,
+  /\bforget\b.*\binstructions\b/i,
+  /\bact\s+as\b.*\binstead\b/i,
+];
+
+/**
+ * Sanitize user input: strip control chars, neutralize injection patterns,
+ * trim, and limit length. Adopts the knowledge pipeline's defense-in-depth
+ * approach (see knowledge/sanitize.ts).
+ */
+function sanitizeInput(text: string): string {
+  // Layer 1: Remove control characters (except newline/tab) and zero-width chars
+  let cleaned = text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
+
+  // Layer 2: Strip XML tags that could escape trust boundaries
+  cleaned = cleaned.replace(/<\s*\/?\s*project-context\s*>/gi, '[tag-removed]');
+
+  // Layer 3: Neutralize prompt-injection patterns
+  for (const pattern of INJECTION_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '[redacted]');
+  }
+
+  // Layer 4: Trim and truncate
+  return cleaned.trim().slice(0, MAX_INPUT_LENGTH);
+}

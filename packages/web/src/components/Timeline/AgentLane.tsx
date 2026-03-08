@@ -108,7 +108,7 @@ export function AgentLane({ agent, xScale, y, width, height = DEFAULT_HEIGHT, on
         <div
           className="flex items-center gap-1.5 h-full px-2 cursor-pointer select-none hover:bg-white/5 rounded-l"
           onClick={() => onExpand?.(agent.id)}
-          title={`${agent.role} (${agent.id})`}
+          title={`${agent.role} (${agent.id.slice(0, 4)})`}
         >
           <span className="text-sm">{ROLE_ICONS[agent.role] ?? '🤖'}</span>
           <div className="flex flex-col min-w-0 leading-tight">
@@ -116,7 +116,7 @@ export function AgentLane({ agent, xScale, y, width, height = DEFAULT_HEIGHT, on
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-mono text-th-text-muted">{agent.shortId}</span>
               {agent.model && (
-                <span className="text-[9px] text-th-text-muted truncate">{agent.model}</span>
+                <span className="text-[11px] text-th-text-muted truncate">{agent.model}</span>
               )}
             </div>
           </div>

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
-import type { AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare } from 'lucide-react';
+import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
+import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench } from 'lucide-react';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { splitCommandBlocks } from '../../utils/commandParser';
 import { PromptNav, hasUserMention } from '../PromptNav';
@@ -24,6 +24,51 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   medium: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
   low: 'bg-gray-500/20 text-th-text-muted',
 };
+
+const TC_STATUS: Record<AcpToolCall['status'], string> = {
+  pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
+  in_progress: 'bg-blue-500/20 text-blue-400',
+  completed: 'bg-purple-500/20 text-purple-400',
+  cancelled: 'bg-gray-500/20 text-th-text-muted',
+};
+
+/** Render a single content item — handles text, resource, image, audio, or unknown */
+function renderContentItem(c: any): string {
+  if (typeof c === 'string') return c;
+  if (c == null) return '';
+  if (typeof c.text === 'string' && (c.type === 'text' || !c.type || c.type === undefined)) return c.text;
+  if (c.type === 'text' && typeof c.text === 'string') return c.text;
+  if (c.type === 'resource') {
+    const uri = c.resource?.uri ?? '';
+    const text = c.resource?.text ?? '';
+    return uri ? `📎 ${uri}\n${text}` : text;
+  }
+  if (c.type === 'image') return `[🖼️ image: ${c.mimeType ?? 'unknown'}]`;
+  if (c.type === 'audio') return `[🔊 audio: ${c.mimeType ?? 'unknown'}]`;
+  if (typeof c.text === 'string') return c.text;
+  if (c.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
+  return JSON.stringify(c, null, 2);
+}
+
+/** Safely render tool call content — handles string, array, or object */
+function stringifyContent(content: any): string {
+  if (typeof content === 'string') {
+    if (content.startsWith('{') || content.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(content);
+        return stringifyContent(parsed);
+      } catch { /* not JSON, use as-is */ }
+    }
+    return content.slice(0, 500);
+  }
+  if (Array.isArray(content)) {
+    return content.map(renderContentItem).join('\n').slice(0, 500);
+  }
+  if (content && typeof content === 'object') {
+    return renderContentItem(content).slice(0, 500);
+  }
+  return String(content).slice(0, 500);
+}
 
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
@@ -368,9 +413,21 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
           </div>
           <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{lastTs}</span>
         </div>
-        {group.systemEvents.length > 0 && (
-          <CollapsibleSystemEvents events={group.systemEvents} />
-        )}
+        {/* Render 📨 DM notifications from system events with proper orange styling */}
+        {group.systemEvents
+          .filter((e) => e.kind === 'message' && typeof e.msg.text === 'string' && e.msg.text.startsWith('📨'))
+          .map((e, i) => {
+            const msg = (e as { kind: 'message'; msg: { text: string; timestamp?: number }; index: number }).msg;
+            const dmTs = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            return <CollapsibleIncomingMessage key={`dm-${i}`} text={msg.text} timestamp={dmTs} />;
+          })}
+        {/* Remaining system events in collapsible toggle */}
+        {(() => {
+          const nonDm = group.systemEvents.filter(
+            (e) => !(e.kind === 'message' && typeof e.msg.text === 'string' && e.msg.text.startsWith('📨')),
+          );
+          return nonDm.length > 0 ? <CollapsibleSystemEvents events={nonDm} /> : null;
+        })()}
       </div>
     );
   }

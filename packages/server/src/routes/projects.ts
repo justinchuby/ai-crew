@@ -4,9 +4,27 @@ import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
+import type { DagTask } from '../tasks/TaskDAG.js';
+import { slugify } from '../utils/projectId.js';
+
+const PROJECT_TITLE_MAX = 100;
+
+/** Validate a project title. Returns an error string or null if valid. */
+function validateProjectTitle(name: unknown): string | null {
+  if (!name || typeof name !== 'string') return 'name is required';
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return 'name is required';
+  if (trimmed.length > PROJECT_TITLE_MAX) return `name must be ${PROJECT_TITLE_MAX} characters or less`;
+  // Ensure title produces a usable slug (not just the default "project" fallback)
+  const slug = slugify(trimmed);
+  if (slug === 'project' && !/project/i.test(trimmed)) {
+    return 'name must contain at least one letter or number';
+  }
+  return null;
+}
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -14,7 +32,21 @@ export function projectsRoutes(ctx: AppContext): Router {
   router.get('/projects', (_req, res) => {
     if (!projectRegistry) return res.json([]);
     const status = typeof _req.query.status === 'string' ? _req.query.status : undefined;
-    res.json(projectRegistry.list(status));
+    const projects = projectRegistry.list(status);
+
+    // Enrich with storage info and active agent counts
+    const allAgents = agentManager.getAll();
+    const enriched = projects.map((p) => {
+      const activeAgents = allAgents.filter(
+        (a) => a.projectId === p.id && (a.status === 'running' || a.status === 'idle')
+      );
+      return {
+        ...p,
+        activeAgentCount: activeAgents.length,
+        storageMode: storageManager?.getStorageMode(p.id) ?? 'user',
+      };
+    });
+    res.json(enriched);
   });
 
   router.get('/projects/:id', (req, res) => {
@@ -24,7 +56,17 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
-    res.json({ ...project, sessions, activeLeadId });
+    const allAgents = agentManager.getAll();
+    const activeAgents = allAgents.filter(
+      (a) => a.projectId === project.id && (a.status === 'running' || a.status === 'idle')
+    );
+    res.json({
+      ...project,
+      sessions,
+      activeLeadId,
+      activeAgentCount: activeAgents.length,
+      storageMode: storageManager?.getStorageMode(project.id) ?? 'user',
+    });
   });
 
   // Historical DAG tasks for a project (from database)
@@ -79,6 +121,220 @@ export function projectsRoutes(ctx: AppContext): Router {
       summary,
     });
   });
+
+  // ── Task mutation endpoints (for Kanban board drag-and-drop) ────────
+
+  /**
+   * Transition a task's status. Used by the KanbanBoard when dragging
+   * tasks between columns.
+   *
+   * The endpoint maps status changes to the appropriate TaskDAG method
+   * and validates the transition against the state machine.
+   */
+  router.patch('/projects/:id/tasks/:taskId/status', (req, res) => {
+    const { id: projectId, taskId } = req.params;
+    const { status } = req.body as { status?: string };
+
+    if (!status || typeof status !== 'string') {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    const validStatuses = ['pending', 'ready', 'running', 'done', 'failed', 'blocked', 'paused', 'skipped'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+
+    // Find the task to get its leadId (TaskDAG methods require leadId)
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const task = _db.drizzle.select().from(dagTasks)
+      .where(eq(dagTasks.id, taskId))
+      .get();
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.projectId && task.projectId !== projectId) {
+      return res.status(404).json({ error: 'Task not found in this project' });
+    }
+
+    const leadId = task.leadId;
+    const currentStatus = task.dagStatus ?? 'pending';
+
+    // Map target status → TaskDAG method
+    type TransitionResult = boolean | DagTask | DagTask[] | { skippedAgentId: string } | { oldAgentId: string } | null;
+    let result: TransitionResult = null;
+    let errorMsg: string | null = null;
+
+    try {
+      if (status === currentStatus) {
+        return res.json({ ok: true, task: formatTask(task) });
+      }
+
+      switch (status) {
+        case 'running':
+          // Can't manually start a task without an agent assignment
+          return res.status(400).json({ error: 'Cannot manually transition to running — tasks must be assigned to an agent' });
+        case 'done':
+          result = taskDAG.completeTask(leadId, taskId);
+          break;
+        case 'failed':
+          result = taskDAG.failTask(leadId, taskId) || null;
+          break;
+        case 'paused':
+          result = taskDAG.pauseTask(leadId, taskId) || null;
+          break;
+        case 'ready':
+          if (currentStatus === 'paused') {
+            result = taskDAG.resumeTask(leadId, taskId) || null;
+          } else if (currentStatus === 'failed') {
+            result = taskDAG.retryTask(leadId, taskId) || null;
+          } else if (currentStatus === 'pending' || currentStatus === 'blocked') {
+            result = taskDAG.forceReady(leadId, taskId);
+          } else if (currentStatus === 'done') {
+            result = taskDAG.reopenTask(leadId, taskId);
+          } else {
+            errorMsg = `Cannot transition from ${currentStatus} to ready`;
+          }
+          break;
+        case 'pending':
+          if (currentStatus === 'done') {
+            result = taskDAG.reopenTask(leadId, taskId);
+          } else {
+            errorMsg = `Cannot transition from ${currentStatus} to pending`;
+          }
+          break;
+        case 'skipped':
+          result = taskDAG.skipTask(leadId, taskId);
+          break;
+        case 'blocked':
+          errorMsg = 'Cannot manually transition to blocked — this status is set by dependency resolution';
+          break;
+        default:
+          errorMsg = `Unsupported target status: ${status}`;
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: `Transition failed: ${message}` });
+    }
+
+    if (errorMsg) {
+      return res.status(400).json({ error: errorMsg, currentStatus });
+    }
+    if (result === null || result === false) {
+      return res.status(409).json({
+        error: `Invalid transition from '${currentStatus}' to '${status}'`,
+        currentStatus,
+        targetStatus: status,
+      });
+    }
+
+    // Re-fetch the updated task
+    const updated = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    return res.json({ ok: true, task: updated ? formatTask(updated) : null });
+  });
+
+  /** Update a task's priority. Used by KanbanBoard for reordering within columns. */
+  router.patch('/projects/:id/tasks/:taskId/priority', (req, res) => {
+    const { id: projectId, taskId } = req.params;
+    const { priority } = req.body as { priority?: number };
+
+    if (typeof priority !== 'number' || !Number.isFinite(priority)) {
+      return res.status(400).json({ error: 'priority must be a finite number' });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const task = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.projectId && task.projectId !== projectId) {
+      return res.status(404).json({ error: 'Task not found in this project' });
+    }
+
+    const result = taskDAG.updatePriority(task.leadId, taskId, priority);
+    if (!result) return res.status(500).json({ error: 'Failed to update priority' });
+
+    const updated = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    return res.json({ ok: true, task: updated ? formatTask(updated) : null });
+  });
+
+  /** Create a new task from the Kanban board. */
+  router.post('/projects/:id/tasks', (req, res) => {
+    const { id: projectId } = req.params;
+    const { title, description, role, priority, dependsOn, files } = req.body as {
+      title?: string;
+      description?: string;
+      role?: string;
+      priority?: number;
+      dependsOn?: string[];
+      files?: string[];
+    };
+
+    if (!role || typeof role !== 'string') {
+      return res.status(400).json({ error: 'role is required' });
+    }
+    if (!title && !description) {
+      return res.status(400).json({ error: 'title or description is required' });
+    }
+
+    // Find an active lead for this project
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const session = _db.drizzle.select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, projectId))
+      .orderBy(desc(projectSessions.startedAt))
+      .limit(1)
+      .get();
+
+    if (!session) {
+      return res.status(400).json({ error: 'No active session for this project. Start a session first.' });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+    const taskId = `ui-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    try {
+      const result = taskDAG.declareTaskBatch(session.leadId, [{
+        taskId,
+        role,
+        title: title || undefined,
+        description: description || title || '',
+        priority: priority ?? 0,
+        dependsOn: dependsOn ?? [],
+        files: files ?? [],
+      }], projectId);
+
+      return res.status(201).json({
+        ok: true,
+        taskId,
+        tasks: result.tasks,
+        conflicts: result.conflicts,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: `Failed to create task: ${message}` });
+    }
+  });
+
+  // Helper to format a DB row as a DagTask response
+  function formatTask(t: typeof dagTasks.$inferSelect) {
+    return {
+      id: t.id,
+      leadId: t.leadId,
+      projectId: t.projectId ?? null,
+      role: t.role,
+      title: t.title,
+      description: t.description,
+      files: JSON.parse(t.files ?? '[]'),
+      dependsOn: JSON.parse(t.dependsOn ?? '[]'),
+      dagStatus: t.dagStatus ?? 'pending',
+      priority: t.priority,
+      assignedAgentId: t.assignedAgentId,
+      failureReason: t.failureReason ?? null,
+      createdAt: t.createdAt ?? '',
+      startedAt: t.startedAt ?? null,
+      completedAt: t.completedAt ?? null,
+    };
+  }
 
   // Historical group chats for a project (from database)
   router.get('/projects/:id/groups', (req, res) => {
@@ -183,9 +439,11 @@ export function projectsRoutes(ctx: AppContext): Router {
   router.post('/projects', (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const { name, description, cwd } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
-    const project = projectRegistry.create(name, description, cwd);
-    logger.info('project', `Created project "${name}" (${project.id.slice(0, 8)})`);
+    const titleError = validateProjectTitle(name);
+    if (titleError) return res.status(400).json({ error: titleError });
+    const trimmedName = (name as string).trim();
+    const project = projectRegistry.create(trimmedName, description, cwd);
+    logger.info({ module: 'project', msg: 'Project created', projectId: project.id, name: trimmedName });
     res.status(201).json(project);
   });
 
@@ -196,7 +454,7 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     const { name, description, cwd, status } = req.body;
     projectRegistry.update(req.params.id, { name, description, cwd, status });
-    logger.info('project', `Updated project "${project.name}" (${project.id.slice(0, 8)})`);
+    logger.info({ module: 'project', msg: 'Project updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.get(req.params.id));
   });
 
@@ -263,14 +521,14 @@ export function projectsRoutes(ctx: AppContext): Router {
         }, 5000);
       }
 
-      logger.info('project', `Resumed project "${project.name}" with new lead (${agent.id.slice(0, 8)})`);
+      logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
 
       // Auto-spawn Secretary for DAG tracking (skips if one exists)
       agentManager.autoSpawnSecretary(agent);
 
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
-      logger.error('project', `Failed to resume project: ${err.message}`);
+      logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
       // Only expose rate-limit messages; sanitize all other errors
       const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');
       res.status(isRateLimit ? 429 : 500).json({
@@ -284,7 +542,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const deleted = projectRegistry.delete(req.params.id as string);
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
-    logger.info('project', `Deleted project ${(req.params.id as string).slice(0, 8)}`);
+    logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id });
     res.json({ ok: true });
   });
 
@@ -320,7 +578,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     }
 
     projectRegistry.setModelConfig(req.params.id, config);
-    logger.info('project', `Updated model config for project "${project.name}" (${project.id.slice(0, 8)})`);
+    logger.info({ module: 'project', msg: 'Model config updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.getModelConfig(req.params.id));
   });
 

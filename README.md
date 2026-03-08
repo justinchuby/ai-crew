@@ -354,3 +354,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 <img width="1412" height="826" alt="Agent fleet and controls" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
 
 <img width="1406" height="817" alt="Settings and custom role editor" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
+
+## Acknowledgments
+
+Flightdeck is built on many excellent open-source projects. See [docs/CREDITS.md](docs/CREDITS.md) for full attribution, including the research projects, agent SDKs, core libraries, and design references that made this possible.

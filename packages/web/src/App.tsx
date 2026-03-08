@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
-import { useSettingsStore } from './stores/settingsStore';
+import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
 import { CommandPalette } from './components/CommandPalette/CommandPalette';
 import { ContextualCoach } from './components/Onboarding';
@@ -17,32 +17,38 @@ import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
-import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
+import { AttentionBar } from './components/AttentionBar';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { CatchUpBanner } from './components/CatchUp';
+import { AgentServerStatus } from './components/AgentServerStatus';
+import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
+import { ProjectLayout } from './layouts/ProjectLayout';
 
 // Lazy-loaded route components (~40-50% initial bundle reduction)
-const AgentDashboard = lazy(() => import('./components/AgentDashboard/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
 const TaskQueuePanel = lazy(() => import('./components/TaskQueue/TaskQueuePanel').then(m => ({ default: m.TaskQueuePanel })));
 const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
-const DataBrowser = lazy(() => import('./components/DataBrowser/DataBrowser').then(m => ({ default: m.DataBrowser })));
 const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => ({ default: m.OrgChart })));
 const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
-const MissionControlPage = lazy(() => import('./components/MissionControl').then(m => ({ default: m.MissionControlPage })));
 const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
+const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
+const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
+const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
+const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
+const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
 
 function RouteSpinner() {
   return (
@@ -50,6 +56,57 @@ function RouteSpinner() {
       <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
     </div>
   );
+}
+
+/**
+ * Redirects from old flat routes to project-scoped routes.
+ * Resolves the active project ID from leadStore + live agents.
+ */
+function ProjectRedirect({ page }: { page: string }) {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (!selectedLeadId) {
+      // Fall back to first live lead's projectId
+      const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+      return firstLead?.projectId ?? firstLead?.id ?? null;
+    }
+    // If selectedLeadId is a project: prefix, extract the ID
+    if (selectedLeadId.startsWith('project:')) {
+      return selectedLeadId.slice('project:'.length);
+    }
+    // Otherwise it's a lead agent ID — find its projectId
+    const lead = agents.find((a) => a.id === selectedLeadId);
+    return lead?.projectId ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/${page}`} replace />;
+}
+
+/**
+ * Home route: redirect to active project's session or projects list.
+ */
+function HomeRedirect() {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (selectedLeadId) {
+      if (selectedLeadId.startsWith('project:')) {
+        return selectedLeadId.slice('project:'.length);
+      }
+      const lead = agents.find((a) => a.id === selectedLeadId);
+      return lead?.projectId ?? selectedLeadId;
+    }
+    // Fall back to first live lead
+    const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+    return firstLead?.projectId ?? firstLead?.id ?? null;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/session`} replace />;
 }
 
 export function App() {
@@ -85,6 +142,9 @@ export function App() {
   const { shouldShow } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(shouldShow);
 
+  // Setup wizard — show if providers not yet configured
+  const [showSetupWizard, setShowSetupWizard] = useState(() => shouldShowSetupWizard());
+
   // Shift+A global shortcut to open approval queue
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -99,30 +159,41 @@ export function App() {
   }, []);
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
+  // Gated by Trust Dial oversight level (AC-16.5): detailed=all, standard=exceptions, minimal=critical only
   useEffect(() => {
     const handler = (event: Event) => {
       const msg = JSON.parse((event as MessageEvent).data);
       if (msg.type === 'agent:spawned') {
-        addToast('info', `${msg.agent.role.icon} ${msg.agent.role.name} agent spawned`);
+        if (shouldNotify('info')) addToast('info', `${msg.agent.role.icon} ${msg.agent.role.name} agent spawned`);
       } else if (msg.type === 'agent:exit') {
-        addToast(msg.code === 0 ? 'success' : 'error', `Agent ${msg.agentId.slice(0, 8)} ${msg.code === 0 ? 'completed' : 'failed'}`);
+        const failed = msg.code !== 0;
+        // Failures are critical — ALWAYS toast regardless of level
+        if (failed) {
+          addToast('error', `Agent ${msg.agentId.slice(0, 8)} failed`);
+        } else if (shouldNotify('info')) {
+          addToast('success', `Agent ${msg.agentId.slice(0, 8)} completed`);
+        }
       } else if (msg.type === 'agent:sub_spawned') {
-        addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
+        if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
       } else if (msg.type === 'agent:permission_request' && soundEnabled) {
         playAttentionSound();
       } else if (msg.type === 'agent:context_compacted') {
-        const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
-        addToast('info', `🔄 Context compacted for agent ${msg.agentId.slice(0, 8)}${pct}`);
+        if (shouldNotify('info')) {
+          const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
+          addToast('info', `🔄 Context compacted for agent ${msg.agentId.slice(0, 8)}${pct}`);
+        }
       } else if (msg.type === 'activity') {
         const e = msg.entry;
         if (e?.action === 'heartbeat_halted') {
-          addToast('info', `⏸️ Heartbeat halted by ${e.agentId?.slice(0, 8) ?? 'agent'}`);
+          if (shouldNotify('exception')) addToast('info', `⏸️ Heartbeat halted by ${e.agentId?.slice(0, 8) ?? 'agent'}`);
         } else if (e?.action === 'limit_change_requested') {
-          addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
+          if (shouldNotify('info')) addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
         }
       } else if (msg.type === 'intent:alert') {
-        const label = msg.rule?.label || msg.decision?.title || 'Intent alert triggered';
-        addToast('info', `⚠️ Alert: ${label}`);
+        if (shouldNotify('exception')) {
+          const label = msg.rule?.label || msg.decision?.title || 'Intent alert triggered';
+          addToast('info', `⚠️ Alert: ${label}`);
+        }
       }
     };
     window.addEventListener('ws-message', handler);
@@ -249,27 +320,53 @@ export function App() {
             </div>
           </header>
 
+          <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
           <MobilePulse />
+          <AgentServerStatus />
 
           <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary>
           <Suspense fallback={<RouteSpinner />}>
           <Routes>
-            <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
-            <Route path="/lead" element={<Navigate to="/" replace />} />
-            <Route path="/agents" element={<AgentDashboard api={api} ws={ws} />} />
-            <Route path="/overview" element={<OverviewPage api={api} ws={ws} />} />
-            <Route path="/groups" element={<GroupChat api={api} ws={ws} />} />
-            <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
-            <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
+            {/* ── Project-scoped nested routes ─────────────────── */}
+            <Route path="/projects/:id" element={<ProjectLayout />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<OverviewPage api={api} ws={ws} />} />
+              <Route path="session" element={<LeadDashboard api={api} ws={ws} />} />
+              <Route path="tasks" element={<TaskQueuePanel api={api} />} />
+              <Route path="agents" element={<TeamPage />} />
+              <Route path="knowledge" element={<KnowledgePanel />} />
+              <Route path="timeline" element={<TimelinePage api={api} ws={ws} />} />
+              <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
+              <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="canvas" element={<CanvasPage />} />
+            </Route>
+
+            {/* ── Global (non-project-scoped) routes ───────────── */}
+            <Route path="/projects" element={<ProjectsPanel />} />
             <Route path="/settings" element={<SettingsPanel api={api} />} />
-            <Route path="/data" element={<DataBrowser />} />
-            <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
-            <Route path="/mission-control" element={<MissionControlPage />} />
-            <Route path="/canvas" element={<CanvasPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/agent-server" element={<AgentServerPanel />} />
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
+
+            {/* ── Backward-compat redirects from old flat routes ─ */}
+            <Route path="/" element={<HomeDashboard />} />
+            <Route path="/lead" element={<ProjectRedirect page="session" />} />
+            <Route path="/overview" element={<ProjectRedirect page="overview" />} />
+            <Route path="/agents" element={<ProjectRedirect page="agents" />} />
+            <Route path="/team" element={<ProjectRedirect page="agents" />} />
+            <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
+            <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
+            <Route path="/timeline" element={<ProjectRedirect page="timeline" />} />
+            <Route path="/groups" element={<ProjectRedirect page="groups" />} />
+            <Route path="/org" element={<ProjectRedirect page="org-chart" />} />
+            <Route path="/analytics" element={<ProjectRedirect page="analytics" />} />
+            <Route path="/canvas" element={<ProjectRedirect page="canvas" />} />
+            <Route path="/mission-control" element={<ProjectRedirect page="overview" />} />
+            <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
+
+            {/* ── Catch-all ─────────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
@@ -290,6 +387,7 @@ export function App() {
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      {showSetupWizard && !showOnboarding && <SetupWizard onComplete={() => setShowSetupWizard(false)} />}
       <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
       <BottomTabBar />
       <InstallPrompt />

@@ -5,6 +5,127 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - Unreleased
+
+### Added
+
+#### Multi-CLI Provider Support
+
+- **6 provider presets** — Built-in configurations for Copilot, Gemini CLI, OpenCode, Cursor, Codex, and Claude. Each preset defines binary path, transport mode, ACP version, environment variables, and capability flags.
+- **Cross-CLI model resolver** — 4-step resolution: tier alias → native passthrough → cross-provider equivalence mapping → fallback. Standard/fast/premium tier aliases work across all providers.
+- **Claude SDK adapter** — Direct in-process adapter via `@anthropic-ai/claude-code` SDK with native session resume. Two-layer session ID (Flightdeck UUID immediate, SDK session ID async). Dynamic SDK loading with graceful fallback.
+- **Unified adapter factory** — `createAdapterForProvider()` with `resolveBackend()` (fork/sdk/daemon) and `buildStartOptions()`. Single entry point for all agent spawning regardless of CLI provider.
+- **Role file writers** — Per-provider role file generation for agent identity injection.
+
+#### Agent Server Architecture (Two-Process Model)
+
+- **Agent server entry point** — `AgentServer` class with message dispatch for spawn, terminate, prompt, cancel, list, subscribe, shutdown, configure. Orphan self-termination timer (12h default). PID file management.
+- **ForkTransport** — Orchestrator-side transport using `child_process.fork()` IPC. Detached child survives orchestrator restarts. State machine: disconnected → connecting → connected → reconnecting.
+- **ForkListener** — Agent server-side listener with dual IPC + TCP modes. IPC auto-created from `process.send`; TCP on localhost with port file for reconnection.
+- **TCP reconnection auth** — 256-bit token, 5s timeout, `timingSafeEqual` validation. IPC connections skip auth. Token stored in `agent-server.token` file.
+- **Health monitoring** — 3-state machine (connected → degraded → disconnected) with configurable ping intervals and thresholds. ForkListener auto-responds to pings.
+- **AgentServerClient** — Client SDK with auto-reconnect, event subscription with `lastSeenEventId` cursor-based replay, and request timeout management.
+- **Agent migration** — All agent spawning moved from orchestrator to agent server. `AgentManager` refactored to use IPC via `ServerClientBridge`.
+- **State persistence** — Write-on-mutation with self-recovery. Orchestrator reconciliation on reconnect.
+
+#### Knowledge System
+
+- **KnowledgeStore with FTS5** — Full-text search backed by SQLite FTS5 with 4-tier memory categories (core, procedural, semantic, episodic).
+- **Hybrid search with RRF fusion** — Reciprocal Rank Fusion combining FTS5 and semantic similarity for best-of-both retrieval.
+- **Token-budgeted injection** — Knowledge injected into agent prompts within configurable token budgets, with prompt injection defense at the write boundary.
+- **Training capture** — Records agent corrections and learning events for team knowledge accumulation.
+- **Session knowledge extraction** — Automatic extraction of reusable knowledge from session transcripts.
+- **Identity protection** — Shared memory with access controls preventing cross-agent identity leakage.
+
+#### Portable Teams
+
+- **Team export bundles** — Versioned `.flightdeck-team/` directory with manifest, per-agent configs, knowledge by category, and training history. SHA-256 integrity checksums. Selective export by agents or knowledge categories.
+- **Team import with validation** — 5-phase validation (format, version, integrity, size, conflicts). Conflict strategies: agent (rename/skip/overwrite), knowledge (keep_both/prefer_import/prefer_existing/skip). Dry-run mode.
+- **Team REST API** — POST export, POST import, GET list, GET team details. Rate-limited write endpoints.
+- **Team management UI** — Consolidated Team page with roster, agent profiles, health dashboard, and lifecycle controls (retire/clone/retrain with confirmations).
+
+#### Multi-Team / Multi-Project
+
+- **`(projectId, teamId)` scoping** — Human-readable project IDs with collision-resistant generation. DB migration adds `team_id` to agent_roster, active_delegations, and dag_tasks with backward-compatible defaults.
+- **Storage architecture** — `SyncEngine` for cross-device state synchronization, `StorageManager` for structured persistence.
+
+#### UI
+
+- **Projects panel** — Project management and selection interface.
+- **Knowledge panel** — Browse, search, and manage knowledge entries across categories.
+- **Agent Server panel** — Real-time status, agent list with expand/collapse, lifecycle controls (stop server, terminate agents) with confirmation dialogs. Renamed from DaemonPanel to AgentServerPanel.
+- **Team Health page** — Status cards, mass failure alerts, polling-based live updates.
+- **Agent Lifecycle modal** — Retire, clone, and retrain agents with confirmation workflows.
+
+#### Research & Design Documents
+
+- **Agent server architecture doc** — Two-process model design covering transport layer, reconnection, state persistence, and portable teams.
+- **Multi-CLI ACP research** — Compatibility matrix for 6 CLI tools with ACP protocol analysis.
+- **Claude agent-sdk comparison** — Evaluation of direct SDK integration vs. subprocess approach.
+
+### Changed
+
+- **Daemon removal** — Removed ~7,400 lines of unnecessary daemon code after agent server migration. Daemon concept replaced by two-process agent server architecture.
+- **Frontend route rename** — `/daemon` → `/agent-server`, component `DaemonPanel` → `AgentServerPanel`, sidebar label updated.
+
+### Fixed
+
+- **Agent server fork crash** — `ForkTransport.fork()` defaulted `execArgv` to `[]`, stripping tsx's `--import` loader args. Child process couldn't load `.ts` files in dev mode. Fix: `filterExecArgv()` inherits parent's `process.execArgv` while stripping `--watch` flags. Also pipes child stderr for crash diagnostics.
+- **Agent server routes not mounted** — `agentServerRoutes()` was never imported in `routes/index.ts`. Added import and mount.
+- **Path traversal protection** — Shared `validatePathWithinDir()` utility handles null bytes, `../`, absolute paths, and directory boundary edge cases.
+- **Prompt injection defense** — Write-boundary sanitization in `KnowledgeStore.put()` prevents stored injection attacks.
+- **`resumeAll()` race condition** — Fixed concurrent resume causing duplicate agent instances.
+- **HybridSearchEngine fetchLimit cap** — Prevents unbounded query expansion.
+- **ModelResolver silent fallback** — Now warns when falling back to default tier model instead of silently substituting.
+- **`projectId` collision** — Increased randomness from 2→3 bytes to reduce collision probability.
+
+### Stats
+
+- 55 implementation tasks completed across 2 waves
+- 4,138+ tests passing
+- ~25,000+ lines of production code added
+
+## [0.4.0] - Unreleased
+
+### Added
+
+#### Architecture (8 recommendations from cross-project synthesis)
+
+- **R1: DI Container** — `createContainer()` factory builds ~35 services in 6 dependency tiers with lifecycle shutdown. `index.ts` reduced from 411→146 lines. `apiRouter()` takes single `AppContext` object instead of 35 positional params.
+- **R2: Shared Types Package** (`@flightdeck/shared`) — 11 Zod domain schemas, 46 server→client + 8 client→server WS event types as discriminated unions. Fixed 3 type drift bugs (Delegation missing `cancelled`/`terminated` statuses, DagTask missing `projectId`, ChatGroup missing `archived`). CI grep-based drift prevention.
+- **R3: Coordination Reorg** — 46 files reorganized into 16 domain subdirectories with barrel exports. Root barrel re-exports everything for backward compat.
+- **R4: Governance Hooks** — `GovernancePipeline` with 6 built-in hooks (file write guard, shell command blocklist, commit validation, rate limiting). Pre/post hook pipeline intercepts agent actions programmatically.
+- **R5: Structured Logging** (Phases 1-2) — Replaced custom logger with pino. JSON output in production, pretty-printed in dev. AsyncLocalStorage context injection at 5 entry points — 85% of logs auto-get `agentId`/`projectId`/`role`.
+- **R9: ACP Adapter** — `@agentclientprotocol/sdk` now imported in exactly 1 file (`adapters/AcpAdapter.ts`). `AgentAdapter` interface enables `MockAdapter` for testing.
+- **R12: Secret Redaction** — Boundary redaction at WS broadcast, DB writes, logs, and `Agent.toJSON()`. 12 regex pattern categories (AWS, GitHub, OpenAI, Anthropic, JWT, PEM, Bearer, connection strings).
+- **R15: Hot-Reload Config** — Configuration changes take effect without server restart, preserving active agent state. File watcher with mtime+size+hash change detection.
+
+#### Performance
+
+- **SQLite tuning** — Cache size 64→256MB, WAL monitoring with auto-checkpoint (PASSIVE mode)
+- **Activity log auto-pruning** — 7-day retention + 50k row cap prevents unbounded growth
+- **FileLockRegistry transaction safety** — Lock operations wrapped in transactions
+
+#### Research & Documentation
+
+- **Cross-project synthesis** — Analyzed 4 external repos (Symphony, Paperclip, Squad, Edict) producing 19 prioritized recommendations, 9 anti-patterns, and 6 cross-cutting themes
+- **Agent Host Daemon design doc** — 1,466 lines covering architecture, security (14 threat mitigations), cross-platform support (Windows/Mac/Linux), UX design, quality bars
+- **Multi-CLI ACP research** — Gemini CLI, OpenCode, Cursor CLI, Codex, Claude agent-sdk all compatible via existing AgentAdapter
+- **Claude agent-sdk comparison report**
+- **8 implementation specs** — Detailed specs for R1, R2, R3, R4, R5, R9, R12, R15 with migration strategies, CI verification, and integration notes
+
+### Changed
+
+- **R5 Phase 3-4** (in progress) — Structured logging call-site migration: 193 calls across 50 files converting to pino structured API
+- **Docs reorganization** — All documentation moved to `docs/` directory (`research/`, `specs/`, `reference/`)
+- **Project rename** — `ai-crew` → `flightdeck` throughout all documentation
+- **Synthesis report v3** — 8/19 recommendations marked as implemented with status tracking
+
+### Fixed
+
+- **SQLite WAL checkpoint** — Changed from TRUNCATE to PASSIVE mode (prevents blocking concurrent reads)
+- **FileLockRegistry** — `lock:acquired` event no longer fires on TTL refresh (was causing spurious UI updates)
+
 ## [0.3.2] - 2026-03-07
 
 ### Fixed

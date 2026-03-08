@@ -70,6 +70,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [starting, setStarting] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectNameTouched, setNewProjectNameTouched] = useState(false);
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
   const [newProjectCwd, setNewProjectCwd] = useState('');
@@ -799,6 +800,7 @@ export function LeadDashboard({ api, ws }: Props) {
         }
         setShowNewProject(false);
         setNewProjectName('');
+        setNewProjectNameTouched(false);
         setNewProjectTask('');
         setNewProjectModel('');
         setNewProjectCwd('');
@@ -1004,7 +1006,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   useLeadStore.getState().addProject(lead.id);
                   useLeadStore.getState().selectLead(lead.id);
                 }}
-                className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group ${
+                className={`w-full text-left px-3 py-2 border-b border-th-border/50 transition-colors group ${
                   isSelected
                     ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
                     : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
@@ -1125,7 +1127,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         useLeadStore.getState().selectLead(key);
                       }
                     }}
-                    className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group cursor-pointer ${
+                    className={`w-full text-left px-3 py-2 border-b border-th-border/50 transition-colors group cursor-pointer ${
                       isSelected
                         ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
                         : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
@@ -1133,7 +1135,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full shrink-0 bg-th-bg-hover" />
-                      <span className="text-sm font-mono truncate flex-1 text-th-text-muted">{proj.name}</span>
+                      <span className="text-sm font-mono truncate flex-1 text-th-text-muted" title={proj.name}>{proj.name}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1217,15 +1219,27 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
             <div className="px-5 py-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               <div>
-                <label className="block text-xs text-th-text-muted mb-1 font-medium">Project Name</label>
+                <label className="block text-xs text-th-text-muted mb-1 font-medium">Project Name <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onChange={(e) => { setNewProjectName(e.target.value); setNewProjectNameTouched(true); }}
+                  onBlur={() => setNewProjectNameTouched(true)}
                   placeholder="My Feature"
-                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
+                  maxLength={100}
+                  className={`w-full bg-th-bg border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none ${
+                    newProjectNameTouched && !newProjectName.trim()
+                      ? 'border-red-500 focus:border-red-500'
+                      : 'border-th-border focus:border-yellow-500'
+                  }`}
                   autoFocus
                 />
+                {newProjectNameTouched && !newProjectName.trim() && (
+                  <p className="text-xs text-red-400 mt-1">Project name is required</p>
+                )}
+                {newProjectName.trim().length > 100 && (
+                  <p className="text-xs text-red-400 mt-1">Must be 100 characters or less</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-th-text-muted mb-1 font-medium">Task / Prompt</label>
@@ -1346,16 +1360,19 @@ export function LeadDashboard({ api, ws }: Props) {
                 Cancel
               </button>
               <button
-                onClick={() => startLead(
-                  newProjectName || 'Untitled',
-                  newProjectTask.trim() || undefined,
-                  newProjectModel || undefined,
-                  newProjectCwd.trim() || undefined,
-                  resumeSessionId.trim() || undefined,
-                  selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
-                )}
-                disabled={starting}
-                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
+                onClick={() => {
+                  if (!newProjectName.trim()) { setNewProjectNameTouched(true); return; }
+                  startLead(
+                    newProjectName.trim(),
+                    newProjectTask.trim() || undefined,
+                    newProjectModel || undefined,
+                    newProjectCwd.trim() || undefined,
+                    resumeSessionId.trim() || undefined,
+                    selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
+                  );
+                }}
+                disabled={starting || !newProjectName.trim()}
+                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover disabled:text-th-text-muted text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
               >
                 {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
                 {starting ? 'Starting...' : resumeSessionId.trim() ? 'Resume Project' : 'Create Project'}
@@ -1719,8 +1736,8 @@ export function LeadDashboard({ api, ws }: Props) {
                       {catchUpSummary.newReports > 0 && <span className="text-amber-600 dark:text-amber-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
                     </div>
                     <div className="flex gap-2 mt-2.5">
-                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-th-bg-alt border border-th-border text-th-text-alt hover:bg-th-bg-muted transition-colors">Dismiss</button>
-                      <button onClick={() => { setCatchUpSummary(null); messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[11px] px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors">Show All</button>
+                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2 py-1 rounded-md bg-th-bg-alt border border-th-border text-th-text-alt hover:bg-th-bg-muted transition-colors">Dismiss</button>
+                      <button onClick={() => { setCatchUpSummary(null); messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[11px] px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors">Show All</button>
                     </div>
                   </div>
                 </div>
@@ -1917,7 +1934,7 @@ export function LeadDashboard({ api, ws }: Props) {
                             onDragEnd={handleTabDragEnd}
                             onDragLeave={() => setDragOverTab(null)}
                             onClick={() => setSidebarTab(tabId)}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
+                            className={`flex items-center gap-1 px-2 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
                               dragOverTab === tabId
                                 ? 'border-blue-400 bg-blue-500/10 text-blue-600 dark:text-blue-300'
                                 : sidebarTab === tabId
@@ -2211,7 +2228,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               >
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm leading-none">{agent.role.icon}</span>
-                  <span className="text-xs font-mono font-semibold text-th-text-alt truncate">{agent.role.name}</span>
+                  <span className="text-xs font-mono font-semibold text-th-text-alt truncate" title={agent.role.name}>{agent.role.name}</span>
                   <span className={`text-[10px] font-mono ${colorClass} ml-auto shrink-0`}>{agent.status}</span>
                   {onOpenChat && (
                     <button
@@ -2246,7 +2263,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   return (
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className="text-[9px] text-th-text-muted">{actTime}</span>
-                      <span className="text-[10px] text-th-text-muted truncate">{latestAct.summary}</span>
+                      <span className="text-[10px] text-th-text-muted truncate" title={latestAct.summary}>{latestAct.summary}</span>
                     </div>
                   );
                 })()}
@@ -2409,7 +2426,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                       return (
                         <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
                           <span className="text-th-text-muted">{time}</span>
-                          <span className="text-th-text-alt truncate">{evt.summary}</span>
+                          <span className="text-th-text-alt truncate" title={evt.summary}>{evt.summary}</span>
                           {evt.status && (
                             <span className={`ml-auto shrink-0 text-[10px] ${
                               evt.status === 'completed' ? 'text-purple-400' :
@@ -2476,7 +2493,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                     }
                   }}
                   placeholder={`Message ${selectedAgent.role.name}...`}
-                  className="flex-1 bg-th-bg border border-th-border rounded px-2.5 py-1.5 text-xs font-mono text-th-text resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  className="flex-1 bg-th-bg border border-th-border rounded px-2 py-1.5 text-xs font-mono text-th-text resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                   rows={2}
                   disabled={sendingMsg}
                 />
