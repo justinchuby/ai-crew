@@ -228,16 +228,19 @@ describe('NotificationBridge', () => {
   it('generates notification from lead:decision event', () => {
     const adapter = createMockAdapter();
     bridge.addAdapter(adapter);
-    bridge.subscribe('chat-1', 'project-1');
+    // Subscribe to the real project ID — NOT the lead agent ID
+    bridge.subscribe('chat-1', 'decision-project-42');
 
     const manager = createMockAgentManager();
+    // Mock resolves lead agent → real project ID
+    manager.getProjectIdForAgent.mockReturnValue('decision-project-42');
     bridge.wire(manager);
 
     manager.emit('lead:decision', {
       id: 1,
       agentId: 'agent-1',
       agentRole: 'developer',
-      leadId: 'project-1',
+      leadId: 'lead-agent-007', // Deliberately different from projectId
       title: 'Use React',
       rationale: 'Better ecosystem',
       needsConfirmation: true,
@@ -246,6 +249,7 @@ describe('NotificationBridge', () => {
 
     vi.advanceTimersByTime(NotificationBridge.BATCH_WINDOW_MS + 100);
 
+    expect(manager.getProjectIdForAgent).toHaveBeenCalledWith('lead-agent-007');
     expect(adapter.sentMessages).toHaveLength(1);
     expect(adapter.sentMessages[0].text).toContain('Decision needs approval');
     expect(adapter.sentMessages[0].text).toContain('Better ecosystem');
