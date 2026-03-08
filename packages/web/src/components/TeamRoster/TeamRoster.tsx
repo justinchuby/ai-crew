@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
+import { Tabs } from '../ui/Tabs';
+import type { TabItem } from '../ui/Tabs';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -142,12 +144,12 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
   }
 
   const badge = statusBadge(profile.status, profile.liveStatus);
-  const tabs: Array<{ id: ProfileTab; label: string; icon: typeof User }> = [
-    { id: 'overview', label: 'Overview', icon: User },
-    { id: 'history', label: 'History', icon: Clock },
-    { id: 'knowledge', label: 'Knowledge', icon: BookOpen },
-    { id: 'skills', label: 'Skills', icon: Wrench },
-    { id: 'settings', label: 'Settings', icon: Settings },
+  const tabs: TabItem[] = [
+    { id: 'overview', label: 'Overview', icon: <User className="w-3.5 h-3.5" /> },
+    { id: 'history', label: 'History', icon: <Clock className="w-3.5 h-3.5" /> },
+    { id: 'knowledge', label: 'Knowledge', icon: <BookOpen className="w-3.5 h-3.5" /> },
+    { id: 'skills', label: 'Skills', icon: <Wrench className="w-3.5 h-3.5" /> },
+    { id: 'settings', label: 'Settings', icon: <Settings className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -174,22 +176,12 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-th-border px-4">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-th-accent text-th-accent'
-                : 'border-transparent text-th-text-alt hover:text-th-text'
-            }`}
-          >
-            <tab.icon className="w-3.5 h-3.5" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as ProfileTab)}
+        className="px-4"
+      />
 
       {/* Tab Content */}
       <div className="p-4">
