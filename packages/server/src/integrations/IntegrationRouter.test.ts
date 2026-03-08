@@ -447,4 +447,70 @@ describe('IntegrationRouter', () => {
       expect.not.stringContaining('\u200B'),
     );
   });
+
+  // ── B-1/C-2: Challenge-response for session binding ──────
+
+  describe('challenge-response session binding', () => {
+    beforeEach(async () => {
+      configStore = createMockConfigStore(true);
+      agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+      await agent.start();
+    });
+
+    it('createChallenge sends verification code to chat', async () => {
+      const adapter = agent.getAdapter('telegram')!;
+      const result = await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+
+      expect(result.chatId).toBe('chat-99');
+      expect(result.expiresAt).toBeGreaterThan(Date.now());
+      expect(adapter.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 'chat-99',
+          text: expect.stringContaining('verification code'),
+        }),
+      );
+      // Session should NOT be bound yet
+      expect(agent.getSession('chat-99')).toBeUndefined();
+    });
+
+    it('verifyChallenge binds session with correct code', async () => {
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+      const challenge = agent.getPendingChallenge('chat-99');
+      expect(challenge).toBeDefined();
+
+      const session = agent.verifyChallenge('chat-99', challenge!.code);
+      expect(session).not.toBeNull();
+      expect(session!.chatId).toBe('chat-99');
+      expect(session!.projectId).toBe('proj-1');
+
+      // Challenge should be cleared after verification
+      expect(agent.getPendingChallenge('chat-99')).toBeUndefined();
+      // Session should now exist
+      expect(agent.getSession('chat-99')).toBeDefined();
+    });
+
+    it('verifyChallenge rejects wrong code', async () => {
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+      const session = agent.verifyChallenge('chat-99', '000000');
+      expect(session).toBeNull();
+      // Challenge should still be pending (allows retry)
+      expect(agent.getPendingChallenge('chat-99')).toBeDefined();
+    });
+
+    it('verifyChallenge rejects expired challenge', async () => {
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+      const challenge = agent.getPendingChallenge('chat-99')!;
+
+      // Manually expire it
+      challenge.expiresAt = Date.now() - 1000;
+
+      const session = agent.verifyChallenge('chat-99', challenge.code);
+      expect(session).toBeNull();
+    });
+
+    it('verifyChallenge returns null for unknown chatId', () => {
+      const session = agent.verifyChallenge('nonexistent', '123456');
+      expect(session).toBeNull();
+    });
+  });
 });

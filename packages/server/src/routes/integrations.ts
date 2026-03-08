@@ -53,10 +53,10 @@ export function integrationRoutes(ctx: AppContext): Router {
     }
   });
 
-  // ── Session Management ────────────────────────────────────
+  // ── Session Management (challenge-response flow, B-1/C-2) ──
 
-  // POST /api/integrations/sessions
-  router.post('/integrations/sessions', (req, res) => {
+  // POST /api/integrations/sessions — initiates a challenge
+  router.post('/integrations/sessions', async (req, res) => {
     try {
       const agent = ctx.integrationRouter;
       if (!agent) {
@@ -74,10 +74,40 @@ export function integrationRoutes(ctx: AppContext): Router {
         return res.status(404).json({ error: `No adapter found for platform: ${platform}` });
       }
 
-      const session = agent.bindSession(chatId, platform, projectId, boundBy ?? 'api');
+      // Issue challenge — sends verification code to the chat
+      const challenge = await agent.createChallenge(chatId, platform, projectId, boundBy ?? 'api');
+      res.status(202).json({
+        status: 'challenge_sent',
+        chatId: challenge.chatId,
+        expiresAt: new Date(challenge.expiresAt).toISOString(),
+        message: 'A verification code has been sent to the chat. POST to /integrations/sessions/verify with the code.',
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to create session challenge', detail: (err as Error).message });
+    }
+  });
+
+  // POST /api/integrations/sessions/verify — completes the challenge
+  router.post('/integrations/sessions/verify', (req, res) => {
+    try {
+      const agent = ctx.integrationRouter;
+      if (!agent) {
+        return res.status(503).json({ error: 'Integration agent not available' });
+      }
+
+      const { chatId, code } = req.body ?? {};
+      if (!chatId || !code) {
+        return res.status(400).json({ error: 'chatId and code are required' });
+      }
+
+      const session = agent.verifyChallenge(chatId, String(code));
+      if (!session) {
+        return res.status(403).json({ error: 'Invalid or expired verification code' });
+      }
+
       res.status(201).json(session);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to create session', detail: (err as Error).message });
+      res.status(500).json({ error: 'Failed to verify session', detail: (err as Error).message });
     }
   });
 

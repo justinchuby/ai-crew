@@ -3,6 +3,7 @@
 // Routes inbound messages from messaging platforms to the correct
 // project lead, and formats outbound responses.
 
+import { randomInt } from 'node:crypto';
 import { logger } from '../utils/logger.js';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
@@ -33,9 +34,23 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
  * 4. Registers command handlers on adapters (/status, /projects, /agents, /help)
  * 5. Coordinates with NotificationBatcher for outbound event delivery
  */
+export interface PendingChallenge {
+  code: string;
+  chatId: string;
+  platform: 'telegram' | 'slack';
+  projectId: string;
+  boundBy: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+/** Challenge TTL: 5 minutes. */
+const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
 export class IntegrationRouter {
   private adapters: Map<string, MessagingAdapter> = new Map();
   private sessions: Map<string, ChatSession> = new Map(); // chatId → session
+  private pendingChallenges: Map<string, PendingChallenge> = new Map(); // chatId → challenge
   private notificationBatcher: NotificationBatcher;
   private agentManager: AgentManager;
   private projectRegistry: ProjectRegistry | undefined;
@@ -161,6 +176,80 @@ export class IntegrationRouter {
       }
     }
     return result;
+  }
+
+  // ── Challenge-response for session binding (B-1 / C-2) ────────────
+
+  /**
+   * Initiate a challenge: generate a 6-digit code, send it to the chat,
+   * and store it as a pending challenge. Returns the challenge metadata
+   * (without the code — the code is only sent to the chat).
+   */
+  async createChallenge(
+    chatId: string,
+    platform: 'telegram' | 'slack',
+    projectId: string,
+    boundBy: string,
+  ): Promise<{ chatId: string; expiresAt: number }> {
+    const adapter = this.adapters.get(platform);
+    if (!adapter) throw new Error(`No adapter for platform: ${platform}`);
+
+    const code = String(randomInt(100000, 999999));
+    const challenge: PendingChallenge = {
+      code,
+      chatId,
+      platform,
+      projectId,
+      boundBy,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    };
+    this.pendingChallenges.set(chatId, challenge);
+
+    // Send the verification code to the Telegram chat
+    await adapter.sendMessage({
+      platform,
+      chatId,
+      text: `🔐 Flightdeck verification code: ${code}\nEnter this code in the Flightdeck UI to bind this chat. Expires in 5 minutes.`,
+    });
+
+    logger.info({ module: 'integration-router', msg: 'Challenge issued', chatId, projectId });
+    return { chatId, expiresAt: challenge.expiresAt };
+  }
+
+  /**
+   * Verify a challenge code. If correct, binds the session and clears
+   * the pending challenge. Returns the session on success, null on failure.
+   */
+  verifyChallenge(chatId: string, code: string): ChatSession | null {
+    const challenge = this.pendingChallenges.get(chatId);
+    if (!challenge) return null;
+
+    // Expired?
+    if (challenge.expiresAt <= Date.now()) {
+      this.pendingChallenges.delete(chatId);
+      return null;
+    }
+
+    // Wrong code? (constant-time comparison not critical for 6-digit codes, but log attempt)
+    if (challenge.code !== code) {
+      logger.warn({ module: 'integration-router', msg: 'Challenge verification failed', chatId });
+      return null;
+    }
+
+    // Success — bind the session
+    this.pendingChallenges.delete(chatId);
+    return this.bindSession(chatId, challenge.platform, challenge.projectId, challenge.boundBy);
+  }
+
+  /** Get pending challenge for a chat (for testing/status). */
+  getPendingChallenge(chatId: string): PendingChallenge | undefined {
+    const challenge = this.pendingChallenges.get(chatId);
+    if (challenge && challenge.expiresAt <= Date.now()) {
+      this.pendingChallenges.delete(chatId);
+      return undefined;
+    }
+    return challenge;
   }
 
   // ── Private ──────────────────────────────────────────────
