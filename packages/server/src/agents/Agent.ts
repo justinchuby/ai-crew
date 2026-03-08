@@ -89,6 +89,8 @@ export class Agent {
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
   public exitError?: string;
+  /** Summary from COMPLETE_TASK command, used for knowledge extraction */
+  public completionSummary?: string;
   /** Tracks when the last human message was received (for leads) */
   public lastHumanMessageAt: Date | null = null;
   public lastHumanMessageText: string | null = null;
@@ -155,14 +157,18 @@ export class Agent {
     ensureSharedWorkspace(this);
     const isResume = !!this.resumeSessionId;
 
-    if (isResume) {
-      startAcpBridge(this, this.config, undefined);
-    } else {
-      const contextManifest = this.buildContextManifest(this.peers, this.budget);
-      const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
-      const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
-      startAcpBridge(this, this.config, initialPrompt);
-    }
+    // startAcpBridge is async (adapter creation uses dynamic imports).
+    // Errors are handled internally by the bridge (sets agent status to 'failed').
+    const bridgePromise = isResume
+      ? startAcpBridge(this, this.config, undefined)
+      : startAcpBridge(this, this.config,
+          `${this.role.systemPrompt}\n\n${this.buildContextManifest(this.peers, this.budget)}\n\nYou are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`);
+
+    bridgePromise.catch((err) => {
+      logger.error({ module: 'agent', msg: 'Bridge startup failed', agentId: this.id, err: (err as Error).message });
+      this.exitError = (err as Error).message;
+      this.status = 'failed';
+    });
   }
 
   // ── Internal methods used by AgentAcpBridge ─────────────────────────────
