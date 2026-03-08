@@ -138,10 +138,10 @@ export function useAttentionItems(): AttentionState {
       escalation = 'yellow';
     }
 
-    // Progress text
+    // Progress text — avoid misleading "0/0 done" (AC-13.10)
     const progressText = totalTasks > 0
       ? `${totalDone}/${totalTasks} done`
-      : agents.length > 0 ? `${agents.length} agents active` : '';
+      : '';
 
     return {
       items,

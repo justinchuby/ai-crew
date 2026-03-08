@@ -274,6 +274,37 @@ describe('AttentionBar', () => {
     expect(screen.getByText('5/7 done')).toBeInTheDocument();
   });
 
+  it('uses role="status" for green/yellow and role="alert" for red (AC-13.15)', () => {
+    // Green
+    mockAppState.agents = [makeAgent('a1', 'running')];
+    const { unmount } = renderBar();
+    let bar = screen.getByTestId('attention-bar');
+    expect(bar).toHaveAttribute('role', 'status');
+    unmount();
+
+    // Red
+    mockLeadState.projects = {
+      'lead-1': {
+        dagStatus: makeDagStatus(
+          { failed: 1 },
+          [makeTask('t1', 'failed')],
+        ),
+      },
+    };
+    renderBar();
+    bar = screen.getByTestId('attention-bar');
+    expect(bar).toHaveAttribute('role', 'alert');
+  });
+
+  it('does not show 0/0 done when no projects exist (AC-13.10)', () => {
+    mockAppState.agents = [makeAgent('a1', 'running')];
+    // No projects, no DAG data
+    mockLeadState.projects = {};
+    renderBar();
+
+    expect(screen.queryByText(/0\/0/)).not.toBeInTheDocument();
+  });
+
   it('shows escalation dot with correct color', () => {
     // Green
     mockAppState.agents = [makeAgent('a1', 'running')];

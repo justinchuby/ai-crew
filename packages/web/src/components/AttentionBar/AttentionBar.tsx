@@ -80,10 +80,17 @@ export function AttentionBar() {
   const { escalation, items, progressText, runningCount, pendingDecisionCount } = state;
   const styles = ESCALATION_STYLES[escalation];
 
+  // Build aria label for screen readers (AC-13.15)
+  const ariaLabel = escalation === 'green'
+    ? `All healthy. ${progressText || `${state.agentCount} agents active`}`
+    : `Attention: ${items.map((i) => i.label).join(', ')}. ${progressText}`;
+
   return (
     <div
       data-testid="attention-bar"
       data-escalation={escalation}
+      role={escalation === 'red' ? 'alert' : 'status'}
+      aria-label={ariaLabel}
       className={`${styles.height} ${styles.bar} ${styles.border} flex items-center px-4 gap-4 text-xs shrink-0 overflow-x-auto transition-all duration-300`}
     >
       {/* Escalation indicator dot */}
