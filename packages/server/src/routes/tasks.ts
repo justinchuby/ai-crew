@@ -18,8 +18,10 @@ export function tasksRoutes(ctx: AppContext): Router {
    *   &status=running,failed  (comma-separated filter)
    *   &role=developer          (filter by role)
    *   &assignedAgentId=<id>   (filter by assigned agent)
+   *   &limit=200              (max results, default 200, capped at 1000)
+   *   &offset=0               (skip N results for pagination)
    *
-   * Returns all tasks across all projects (scope=global) or filtered
+   * Returns paginated tasks across all projects (scope=global) or filtered
    * to a single project.
    */
   router.get('/tasks', (req, res) => {
@@ -29,6 +31,8 @@ export function tasksRoutes(ctx: AppContext): Router {
     const statusFilter = req.query.status as string | undefined;
     const roleFilter = req.query.role as string | undefined;
     const agentFilter = req.query.assignedAgentId as string | undefined;
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 200, 1), 1000);
+    const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
     let tasks: DagTask[];
 
@@ -53,9 +57,17 @@ export function tasksRoutes(ctx: AppContext): Router {
       tasks = tasks.filter(t => t.assignedAgentId === agentFilter);
     }
 
+    const total = tasks.length;
+
+    // Apply pagination after filtering
+    const paginated = tasks.slice(offset, offset + limit);
+
     return res.json({
-      tasks,
-      total: tasks.length,
+      tasks: paginated,
+      total,
+      limit,
+      offset,
+      hasMore: offset + limit < total,
       scope,
       ...(projectId ? { projectId } : {}),
     });

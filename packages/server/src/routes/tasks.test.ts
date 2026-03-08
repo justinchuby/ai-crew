@@ -154,6 +154,52 @@ describe('GET /tasks — global task query', () => {
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].assignedAgentId).toBe('agent-1');
   });
+
+  it('paginates with limit and offset', async () => {
+    const res = await fetch(`${baseUrl}/tasks?limit=2&offset=0`);
+    const body = await res.json();
+    expect(body.tasks).toHaveLength(2);
+    expect(body.total).toBe(5);
+    expect(body.limit).toBe(2);
+    expect(body.offset).toBe(0);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it('returns second page with offset', async () => {
+    const res = await fetch(`${baseUrl}/tasks?limit=2&offset=2`);
+    const body = await res.json();
+    expect(body.tasks).toHaveLength(2);
+    expect(body.offset).toBe(2);
+    expect(body.hasMore).toBe(true);
+  });
+
+  it('returns last page with hasMore=false', async () => {
+    const res = await fetch(`${baseUrl}/tasks?limit=2&offset=4`);
+    const body = await res.json();
+    expect(body.tasks).toHaveLength(1);
+    expect(body.hasMore).toBe(false);
+  });
+
+  it('defaults to limit=200 when not specified', async () => {
+    const res = await fetch(`${baseUrl}/tasks`);
+    const body = await res.json();
+    expect(body.limit).toBe(200);
+    expect(body.offset).toBe(0);
+  });
+
+  it('caps limit at 1000', async () => {
+    const res = await fetch(`${baseUrl}/tasks?limit=5000`);
+    const body = await res.json();
+    expect(body.limit).toBe(1000);
+  });
+
+  it('paginates after filtering', async () => {
+    const res = await fetch(`${baseUrl}/tasks?status=running&limit=1&offset=0`);
+    const body = await res.json();
+    expect(body.tasks).toHaveLength(1);
+    expect(body.total).toBe(2); // 2 running tasks
+    expect(body.hasMore).toBe(true);
+  });
 });
 
 describe('GET /attention — attention items', () => {
