@@ -66,9 +66,61 @@ budget:
     pause: 1.0
 
 provider:
-  id: copilot                         # 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude'
-  # sdkMode: false                    # true = use in-process SDK (Claude only), false = ACP subprocess
-  # binaryOverride: /usr/local/bin/copilot  # Override binary path (optional)
-  # argsOverride: ['--acp', '--stdio']      # Override spawn args (optional)
-  # envOverride:                             # Extra env vars (optional)
-  #   GEMINI_API_KEY: your-key-here
+  id: copilot                         # Active provider — one of the 6 below
+  # sdkMode: false                    # true = use in-process SDK (Claude only)
+  # binaryOverride: null              # Override binary path (optional)
+  # argsOverride: null                # Override spawn args (optional)
+  # envOverride: {}                   # Extra env vars (optional)
+
+# ── Provider reference ──────────────────────────────────────────────
+# Uncomment the provider block you want to use and set id: above.
+#
+# ┌─────────┬──────────────┬───────────────────────┬──────────────────────────┐
+# │ id      │ name         │ binary                │ required env vars        │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ copilot │ GitHub       │ copilot               │ (none — uses gh auth)    │
+# │         │ Copilot      │ --acp --stdio         │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ claude  │ Claude Code  │ claude                │ ANTHROPIC_API_KEY        │
+# │         │              │ --acp --stdio         │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ gemini  │ Google       │ gemini                │ GEMINI_API_KEY           │
+# │         │ Gemini CLI   │ --experimental-acp    │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ codex   │ Codex CLI    │ codex                 │ OPENAI_API_KEY           │
+# │         │              │ --acp                 │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ cursor  │ Cursor       │ agent                 │ CURSOR_API_KEY           │
+# │         │              │ acp                   │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ opencode│ OpenCode     │ opencode              │ (none)                   │
+# │         │              │ acp                   │                          │
+# └─────────┴──────────────┴───────────────────────┴──────────────────────────┘
+#
+# Example: Switch to Claude Code
+# provider:
+#   id: claude
+#   envOverride:
+#     ANTHROPIC_API_KEY: sk-ant-...
+#
+# Example: Switch to Gemini
+# provider:
+#   id: gemini
+#   envOverride:
+#     GEMINI_API_KEY: AIza...
+#
+# Example: Switch to Codex CLI
+# provider:
+#   id: codex
+#   envOverride:
+#     OPENAI_API_KEY: sk-...
+#
+# Example: Switch to Cursor
+# provider:
+#   id: cursor
+#   envOverride:
+#     CURSOR_API_KEY: cur-...
+#
+# Example: Switch to OpenCode
+# provider:
+#   id: opencode
