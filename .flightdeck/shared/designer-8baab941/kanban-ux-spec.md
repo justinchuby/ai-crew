@@ -17,6 +17,9 @@
 6. [Edge Cases](#6-edge-cases)
 7. [Specific Recommendations](#7-specific-recommendations)
 8. [Current State Assessment](#8-current-state-assessment)
+9. [Global vs Project-Specific Views](#9-global-vs-project-specific-views)
+10. [Creative Alternatives: Command Center Model](#10-creative-alternatives-command-center-model)
+11. [Many-to-Many Team ↔ Project Implications](#11-many-to-many-team--project-implications)
 
 ---
 
@@ -597,3 +600,257 @@ When tasks have no `dependsOn` relationships, the dependency features are useles
 ---
 
 *This spec is a living document. Feedback welcome from @49cbf6e1 (Lead), PM, and developers.*
+
+---
+
+## 9. Global vs Project-Specific Views
+
+### The Requirement
+The Kanban must support two scopes:
+- **Global view**: All tasks across all projects — the "air traffic control" perspective
+- **Project-specific view**: Tasks for one project — the "cockpit" perspective
+
+### 9.1 Scope Switcher Design
+
+The scope switcher should be **prominent but not intrusive** — top-left of the Kanban, before the column grid.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│  🌐 All Projects ▾  │  🔍 Search...  │  Role ▾ │  Priority ▾ │       │
+│  ─────────────────── │                                                │
+│  ┌─ Dropdown ──────┐ │                                                │
+│  │ 🌐 All Projects │ │                                                │
+│  │ ─────────────── │ │                                                │
+│  │ 📁 Auth Service │ │                                                │
+│  │ 📁 API Gateway  │ │                                                │
+│  │ 📁 Frontend v2  │ │                                                │
+│  └─────────────────┘ │                                                │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+**Interaction:** Click the scope selector → dropdown listing "All Projects" + each active project. Selecting a project filters the board to only that project's tasks. The selected scope should be reflected in the URL (`/tasks?scope=all` vs `/tasks?scope=proj-123`) so it's shareable and bookmarkable.
+
+### 9.2 Global View Differences
+
+When in global view, each task card needs **project attribution** — which project does this task belong to?
+
+**Card modification for global view:**
+```
+┌────────────────────────────────────┐
+│  📁 Auth Service          P2 🟠   │  ← Project name (global view only)
+│  Implement JWT validation          │
+│  🧑‍💻 developer  ·  Agent abc1  ·  5m │
+└────────────────────────────────────┘
+```
+
+- Project name appears as a subtle top line on the card, color-coded per project
+- Project color is auto-assigned (pick from a palette of 8 distinguishable colors)
+- In project-specific view, the project line is hidden (redundant)
+
+**Column behavior in global view:**
+- Tasks from different projects intermix within columns, sorted by priority then project
+- A **"Group by project"** toggle could stack sub-sections within each column:
+  ```
+  ┌─ Running ─────────────────┐
+  │  📁 Auth Service (3)      │
+  │  ├── Task A               │
+  │  ├── Task B               │
+  │  └── Task C               │
+  │                           │
+  │  📁 API Gateway (1)       │
+  │  └── Task D               │
+  └───────────────────────────┘
+  ```
+
+### 9.3 Cross-Project Attention Summary
+
+The attention strip (R1) in global view aggregates across projects:
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ 🔴 Auth: 2 failed  ·  🟠 Gateway: 1 blocked  ·  8/20 total done   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+This gives the "air traffic control" view — immediately see which projects have problems.
+
+### 9.4 Navigation Integration
+
+The scope selector should integrate with the existing navigation:
+- Clicking a project in the sidebar → switches to project-specific Kanban
+- The Tasks page in the sidebar defaults to global view
+- Deep links from the HomeDashboard (e.g., "2 tasks need attention in Auth Service") → project-specific Kanban, pre-filtered
+
+---
+
+## 10. Creative Alternatives: Command Center Model
+
+> *"Be creative about how to reach that goal. The sections are just recommendations."*
+
+The lead's directive opens the door to rethink the Kanban as something more than a status board. Here are three unconventional models worth exploring.
+
+### 10.1 The Unified Command Center (Recommended Exploration)
+
+**Concept:** Instead of separate Dashboard + Kanban pages, merge them into a single **Command Center** that provides both situational awareness AND task management in one view.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  COMMAND CENTER                                     🌐 All Projects │
+├──────────────┬──────────────────────────────────────────────────────┤
+│              │                                                      │
+│  ⚡ NEEDS    │  KANBAN COLUMNS                                      │
+│  ATTENTION   │  ┌──────┬──────┬──────┬──────┐                      │
+│              │  │ Run  │ Ready│ Block│ Fail │                      │
+│  🔴 2 failed │  │      │      │      │      │                      │
+│  🟠 1 blocked│  │ ···  │ ···  │ ···  │ ···  │                      │
+│  ⚠️ 1 stale  │  │      │      │      │      │                      │
+│              │  └──────┴──────┴──────┴──────┘                      │
+│  ────────────│                                                      │
+│              │  ── Done (8) ── Pending (3) ──  [collapsed]         │
+│  📋 DECISIONS│                                                      │
+│              │                                                      │
+│  ✋ Approval │                                                      │
+│     needed   │                                                      │
+│  ✅ JWT auth │                                                      │
+│     approved │                                                      │
+│              │                                                      │
+│  ────────────│                                                      │
+│              │                                                      │
+│  📊 PROGRESS │                                                      │
+│  ████████░░  │                                                      │
+│  67% done    │                                                      │
+│  3 agents    │                                                      │
+│  active      │                                                      │
+│              │                                                      │
+└──────────────┴──────────────────────────────────────────────────────┘
+```
+
+**Layout:** Left sidebar (240px) is the **mission brief** — attention items, decisions, progress. Right area (flex) is the **Kanban board**. This is one page, not two.
+
+**Why this works:**
+- Eliminates the "check dashboard → switch to tasks → switch back" loop
+- The left panel answers "what needs me?" while the right panel answers "what's the full picture?"
+- Decisions and attention items are **always visible** alongside the task board
+- The left panel collapses on smaller screens, giving the Kanban full width
+
+**Key design principles:**
+- Left panel shows **actionable** items only (decisions needing approval, failed tasks, stale warnings)
+- Items disappear from the left panel when resolved → zero-inbox feeling
+- Clicking an item in the left panel highlights the corresponding card in the Kanban
+
+### 10.2 The Pulse Feed (Alternative)
+
+**Concept:** Replace the static Kanban with a **real-time activity feed** that surfaces events in chronological order, with the ability to "zoom out" to the board view.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  PULSE FEED                              [Board View] [Feed View] │
+│                                                                    │
+│  ● 2m ago — Auth Service                                          │
+│    🔴 "Implement JWT validation" FAILED                           │
+│    Error: Token signing key not found in env                      │
+│    [Retry] [View Logs] [Reassign]                                 │
+│                                                                    │
+│  ● 5m ago — API Gateway                                           │
+│    ✅ "Rate limiter middleware" completed by Developer @abc1       │
+│    Unlocked: "Load testing suite" → now READY                     │
+│                                                                    │
+│  ● 8m ago — Auth Service                                          │
+│    ✋ DECISION NEEDED: "Use RS256 or HS256 for JWT signing?"      │
+│    Architect recommends RS256. [Approve RS256] [Override]         │
+│                                                                    │
+│  ● 12m ago — Frontend v2                                          │
+│    🔵 "KanbanBoard component" is now RUNNING (Developer @def2)   │
+│                                                                    │
+│  ● 15m ago — Global                                               │
+│    📋 New task DAG declared for "Frontend v2" (12 tasks)          │
+│                                                                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Why this could work:**
+- Mirrors how operators actually consume information — "what just happened?"
+- Each event is actionable inline — no navigating to a different page
+- Natural fit for real-time WebSocket updates
+- Decisions surface naturally in the flow instead of a separate panel
+
+**Why it might not work:**
+- Loses spatial stability — no fixed position for a task, hard to find a specific one
+- At high event velocity (20+ agents), the feed becomes unreadable
+- Doesn't give the "at a glance" overview that a board provides
+
+**Verdict:** Best as a **complement** to the Kanban, not a replacement. Could be the content of the left panel in the Command Center model (10.1).
+
+### 10.3 The Heat Map Matrix (Alternative)
+
+**Concept:** A dense, spatial overview where rows = agents, columns = time blocks, and cells are color-coded by status.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  AGENT ACTIVITY MATRIX              Last 2 hours → now        │
+│                                                                │
+│                 -2h  -1.5h  -1h  -30m  -15m  NOW             │
+│  Developer 1   🟢    🔵    🔵    🔵    🔵    🔵              │
+│  Developer 2   🟢    🟢    🔵    🔵    🔴    🔴  ← STUCK    │
+│  Architect     ⚪    ⚪    🔵    🔵    🟢    ⚪  ← IDLE      │
+│  Code Reviewer ⚪    🔵    🟢    ⚪    ⚪    ⚪              │
+│  QA Tester     ⚪    ⚪    ⚪    ⚪    🔵    🔵              │
+│                                                                │
+│  Legend: 🔵 Running  🟢 Completed  🔴 Failed  ⚪ Idle        │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Why this could work:** Instant visibility of agent utilization and stuck agents. Great for the "are my agents productive?" question.
+
+**Verdict:** Already partially exists as `AgentHeatmap` in the OverviewPage. Could be incorporated as a mini-widget in the Command Center left panel. Not a Kanban replacement.
+
+### 10.4 Recommendation
+
+**Go with the Command Center model (10.1)** as the primary layout, with the Kanban board as the main content area. The left panel replaces the need for a separate dashboard page for task-related monitoring. The HomeDashboard can focus on the higher-level stuff (project health, system status, onboarding) while the Command Center is the operational workspace.
+
+This approach:
+- ✅ Satisfies "glance and understand everything" requirement
+- ✅ Surfaces decisions and attention items without a separate page
+- ✅ Keeps the Kanban as the primary task visualization
+- ✅ Supports global + project scope switching
+- ✅ Creative but not radical — still learnable for users familiar with project management tools
+
+---
+
+## 11. Many-to-Many Team ↔ Project Implications
+
+### The Challenge
+Teams and Projects have a many-to-many relationship:
+- A Team can work across multiple Projects
+- A Project can have agents from multiple Teams
+
+This affects the Kanban in several ways:
+
+### 11.1 Task Card Attribution
+Each task has a `role` and `assignedAgentId`, but the **team** is not directly on the task. The agent belongs to a team (or multiple teams). 
+
+**Design decision:** Don't show team on the task card. Show **role** and **agent** — these are more operationally relevant. Team filtering is a secondary concern.
+
+### 11.2 Global View Filtering
+In global view, users might want to filter by:
+- **Project** — "show me Auth Service tasks" (use scope selector)
+- **Team** — "show me what Team Alpha is doing across all projects" (add team filter chip)
+- **Agent** — "show me what Developer @abc1 is doing" (already in R4 filter bar)
+
+**Team filter** is the new addition needed. It should resolve to the set of agents in that team, then filter tasks by `assignedAgentId ∈ team.agents`.
+
+### 11.3 Cross-Team Visibility
+When agents from different teams work on the same project, the board should make this visible without being noisy.
+
+**Recommendation:** In the card's agent section, show a subtle team badge only when the project has agents from 2+ teams:
+```
+🧑‍💻 developer · Agent abc1 · Team Alpha
+```
+
+This only appears when disambiguation is needed — if all agents are from the same team, the team badge is redundant and hidden.
+
+### 11.4 Open Question
+Should the Kanban support a **"Team view"** mode (all tasks assigned to agents in a specific team, across projects)? This would be useful for team leads managing a pool of agents, but adds complexity. Recommend deferring to Phase 3 unless PM identifies strong user need.
+
+---
+
+*Updated 2026-03-08 with sections 9-11 based on Lead requirements for global/project views and creative alternatives.*
