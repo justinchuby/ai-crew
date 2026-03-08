@@ -53,6 +53,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private rateBuckets: Map<string, RateBucket> = new Map();
   private rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
+  private startError: string | null = null;
 
   // Retry queue for failed outbound messages (in-memory, 5-min TTL)
   private retryQueue: Array<{ message: OutboundMessage; attempts: number; expiresAt: number }> = [];
@@ -95,9 +96,17 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       );
     }
 
-    // Lazy import grammY — only load when Telegram is actually enabled
-    const { Bot } = await import('grammy');
-    this.bot = new Bot(this.config.botToken);
+    try {
+      // Lazy import grammY — only load when Telegram is actually enabled
+      const { Bot } = await import('grammy');
+      this.bot = new Bot(this.config.botToken);
+    } catch (err) {
+      // H-5: Sanitize bot token from error messages before logging/throwing
+      const safeMsg = sanitizeTokenFromError(err, this.config.botToken);
+      this.startError = safeMsg;
+      this.emit('error', { error: new Error(safeMsg), context: 'start' });
+      throw new Error(`Telegram bot initialization failed: ${safeMsg}`);
+    }
 
     this.setupCommandHandlers();
     this.setupMessageHandler();
@@ -117,9 +126,15 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       onStart: () => {
         logger.info({ module: 'telegram', msg: 'Telegram bot started (long polling)' });
         this.running = true;
+        this.startError = null;
         this.emit('started', undefined as unknown as void);
       },
     });
+  }
+
+  /** Get the last start error (if any) for status reporting — H-2. */
+  getStartError(): string | null {
+    return this.startError;
   }
 
   /** Stop the bot gracefully. */
@@ -280,8 +295,10 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     if (!this.bot) return;
 
     this.bot.catch((err) => {
-      logger.error({ module: 'telegram', msg: 'Bot error', error: err.message });
-      this.emit('error', { error: err.error instanceof Error ? err.error : new Error(String(err.error)), context: 'bot.catch' });
+      // H-5: Never log bot token — sanitize all error messages
+      const safeMsg = sanitizeTokenFromError(err, this.config.botToken);
+      logger.error({ module: 'telegram', msg: 'Bot error', error: safeMsg });
+      this.emit('error', { error: new Error(safeMsg), context: 'bot.catch' });
     });
   }
 
@@ -349,4 +366,43 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       this.scheduleRetryFlush();
     }
   }
+
+  /**
+   * Export retry queue snapshot for persistence (H-4).
+   * Callers can persist this to SQLite and restore via `restoreRetryQueue`.
+   */
+  getRetryQueueSnapshot(): Array<{ message: OutboundMessage; attempts: number; expiresAt: number }> {
+    return [...this.retryQueue];
+  }
+
+  /** Restore retry queue from persisted state (H-4). */
+  restoreRetryQueue(entries: Array<{ message: OutboundMessage; attempts: number; expiresAt: number }>): void {
+    const now = Date.now();
+    // Only restore entries that haven't expired
+    const valid = entries.filter(e => e.expiresAt > now && e.attempts < TelegramAdapter.MAX_RETRY_ATTEMPTS);
+    this.retryQueue.push(...valid);
+    if (valid.length > 0) {
+      logger.info({ module: 'telegram', msg: `Restored ${valid.length} retry queue entries` });
+      this.scheduleRetryFlush();
+    }
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+/**
+ * Sanitize bot token from error messages (H-5: AC-14.26).
+ * grammY may include the token in error output — strip it before logging.
+ */
+function sanitizeTokenFromError(err: unknown, token: string): string {
+  let raw: string;
+  if (err instanceof Error) {
+    raw = err.message;
+  } else if (typeof err === 'object' && err !== null && 'message' in err) {
+    raw = String((err as { message: unknown }).message);
+  } else {
+    raw = String(err);
+  }
+  if (!token) return raw;
+  return raw.replaceAll(token, '[BOT_TOKEN_REDACTED]');
 }
