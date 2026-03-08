@@ -17,6 +17,7 @@ import {
   FolderOpen,
   Users,
   AlertCircle,
+  AlertTriangle,
   Play,
   Clock,
   Activity,
@@ -26,6 +27,7 @@ import {
   Wifi,
   WifiOff,
   ChevronRight,
+  ChevronDown,
   Shield,
   CheckCircle2,
   XCircle,
@@ -126,30 +128,6 @@ const DECISION_CATEGORY_ICONS: Record<string, string> = {
 
 // ── Sub-Components ──────────────────────────────────────────────────
 
-function StatCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
-  return (
-    <div className="bg-surface-raised border border-th-border rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-th-text-muted">{icon}</span>
-        <span className="text-xs text-th-text-muted uppercase tracking-wider">{label}</span>
-      </div>
-      <div className={`text-2xl font-semibold ${accent ? 'text-accent' : 'text-th-text-alt'}`}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function ActionRequiredItem({
   icon,
   title,
@@ -239,7 +217,7 @@ function ProgressBar({ summary }: { summary: DagStatus['summary'] }) {
     <div className="space-y-1.5" data-testid="progress-bar">
       <div className="flex items-center justify-between text-[10px]">
         <span className="text-th-text-muted">
-          {summary.done}/{total} tasks · {summary.running} running
+          {summary.done}/{total} tasks · {summary.running} running{summary.failed > 0 && <> · <span className="text-red-400">{summary.failed} failed</span></>}
         </span>
         <span className="font-medium text-th-text-alt">{pct}%</span>
       </div>
@@ -261,10 +239,12 @@ function ProgressBar({ summary }: { summary: DagStatus['summary'] }) {
 function ProjectCard({
   project,
   agentCount,
+  failedCount,
   onClick,
 }: {
   project: EnrichedProject;
   agentCount: number;
+  failedCount?: number;
   onClick: () => void;
 }) {
   const status = getProjectStatusVariant(agentCount, project.status);
@@ -302,6 +282,12 @@ function ProjectCard({
               <span className="flex items-center gap-1">
                 <Activity className="w-3 h-3" />
                 {activeSessions.length} session{activeSessions.length > 1 ? 's' : ''}
+              </span>
+            )}
+            {(failedCount ?? 0) > 0 && (
+              <span className="flex items-center gap-1 text-red-400">
+                <AlertTriangle className="w-3 h-3" />
+                {failedCount} failed
               </span>
             )}
           </div>
@@ -432,6 +418,40 @@ export function HomeDashboard() {
     return agents.filter(a => a.status !== 'completed' && a.status !== 'failed' && a.status !== 'terminated').length;
   }, [agents]);
 
+  const avgProgress = useMemo(() => {
+    if (progressByProject.length === 0) return 0;
+    const totals = progressByProject.reduce((acc, p) => {
+      const total = Object.values(p.summary).reduce((a, b) => a + b, 0);
+      return { done: acc.done + p.summary.done, total: acc.total + total };
+    }, { done: 0, total: 0 });
+    return totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0;
+  }, [progressByProject]);
+
+  const failedByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of progressByProject) {
+      if (p.summary.failed > 0) map.set(p.projectId, p.summary.failed);
+    }
+    return map;
+  }, [progressByProject]);
+
+  // Group active agents by project for grouped display
+  const agentsByProject = useMemo(() => {
+    const map = new Map<string, AgentInfo[]>();
+    for (const agent of activeAgents) {
+      const key = agent.projectId ?? '__unknown__';
+      const group = map.get(key);
+      if (group) {
+        group.push(agent);
+      } else {
+        map.set(key, [agent]);
+      }
+    }
+    return map;
+  }, [activeAgents]);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
   // ── Navigation ───────────────────────────────────────────────
 
   const handleNavigateToProject = useCallback(
@@ -486,11 +506,12 @@ export function HomeDashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6" data-testid="home-stats">
-        <StatCard icon={<FolderOpen className="w-4 h-4" />} label="Active Projects" value={projects.length} />
-        <StatCard icon={<Users className="w-4 h-4" />} label="Running Agents" value={totalRunningAgents} accent />
-        <StatCard icon={<Bell className="w-4 h-4" />} label="Action Required" value={actionRequiredCount} accent={actionRequiredCount > 0} />
-        <StatCard icon={<Gavel className="w-4 h-4" />} label="Decisions" value={allDecisions.length} />
+      <div className="flex items-center gap-2 text-xs text-th-text-muted mb-6 px-1" data-testid="home-stats">
+        <span>📁 {projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+        <span className="text-th-text-muted/40">·</span>
+        <span>🤖 {totalRunningAgents} agent{totalRunningAgents !== 1 ? 's' : ''} running</span>
+        <span className="text-th-text-muted/40">·</span>
+        <span>📊 {avgProgress}% avg progress</span>
       </div>
 
       {/* ── Section 1: User Action Required ──────────────────── */}
@@ -545,19 +566,46 @@ export function HomeDashboard() {
               {activeAgents.length} agent{activeAgents.length > 1 ? 's' : ''}
             </span>
           </div>
-          <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border">
-            {activeAgents.slice(0, 8).map((agent) => (
-              <ActiveAgentRow
-                key={agent.id}
-                agent={agent}
-                projectName={resolveProjectName(agent.projectId, projects, agents)}
-              />
-            ))}
-            {activeAgents.length > 8 && (
-              <div className="px-3 py-2 text-[11px] text-th-text-muted text-center">
-                +{activeAgents.length - 8} more agent{activeAgents.length - 8 > 1 ? 's' : ''}
-              </div>
-            )}
+          <div className="space-y-2">
+            {Array.from(agentsByProject.entries()).map(([projectId, groupAgents]) => {
+              const projectName = resolveProjectName(projectId === '__unknown__' ? null : projectId, projects, agents);
+              const isCollapsed = collapsedGroups.has(projectId);
+              return (
+                <div
+                  key={projectId}
+                  className="bg-surface-raised border border-th-border rounded-lg"
+                  data-testid="active-work-group"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setCollapsedGroups(prev => {
+                      const next = new Set(prev);
+                      if (next.has(projectId)) next.delete(projectId);
+                      else next.add(projectId);
+                      return next;
+                    })}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-th-bg-alt/20 transition-colors rounded-t-lg"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 text-th-text-muted transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    <span className="text-xs font-medium text-th-text-alt">📁 {projectName}</span>
+                    <span className="text-[10px] text-th-text-muted">
+                      ({groupAgents.length} agent{groupAgents.length > 1 ? 's' : ''})
+                    </span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="divide-y divide-th-border border-t border-th-border">
+                      {groupAgents.map((agent) => (
+                        <ActiveAgentRow
+                          key={agent.id}
+                          agent={agent}
+                          projectName=""
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -630,6 +678,7 @@ export function HomeDashboard() {
               key={project.id}
               project={project}
               agentCount={agentCountByProject.get(project.id) ?? project.activeAgentCount}
+              failedCount={failedByProject.get(project.id)}
               onClick={() => handleNavigateToProject(project.id)}
             />
           ))}

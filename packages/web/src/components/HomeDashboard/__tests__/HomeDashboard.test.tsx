@@ -197,14 +197,13 @@ describe('HomeDashboard', () => {
       });
     });
 
-    it('shows 4 quick stats cards', async () => {
+    it('shows compact stat strip with project count and agent count', async () => {
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
-        expect(screen.getByTestId('home-stats')).toBeTruthy();
-        expect(screen.getByText('Active Projects')).toBeTruthy();
-        expect(screen.getByText('Running Agents')).toBeTruthy();
-        expect(screen.getByText('Action Required')).toBeTruthy();
-        expect(screen.getByText('Decisions')).toBeTruthy();
+        const stats = screen.getByTestId('home-stats');
+        expect(stats).toBeTruthy();
+        expect(stats.textContent).toContain('2 projects');
+        expect(stats.textContent).toContain('3 agents running');
       });
     });
 
@@ -350,6 +349,16 @@ describe('HomeDashboard', () => {
       });
       expect(screen.queryByTestId('active-work-section')).toBeNull();
     });
+
+    it('groups agents by project', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const groups = screen.getAllByTestId('active-work-group');
+        expect(groups.length).toBeGreaterThanOrEqual(1);
+        // All 3 agents belong to proj-1 (Alpha Project)
+        expect(groups[0].textContent).toContain('Alpha Project');
+      });
+    });
   });
 
   describe('decisions feed section', () => {
@@ -405,6 +414,24 @@ describe('HomeDashboard', () => {
       const card = screen.getAllByTestId('progress-card')[0];
       fireEvent.click(card);
       expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
+    });
+
+    it('shows failed task count when projects have failures', async () => {
+      const dagWithFailures = {
+        ...sampleDagStatus,
+        summary: { ...sampleDagStatus.summary, failed: 2 },
+      };
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+        if (path.includes('/dag')) return Promise.resolve(dagWithFailures);
+        return Promise.resolve([]);
+      });
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const bars = screen.getAllByTestId('progress-bar');
+        expect(bars[0].textContent).toContain('2 failed');
+      });
     });
   });
 
