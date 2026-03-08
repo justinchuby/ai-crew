@@ -688,7 +688,12 @@ describe('KanbanBoard', () => {
     });
 
     it('no context menu for done tasks (only Skip shows for non-done/non-skipped)', () => {
-      const tasks = [makeTask({ id: 'd1', dagStatus: 'done', title: 'Done Task' })];
+      // Include an active task so done column doesn't auto-collapse
+      const tasks = [
+        makeTask({ id: 'd1', dagStatus: 'done', title: 'Done Task' }),
+        makeTask({ id: 'r1', dagStatus: 'running', title: 'Active Task', startedAt: new Date().toISOString() }),
+        makeTask({ id: 'r2', dagStatus: 'running', title: 'Active Task 2', startedAt: new Date().toISOString() }),
+      ];
       render(<KanbanBoard dagStatus={makeDagStatus(tasks)} projectId="proj-1" />);
 
       fireEvent.contextMenu(screen.getByTestId('kanban-card-d1'));
