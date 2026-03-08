@@ -74,6 +74,9 @@ const ALL_TAB_IDS = new Set([
   ...OVERFLOW_ITEMS.map(t => t.id),
 ]);
 
+const TAB_STORAGE_KEY = 'flightdeck-project-tab';
+const MAX_STORED_PROJECTS = 50;
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function projectStatusVariant(status: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
@@ -211,12 +214,18 @@ export function ProjectLayout() {
   };
 
   // B-10: Persist last active tab per project to localStorage
-  const TAB_STORAGE_KEY = 'flightdeck-project-tab';
   useEffect(() => {
     if (!id || activeTab === 'overview') return;
     try {
       const stored = JSON.parse(localStorage.getItem(TAB_STORAGE_KEY) ?? '{}');
       stored[id] = activeTab;
+      // Evict oldest entries if too many projects stored
+      const keys = Object.keys(stored);
+      if (keys.length > MAX_STORED_PROJECTS) {
+        for (const k of keys.slice(0, keys.length - MAX_STORED_PROJECTS)) {
+          delete stored[k];
+        }
+      }
       localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(stored));
     } catch {}
   }, [id, activeTab]);
@@ -237,10 +246,10 @@ export function ProjectLayout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // B-11: Keyboard shortcuts — Cmd/Ctrl+1-5 for primary tabs
+  // B-11: Keyboard shortcuts — Alt+1-5 for primary tabs
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
+      if (!e.altKey) return;
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= PRIMARY_TABS.length) {
         e.preventDefault();
@@ -301,9 +310,9 @@ export function ProjectLayout() {
             </div>
           </div>
 
-          {/* Tab bar */}
+          {/* Tab bar — horizontal scroll on mobile, hide scrollbar */}
           <div
-            className="flex items-center overflow-x-auto px-2"
+            className="flex items-center flex-nowrap overflow-x-auto px-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
             data-testid="project-tab-bar"
           >
             <Tabs
