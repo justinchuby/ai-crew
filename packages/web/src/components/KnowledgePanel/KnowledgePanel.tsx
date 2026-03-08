@@ -75,14 +75,6 @@ const CATEGORY_META: Record<KnowledgeCategory, { icon: typeof Brain; label: stri
   semantic: { icon: Database, label: 'Semantic', color: 'text-purple-500', description: 'Facts, relationships, context' },
 };
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return iso;
-  }
-}
-
 function formatRelativeTime(iso: string): string {
   try {
     const diff = Date.now() - new Date(iso).getTime();
@@ -198,11 +190,11 @@ function EntryCard({
             </div>
             <div>
               <span className="text-th-text-muted">Created</span>
-              <div className="text-th-text-alt">{formatDate(entry.createdAt)}</div>
+              <div className="text-th-text-alt">{formatRelativeTime(entry.createdAt)}</div>
             </div>
             <div>
               <span className="text-th-text-muted">Updated</span>
-              <div className="text-th-text-alt">{formatDate(entry.updatedAt)}</div>
+              <div className="text-th-text-alt">{formatRelativeTime(entry.updatedAt)}</div>
             </div>
           </div>
 

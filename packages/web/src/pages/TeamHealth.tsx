@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
 import { AgentLifecycle } from '../components/AgentLifecycle';
+import { EmptyState } from '../components/ui/EmptyState';
+import { formatAgentId } from '../utils/format';
 import {
   Activity,
   AlertTriangle,
@@ -117,22 +119,25 @@ export function TeamHealth({ teamId = 'default' }: Props) {
   }
 
   if (error) {
-    // Friendly empty state for team-not-found
+    // Friendly empty state for team-not-found or no data
     if (error.includes('404') || error.includes('not found') || error.toLowerCase().includes('no team')) {
       return (
-        <div className="p-6 text-center" data-testid="team-health-empty">
-          <Users className="w-10 h-10 mx-auto mb-3 text-th-text-muted/40" />
-          <h2 className="text-th-text font-medium mb-1">No team found</h2>
-          <p className="text-sm text-th-text-muted">Team &quot;{teamId}&quot; doesn&apos;t exist yet. Create a team to see health data.</p>
+        <div className="p-6" data-testid="team-health-empty">
+          <EmptyState
+            icon={<Users className="w-10 h-10 text-th-text-muted/40" />}
+            title="No team found"
+            description={`Team "${teamId}" doesn't exist yet. Create a team to see health data.`}
+          />
         </div>
       );
     }
     return (
       <div className="p-6" data-testid="team-health-error">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
-          <AlertTriangle className="w-4 h-4 inline mr-2" />
-          {error}
-        </div>
+        <EmptyState
+          icon={<AlertTriangle className="w-10 h-10 text-red-400" />}
+          title="Unable to load health data"
+          description={error}
+        />
       </div>
     );
   }
@@ -221,7 +226,7 @@ export function TeamHealth({ teamId = 'default' }: Props) {
             {agents.map((agent) => (
               <tr key={agent.agentId} className="hover:bg-th-bg-alt/50">
                 <td className="px-3 py-2 text-th-text font-mono text-xs">
-                  {agent.agentId.slice(0, 8)}
+                  {formatAgentId(agent.role, agent.agentId)}
                   {agent.clonedFromId && (
                     <span className="ml-1 text-th-text-muted" title={`Cloned from ${agent.clonedFromId}`}>
                       🧬
