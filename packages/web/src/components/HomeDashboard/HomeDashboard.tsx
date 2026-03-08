@@ -1,12 +1,14 @@
 /**
- * HomeDashboard — Main landing page for Flightdeck.
+ * HomeDashboard — Command center for Flightdeck.
  *
- * Shows: running projects grid, attention queue (pending decisions),
- * system health overview, and quick stats. Replaces the old HomeRedirect
- * that simply redirected to the active project's session.
+ * Sections (in visual priority order):
+ * 1. User Action Required — decisions needing approval + permission requests
+ * 2. Active Work — what agents are doing right now, grouped by project
+ * 3. Decisions Made — feed of recent agent decisions (informational)
+ * 4. Progress — per-project DAG task summaries
+ * 5. Projects — card grid of all active projects
  *
- * Supports the many-to-many Teams ↔ Projects relationship by design:
- * project cards show team assignments when available.
+ * Supports many-to-many Teams ↔ Projects relationship by design.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,12 +26,18 @@ import {
   Wifi,
   WifiOff,
   ChevronRight,
+  Shield,
+  CheckCircle2,
+  XCircle,
+  Gavel,
+  ListChecks,
+  Loader2,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { EmptyState } from '../ui/EmptyState';
 import { StatusBadge } from '../ui/StatusBadge';
-import type { AgentInfo, Decision } from '../../types';
+import type { AgentInfo, Decision, DagStatus } from '../../types';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -56,16 +64,12 @@ interface EnrichedProject {
   activeLeadId?: string;
 }
 
-/** Attention item — a pending decision or permission request that needs user action */
-interface AttentionItem {
-  id: string;
-  projectId: string | null;
+/** Per-project DAG progress summary */
+interface ProjectProgress {
+  projectId: string;
   projectName: string;
-  agentRole: string;
-  title: string;
-  category: string;
-  timestamp: string;
-  type: 'decision' | 'permission';
+  leadId: string;
+  summary: DagStatus['summary'];
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -86,15 +90,16 @@ function formatRelativeTime(iso: string): string {
 }
 
 function getProjectStatusVariant(
-  project: EnrichedProject,
+  agentCount: number,
+  status: string,
 ): { variant: 'success' | 'warning' | 'neutral'; label: string; pulse: boolean } {
-  if (project.activeAgentCount > 0) {
-    return { variant: 'success', label: `${project.activeAgentCount} agent${project.activeAgentCount > 1 ? 's' : ''} running`, pulse: true };
+  if (agentCount > 0) {
+    return { variant: 'success', label: `${agentCount} agent${agentCount > 1 ? 's' : ''} running`, pulse: true };
   }
-  if (project.status === 'active') {
+  if (status === 'active') {
     return { variant: 'warning', label: 'Idle', pulse: false };
   }
-  return { variant: 'neutral', label: project.status, pulse: false };
+  return { variant: 'neutral', label: status, pulse: false };
 }
 
 function resolveProjectName(
@@ -109,6 +114,15 @@ function resolveProjectName(
   if (lead?.projectName) return lead.projectName;
   return projectId.slice(0, 12);
 }
+
+const DECISION_CATEGORY_ICONS: Record<string, string> = {
+  architecture: '🏗️',
+  dependency: '📦',
+  style: '🎨',
+  tool_access: '🔧',
+  testing: '🧪',
+  general: '💡',
+};
 
 // ── Sub-Components ──────────────────────────────────────────────────
 
@@ -136,6 +150,114 @@ function StatCard({
   );
 }
 
+function ActionRequiredItem({
+  icon,
+  title,
+  subtitle,
+  timestamp,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  timestamp: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-th-bg-alt/30 transition-colors group"
+      data-testid="action-required-item"
+    >
+      <span className="shrink-0 text-amber-400">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-medium text-th-text-alt truncate block">{title}</span>
+        <span className="text-[10px] text-th-text-muted">{subtitle}</span>
+      </div>
+      <span className="text-[10px] text-th-text-muted shrink-0">{formatRelativeTime(timestamp)}</span>
+      <ChevronRight className="w-3.5 h-3.5 text-th-text-muted/50 shrink-0 group-hover:text-th-text-muted" />
+    </button>
+  );
+}
+
+function DecisionFeedItem({ decision, projectName }: { decision: Decision; projectName: string }) {
+  const icon = DECISION_CATEGORY_ICONS[decision.category] ?? '💡';
+  const statusIcon = decision.status === 'confirmed'
+    ? <CheckCircle2 className="w-3 h-3 text-green-400" />
+    : decision.status === 'rejected'
+      ? <XCircle className="w-3 h-3 text-red-400" />
+      : <Clock className="w-3 h-3 text-th-text-muted" />;
+
+  return (
+    <div className="flex items-start gap-2.5 px-3 py-2" data-testid="decision-feed-item">
+      <span className="text-sm shrink-0 mt-0.5">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          {statusIcon}
+          <span className="text-xs text-th-text-alt truncate">{decision.title}</span>
+        </div>
+        <div className="text-[10px] text-th-text-muted mt-0.5">
+          {decision.agentRole} · {projectName} · {formatRelativeTime(decision.timestamp)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActiveAgentRow({ agent, projectName }: { agent: AgentInfo; projectName: string }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2" data-testid="active-agent-row">
+      <span className="relative flex shrink-0">
+        <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping bg-green-400" />
+        <span className="relative inline-flex rounded-full w-2 h-2 bg-green-400" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-th-text-alt">{agent.role?.name ?? agent.role?.id ?? 'Agent'}</span>
+          <span className="text-[10px] text-th-text-muted">{projectName}</span>
+        </div>
+        {agent.task && (
+          <p className="text-[10px] text-th-text-muted truncate mt-0.5">{agent.task}</p>
+        )}
+      </div>
+      <StatusBadge
+        variant={agent.status === 'running' ? 'success' : agent.status === 'creating' ? 'warning' : 'info'}
+        label={agent.status}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+function ProgressBar({ summary }: { summary: DagStatus['summary'] }) {
+  const total = summary.done + summary.running + summary.ready + summary.pending + summary.failed + summary.blocked + summary.paused + summary.skipped;
+  if (total === 0) return null;
+  const pct = Math.round((summary.done / total) * 100);
+
+  return (
+    <div className="space-y-1.5" data-testid="progress-bar">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-th-text-muted">
+          {summary.done}/{total} tasks · {summary.running} running
+        </span>
+        <span className="font-medium text-th-text-alt">{pct}%</span>
+      </div>
+      <div className="h-1.5 bg-th-bg-muted rounded-full overflow-hidden flex">
+        {summary.done > 0 && (
+          <div className="bg-green-400 transition-all" style={{ width: `${(summary.done / total) * 100}%` }} />
+        )}
+        {summary.running > 0 && (
+          <div className="bg-blue-400 transition-all" style={{ width: `${(summary.running / total) * 100}%` }} />
+        )}
+        {summary.failed > 0 && (
+          <div className="bg-red-400 transition-all" style={{ width: `${(summary.failed / total) * 100}%` }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProjectCard({
   project,
   agentCount,
@@ -145,7 +267,7 @@ function ProjectCard({
   agentCount: number;
   onClick: () => void;
 }) {
-  const status = getProjectStatusVariant({ ...project, activeAgentCount: agentCount });
+  const status = getProjectStatusVariant(agentCount, project.status);
   const activeSessions = project.sessions?.filter(s => s.status === 'active') ?? [];
 
   return (
@@ -160,12 +282,7 @@ function ProjectCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-th-text-alt">{project.name}</span>
-            <StatusBadge
-              variant={status.variant}
-              label={status.label}
-              dot
-              pulse={status.pulse}
-            />
+            <StatusBadge variant={status.variant} label={status.label} dot pulse={status.pulse} />
           </div>
           {project.description && (
             <p className="text-xs text-th-text-muted line-clamp-2 mt-1">{project.description}</p>
@@ -195,41 +312,6 @@ function ProjectCard({
   );
 }
 
-function AttentionQueueItem({
-  item,
-  onClick,
-}: {
-  item: AttentionItem;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-th-bg-alt/30 transition-colors group"
-      data-testid="attention-item"
-    >
-      <span className="relative flex shrink-0">
-        <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping bg-amber-400" />
-        <span className="relative inline-flex rounded-full w-2 h-2 bg-amber-400" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-th-text-alt truncate">{item.title}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] text-th-text-muted mt-0.5">
-          <span>{item.projectName}</span>
-          <span>·</span>
-          <span>{item.agentRole}</span>
-          <span>·</span>
-          <span>{formatRelativeTime(item.timestamp)}</span>
-        </div>
-      </div>
-      <ChevronRight className="w-3.5 h-3.5 text-th-text-muted/50 shrink-0 group-hover:text-th-text-muted" />
-    </button>
-  );
-}
-
 // ── Main Component ──────────────────────────────────────────────────
 
 export function HomeDashboard() {
@@ -239,27 +321,63 @@ export function HomeDashboard() {
   const pendingDecisions = useAppStore((s) => s.pendingDecisions);
 
   const [projects, setProjects] = useState<EnrichedProject[]>([]);
+  const [allDecisions, setAllDecisions] = useState<Decision[]>([]);
+  const [progressByProject, setProgressByProject] = useState<ProjectProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchProjects = useCallback(async () => {
+  // Fetch projects + decisions + progress
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiFetch<EnrichedProject[]>('/projects');
-      if (Array.isArray(data)) {
-        setProjects(data.filter(p => p.status !== 'archived'));
+      const [projectsData, decisionsData] = await Promise.all([
+        apiFetch<EnrichedProject[]>('/projects').catch(() => []),
+        apiFetch<Decision[]>('/decisions').catch(() => []),
+      ]);
+
+      const activeProjects = Array.isArray(projectsData)
+        ? projectsData.filter(p => p.status !== 'archived')
+        : [];
+      setProjects(activeProjects);
+      setAllDecisions(Array.isArray(decisionsData) ? decisionsData : []);
+
+      // Fetch DAG progress for projects with active leads
+      const progressResults: ProjectProgress[] = [];
+      for (const proj of activeProjects) {
+        const leadId = proj.activeLeadId || proj.sessions?.find(s => s.status === 'active')?.leadId;
+        if (leadId) {
+          try {
+            const dag = await apiFetch<DagStatus>(`/lead/${leadId}/dag`);
+            if (dag?.summary) {
+              const total = Object.values(dag.summary).reduce((a, b) => a + b, 0);
+              if (total > 0) {
+                progressResults.push({
+                  projectId: proj.id,
+                  projectName: proj.name,
+                  leadId,
+                  summary: dag.summary,
+                });
+              }
+            }
+          } catch {
+            // Non-critical — skip this project's progress
+          }
+        }
       }
+      setProgressByProject(progressResults);
     } catch {
-      // Silently fail — empty state is shown
+      // Silently fail — empty state shown
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchData();
+  }, [fetchData]);
 
-  // Count agents per project from live WebSocket data
+  // ── Derived data ─────────────────────────────────────────────
+
+  // Live agent counts from WebSocket
   const agentCountByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const agent of agents) {
@@ -270,53 +388,63 @@ export function HomeDashboard() {
     return counts;
   }, [agents]);
 
-  // Build attention queue from pending decisions
-  const attentionItems: AttentionItem[] = useMemo(() => {
+  // Active (non-terminal) agents for the "Active Work" section
+  const activeAgents = useMemo(() => {
+    return agents.filter(a =>
+      a.status === 'running' || a.status === 'creating' || a.status === 'idle',
+    );
+  }, [agents]);
+
+  // Decisions needing user approval
+  const decisionsNeedingApproval = useMemo(() => {
     return pendingDecisions
       .filter((d: Decision) => d.needsConfirmation && d.status === 'recorded')
-      .map((d: Decision) => ({
-        id: d.id,
-        projectId: d.projectId,
-        projectName: resolveProjectName(d.projectId, projects, agents),
-        agentRole: d.agentRole,
-        title: d.title,
-        category: d.category,
-        timestamp: d.timestamp,
-        type: 'decision' as const,
-      }))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [pendingDecisions, projects, agents]);
+  }, [pendingDecisions]);
 
-  // Sort projects: active with agents first, then active idle, then by updatedAt
+  // Permission requests from agents
+  const permissionRequests = useMemo(() => {
+    return agents.filter(a => a.pendingPermission);
+  }, [agents]);
+
+  // Total action-required count
+  const actionRequiredCount = decisionsNeedingApproval.length + permissionRequests.length;
+
+  // Recent decisions (informational feed — all statuses, last 10)
+  const recentDecisions = useMemo(() => {
+    return [...allDecisions]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 10);
+  }, [allDecisions]);
+
+  // Sort projects: active agents first, then by updatedAt
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => {
       const aAgents = agentCountByProject.get(a.id) ?? a.activeAgentCount;
       const bAgents = agentCountByProject.get(b.id) ?? b.activeAgentCount;
-      // Active with agents first
       if (aAgents > 0 && bAgents === 0) return -1;
       if (bAgents > 0 && aAgents === 0) return 1;
-      // Then by most recently updated
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
   }, [projects, agentCountByProject]);
 
-  // Derived stats
   const totalRunningAgents = useMemo(() => {
     return agents.filter(a => a.status !== 'completed' && a.status !== 'failed' && a.status !== 'terminated').length;
   }, [agents]);
 
+  // ── Navigation ───────────────────────────────────────────────
+
   const handleNavigateToProject = useCallback(
-    (projectId: string) => {
-      navigate(`/projects/${projectId}/session`);
-    },
+    (projectId: string) => navigate(`/projects/${projectId}/session`),
     [navigate],
   );
 
-  const handleNavigateToProjects = useCallback(() => {
-    navigate('/projects');
-  }, [navigate]);
+  const handleNavigateToProjects = useCallback(
+    () => navigate('/projects'),
+    [navigate],
+  );
 
-  // ── Loading state ────────────────────────────────────────────
+  // ── Loading ──────────────────────────────────────────────────
   if (loading && projects.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="home-loading">
@@ -325,7 +453,7 @@ export function HomeDashboard() {
     );
   }
 
-  // ── Empty state (no projects) ────────────────────────────────
+  // ── Empty state ──────────────────────────────────────────────
   if (!loading && projects.length === 0) {
     return (
       <div className="flex-1 overflow-auto p-6" data-testid="home-empty">
@@ -333,10 +461,7 @@ export function HomeDashboard() {
           icon={<LayoutDashboard className="w-12 h-12" />}
           title="Welcome to Flightdeck"
           description="Create your first project to start delegating work to AI agents. Each project gets its own team, knowledge base, and task board."
-          action={{
-            label: 'View Projects',
-            onClick: handleNavigateToProjects,
-          }}
+          action={{ label: 'View Projects', onClick: handleNavigateToProjects }}
         />
       </div>
     );
@@ -361,56 +486,129 @@ export function HomeDashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6" data-testid="home-stats">
-        <StatCard
-          icon={<FolderOpen className="w-4 h-4" />}
-          label="Active Projects"
-          value={projects.length}
-        />
-        <StatCard
-          icon={<Users className="w-4 h-4" />}
-          label="Running Agents"
-          value={totalRunningAgents}
-          accent
-        />
-        <StatCard
-          icon={<Bell className="w-4 h-4" />}
-          label="Needs Attention"
-          value={attentionItems.length}
-          accent={attentionItems.length > 0}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6" data-testid="home-stats">
+        <StatCard icon={<FolderOpen className="w-4 h-4" />} label="Active Projects" value={projects.length} />
+        <StatCard icon={<Users className="w-4 h-4" />} label="Running Agents" value={totalRunningAgents} accent />
+        <StatCard icon={<Bell className="w-4 h-4" />} label="Action Required" value={actionRequiredCount} accent={actionRequiredCount > 0} />
+        <StatCard icon={<Gavel className="w-4 h-4" />} label="Decisions" value={allDecisions.length} />
       </div>
 
-      {/* Attention Queue */}
-      {attentionItems.length > 0 && (
-        <div className="mb-6" data-testid="attention-queue">
+      {/* ── Section 1: User Action Required ──────────────────── */}
+      {actionRequiredCount > 0 && (
+        <div className="mb-6" data-testid="action-required-section">
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-medium text-th-text-alt">Needs Your Attention</h2>
+            <h2 className="text-sm font-medium text-th-text-alt">User Action Required</h2>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-medium">
-              {attentionItems.length}
+              {actionRequiredCount}
             </span>
           </div>
-          <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border">
-            {attentionItems.slice(0, 5).map((item) => (
-              <AttentionQueueItem
-                key={item.id}
-                item={item}
-                onClick={() => {
-                  if (item.projectId) handleNavigateToProject(item.projectId);
-                }}
+          <div className="bg-surface-raised border border-amber-400/20 rounded-lg divide-y divide-th-border">
+            {/* Permission requests first (most urgent) */}
+            {permissionRequests.map((agent) => (
+              <ActionRequiredItem
+                key={`perm-${agent.id}`}
+                icon={<Shield className="w-4 h-4" />}
+                title={`${agent.role?.name ?? 'Agent'} requests permission: ${agent.pendingPermission?.toolName ?? 'tool access'}`}
+                subtitle={`${resolveProjectName(agent.projectId, projects, agents)} · Permission request`}
+                timestamp={agent.pendingPermission?.timestamp ?? agent.createdAt}
+                onClick={() => { if (agent.projectId) handleNavigateToProject(agent.projectId); }}
               />
             ))}
-            {attentionItems.length > 5 && (
+            {/* Decisions needing approval */}
+            {decisionsNeedingApproval.slice(0, 5).map((d) => (
+              <ActionRequiredItem
+                key={`dec-${d.id}`}
+                icon={<Gavel className="w-4 h-4" />}
+                title={d.title}
+                subtitle={`${resolveProjectName(d.projectId, projects, agents)} · ${d.agentRole} · ${d.category}`}
+                timestamp={d.timestamp}
+                onClick={() => { if (d.projectId) handleNavigateToProject(d.projectId); }}
+              />
+            ))}
+            {decisionsNeedingApproval.length > 5 && (
               <div className="px-3 py-2 text-[11px] text-th-text-muted text-center">
-                +{attentionItems.length - 5} more item{attentionItems.length - 5 > 1 ? 's' : ''}
+                +{decisionsNeedingApproval.length - 5} more
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Projects Grid */}
+      {/* ── Section 2: Active Work ───────────────────────────── */}
+      {activeAgents.length > 0 && (
+        <div className="mb-6" data-testid="active-work-section">
+          <div className="flex items-center gap-2 mb-3">
+            <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
+            <h2 className="text-sm font-medium text-th-text-alt">Active Work</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-400/10 text-green-400 font-medium">
+              {activeAgents.length} agent{activeAgents.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border">
+            {activeAgents.slice(0, 8).map((agent) => (
+              <ActiveAgentRow
+                key={agent.id}
+                agent={agent}
+                projectName={resolveProjectName(agent.projectId, projects, agents)}
+              />
+            ))}
+            {activeAgents.length > 8 && (
+              <div className="px-3 py-2 text-[11px] text-th-text-muted text-center">
+                +{activeAgents.length - 8} more agent{activeAgents.length - 8 > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Two-column: Decisions + Progress ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Section 3: Decisions Made */}
+        {recentDecisions.length > 0 && (
+          <div data-testid="decisions-feed-section">
+            <div className="flex items-center gap-2 mb-3">
+              <Gavel className="w-4 h-4 text-th-text-muted" />
+              <h2 className="text-sm font-medium text-th-text-alt">Recent Decisions</h2>
+            </div>
+            <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border max-h-64 overflow-y-auto">
+              {recentDecisions.map((d) => (
+                <DecisionFeedItem
+                  key={d.id}
+                  decision={d}
+                  projectName={resolveProjectName(d.projectId, projects, agents)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 4: Progress */}
+        {progressByProject.length > 0 && (
+          <div data-testid="progress-section">
+            <div className="flex items-center gap-2 mb-3">
+              <ListChecks className="w-4 h-4 text-th-text-muted" />
+              <h2 className="text-sm font-medium text-th-text-alt">Progress</h2>
+            </div>
+            <div className="space-y-3">
+              {progressByProject.map((p) => (
+                <button
+                  key={p.projectId}
+                  type="button"
+                  onClick={() => handleNavigateToProject(p.projectId)}
+                  className="w-full text-left bg-surface-raised border border-th-border rounded-lg p-3 hover:border-th-border-hover transition-colors"
+                  data-testid="progress-card"
+                >
+                  <div className="text-xs font-medium text-th-text-alt mb-2">{p.projectName}</div>
+                  <ProgressBar summary={p.summary} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 5: Projects Grid ─────────────────────────── */}
       <div data-testid="home-projects">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -426,7 +624,6 @@ export function HomeDashboard() {
             Manage Projects
           </button>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {sortedProjects.map((project) => (
             <ProjectCard

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, within, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // Mock apiFetch
@@ -46,6 +46,7 @@ const sampleProjects = [
     updatedAt: '2026-03-08T04:00:00Z',
     activeAgentCount: 3,
     storageMode: 'user' as const,
+    activeLeadId: 'lead-1',
     sessions: [
       { id: 1, projectId: 'proj-1', leadId: 'lead-1', status: 'active', startedAt: '2026-03-08T03:00:00Z', endedAt: null, task: 'Build feature' },
     ],
@@ -65,9 +66,9 @@ const sampleProjects = [
 ];
 
 const sampleAgents = [
-  { id: 'agent-1', role: { id: 'lead' }, status: 'running', projectId: 'proj-1', projectName: 'Alpha Project' },
-  { id: 'agent-2', role: { id: 'developer' }, status: 'running', projectId: 'proj-1' },
-  { id: 'agent-3', role: { id: 'developer' }, status: 'running', projectId: 'proj-1' },
+  { id: 'agent-1', role: { id: 'lead', name: 'Project Lead' }, status: 'running', projectId: 'proj-1', projectName: 'Alpha Project', task: 'Coordinate team' },
+  { id: 'agent-2', role: { id: 'developer', name: 'Developer' }, status: 'running', projectId: 'proj-1', task: 'Implement auth module' },
+  { id: 'agent-3', role: { id: 'developer', name: 'Developer' }, status: 'running', projectId: 'proj-1', task: 'Write tests' },
 ];
 
 const sampleDecisions = [
@@ -88,10 +89,62 @@ const sampleDecisions = [
   },
 ];
 
+const sampleAllDecisions = [
+  ...sampleDecisions,
+  {
+    id: 'dec-2',
+    agentId: 'agent-1',
+    agentRole: 'Project Lead',
+    leadId: null,
+    projectId: 'proj-1',
+    title: 'Use TypeScript strict mode',
+    rationale: 'Better type safety',
+    needsConfirmation: false,
+    status: 'confirmed',
+    autoApproved: true,
+    confirmedAt: '2026-03-08T04:30:00Z',
+    timestamp: '2026-03-08T04:30:00Z',
+    category: 'architecture',
+  },
+  {
+    id: 'dec-3',
+    agentId: 'agent-3',
+    agentRole: 'Developer',
+    leadId: 'agent-1',
+    projectId: 'proj-1',
+    title: 'Use vitest for testing',
+    rationale: 'Faster than jest',
+    needsConfirmation: false,
+    status: 'confirmed',
+    autoApproved: true,
+    confirmedAt: '2026-03-08T04:00:00Z',
+    timestamp: '2026-03-08T04:00:00Z',
+    category: 'testing',
+  },
+];
+
+const sampleDagStatus = {
+  tasks: [],
+  fileLockMap: {},
+  summary: { pending: 2, ready: 1, running: 3, done: 5, failed: 0, blocked: 0, paused: 0, skipped: 1 },
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function renderWithRouter(component: React.ReactElement) {
   return render(<MemoryRouter>{component}</MemoryRouter>);
+}
+
+function setupDefaultMocks() {
+  mockApiFetch.mockImplementation((path: string) => {
+    if (path === '/projects') return Promise.resolve(sampleProjects);
+    if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+    if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
+    return Promise.resolve([]);
+  });
+  mockAppState.agents = sampleAgents as any;
+  mockAppState.connected = true;
+  mockAppState.pendingDecisions = sampleDecisions as any;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -134,10 +187,7 @@ describe('HomeDashboard', () => {
   });
 
   describe('dashboard with projects', () => {
-    beforeEach(() => {
-      mockApiFetch.mockResolvedValue(sampleProjects);
-      mockAppState.agents = sampleAgents as any;
-    });
+    beforeEach(setupDefaultMocks);
 
     it('renders the dashboard with header', async () => {
       renderWithRouter(<HomeDashboard />);
@@ -147,29 +197,14 @@ describe('HomeDashboard', () => {
       });
     });
 
-    it('shows quick stats cards', async () => {
+    it('shows 4 quick stats cards', async () => {
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
         expect(screen.getByTestId('home-stats')).toBeTruthy();
         expect(screen.getByText('Active Projects')).toBeTruthy();
         expect(screen.getByText('Running Agents')).toBeTruthy();
-        expect(screen.getByText('Needs Attention')).toBeTruthy();
-      });
-    });
-
-    it('displays correct project count in stats', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        const statsEl = screen.getByTestId('home-stats');
-        expect(statsEl.textContent).toContain('2'); // 2 active projects
-      });
-    });
-
-    it('displays correct running agent count from live WebSocket data', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        const statsEl = screen.getByTestId('home-stats');
-        expect(statsEl.textContent).toContain('3'); // 3 running agents
+        expect(screen.getByText('Action Required')).toBeTruthy();
+        expect(screen.getByText('Decisions')).toBeTruthy();
       });
     });
 
@@ -178,26 +213,19 @@ describe('HomeDashboard', () => {
       await waitFor(() => {
         const cards = screen.getAllByTestId('project-card');
         expect(cards).toHaveLength(2);
-        expect(screen.getByText('Alpha Project')).toBeTruthy();
-        expect(screen.getByText('Beta Project')).toBeTruthy();
-      });
-    });
-
-    it('shows project descriptions', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('Frontend redesign')).toBeTruthy();
-        expect(screen.getByText('API migration')).toBeTruthy();
+        expect(cards[0].textContent).toContain('Alpha Project');
+        expect(cards[1].textContent).toContain('Beta Project');
       });
     });
 
     it('navigates to project session on card click', async () => {
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
-        expect(screen.getByText('Alpha Project')).toBeTruthy();
+        const cards = screen.getAllByTestId('project-card');
+        expect(cards.length).toBeGreaterThan(0);
       });
-
-      fireEvent.click(screen.getByText('Alpha Project'));
+      const card = screen.getAllByTestId('project-card')[0];
+      fireEvent.click(card);
       expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
     });
 
@@ -205,18 +233,20 @@ describe('HomeDashboard', () => {
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
         const cards = screen.getAllByTestId('project-card');
-        // Alpha Project (3 agents) should be first
         expect(cards[0].textContent).toContain('Alpha Project');
-        // Beta Project (0 agents) should be second
         expect(cards[1].textContent).toContain('Beta Project');
       });
     });
 
     it('filters out archived projects', async () => {
-      mockApiFetch.mockResolvedValue([
-        ...sampleProjects,
-        { ...sampleProjects[1], id: 'proj-archived', name: 'Archived One', status: 'archived' },
-      ]);
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve([
+          ...sampleProjects,
+          { ...sampleProjects[1], id: 'proj-archived', name: 'Archived One', status: 'archived' },
+        ]);
+        if (path === '/decisions') return Promise.resolve([]);
+        return Promise.resolve([]);
+      });
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
         expect(screen.queryByText('Archived One')).toBeNull();
@@ -224,9 +254,166 @@ describe('HomeDashboard', () => {
     });
   });
 
+  describe('user action required section', () => {
+    beforeEach(setupDefaultMocks);
+
+    it('shows action required section when there are pending decisions', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('action-required-section')).toBeTruthy();
+        expect(screen.getByText('User Action Required')).toBeTruthy();
+      });
+    });
+
+    it('displays pending decision titles', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const section = screen.getByTestId('action-required-section');
+        expect(within(section).getByText('Add lodash dependency')).toBeTruthy();
+      });
+    });
+
+    it('shows permission requests when agents have pendingPermission', async () => {
+      mockAppState.agents = [
+        ...sampleAgents,
+        {
+          id: 'agent-perm',
+          role: { id: 'developer', name: 'Developer' },
+          status: 'running',
+          projectId: 'proj-1',
+          createdAt: '2026-03-08T05:00:00Z',
+          pendingPermission: {
+            id: 'perm-1',
+            agentId: 'agent-perm',
+            toolName: 'write_file',
+            arguments: { path: '/etc/config' },
+            timestamp: '2026-03-08T05:30:00Z',
+          },
+        },
+      ] as any;
+
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const items = screen.getAllByTestId('action-required-item');
+        // Permission request should be first (most urgent)
+        expect(items[0].textContent).toContain('write_file');
+      });
+    });
+
+    it('navigates to project on action item click', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('action-required-section')).toBeTruthy();
+      });
+      const section = screen.getByTestId('action-required-section');
+      const item = within(section).getByText('Add lodash dependency');
+      fireEvent.click(item);
+      expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
+    });
+
+    it('hides action section when no pending items', async () => {
+      mockAppState.pendingDecisions = [];
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('home-dashboard')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('action-required-section')).toBeNull();
+    });
+  });
+
+  describe('active work section', () => {
+    beforeEach(setupDefaultMocks);
+
+    it('shows active agents with their tasks', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('active-work-section')).toBeTruthy();
+        expect(screen.getByText('Active Work')).toBeTruthy();
+      });
+    });
+
+    it('displays agent roles and tasks', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const rows = screen.getAllByTestId('active-agent-row');
+        expect(rows.length).toBe(3);
+        expect(screen.getByText('Implement auth module')).toBeTruthy();
+        expect(screen.getByText('Write tests')).toBeTruthy();
+      });
+    });
+
+    it('hides when no active agents', async () => {
+      mockAppState.agents = [];
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('home-dashboard')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('active-work-section')).toBeNull();
+    });
+  });
+
+  describe('decisions feed section', () => {
+    beforeEach(setupDefaultMocks);
+
+    it('shows recent decisions feed', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('decisions-feed-section')).toBeTruthy();
+        expect(screen.getByText('Recent Decisions')).toBeTruthy();
+      });
+    });
+
+    it('displays decision titles with status icons', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const items = screen.getAllByTestId('decision-feed-item');
+        expect(items.length).toBe(3); // 3 sample decisions
+        expect(screen.getByText('Use TypeScript strict mode')).toBeTruthy();
+        expect(screen.getByText('Use vitest for testing')).toBeTruthy();
+      });
+    });
+  });
+
+  describe('progress section', () => {
+    beforeEach(setupDefaultMocks);
+
+    it('shows progress bars for projects with DAG tasks', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('progress-section')).toBeTruthy();
+        expect(screen.getByText('Progress')).toBeTruthy();
+      });
+    });
+
+    it('displays task counts in progress bar', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const bars = screen.getAllByTestId('progress-bar');
+        expect(bars.length).toBeGreaterThan(0);
+        // 5 done out of 12 total = 42%
+        expect(bars[0].textContent).toContain('5/12');
+        expect(bars[0].textContent).toContain('42%');
+      });
+    });
+
+    it('navigates to project on progress card click', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const cards = screen.getAllByTestId('progress-card');
+        expect(cards.length).toBeGreaterThan(0);
+      });
+      const card = screen.getAllByTestId('progress-card')[0];
+      fireEvent.click(card);
+      expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
+    });
+  });
+
   describe('connection status', () => {
     beforeEach(() => {
-      mockApiFetch.mockResolvedValue(sampleProjects);
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        return Promise.resolve([]);
+      });
     });
 
     it('shows Connected badge when connected', async () => {
@@ -246,76 +433,14 @@ describe('HomeDashboard', () => {
     });
   });
 
-  describe('attention queue', () => {
-    beforeEach(() => {
-      mockApiFetch.mockResolvedValue(sampleProjects);
-      mockAppState.agents = sampleAgents as any;
-      mockAppState.pendingDecisions = sampleDecisions as any;
-    });
-
-    it('shows attention queue when there are pending decisions', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByTestId('attention-queue')).toBeTruthy();
-        expect(screen.getByText('Needs Your Attention')).toBeTruthy();
-      });
-    });
-
-    it('displays decision title and agent role', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('Add lodash dependency')).toBeTruthy();
-        expect(screen.getByText(/Developer/)).toBeTruthy();
-      });
-    });
-
-    it('shows project name in attention items', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        const items = screen.getAllByTestId('attention-item');
-        expect(items[0].textContent).toContain('Alpha Project');
-      });
-    });
-
-    it('navigates to project on attention item click', async () => {
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('Add lodash dependency')).toBeTruthy();
-      });
-
-      fireEvent.click(screen.getByText('Add lodash dependency'));
-      expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
-    });
-
-    it('hides attention queue when no pending decisions', async () => {
-      mockAppState.pendingDecisions = [];
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByTestId('home-dashboard')).toBeTruthy();
-      });
-      expect(screen.queryByTestId('attention-queue')).toBeNull();
-    });
-
-    it('does not show already-confirmed decisions', async () => {
-      mockAppState.pendingDecisions = [
-        { ...sampleDecisions[0], id: 'dec-confirmed', status: 'confirmed' },
-      ] as any;
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByTestId('home-dashboard')).toBeTruthy();
-      });
-      expect(screen.queryByTestId('attention-queue')).toBeNull();
-    });
-  });
-
   describe('navigation', () => {
+    beforeEach(setupDefaultMocks);
+
     it('navigates to projects page via Manage Projects button', async () => {
-      mockApiFetch.mockResolvedValue(sampleProjects);
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
         expect(screen.getByText('Manage Projects')).toBeTruthy();
       });
-
       fireEvent.click(screen.getByText('Manage Projects'));
       expect(mockNavigate).toHaveBeenCalledWith('/projects');
     });
