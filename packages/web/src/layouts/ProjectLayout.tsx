@@ -227,7 +227,7 @@ export function ProjectLayout() {
         }
       }
       localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(stored));
-    } catch {}
+    } catch { /* Gracefully ignore corrupt localStorage */ }
   }, [id, activeTab]);
 
   // Restore last tab on initial navigation to project root
@@ -241,7 +241,7 @@ export function ProjectLayout() {
       if (lastTab && ALL_TAB_IDS.has(lastTab) && lastTab !== 'overview') {
         navigate(`/projects/${id}/${lastTab}`, { replace: true });
       }
-    } catch {}
+    } catch { /* Gracefully ignore corrupt localStorage */ }
   // Only run on project ID change, not on every location change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
