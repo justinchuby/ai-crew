@@ -31,6 +31,9 @@ import { KnowledgeStore } from './knowledge/KnowledgeStore.js';
 import { HybridSearchEngine } from './knowledge/HybridSearchEngine.js';
 import { MemoryCategoryManager } from './knowledge/MemoryCategoryManager.js';
 import { TrainingCapture } from './knowledge/TrainingCapture.js';
+import { KnowledgeInjector } from './knowledge/KnowledgeInjector.js';
+import { SessionKnowledgeExtractor } from './knowledge/SessionKnowledgeExtractor.js';
+import { CollectiveMemory } from './coordination/knowledge/CollectiveMemory.js';
 import { TeamExporter } from './teams/TeamExporter.js';
 import { TeamImporter } from './teams/TeamImporter.js';
 
@@ -41,6 +44,8 @@ import { ForkTransport } from './transport/ForkTransport.js';
 import { AgentServerClient } from './agents/AgentServerClient.js';
 import { AgentServerHealth } from './agents/AgentServerHealth.js';
 import { MassFailureDetector } from './transport/MassFailureDetector.js';
+import { AgentReconciliation } from './agents/AgentReconciliation.js';
+import type { ExpectedAgent } from './agents/AgentReconciliation.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';
@@ -73,6 +78,7 @@ import { SearchEngine } from './coordination/knowledge/SearchEngine.js';
 
 // ── Imports: Tier 4-5 (AgentManager + dependents) ──────────
 import { AgentManager } from './agents/AgentManager.js';
+import { isTerminalStatus } from './agents/Agent.js';
 import { ContextRefresher } from './coordination/agents/ContextRefresher.js';
 import { CapabilityRegistry } from './coordination/agents/CapabilityRegistry.js';
 import { AlertEngine } from './coordination/alerts/AlertEngine.js';
@@ -85,6 +91,7 @@ import { SessionResumeManager } from './agents/SessionResumeManager.js';
 // ── Imports: Tier 6 (HTTP/WS) ──────────────────────────────
 import { WebSocketServer } from './comms/WebSocketServer.js';
 import { Scheduler } from './utils/Scheduler.js';
+import { logger } from './utils/logger.js';
 import { runWithAgentContext } from './middleware/requestContext.js';
 
 // ── Types ──────────────────────────────────────────────────
@@ -175,6 +182,9 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const memoryCategoryManager = new MemoryCategoryManager(knowledgeStore);
   const hybridSearchEngine = new HybridSearchEngine(knowledgeStore);
   const trainingCapture = new TrainingCapture(knowledgeStore);
+  const knowledgeInjector = new KnowledgeInjector(memoryCategoryManager, hybridSearchEngine);
+  const sessionKnowledgeExtractor = new SessionKnowledgeExtractor(knowledgeStore);
+  const collectiveMemory = new CollectiveMemory(db);
 
   // ── Agent Server Transport & Client ─────────────────────
   // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
@@ -288,10 +298,11 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       db, deferredIssueRegistry, timerRegistry, capabilityInjector,
       taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker,
       governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository,
-      agentServerClient,
+      agentServerClient, knowledgeInjector,
     },
   );
   agentManager.setProjectRegistry(projectRegistry);
+  agentManager.setSessionKnowledgeExtractor(sessionKnowledgeExtractor);
   onShutdown('agentManager', () => agentManager.shutdownAll());
 
   // SessionResumeManager: persists agent roster on lifecycle events, handles resume on startup
@@ -346,6 +357,11 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       messageQueueStore.expireStale(3); // Expire queued messages older than 3 days
     },
   });
+  scheduler.register({
+    id: 'collective-memory-prune',
+    interval: 86_400_000, // 24 hours
+    run: () => { collectiveMemory.prune(90); }, // Remove memories unused for 90 days
+  });
   onShutdown('scheduler', () => scheduler.stop());
 
   onShutdown('escalationManager', () => escalationManager.stop());
@@ -393,6 +409,8 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     hybridSearchEngine,
     memoryCategoryManager,
     trainingCapture,
+    sessionKnowledgeExtractor,
+    collectiveMemory,
     agentServerClient,
     agentServerHealth,
     massFailureDetector,
@@ -468,7 +486,7 @@ function wireEvents(c: ServiceContainer): void {
   const {
     eventPipeline, activityLedger, lockRegistry, decisionLog,
     alertEngine, eagerScheduler, agentManager, webhookManager,
-    capabilityRegistry, decisionRecordStore,
+    capabilityRegistry, decisionRecordStore, agentServerClient,
   } = c;
   const { taskDAG, timerRegistry, configStore } = c.internal;
 
@@ -550,10 +568,72 @@ function wireEvents(c: ServiceContainer): void {
   // Start the watcher (safe to call here — watcher uses polling + fs.watch)
   configStore.start();
 
+  // ── Agent reconciliation on reconnect ─────────────────
+  if (agentServerClient) {
+    wireReconciliationOnReconnect(agentServerClient, agentManager, c.internal.wsServer);
+  }
+
   // Alert engine → WS broadcast is wired in wireHttpLayer() after HTTP server creation
 }
 
 // ── Test Helper ────────────────────────────────────────────
+
+// ── Reconciliation Wiring ──────────────────────────────────
+
+/**
+ * Wire AgentReconciliation to auto-run when the agent server client reconnects.
+ * Skips the initial connect (no agents to reconcile) and only runs on
+ * subsequent reconnects when there are non-terminal agents to verify.
+ */
+export function wireReconciliationOnReconnect(
+  agentServerClient: AgentServerClient,
+  agentManager: AgentManager,
+  wsServer?: { broadcastEvent: (event: any, projectId?: string) => void } | null,
+): void {
+  const reconciliation = new AgentReconciliation(agentServerClient);
+  let hasConnectedBefore = false;
+
+  agentServerClient.on('connected', () => {
+    if (!hasConnectedBefore) {
+      hasConnectedBefore = true;
+      return; // Skip reconciliation on initial connect
+    }
+
+    const nonTerminalAgents = agentManager.getAll().filter(
+      a => !isTerminalStatus(a.status),
+    );
+    if (nonTerminalAgents.length === 0) return;
+
+    const expectedAgents: ExpectedAgent[] = nonTerminalAgents.map(a => ({
+      agentId: a.id,
+      role: a.role?.id ?? 'unknown',
+      model: a.model ?? 'unknown',
+      lastSeenEventId: agentServerClient.getLastSeenEventId(a.id),
+    }));
+
+    reconciliation.reconcile(expectedAgents)
+      .then(report => {
+        logger.info({
+          module: 'reconciliation',
+          msg: 'Agent reconciliation completed after reconnect',
+          reconnected: report.reconnected.length,
+          lost: report.lost.length,
+          discovered: report.discovered.length,
+        });
+        wsServer?.broadcastEvent({
+          type: 'reconciliation:complete',
+          report,
+        });
+      })
+      .catch(err => {
+        logger.warn({
+          module: 'reconciliation',
+          msg: 'Agent reconciliation failed after reconnect',
+          error: err.message,
+        });
+      });
+  });
+}
 
 /**
  * Creates a container with an in-memory database for testing.
