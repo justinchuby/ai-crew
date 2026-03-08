@@ -98,7 +98,7 @@ export function GroupsPanelContent({
   }, [expandedGroup, effectiveMessages[expandedGroup ?? '']?.length]);
 
   return (
-    <div ref={feedRef} className="h-full overflow-y-auto">
+    <div ref={feedRef} className="h-full min-h-0 overflow-y-auto">
       {isHistorical && (
         <p className="text-[10px] text-th-text-muted text-center py-1 font-mono opacity-60">Historical group chats</p>
       )}

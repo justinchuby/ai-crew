@@ -46,6 +46,7 @@ const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ d
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
+const DesignPanel = lazy(() => import('./components/DesignPanel').then(m => ({ default: m.DesignPanel })));
 const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
@@ -337,6 +338,7 @@ export function App() {
               <Route path="tasks" element={<TaskQueuePanel api={api} />} />
               <Route path="agents" element={<TeamPage />} />
               <Route path="knowledge" element={<KnowledgePanel />} />
+              <Route path="design" element={<DesignPanel />} />
               <Route path="timeline" element={<TimelinePage api={api} ws={ws} />} />
               <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
               <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
@@ -375,7 +377,7 @@ export function App() {
         </div>
 
         {selectedAgentId && (
-          <div className="w-full max-w-[500px] border-l border-th-border flex flex-col">
+          <div className="fixed inset-0 z-30 md:relative md:inset-auto md:z-auto w-full md:max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
             <ChatPanel agentId={selectedAgentId} ws={ws} />
           </div>
         )}

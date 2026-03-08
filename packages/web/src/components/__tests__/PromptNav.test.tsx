@@ -26,7 +26,7 @@ describe('PromptNav', () => {
   it('shows total user prompt count', () => {
     const msgs = makeMessages(10, [0, 3, 7]);
     render(<PromptNav containerRef={containerRef} messages={msgs} />);
-    expect(screen.getByText('—/3')).toBeTruthy();
+    expect(screen.getByText('·/3')).toBeTruthy();
   });
 
   it('wraps UP from first message to last', () => {
@@ -102,6 +102,6 @@ describe('PromptNav', () => {
       { sender: 'agent', text: '@user here is the answer', timestamp: Date.now() },
     ];
     render(<PromptNav containerRef={containerRef} messages={msgs} />);
-    expect(screen.getByText('—/2')).toBeTruthy(); // user msg + @user mention
+    expect(screen.getByText('·/2')).toBeTruthy(); // user msg + @user mention
   });
 });

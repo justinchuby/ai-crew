@@ -105,10 +105,12 @@ export function ContextualCoach({ onNavigate }: Props) {
     if (activeTip.cta.action.startsWith('/') && onNavigate) {
       onNavigate(activeTip.cta.action);
     } else if (activeTip.cta.action === 'compact') {
-      // Navigate to the agent chat where the user can trigger compaction
       const pressured = agents.find(a => a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > CONTEXT_PRESSURE_THRESHOLD);
       if (pressured && onNavigate) {
         onNavigate(`/projects/${pressured.projectId}/session?agent=${pressured.id}`);
+      } else if (onNavigate) {
+        // No pressured agent found — navigate to agents view as fallback
+        onNavigate('/agents');
       }
     }
   };

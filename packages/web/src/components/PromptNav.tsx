@@ -102,7 +102,7 @@ export function PromptNav({
         <ChevronUp className="w-3.5 h-3.5" />
       </button>
       <span className="text-[10px] font-mono text-th-text-muted select-none leading-none py-0.5">
-        {currentIdx >= 0 ? currentIdx + 1 : '—'}/{total}
+        {currentIdx >= 0 ? currentIdx + 1 : '·'}/{total}
       </span>
       <button
         onClick={goDown}

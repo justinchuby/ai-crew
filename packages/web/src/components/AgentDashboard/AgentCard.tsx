@@ -208,10 +208,10 @@ export function AgentCard({ agent, api }: Props) {
 
       {agent.outputPreview && (
         <div className="relative mt-2">
-          <pre className="text-xs text-th-text-muted overflow-hidden h-12 font-mono bg-surface/50 rounded p-1">
+          <pre className="text-xs text-th-text-muted overflow-hidden max-h-16 font-mono bg-surface/50 rounded p-1 whitespace-pre-wrap break-words">
             {agent.outputPreview.slice(-200)}
           </pre>
-          <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-surface/50 to-transparent rounded-b pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-surface/50 to-transparent rounded-b pointer-events-none" />
         </div>
       )}
 

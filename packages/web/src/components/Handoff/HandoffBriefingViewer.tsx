@@ -64,7 +64,7 @@ export function HandoffBriefingViewer({ handoffId, onClose }: HandoffBriefingVie
 
   return (
     <div
-      className="fixed inset-y-0 right-0 w-full max-w-[520px] bg-th-bg border-l border-th-border shadow-xl z-40 flex flex-col animate-slide-in-right"
+      className="fixed inset-y-0 right-0 w-full sm:max-w-[520px] bg-th-bg border-l border-th-border shadow-xl z-40 flex flex-col animate-slide-in-right"
       data-testid="handoff-briefing-viewer"
     >
       {/* Header */}

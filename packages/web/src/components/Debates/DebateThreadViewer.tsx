@@ -35,7 +35,7 @@ export function DebateThreadViewer({ debate, onClose }: DebateThreadViewerProps)
 
   return (
     <div
-      className="fixed inset-y-0 right-0 w-full max-w-[480px] bg-th-bg border-l border-th-border shadow-xl z-40 flex flex-col animate-slide-in-right"
+      className="fixed inset-y-0 right-0 w-full sm:max-w-[480px] bg-th-bg border-l border-th-border shadow-xl z-40 flex flex-col animate-slide-in-right"
       data-testid="debate-thread-viewer"
     >
       {/* Header */}
