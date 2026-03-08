@@ -377,6 +377,7 @@ export function App() {
           </main>
         </div>
 
+        {/* Mobile: full-screen overlay. Desktop: sidebar panel */}
         {selectedAgentId && (
           <div className="fixed inset-0 z-30 md:relative md:inset-auto md:z-auto w-full md:max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
             <ChatPanel agentId={selectedAgentId} ws={ws} />

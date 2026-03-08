@@ -3,6 +3,8 @@ import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, Decision } from '../../types';
 
 const CONTEXT_PRESSURE_THRESHOLD = 0.8;
+const isContextPressured = (a: AgentInfo) =>
+  a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > CONTEXT_PRESSURE_THRESHOLD;
 
 interface CoachTip {
   id: string;
@@ -31,7 +33,7 @@ const TIPS: CoachTip[] = [
   },
   {
     id: 'coach-context-pressure',
-    trigger: ({ agents }) => agents.some(a => a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > CONTEXT_PRESSURE_THRESHOLD),
+    trigger: ({ agents }) => agents.some(isContextPressured),
     title: 'Context running low',
     body: 'An agent is running low on context. You can compact it to continue.',
     icon: '💡',
@@ -105,7 +107,7 @@ export function ContextualCoach({ onNavigate }: Props) {
     if (activeTip.cta.action.startsWith('/') && onNavigate) {
       onNavigate(activeTip.cta.action);
     } else if (activeTip.cta.action === 'compact') {
-      const pressured = agents.find(a => a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > CONTEXT_PRESSURE_THRESHOLD);
+      const pressured = agents.find(isContextPressured);
       if (pressured && onNavigate) {
         onNavigate(`/projects/${pressured.projectId}/session?agent=${pressured.id}`);
       } else if (onNavigate) {

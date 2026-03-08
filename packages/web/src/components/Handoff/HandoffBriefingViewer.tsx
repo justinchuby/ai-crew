@@ -62,6 +62,7 @@ export function HandoffBriefingViewer({ handoffId, onClose }: HandoffBriefingVie
 
   const triggerInfo = record ? TRIGGER_DISPLAY[record.trigger] : null;
 
+  // Intentionally 520px — handoff briefings have wider tables than debates/conflicts
   return (
     <div
       className="fixed inset-y-0 right-0 w-full sm:max-w-[520px] bg-th-bg border-l border-th-border shadow-xl z-40 flex flex-col animate-slide-in-right"
