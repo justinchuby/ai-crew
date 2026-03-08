@@ -63,10 +63,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-CLI ACP research** — Compatibility matrix for 6 CLI tools with ACP protocol analysis.
 - **Claude agent-sdk comparison** — Evaluation of direct SDK integration vs. subprocess approach.
 
+#### Knowledge Pipeline Integration
+
+- **KnowledgeInjector wired into AgentManager.spawn()** — Agents receive project knowledge on startup with 4-category priority and 1,200-token budget.
+- **SessionKnowledgeExtractor** — Automatic extraction of decisions, patterns, and error resolutions from agent sessions on exit.
+- **CollectiveMemory** — Wired into DI container for cross-agent shared memory.
+- **SkillsLoader** — Reads `.github/skills/` SKILL.md files and injects into agent prompts with token budget and truncation.
+- **AgentReconciliation** — Auto-runs on WebSocket reconnect to sync agent state.
+- **E2E integration tests** — Full knowledge loop verified with AgentManager + SkillsLoader integration (16 tests).
+
+#### SDK Adapter Enhancements
+
+- **CopilotSdkAdapter** — Native adapter via `@github/copilot-sdk` JSON-RPC with explicit session resume (`client.resumeSession()`).
+- **Lazy dynamic imports** — All 3 SDK adapters converted to `import()` so the server compiles and starts without any SDK installed. SDKs load only when the adapter is configured.
+- **AcpAdapter unit tests** — Comprehensive test suite added (59 tests).
+- **Connection timeouts** — All SDK adapters now have configurable connection timeouts.
+
+#### Telegram Integration
+
+- **TelegramBot** — Core bot implementation with grammY framework.
+- **NotificationBatcher** — 5-second debounce batching for grouped message delivery.
+- **IntegrationRouter** — Deterministic message routing from agent events to external channels.
+- **Challenge-response authentication** — Session binding security for all Telegram REST endpoints.
+- **Settings UI panel** — Configure Telegram bot token and chat ID from the web interface.
+- **Security hardening** — 4-layer prompt injection sanitization, deny-all on empty allowlist, token masking in logs, retry queue persistence.
+
+#### Home Dashboard
+
+- **5-section layout** — Active Projects, Decisions Made, Decisions Needing Approval, User Action Required, and Progress/Milestones.
+- **Compact stats** — Grouped work items with failed task indicators and relative timestamps.
+- **Attention API** — Wired to `GET /attention` API with client-side fallback when server is unavailable.
+
+#### Interactive Kanban Board
+
+- **Drag-and-drop** — Status transitions via `@dnd-kit` with validation (prevents invalid moves like done→running).
+- **Context menu** — Right-click actions: Retry, Pause, Resume, Skip, Force Ready.
+- **Scope switcher** — Toggle between global (all projects) and per-project task views.
+- **Add Task form** — Create tasks directly from the board with title, description, and priority.
+- **Load More pagination** — Paginated task loading for large backlogs.
+- **Visual polish** — Agent avatar on card face, time-in-status display, filter bar, stale badge, emerald done column, auto-collapse done tasks.
+- **113+ tests** — DnD interaction tests, form tests, filter tests, context menu API tests.
+
+#### AttentionBar
+
+- **3 escalation states** — Green (all clear), yellow (needs attention), red (action required). Persistent system-wide component.
+- **WebSocket push** — Replaced 10-second polling with server-pushed signals for <3s latency.
+- **Connection-lost indicator** — Visual feedback when the WebSocket connection drops.
+- **Trust Dial integration** — Escalation sensitivity adjusts with the user's oversight level.
+
+#### Trust Dial
+
+- **3-level oversight** — Detailed (all notifications, expanded cards), Standard (exceptions only, balanced density), Minimal (action-required only, compact cards).
+- **Per-project overrides** — Override the global oversight level for individual projects.
+- **Toast notification gating** — Notifications filtered by Trust Dial level (AC-16.5).
+
+#### Catch-Up Banner
+
+- **"While you were away" summary** — Slide-down banner summarizing tasks completed, decisions pending, and failures encountered.
+- **Smart thresholds** — Triggers after ≥5 events accumulate; shows failed task count with direct navigation button.
+
+#### Backend APIs (Kanban + Attention)
+
+- **`GET /tasks`** — Global task query with scope, status, role, and agent filters plus `limit`/`offset` pagination.
+- **`GET /attention`** — Attention items with escalation level for AttentionBar.
+- **`PATCH /tasks/:id/status`** — Drag-and-drop status transitions with validation.
+- **`PATCH /tasks/:id/priority`** — Priority reordering.
+- **`POST /tasks`** — Create tasks from the Kanban board.
+
 ### Changed
 
 - **Daemon removal** — Removed ~7,400 lines of unnecessary daemon code after agent server migration. Daemon concept replaced by two-process agent server architecture.
 - **Frontend route rename** — `/daemon` → `/agent-server`, component `DaemonPanel` → `AgentServerPanel`, sidebar label updated.
+- **KanbanBoard decomposition** — Refactored 1,114-line monolith into 6 focused files: `KanbanColumn`, `KanbanCard`, `KanbanFilters`, `AddTaskForm`, `KanbanContextMenu`, `useDragAndDrop`.
+- **NotificationBridge → NotificationBatcher** — Renamed for clarity; batches notifications with 5s debounce window.
+- **IntegrationAgent → IntegrationRouter** — Renamed to reflect its routing responsibility (not an agent).
+- **`formatRelativeTime` extraction** — Moved from inline implementations to a shared utility used across all timestamp displays.
+- **PulseStrip cleanup** — Removed pending decisions badge (moved to AttentionBar).
 
 ### Fixed
 
@@ -79,11 +151,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ModelResolver silent fallback** — Now warns when falling back to default tier model instead of silently substituting.
 - **`projectId` collision** — Increased randomness from 2→3 bytes to reduce collision probability.
 
+#### Security (6 Critical Merge-Blockers)
+
+- **C-1: Telegram prompt injection** — 4-layer sanitization (displayName, content, structured JSON envelope) prevents malicious input from reaching agent prompts.
+- **C-2: REST API authentication** — Challenge-response flow for session binding on all Telegram endpoints. Unauthenticated requests rejected.
+- **C-3: Async shutdown data loss** — All shutdown handlers now awaited in sequence; prevents data loss from premature process exit.
+- **C-4: Task pagination** — `GET /tasks` now requires `limit`/`offset` parameters; unbounded queries blocked.
+- **C-5: Default-deny allowlist** — Empty allowlist now denies all (previously allowed all). Prevents accidental open access.
+- **C-6: Permission handler race condition** — Fixed in all 3 SDK adapters (Claude, Copilot, ACP). Concurrent permission requests no longer corrupt handler state.
+
+#### Bug Fixes
+
+- **DAG task lifecycle on agent termination** — Running tasks assigned to a terminated agent now transition to `failed` via `failTask()`. Dependent tasks unblock correctly.
+- **Keyboard scrolling** — All page containers now accept keyboard focus (`tabIndex={0}`) for arrow-key and Page Up/Down scrolling.
+- **11 stale test assertions** — Updated to match current component rendering after UI refactors.
+- **CollapsibleSystemEvents fallback** — Added 📨 fallback rendering for unrecognized system event types.
+- **DM notification rendering** — Restored orange collapsible styling for incoming direct message notifications.
+- **AttentionBar hook cleanup** — Fixed memory leak from uncleared intervals in `useAttentionItems` hook.
+- **N+1 DAG progress fetches** — Parallelized with `Promise.all` to eliminate sequential API calls.
+- **NotificationBatcher event listener leak** — Event listeners now removed on `stop()`.
+- **AcpConnection stale mocks** — Fixed test mocks that referenced removed API surface.
+- **SkillsLoader token budget** — `formatForInjection()` now truncates skills that exceed the token budget.
+
 ### Stats
 
-- 55 implementation tasks completed across 2 waves
-- 4,138+ tests passing
-- ~25,000+ lines of production code added
+- 74 commits in this session
+- 69 DAG tasks created, 60+ completed
+- 1,351 web tests passing, 372 adapter tests passing
+- 160 acceptance criteria defined (78 P0)
+- 6 critical security issues found and resolved
+- 13 agents active at peak concurrency
 
 ## [0.4.0] - Unreleased
 

@@ -104,17 +104,19 @@ npm run dev
 - **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
 - **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
 - **Broadcasts** — Send a message to every active agent at once
+- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery, challenge-response auth, and configurable settings
 
 ### 📈 Visualization & Monitoring
+- **Home Dashboard** — At-a-glance view of active projects, decisions made, decisions needing approval, action-required items, and progress milestones
+- **AttentionBar** — Persistent system-wide status bar with 3 escalation states (green/yellow/red). WebSocket push for <3s latency. Adjusts sensitivity based on Trust Dial level
+- **Kanban Board** — Interactive task board with drag-and-drop (via @dnd-kit), context menus, scope switcher (global/per-project), add-task form, filters, and pagination. Decomposed into 6 focused components
 - **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, token usage curve, and progress indicators with unified project tabs
 - **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
 - **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
-- **Canvas** — Spatial agent graph with ReactFlow for visual crew topology and project tabs
 - **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
 - **Token Economics** — Per-agent token breakdown with estimation fallback (~4 chars/token from output preview), shown with `~` prefix and `(est.)` suffix
-- **The Pulse** — Persistent ambient status strip showing fleet health; empty indicators hidden, badges link to /agents
 - **Chat** — Virtual scrolling with `react-virtuoso`, pinned user message banner, grouped sequential messages, per-project group chat history
-- **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
+- **Catch-Up Banner** — "While you were away" slide-down summary of tasks completed, decisions pending, and failures
 - **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
 
 ### ✅ Decision & Progress Tracking
@@ -125,12 +127,14 @@ npm run dev
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
 - **Scoped COMMIT** — `git add` only on files the agent has locked, then post-commit verification. Prevents `git add -A` from leaking other agents' work.
+- **Trust Dial** — 3-level oversight (Detailed / Standard / Minimal) controls notification volume, card density, and escalation thresholds. Per-project overrides supported
 - **Event Pipeline** — Reactive handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
 - **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
-- **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
+- **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting
 
 ### 💾 Persistence & Recovery
-- **Session Resume** — Resume from a previous Copilot session ID with full context recovery
+- **Session Resume** — Resume from a previous Copilot session ID with full context recovery. Native SDK resume for Claude and Copilot adapters
+- **Knowledge Pipeline** — Automatic knowledge injection on agent spawn (KnowledgeInjector), session knowledge extraction on agent exit, SkillsLoader for `.github/skills/`, and AgentReconciliation on reconnect
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
 - **Data Retention** — Data management in Settings with storage stats and cleanup by age (7d/30d/90d/all)
@@ -141,13 +145,13 @@ npm run dev
 
 | Package | Description |
 |---------|-------------|
-| `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
-| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
+| `packages/server` | Express 5 + WebSocket server, multi-SDK agent adapters, SQLite/Drizzle ORM, knowledge pipeline |
+| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, interactive Kanban, AttentionBar |
 
-**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · ReactFlow · WebSocket (ws)
+**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · @dnd-kit · WebSocket (ws)
 
 ```
-React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
+React UI ←→ WebSocket ←→ Node.js Server ←→ SDK Adapters ←→ Copilot/Claude/ACP ×N
                               │
                          AgentManager (TypedEmitter)
                         ┌─────┴──────┐
@@ -158,6 +162,8 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
                    CommandDispatcher  TimelineStore
                    DeferredIssueRegistry  EventPipeline
                    AlertEngine  TimerRegistry
+                    KnowledgeInjector  NotificationBatcher
+                    IntegrationRouter  SkillsLoader
 ```
 
 ### Key Components
