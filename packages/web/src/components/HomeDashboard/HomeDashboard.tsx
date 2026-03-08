@@ -314,29 +314,24 @@ export function HomeDashboard() {
       setProjects(activeProjects);
       setAllDecisions(Array.isArray(decisionsData) ? decisionsData : []);
 
-      // Fetch DAG progress for projects with active leads
-      const progressResults: ProjectProgress[] = [];
-      for (const proj of activeProjects) {
-        const leadId = proj.activeLeadId || proj.sessions?.find(s => s.status === 'active')?.leadId;
-        if (leadId) {
-          try {
-            const dag = await apiFetch<DagStatus>(`/lead/${leadId}/dag`);
-            if (dag?.summary) {
+      // Fetch DAG progress for projects with active leads (parallelized)
+      const dagPromises = activeProjects
+        .map((proj) => {
+          const leadId = proj.activeLeadId || proj.sessions?.find(s => s.status === 'active')?.leadId;
+          if (!leadId) return null;
+          return apiFetch<DagStatus>(`/lead/${leadId}/dag`)
+            .then((dag): ProjectProgress | null => {
+              if (!dag?.summary) return null;
               const total = Object.values(dag.summary).reduce((a, b) => a + b, 0);
-              if (total > 0) {
-                progressResults.push({
-                  projectId: proj.id,
-                  projectName: proj.name,
-                  leadId,
-                  summary: dag.summary,
-                });
-              }
-            }
-          } catch {
-            // Non-critical — skip this project's progress
-          }
-        }
-      }
+              if (total === 0) return null;
+              return { projectId: proj.id, projectName: proj.name, leadId, summary: dag.summary };
+            })
+            .catch(() => null);
+        })
+        .filter(Boolean);
+      const progressResults = (await Promise.all(dagPromises)).filter(
+        (r): r is ProjectProgress => r !== null,
+      );
       setProgressByProject(progressResults);
     } catch {
       // Silently fail — empty state shown
