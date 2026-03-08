@@ -778,8 +778,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Runs unconditionally (no exit code check) because explicit termination
     // always means the agent can't finish its work — unlike onExit which only
     // fails tasks on non-zero exit codes to allow clean completions.
+    let dagTaskFailed = false;
     if (agent.parentId) {
-      this.failDagTaskForAgent(agent.parentId, id, 'Agent terminated');
+      dagTaskFailed = this.failDagTaskForAgent(agent.parentId, id, 'Agent terminated');
     }
 
     // Cascade: terminate orphaned children recursively
@@ -794,8 +795,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Clean up delegation records for this agent
     this.dispatcher.completeDelegationsForAgent(id);
 
-    // Notify parent and clean up childIds reference
-    this.dispatcher.notifyParentOfCompletion(agent, -1);
+    // Notify parent of completion — skip if failDagTaskForAgent already
+    // notified the parent to avoid double-messaging about the same termination.
+    if (!dagTaskFailed) {
+      this.dispatcher.notifyParentOfCompletion(agent, -1);
+    }
     if (agent.parentId) {
       const parent = this.agents.get(agent.parentId);
       if (parent) {
@@ -1122,10 +1126,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /**
    * Fail running DAG task assigned to an agent and notify the parent lead.
    * Shared by both onExit (crash path) and terminate (explicit kill path).
+   * Returns true if a task was actually failed (used to skip redundant notifications).
    */
-  private failDagTaskForAgent(leadId: string, agentId: string, reason: string): void {
+  private failDagTaskForAgent(leadId: string, agentId: string, reason: string): boolean {
     const dagTask = this.taskDAG.getTaskByAgent(leadId, agentId);
-    if (!dagTask || dagTask.dagStatus !== 'running') return;
+    if (!dagTask || dagTask.dagStatus !== 'running') return false;
 
     this.taskDAG.failTask(leadId, dagTask.id, reason);
     logger.info({ module: 'agent', msg: 'Failed DAG task for agent', agentId, taskId: dagTask.id, reason });
@@ -1134,6 +1139,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (dagParent && (dagParent.status === 'running' || dagParent.status === 'idle')) {
       dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (${reason}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
     }
+    return true;
   }
 
   /** Buffer agent output text, flushing after 2s of silence */
