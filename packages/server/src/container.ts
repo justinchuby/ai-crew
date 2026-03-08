@@ -196,7 +196,14 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     { projectId: (effectiveConfig as any).projectId ?? 'default', teamId: (effectiveConfig as any).teamId ?? 'default' },
   );
   const agentServerHealth = new AgentServerHealth(
-    () => { const id = randomUUID(); agentServerClient.ping(); return id; },
+    () => {
+      const id = randomUUID();
+      // Fire ping and wire the pong response back to health monitor
+      agentServerClient.ping()
+        .then(() => agentServerHealth.recordPong(id))
+        .catch(() => { /* missed pong — health monitor handles via tick */ });
+      return id;
+    },
   );
   onShutdown('agentServerHealth', () => agentServerHealth.stop());
   onShutdown('agentServerClient', () => { agentServerClient.dispose(); });
