@@ -27,6 +27,7 @@ import { PulseStrip } from './components/Pulse';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { CatchUpBanner } from './components/CatchUp';
 import { AgentServerStatus } from './components/AgentServerStatus';
+import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
@@ -89,6 +90,9 @@ export function App() {
   // Onboarding wizard — show on first visit
   const { shouldShow } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(shouldShow);
+
+  // Setup wizard — show if providers not yet configured
+  const [showSetupWizard, setShowSetupWizard] = useState(() => shouldShowSetupWizard());
 
   // Shift+A global shortcut to open approval queue
   useEffect(() => {
@@ -300,6 +304,7 @@ export function App() {
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      {showSetupWizard && !showOnboarding && <SetupWizard onComplete={() => setShowSetupWizard(false)} />}
       <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
       <BottomTabBar />
       <InstallPrompt />
