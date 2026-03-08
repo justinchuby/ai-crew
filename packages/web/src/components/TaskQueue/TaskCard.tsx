@@ -294,6 +294,7 @@ export interface SortableTaskCardProps {
 }
 
 export function SortableTaskCard({ task, allTasks, projectId, onTaskUpdated, showProjectName, projectName }: SortableTaskCardProps) {
+  const isArchived = !!task.archivedAt;
   const {
     attributes,
     listeners,
@@ -301,7 +302,7 @@ export function SortableTaskCard({ task, allTasks, projectId, onTaskUpdated, sho
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: task.id, disabled: isArchived });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -310,7 +311,7 @@ export function SortableTaskCard({ task, allTasks, projectId, onTaskUpdated, sho
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...(isArchived ? {} : listeners)}>
       <TaskCard task={task} allTasks={allTasks} projectId={projectId} onTaskUpdated={onTaskUpdated} showProjectName={showProjectName} projectName={projectName} />
     </div>
   );
