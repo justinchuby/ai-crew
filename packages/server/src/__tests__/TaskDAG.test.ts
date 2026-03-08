@@ -1842,4 +1842,56 @@ describe('TaskDAG', () => {
       expect(found).toBeNull();
     });
   });
+
+  // ── G-1: Regression — agent termination fails assigned DAG tasks ──
+
+  describe('agent termination → task failure (G-1)', () => {
+    it('getTaskByAgent finds running task assigned to agent', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+
+      dag.startTask('lead-1', 'a', 'agent-42');
+      const found = dag.getTaskByAgent('lead-1', 'agent-42');
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe('a');
+      expect(found!.dagStatus).toBe('running');
+    });
+
+    it('failTask transitions running task to failed and blocks dependents', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+        { taskId: 'c', role: 'Dev', dependsOn: ['b'] },
+      ]);
+
+      dag.startTask('lead-1', 'a', 'agent-42');
+
+      // Simulate: agent crashes → failTask called with reason
+      const result = dag.failTask('lead-1', 'a', 'Agent crashed: exit code 1');
+      expect(result).toBe(true);
+
+      const a = dag.getTask('lead-1', 'a')!;
+      expect(a.dagStatus).toBe('failed');
+      expect(a.failureReason).toBe('Agent crashed: exit code 1');
+
+      // Direct dependent blocked
+      const b = dag.getTask('lead-1', 'b')!;
+      expect(b.dagStatus).toBe('blocked');
+
+      // Transitive dependent stays pending (not directly dependent on 'a')
+      const c = dag.getTask('lead-1', 'c')!;
+      expect(c.dagStatus).toBe('pending');
+    });
+
+    it('getTaskByAgent returns null after task is failed', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-42');
+      dag.failTask('lead-1', 'a', 'Agent terminated');
+
+      const found = dag.getTaskByAgent('lead-1', 'agent-42');
+      expect(found).toBeNull();
+    });
+  });
 });
