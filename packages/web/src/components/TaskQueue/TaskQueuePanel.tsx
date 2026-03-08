@@ -146,12 +146,12 @@ function DagPanel({
   const [projectNameMap, setProjectNameMap] = useState<Map<string, string>>(new Map());
   const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
   const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+  const archivedParam = showArchived ? '&includeArchived=true' : '';
 
   // Fetch global tasks when scope=global and view=kanban
   useEffect(() => {
     if (kanbanScope !== 'global' || effectiveView !== 'kanban') return;
     let cancelled = false;
-    const archivedParam = showArchived ? '&includeArchived=true' : '';
     const fetchGlobal = async () => {
       try {
         const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
@@ -199,7 +199,6 @@ function DagPanel({
   const loadMoreGlobalTasks = async () => {
     if (!globalHasMore || !globalDagStatus) return;
     try {
-      const archivedParam = showArchived ? '&includeArchived=true' : '';
       const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
       if (data) {
         const merged = [...globalDagStatus.tasks, ...data.tasks];
