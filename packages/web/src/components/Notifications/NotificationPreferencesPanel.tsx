@@ -6,7 +6,7 @@ import {
 } from './types';
 
 const ALL_EVENTS = Object.keys(EVENT_LABELS) as NotifiableEvent[];
-const CHANNEL_ORDER: ChannelType[] = ['desktop', 'slack', 'email', 'webhook'];
+const CHANNEL_ORDER: ChannelType[] = ['desktop', 'slack', 'telegram', 'email', 'webhook'];
 
 export function NotificationPreferencesPanel() {
   const [channels, setChannels] = useState<NotificationChannel[]>([]);

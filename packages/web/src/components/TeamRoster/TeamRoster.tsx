@@ -30,6 +30,13 @@ type ProfileTab = 'overview' | 'history' | 'knowledge' | 'skills' | 'settings';
 type SortField = 'role' | 'status' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
+const ROLE_ICONS: Record<string, string> = {
+  lead: '👑', architect: '🏗', developer: '👨‍💻', 'code-reviewer': '🔍',
+  'qa-tester': '🧪', designer: '🎨', 'tech-writer': '📝', 'product-manager': '📋',
+  secretary: '📋', 'critical-reviewer': '🛡', 'readability-reviewer': '📖',
+  'radical-thinker': '💡', generalist: '🔧',
+};
+
 interface RosterAgent {
   agentId: string;
   role: string;
@@ -92,7 +99,11 @@ function AgentCard({ agent, onSelect }: { agent: RosterAgent; onSelect: (id: str
     >
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-th-bg-alt flex items-center justify-center">
-          <User className="w-4 h-4 text-th-text-alt" />
+          {ROLE_ICONS[agent.role] ? (
+            <span className="text-lg">{ROLE_ICONS[agent.role]}</span>
+          ) : (
+            <User className="w-4 h-4 text-th-text-alt" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

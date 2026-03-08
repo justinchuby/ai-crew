@@ -14,9 +14,9 @@ import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
 
 const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
-  { level: 'detailed', label: 'Detailed', description: 'All notifications, expanded cards, yellow alerts at 1 exception' },
-  { level: 'standard', label: 'Standard', description: 'Exceptions only, balanced density, yellow at 2 exceptions (default)' },
-  { level: 'minimal', label: 'Minimal', description: 'Red alerts only, compact cards, failures only' },
+  { level: 'detailed', label: 'Detailed', description: 'All notifications, expanded cards, heads-up at 1 exception' },
+  { level: 'standard', label: 'Standard', description: 'Exceptions only, balanced density, alerts at 2+ exceptions (default)' },
+  { level: 'minimal', label: 'Minimal', description: 'Action-required only, compact cards, failures only' },
 ];
 
 interface Props {
@@ -73,7 +73,8 @@ export function SettingsPanel({ api }: Props) {
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
   return (
-    <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto">
+    <div className="flex-1 overflow-auto focus:outline-none" tabIndex={0}>
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <Settings className="w-6 h-6 text-th-text-muted" />
         <h2 className="text-xl font-semibold">Settings</h2>
@@ -433,6 +434,7 @@ export function SettingsPanel({ api }: Props) {
         </a>{' '}
         and a team of AIs
       </footer>
+    </div>
     </div>
   );
 }
