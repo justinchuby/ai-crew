@@ -15,8 +15,9 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { DagTask } from '../../types';
-import { truncate, priorityBadge, timeInStatus, isStale } from './kanbanConstants';
+import { truncate, priorityBadge, timeInStatus, isStale, TRUNCATE_LENGTHS } from './kanbanConstants';
 
 // ── Task Card Component ─────────────────────────────────────────────
 
@@ -31,6 +32,9 @@ export interface TaskCardProps {
 }
 
 export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdated, showProjectName, projectName }: TaskCardProps) {
+  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
+  const isMinimal = oversightLevel === 'minimal';
+  const isDetailed = oversightLevel === 'detailed';
   const [expanded, setExpanded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -38,6 +42,11 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
   const hasDetails = task.dependsOn.length > 0 || task.files.length > 0 || task.assignedAgentId;
   const stale = isStale(task);
   const statusTime = timeInStatus(task);
+
+  // Auto-expand in detailed mode (AC-16.4)
+  useEffect(() => {
+    if (isDetailed && hasDetails) setExpanded(true);
+  }, [isDetailed, hasDetails]);
 
   const dependencyNames = useMemo(() => {
     if (task.dependsOn.length === 0) return [];
@@ -64,7 +73,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  const doAction = useCallback(async (action: string) => {
+  const handleTaskAction = useCallback(async (action: string) => {
     setContextMenu(null);
     if (!projectId) return;
     try {
@@ -117,7 +126,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
     <div
       className={`group/card bg-th-bg rounded-md border ${
         stale ? 'border-l-2 border-l-amber-400 border-t-th-border border-r-th-border border-b-th-border' : 'border-th-border'
-      } p-2.5 shadow-sm transition-colors ${
+      } ${isMinimal ? 'p-1.5' : 'p-2.5'} shadow-sm transition-all ${
         isDragOverlay ? 'opacity-80 shadow-lg ring-2 ring-blue-500/30' : 'hover:border-th-text-muted/30 cursor-pointer'
       }`}
       onClick={() => !isDragOverlay && hasDetails && setExpanded(!expanded)}
@@ -127,7 +136,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
       {/* Project name (shown in global scope) */}
       {showProjectName && projectName && (
         <div className="text-[10px] text-th-text-muted mb-0.5 flex items-center gap-1">
-          📁 {truncate(projectName, 30)}
+          📁 {truncate(projectName, TRUNCATE_LENGTHS.projectName)}
         </div>
       )}
 
@@ -140,7 +149,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
             </span>
           )}
           <span className="text-xs font-medium text-th-text leading-tight break-words">
-            {truncate(title, 80)}
+            {truncate(title, TRUNCATE_LENGTHS.title)}
           </span>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -167,26 +176,28 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
         </div>
       </div>
 
-      {/* Meta row: role + agent + time-in-status */}
-      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-th-text-muted">
-        <span className="bg-th-bg-muted px-1.5 py-0.5 rounded text-th-text-alt">{task.role}</span>
-        {task.assignedAgentId && (
-          <span className="flex items-center gap-0.5" data-testid="agent-badge">
-            <User size={9} />
-            {truncate(task.assignedAgentId, 4)}
-          </span>
-        )}
-        {statusTime && (
-          <span className="ml-auto" title={task.startedAt || task.createdAt}>
-            {task.dagStatus === 'running' ? '⏱' : task.dagStatus === 'blocked' ? '⏳' : ''} {statusTime}
-          </span>
-        )}
-      </div>
+      {/* Meta row: role + agent + time-in-status (hidden in minimal mode, AC-16.4) */}
+      {!isMinimal && (
+        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-th-text-muted">
+          <span className="bg-th-bg-muted px-1.5 py-0.5 rounded text-th-text-alt">{task.role}</span>
+          {task.assignedAgentId && (
+            <span className="flex items-center gap-0.5" data-testid="agent-badge">
+              <User size={9} />
+              {truncate(task.assignedAgentId, 4)}
+            </span>
+          )}
+          {statusTime && (
+            <span className="ml-auto" title={task.startedAt || task.createdAt}>
+              {task.dagStatus === 'running' ? '⏱' : task.dagStatus === 'blocked' ? '⏳' : ''} {statusTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Failure reason (shown inline for failed tasks) */}
       {task.dagStatus === 'failed' && task.failureReason && (
         <div className="mt-1.5 text-[10px] text-red-400 bg-red-500/10 px-1.5 py-1 rounded" data-testid="failure-reason">
-          {truncate(task.failureReason, 80)}
+          {truncate(task.failureReason, TRUNCATE_LENGTHS.failureReason)}
         </div>
       )}
 
@@ -205,7 +216,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
                   <span className={dep.status === 'done' ? 'text-emerald-400' : dep.status === 'running' ? 'text-blue-400' : 'text-th-text-muted'}>
                     {dep.status === 'done' ? '✓' : dep.status === 'running' ? '●' : '○'}
                   </span>
-                  {truncate(dep.label, 40)}
+                  {truncate(dep.label, TRUNCATE_LENGTHS.depLabel)}
                 </div>
               ))}
             </div>
@@ -220,7 +231,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
               </div>
               {task.files.slice(0, 3).map(file => (
                 <div key={file} className="ml-3 text-[10px] text-th-text-alt font-mono">
-                  {truncate(file, 40)}
+                  {truncate(file, TRUNCATE_LENGTHS.depLabel)}
                 </div>
               ))}
               {task.files.length > 3 && (
@@ -234,7 +245,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
           {/* Full description if different from title */}
           {task.description && task.description !== title && (
             <div className="text-[10px] text-th-text-alt mt-1">
-              {truncate(task.description, 200)}
+              {truncate(task.description, TRUNCATE_LENGTHS.description)}
             </div>
           )}
         </div>
@@ -251,7 +262,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
           {contextMenuItems.map(item => (
             <button
               key={item.action}
-              onClick={(e) => { e.stopPropagation(); doAction(item.action); }}
+              onClick={(e) => { e.stopPropagation(); handleTaskAction(item.action); }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-th-text hover:bg-th-bg-muted text-left"
             >
               <span className="text-th-text-muted">{item.icon}</span>

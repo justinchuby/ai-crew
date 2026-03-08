@@ -3,7 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import type { DagTask, DagTaskStatus } from '../../types';
-import { type ColumnDef, STATUS_BG, COLUMN_TOOLTIPS } from './kanbanConstants';
+import { type ColumnDef, STATUS_BG, COLUMN_TOOLTIPS, DEFAULT_VISIBLE } from './kanbanConstants';
 import { SortableTaskCard } from './TaskCard';
 
 // ── Kanban Column Component ─────────────────────────────────────────
@@ -26,9 +26,8 @@ export function KanbanColumn({ column, tasks, allTasks, collapsed, onToggleColla
   const { setNodeRef } = useDroppable({ id: `column-${column.status}` });
   const [showAll, setShowAll] = useState(false);
 
-  // Done/Skipped columns show only 5 most recent by default
+  // Done/Skipped columns show only recent tasks by default
   const isCompletedColumn = column.status === 'done' || column.status === 'skipped';
-  const DEFAULT_VISIBLE = 5;
   const visibleTasks = isCompletedColumn && !showAll && tasks.length > DEFAULT_VISIBLE
     ? tasks.slice(0, DEFAULT_VISIBLE)
     : tasks;

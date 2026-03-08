@@ -52,6 +52,18 @@ export const STATUS_BG: Record<DagTaskStatus, string> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/** Max display lengths for truncated text across Kanban components */
+export const TRUNCATE_LENGTHS = {
+  projectName: 30,
+  depLabel: 40,
+  title: 80,
+  description: 200,
+  failureReason: 80,
+} as const;
+
+/** Number of tasks shown by default in completed columns (Done/Skipped) */
+export const DEFAULT_VISIBLE = 5;
+
 export function truncate(text: string, maxLen: number): string {
   return text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text;
 }
