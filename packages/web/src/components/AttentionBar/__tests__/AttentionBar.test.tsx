@@ -17,6 +17,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 const mockAppState = {
   agents: [] as any[],
   pendingDecisions: [] as any[],
+  connected: true,
   setApprovalQueueOpen: vi.fn(),
 };
 vi.mock('../../../stores/appStore', () => ({
@@ -29,6 +30,12 @@ const mockLeadState = {
 };
 vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: (selector: (s: typeof mockLeadState) => any) => selector(mockLeadState),
+}));
+
+// Mock apiFetch — defaults to rejecting (triggers fallback to client-side)
+const mockApiFetch = vi.fn().mockRejectedValue(new Error('API unavailable'));
+vi.mock('../../../hooks/useApi', () => ({
+  apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -77,8 +84,10 @@ let AttentionBarTestWrapper: React.FC;
 
 beforeEach(async () => {
   mockNavigate.mockReset();
+  mockApiFetch.mockReset().mockRejectedValue(new Error('API unavailable'));
   mockAppState.agents = [];
   mockAppState.pendingDecisions = [];
+  mockAppState.connected = true;
   mockAppState.setApprovalQueueOpen.mockReset();
   mockLeadState.projects = {};
   mockLeadState.selectedLeadId = null;
@@ -280,6 +289,7 @@ describe('AttentionBar', () => {
     const { unmount } = renderBar();
     let bar = screen.getByTestId('attention-bar');
     expect(bar).toHaveAttribute('role', 'status');
+    expect(bar).toHaveAttribute('aria-live', 'polite');
     unmount();
 
     // Red
@@ -294,6 +304,7 @@ describe('AttentionBar', () => {
     renderBar();
     bar = screen.getByTestId('attention-bar');
     expect(bar).toHaveAttribute('role', 'alert');
+    expect(bar).toHaveAttribute('aria-live', 'assertive');
   });
 
   it('does not show 0/0 done when no projects exist (AC-13.10)', () => {
@@ -326,5 +337,59 @@ describe('AttentionBar', () => {
     dot = screen.getByTestId('escalation-dot');
     expect(dot.className).toContain('bg-red-500');
     expect(dot.className).toContain('animate-pulse');
+  });
+
+  // ── API-driven tests ──────────────────────────────────────────────
+
+  describe('with API data', () => {
+    it('uses API escalation level when available', async () => {
+      mockApiFetch.mockResolvedValue({
+        scope: 'global',
+        escalation: 'red',
+        summary: { failedCount: 2, blockedCount: 0, staleCount: 0, decisionCount: 0, totalCount: 2 },
+        items: [
+          { type: 'failed', severity: 'critical', task: { id: 't1', title: 'Build failed', projectId: 'p1' } },
+          { type: 'failed', severity: 'critical', task: { id: 't2', title: 'Test failed', projectId: 'p1' } },
+        ],
+      });
+      mockAppState.agents = [makeAgent('a1', 'running')];
+      mockLeadState.projects = { 'p1': { dagStatus: makeDagStatus({ done: 5, running: 2 }) } };
+
+      renderBar();
+      // Wait for API response to be processed
+      await vi.waitFor(() => {
+        expect(screen.getByTestId('attention-bar')).toHaveAttribute('data-escalation', 'red');
+      });
+      expect(screen.getByText('Build failed')).toBeInTheDocument();
+    });
+
+    it('falls back to client-side when API fails', () => {
+      mockApiFetch.mockRejectedValue(new Error('Network error'));
+      mockAppState.agents = [makeAgent('a1', 'running')];
+      mockAppState.pendingDecisions = [{ id: 'd1', title: 'Auth decision' }];
+      renderBar();
+
+      // Should still work with fallback
+      const bar = screen.getByTestId('attention-bar');
+      expect(bar).toHaveAttribute('data-escalation', 'yellow');
+    });
+
+    it('passes projectId to API when project is selected', async () => {
+      mockApiFetch.mockResolvedValue({
+        scope: 'project',
+        projectId: 'proj-1',
+        escalation: 'green',
+        summary: { failedCount: 0, blockedCount: 0, staleCount: 0, decisionCount: 0, totalCount: 0 },
+        items: [],
+      });
+      mockAppState.agents = [makeAgent('a1', 'running')];
+      mockLeadState.selectedLeadId = 'proj-1';
+      mockLeadState.projects = { 'proj-1': { dagStatus: makeDagStatus({ done: 5, running: 2 }) } };
+
+      renderBar();
+      await vi.waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith('/attention?scope=project&projectId=proj-1');
+      });
+    });
   });
 });

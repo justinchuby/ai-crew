@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
+import { apiFetch } from '../../hooks/useApi';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -25,16 +26,72 @@ export interface AttentionState {
   pendingDecisionCount: number;
 }
 
+/** Shape returned by GET /attention */
+interface AttentionApiResponse {
+  scope: string;
+  projectId?: string;
+  escalation: EscalationLevel;
+  summary: {
+    failedCount: number;
+    blockedCount: number;
+    staleCount: number;
+    decisionCount: number;
+    totalCount: number;
+  };
+  items: Array<{
+    type: 'failed' | 'blocked' | 'stale' | 'decision';
+    severity: 'critical' | 'warning' | 'info';
+    task?: { id: string; title?: string; projectId?: string };
+    decision?: { id: string; title: string; projectId?: string };
+    reason?: string;
+    durationMs?: number;
+  }>;
+}
+
 // ── Constants ───────────────────────────────────────────────────────
 
-const BLOCKED_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes for running tasks
+const POLL_INTERVAL_MS = 10_000;
+const BLOCKED_THRESHOLD_MS = 30 * 60 * 1000;
+const STALE_THRESHOLD_MS = 15 * 60 * 1000;
 
-// ── Hook ────────────────────────────────────────────────────────────
+// ── API Hook ────────────────────────────────────────────────────────
 
 /**
- * Derives attention items and escalation level from app + lead stores.
- * Pure computation — no side effects.
+ * Fetches attention data from the backend API with polling.
+ * Returns null if the API is unavailable (fallback to client-side).
+ */
+function useAttentionApi(projectId: string | null): AttentionApiResponse | null {
+  const [data, setData] = useState<AttentionApiResponse | null>(null);
+  const connected = useAppStore((s) => s.connected);
+
+  const fetchAttention = useCallback(async () => {
+    try {
+      const query = projectId
+        ? `?scope=project&projectId=${encodeURIComponent(projectId)}`
+        : '';
+      const result = await apiFetch<AttentionApiResponse>(`/attention${query}`);
+      setData(result);
+    } catch {
+      // API unavailable — fall back to client-side derivation
+      setData(null);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!connected) return;
+    fetchAttention();
+    const interval = setInterval(fetchAttention, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [connected, fetchAttention]);
+
+  return data;
+}
+
+// ── Main Hook ───────────────────────────────────────────────────────
+
+/**
+ * Primary data source: GET /attention API (server-computed, authoritative).
+ * Fallback: client-side derivation from app + lead stores.
  */
 export function useAttentionItems(): AttentionState {
   const agents = useAppStore((s) => s.agents);
@@ -42,15 +99,69 @@ export function useAttentionItems(): AttentionState {
   const projects = useLeadStore((s) => s.projects);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
 
-  return useMemo(() => {
+  const apiData = useAttentionApi(selectedLeadId);
+
+  // API-driven state (preferred — server is the trust anchor)
+  const apiState = useMemo((): AttentionState | null => {
+    if (!apiData) return null;
+
+    const items: AttentionItem[] = apiData.items.map((item, i) => {
+      const projectRoute = item.task?.projectId || item.decision?.projectId || selectedLeadId;
+      if (item.type === 'decision') {
+        return {
+          id: `decision-${item.decision?.id ?? i}`,
+          kind: 'decision',
+          label: item.decision?.title || 'Decision pending',
+          action: { type: 'callback' as const, key: 'openApprovalQueue' },
+        };
+      }
+      const taskLabel = item.task?.title || item.task?.id || `Task ${i}`;
+      const suffix = item.durationMs ? ` (${Math.round(item.durationMs / 60_000)}m)` : '';
+      return {
+        id: `${item.type}-${item.task?.id ?? i}`,
+        kind: item.type,
+        label: item.type === 'failed' ? taskLabel : `${taskLabel}${suffix}`,
+        action: { type: 'navigate' as const, to: projectRoute ? `/projects/${projectRoute}/tasks` : '/tasks' },
+      };
+    });
+
+    // Agent counts (still from store — API doesn't provide this)
+    let runningCount = 0;
+    for (const agent of agents) {
+      if (agent.status === 'running' || agent.status === 'creating') runningCount++;
+    }
+
+    // Compute progress from DAG data in store (API summary doesn't include total done/total)
+    let totalDone = 0;
+    let totalTasks = 0;
+    const projectEntries = selectedLeadId
+      ? [[selectedLeadId, projects[selectedLeadId]] as const]
+      : Object.entries(projects);
+    for (const [, project] of projectEntries) {
+      if (!project?.dagStatus) continue;
+      const s = project.dagStatus.summary;
+      totalDone += s.done;
+      totalTasks += s.pending + s.ready + s.running + s.done + s.failed + s.blocked + s.paused + s.skipped;
+    }
+
+    return {
+      items,
+      escalation: apiData.escalation,
+      progressText: totalTasks > 0 ? `${totalDone}/${totalTasks} done` : '',
+      agentCount: agents.length,
+      runningCount,
+      failedTaskCount: apiData.summary.failedCount,
+      pendingDecisionCount: apiData.summary.decisionCount,
+    };
+  }, [apiData, agents, projects, selectedLeadId]);
+
+  // Client-side fallback (used when API is unavailable)
+  const fallbackState = useMemo((): AttentionState => {
     const items: AttentionItem[] = [];
     const now = Date.now();
-
-    // Aggregate DAG summary across all projects (or selected project)
     let totalDone = 0;
     let totalTasks = 0;
     let failedTaskCount = 0;
-    let blockedTaskCount = 0;
 
     const projectEntries = selectedLeadId
       ? [[selectedLeadId, projects[selectedLeadId]] as const]
@@ -64,9 +175,7 @@ export function useAttentionItems(): AttentionState {
       totalTasks += summary.pending + summary.ready + summary.running +
         summary.done + summary.failed + summary.blocked + summary.paused + summary.skipped;
       failedTaskCount += summary.failed;
-      blockedTaskCount += summary.blocked;
 
-      // Generate items for failed tasks
       for (const task of tasks) {
         if (task.dagStatus === 'failed') {
           items.push({
@@ -76,36 +185,26 @@ export function useAttentionItems(): AttentionState {
             action: { type: 'navigate', to: `/projects/${projectId}/tasks` },
           });
         }
-      }
-
-      // Generate items for blocked tasks (>30min)
-      for (const task of tasks) {
         if (task.dagStatus === 'blocked') {
           const blockedSince = task.startedAt ? new Date(task.startedAt).getTime()
             : new Date(task.createdAt).getTime();
-          const blockedDuration = now - blockedSince;
-          if (blockedDuration > BLOCKED_THRESHOLD_MS) {
-            const mins = Math.round(blockedDuration / 60_000);
+          if (now - blockedSince > BLOCKED_THRESHOLD_MS) {
             items.push({
               id: `blocked-${task.id}`,
               kind: 'blocked',
-              label: `${task.title || task.id} (blocked ${mins}m)`,
+              label: `${task.title || task.id} (blocked ${Math.round((now - blockedSince) / 60_000)}m)`,
               action: { type: 'navigate', to: `/projects/${projectId}/tasks` },
             });
           }
         }
-      }
-
-      // Generate items for stale running tasks (>15min with no update)
-      for (const task of tasks) {
         if (task.dagStatus === 'running') {
           const startedAt = task.startedAt ? new Date(task.startedAt).getTime() : 0;
-          const runningDuration = startedAt ? now - startedAt : 0;
-          if (runningDuration > STALE_THRESHOLD_MS) {
+          const duration = startedAt ? now - startedAt : 0;
+          if (duration > STALE_THRESHOLD_MS) {
             items.push({
               id: `stale-${task.id}`,
               kind: 'stale',
-              label: `${task.title || task.id} (running ${Math.round(runningDuration / 60_000)}m)`,
+              label: `${task.title || task.id} (running ${Math.round(duration / 60_000)}m)`,
               action: { type: 'navigate', to: `/projects/${projectId}/tasks` },
             });
           }
@@ -113,7 +212,6 @@ export function useAttentionItems(): AttentionState {
       }
     }
 
-    // Pending decisions
     for (const decision of pendingDecisions) {
       items.push({
         id: `decision-${decision.id}`,
@@ -123,34 +221,26 @@ export function useAttentionItems(): AttentionState {
       });
     }
 
-    // Agent counts
     let runningCount = 0;
     for (const agent of agents) {
       if (agent.status === 'running' || agent.status === 'creating') runningCount++;
     }
 
-    // Escalation logic
     const exceptionCount = items.length;
     let escalation: EscalationLevel = 'green';
-    if (failedTaskCount > 0 || exceptionCount >= 3) {
-      escalation = 'red';
-    } else if (exceptionCount >= 1) {
-      escalation = 'yellow';
-    }
-
-    // Progress text — avoid misleading "0/0 done" (AC-13.10)
-    const progressText = totalTasks > 0
-      ? `${totalDone}/${totalTasks} done`
-      : '';
+    if (failedTaskCount > 0 || exceptionCount >= 3) escalation = 'red';
+    else if (exceptionCount >= 1) escalation = 'yellow';
 
     return {
       items,
       escalation,
-      progressText,
+      progressText: totalTasks > 0 ? `${totalDone}/${totalTasks} done` : '',
       agentCount: agents.length,
       runningCount,
       failedTaskCount,
       pendingDecisionCount: pendingDecisions.length,
     };
   }, [agents, pendingDecisions, projects, selectedLeadId]);
+
+  return apiState ?? fallbackState;
 }

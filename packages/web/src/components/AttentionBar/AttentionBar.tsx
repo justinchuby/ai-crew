@@ -91,6 +91,7 @@ export function AttentionBar() {
       data-escalation={escalation}
       role={escalation === 'red' ? 'alert' : 'status'}
       aria-label={ariaLabel}
+      aria-live={escalation === 'red' ? 'assertive' : 'polite'}
       className={`${styles.height} ${styles.bar} ${styles.border} flex items-center px-4 gap-4 text-xs shrink-0 overflow-x-auto transition-all duration-300`}
     >
       {/* Escalation indicator dot */}
