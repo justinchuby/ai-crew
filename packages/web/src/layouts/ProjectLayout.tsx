@@ -302,7 +302,7 @@ export function ProjectLayout() {
         </div>
 
         {/* Route content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           <Outlet />
         </div>
       </div>
