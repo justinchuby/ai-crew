@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, XCircle, Clock, MessageSquareWarning, Users } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
@@ -69,10 +69,13 @@ export function AttentionBar() {
   }, [state.items.length]);
 
   // Re-show if new exceptions arrive after dismissal
+  useEffect(() => {
+    if (dismissed && state.items.length > dismissedVersion) {
+      setDismissed(false);
+    }
+  }, [dismissed, state.items.length, dismissedVersion]);
+
   const isVisible = !dismissed || state.items.length > dismissedVersion;
-  if (isVisible && dismissed) {
-    setDismissed(false);
-  }
 
   // Don't render if no agents active
   if (state.agentCount === 0) return null;
