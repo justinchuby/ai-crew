@@ -89,8 +89,8 @@ import { SessionRetro } from './coordination/sessions/SessionRetro.js';
 import { SessionExporter } from './coordination/sessions/SessionExporter.js';
 import { PerformanceTracker } from './coordination/reporting/PerformanceScorecard.js';
 import { SessionResumeManager } from './agents/SessionResumeManager.js';
-import { IntegrationAgent } from './integrations/IntegrationAgent.js';
-import { NotificationBridge } from './integrations/NotificationBridge.js';
+import { IntegrationRouter } from './integrations/IntegrationRouter.js';
+import { NotificationBatcher } from './integrations/NotificationBatcher.js';
 
 // ── Imports: Tier 6 (HTTP/WS) ──────────────────────────────
 import { WebSocketServer } from './comms/WebSocketServer.js';
@@ -329,18 +329,18 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const performanceTracker = new PerformanceTracker(activityLedger, agentManager);
 
   // ── Integration Agent (Telegram/Slack messaging) ────────
-  const notificationBridge = new NotificationBridge();
-  const integrationAgent = new IntegrationAgent(
+  const notificationBatcher = new NotificationBatcher();
+  const integrationRouter = new IntegrationRouter(
     agentManager,
     projectRegistry,
     configStore,
-    notificationBridge,
+    notificationBatcher,
   );
   // Start asynchronously — don't block container creation
-  integrationAgent.start().catch(err => {
-    logger.warn({ module: 'container', msg: 'IntegrationAgent failed to start', error: (err as Error).message });
+  integrationRouter.start().catch(err => {
+    logger.warn({ module: 'container', msg: 'IntegrationRouter failed to start', error: (err as Error).message });
   });
-  onShutdown('integrationAgent', () => { integrationAgent.stop().catch(() => {}); });
+  onShutdown('integrationRouter', () => { integrationRouter.stop().catch(() => {}); });
 
   // ── Timers & Scheduler ─────────────────────────────────
   timerRegistry.start();
@@ -438,7 +438,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     agentRoster: agentRosterRepository,
     teamExporter,
     teamImporter,
-    integrationAgent,
+    integrationRouter,
 
     // Lifecycle
     async shutdown() {

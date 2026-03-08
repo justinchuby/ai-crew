@@ -78,7 +78,7 @@ export interface AppContext {
   teamExporter?: TeamExporter;
   teamImporter?: TeamImporter;
   agentRoster?: AgentRosterRepository;
-  integrationAgent?: import('../integrations/IntegrationAgent.js').IntegrationAgent;
+  integrationRouter?: import('../integrations/IntegrationRouter.js').IntegrationRouter;
 }
 
 // Rate limiters for expensive operations

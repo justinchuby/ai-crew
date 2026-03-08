@@ -29,14 +29,20 @@ interface RateBucket {
 }
 
 /**
- * TelegramAdapter wraps a grammY Bot instance and implements the
- * MessagingAdapter interface. It handles:
+ * TelegramAdapter — Layer 1 of the 3-layer messaging architecture.
+ *
+ * Architecture: TelegramAdapter (Layer 1: transport) → IntegrationRouter (Layer 2: routing)
+ *               → NotificationBatcher (Layer 3: event aggregation & delivery)
+ *
+ * Thin transport adapter wrapping a grammY Bot instance. Implements the
+ * MessagingAdapter interface for Telegram-specific concerns:
  * - Bot initialization with token from config
+ * - Long polling mode (no webhook / public URL needed)
  * - Command handlers (/status, /projects, /agents, /help)
  * - Inbound message routing to registered handlers
- * - Outbound message delivery with retry queue
- * - Per-user rate limiting
- * - Long polling mode
+ * - Outbound message delivery with retry queue (3 attempts, 5-min TTL)
+ * - Per-user rate limiting (keyed by Telegram user ID, not chat ID)
+ * - Chat allowlist enforcement with user notification on rejection
  */
 export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> implements MessagingAdapter {
   readonly platform: MessagingPlatform = 'telegram';
@@ -54,7 +60,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private static readonly MAX_RETRY_ATTEMPTS = 3;
   private static readonly RETRY_QUEUE_TTL_MS = 5 * 60 * 1000;
 
-  // Command handlers that the IntegrationAgent can register
+  // Command handlers that the IntegrationRouter can register
   private commandHandlers: Map<string, (chatId: string, args: string) => Promise<string>> = new Map();
 
   constructor(config: TelegramConfig) {
@@ -76,7 +82,10 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     this.messageHandlers.push(handler);
   }
 
-  /** Start the bot with long polling. */
+  /**
+   * Start the bot with long polling. Lazy-imports grammY on first call
+   * so the dependency is only loaded when Telegram is actually enabled.
+   */
   async start(): Promise<void> {
     if (this.running) return;
 

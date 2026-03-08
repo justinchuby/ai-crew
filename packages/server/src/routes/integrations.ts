@@ -18,7 +18,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // GET /api/integrations/status
   router.get('/integrations/status', (_req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) {
         return res.json({ enabled: false, adapters: [], sessions: [] });
       }
@@ -33,7 +33,7 @@ export function integrationRoutes(ctx: AppContext): Router {
       }
 
       const sessions = agent.getAllSessions();
-      const bridge = agent.getBridge();
+      const batcher = agent.getBatcher();
 
       res.json({
         enabled: true,
@@ -45,8 +45,8 @@ export function integrationRoutes(ctx: AppContext): Router {
           boundBy: s.boundBy,
           expiresAt: new Date(s.expiresAt).toISOString(),
         })),
-        pendingNotifications: bridge.pendingCount(),
-        subscriptions: bridge.getAllSubscriptions().length,
+        pendingNotifications: batcher.pendingCount(),
+        subscriptions: batcher.getAllSubscriptions().length,
       });
     } catch (err) {
       res.status(500).json({ error: 'Failed to get integration status', detail: (err as Error).message });
@@ -58,7 +58,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // POST /api/integrations/sessions
   router.post('/integrations/sessions', (req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) {
         return res.status(503).json({ error: 'Integration agent not available' });
       }
@@ -78,7 +78,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // GET /api/integrations/sessions
   router.get('/integrations/sessions', (_req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) return res.json([]);
       res.json(agent.getAllSessions());
     } catch (err) {
@@ -91,7 +91,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // POST /api/integrations/subscriptions
   router.post('/integrations/subscriptions', (req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) {
         return res.status(503).json({ error: 'Integration agent not available' });
       }
@@ -101,7 +101,7 @@ export function integrationRoutes(ctx: AppContext): Router {
         return res.status(400).json({ error: 'chatId and projectId are required' });
       }
 
-      agent.getBridge().subscribe(chatId, projectId, categories ?? []);
+      agent.getBatcher().subscribe(chatId, projectId, categories ?? []);
       res.status(201).json({ chatId, projectId, categories: categories ?? [] });
     } catch (err) {
       res.status(500).json({ error: 'Failed to create subscription', detail: (err as Error).message });
@@ -111,7 +111,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // DELETE /api/integrations/subscriptions
   router.delete('/integrations/subscriptions', (req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) {
         return res.status(503).json({ error: 'Integration agent not available' });
       }
@@ -121,7 +121,7 @@ export function integrationRoutes(ctx: AppContext): Router {
         return res.status(400).json({ error: 'chatId and projectId are required' });
       }
 
-      agent.getBridge().unsubscribe(chatId, projectId);
+      agent.getBatcher().unsubscribe(chatId, projectId);
       res.status(204).end();
     } catch (err) {
       res.status(500).json({ error: 'Failed to remove subscription', detail: (err as Error).message });
@@ -131,9 +131,9 @@ export function integrationRoutes(ctx: AppContext): Router {
   // GET /api/integrations/subscriptions
   router.get('/integrations/subscriptions', (_req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) return res.json([]);
-      res.json(agent.getBridge().getAllSubscriptions());
+      res.json(agent.getBatcher().getAllSubscriptions());
     } catch (err) {
       res.status(500).json({ error: 'Failed to list subscriptions', detail: (err as Error).message });
     }
@@ -144,7 +144,7 @@ export function integrationRoutes(ctx: AppContext): Router {
   // POST /api/integrations/test-message
   router.post('/integrations/test-message', async (req, res) => {
     try {
-      const agent = ctx.integrationAgent;
+      const agent = ctx.integrationRouter;
       if (!agent) {
         return res.status(503).json({ error: 'Integration agent not available' });
       }

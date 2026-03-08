@@ -1,9 +1,9 @@
 // packages/server/src/integrations/index.ts
 // Barrel export for the integrations module.
 
-export { IntegrationAgent } from './IntegrationAgent.js';
+export { IntegrationRouter } from './IntegrationRouter.js';
 export { TelegramAdapter } from './TelegramAdapter.js';
-export { NotificationBridge } from './NotificationBridge.js';
+export { NotificationBatcher } from './NotificationBatcher.js';
 export type {
   MessagingPlatform,
   InboundMessage,
