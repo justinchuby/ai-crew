@@ -106,8 +106,9 @@ export function integrationRoutes(ctx: AppContext): Router {
       }
 
       res.status(201).json(session);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to verify session', detail: (err as Error).message });
+    } catch (err: any) {
+      const status = err.status || 500;
+      res.status(status).json({ error: err.message || 'Failed to verify session' });
     }
   });
 

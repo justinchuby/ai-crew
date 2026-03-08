@@ -47,10 +47,16 @@ export interface PendingChallenge {
 /** Challenge TTL: 5 minutes. */
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
+/** Max verification attempts per chatId per window. */
+const VERIFY_MAX_ATTEMPTS = 5;
+/** Rate limit window for verification attempts (1 minute). */
+const VERIFY_WINDOW_MS = 60_000;
+
 export class IntegrationRouter {
   private adapters: Map<string, MessagingAdapter> = new Map();
   private sessions: Map<string, ChatSession> = new Map(); // chatId → session
   private pendingChallenges: Map<string, PendingChallenge> = new Map(); // chatId → challenge
+  private verifyAttempts: Map<string, number[]> = new Map(); // chatId → timestamps
   private notificationBatcher: NotificationBatcher;
   private agentManager: AgentManager;
   private projectRegistry: ProjectRegistry | undefined;
@@ -220,8 +226,18 @@ export class IntegrationRouter {
   /**
    * Verify a challenge code. If correct, binds the session and clears
    * the pending challenge. Returns the session on success, null on failure.
+   * Throws if rate-limited (>5 attempts per minute per chatId).
    */
   verifyChallenge(chatId: string, code: string): ChatSession | null {
+    // Per-chatId rate limiting against brute-force
+    if (this.isVerifyRateLimited(chatId)) {
+      logger.warn({ module: 'integration-router', msg: 'Verification rate-limited', chatId });
+      const err = new Error('Too many verification attempts. Try again in 1 minute.');
+      (err as any).status = 429;
+      throw err;
+    }
+    this.recordVerifyAttempt(chatId);
+
     const challenge = this.pendingChallenges.get(chatId);
     if (!challenge) return null;
 
@@ -237,8 +253,9 @@ export class IntegrationRouter {
       return null;
     }
 
-    // Success — bind the session
+    // Success — bind the session and clear rate limit tracking
     this.pendingChallenges.delete(chatId);
+    this.verifyAttempts.delete(chatId);
     return this.bindSession(chatId, challenge.platform, challenge.projectId, challenge.boundBy);
   }
 
@@ -253,6 +270,23 @@ export class IntegrationRouter {
   }
 
   // ── Private ──────────────────────────────────────────────
+
+  private isVerifyRateLimited(chatId: string): boolean {
+    const now = Date.now();
+    const attempts = this.verifyAttempts.get(chatId);
+    if (!attempts) return false;
+    const recent = attempts.filter((t) => now - t < VERIFY_WINDOW_MS);
+    return recent.length >= VERIFY_MAX_ATTEMPTS;
+  }
+
+  private recordVerifyAttempt(chatId: string): void {
+    const now = Date.now();
+    const attempts = this.verifyAttempts.get(chatId) ?? [];
+    // Prune expired entries and add new one
+    const recent = attempts.filter((t) => now - t < VERIFY_WINDOW_MS);
+    recent.push(now);
+    this.verifyAttempts.set(chatId, recent);
+  }
 
   private async startTelegram(config: TelegramConfig): Promise<void> {
     const adapter = new TelegramAdapter(config);

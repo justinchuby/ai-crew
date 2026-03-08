@@ -513,5 +513,53 @@ describe('IntegrationRouter', () => {
       const session = agent.verifyChallenge('nonexistent', '123456');
       expect(session).toBeNull();
     });
+
+    it('rate-limits after 5 failed verification attempts', async () => {
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+
+      // 5 wrong attempts should be fine
+      for (let i = 0; i < 5; i++) {
+        const session = agent.verifyChallenge('chat-99', '000000');
+        expect(session).toBeNull();
+      }
+
+      // 6th attempt should throw
+      expect(() => agent.verifyChallenge('chat-99', '000000')).toThrow('Too many verification attempts');
+    });
+
+    it('rate-limit does not affect other chatIds', async () => {
+      await agent.createChallenge('chat-A', 'telegram', 'proj-1', 'user-a');
+      await agent.createChallenge('chat-B', 'telegram', 'proj-1', 'user-b');
+
+      // Exhaust chat-A limit
+      for (let i = 0; i < 5; i++) {
+        agent.verifyChallenge('chat-A', '000000');
+      }
+
+      // chat-B should still work
+      const challengeB = agent.getPendingChallenge('chat-B')!;
+      const session = agent.verifyChallenge('chat-B', challengeB.code);
+      expect(session).not.toBeNull();
+    });
+
+    it('successful verification clears rate limit tracking', async () => {
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+      const challenge = agent.getPendingChallenge('chat-99')!;
+
+      // Use 4 wrong attempts
+      for (let i = 0; i < 4; i++) {
+        agent.verifyChallenge('chat-99', '000000');
+      }
+
+      // Correct code clears tracking
+      const session = agent.verifyChallenge('chat-99', challenge.code);
+      expect(session).not.toBeNull();
+
+      // New challenge should accept attempts again (tracking was cleared)
+      await agent.createChallenge('chat-99', 'telegram', 'proj-1', 'user-a');
+      const newChallenge = agent.getPendingChallenge('chat-99')!;
+      const session2 = agent.verifyChallenge('chat-99', newChallenge.code);
+      expect(session2).not.toBeNull();
+    });
   });
 });
