@@ -122,10 +122,14 @@ function DagPanel({
   dagStatus,
   dagView,
   setDagView,
+  projectId,
+  onTaskUpdated,
 }: {
   dagStatus: DagStatus | null;
   dagView: 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | null;
   setDagView: (v: 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | null) => void;
+  projectId?: string;
+  onTaskUpdated?: () => void;
 }) {
   const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
   const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
@@ -211,7 +215,7 @@ function DagPanel({
       </div>
       {effectiveView === 'kanban' ? (
         <div style={{ minHeight: 400 }}>
-          <KanbanBoard dagStatus={dagStatus} />
+          <KanbanBoard dagStatus={dagStatus} projectId={projectId} onTaskUpdated={onTaskUpdated} />
         </div>
       ) : effectiveView === 'graph' ? (
         <div className="flex-1" style={{ minHeight: 400 }}>
@@ -498,7 +502,7 @@ export function TaskQueuePanel({ api }: Props) {
                   </h3>
                   <SessionProgress progress={null} dagStatus={historicalDag} />
                 </div>
-                <DagPanel dagStatus={historicalDag} dagView={dagView} setDagView={setDagView} />
+                <DagPanel dagStatus={historicalDag} dagView={dagView} setDagView={setDagView} projectId={currentTab.project.id} />
               </>
             )}
           </div>
@@ -513,7 +517,7 @@ export function TaskQueuePanel({ api }: Props) {
               <SessionProgress progress={progress} dagStatus={dagStatus} />
             </div>
 
-            <DagPanel dagStatus={dagStatus} dagView={dagView} setDagView={setDagView} />
+            <DagPanel dagStatus={dagStatus} dagView={dagView} setDagView={setDagView} projectId={currentTab.type === 'active' ? (currentTab.agent?.projectId ?? currentTab.project?.id) : undefined} onTaskUpdated={activeLeadId ? () => fetchData(activeLeadId) : undefined} />
           </div>
         )}
       </div>

@@ -186,7 +186,7 @@ describe('KanbanBoard', () => {
 
       // Click column header to collapse
       const runningCol = screen.getByTestId('kanban-column-running');
-      const headerButton = within(runningCol).getByRole('button');
+      const headerButton = within(runningCol).getAllByRole('button')[0];
       fireEvent.click(headerButton);
 
       // Task card should be hidden after collapse
