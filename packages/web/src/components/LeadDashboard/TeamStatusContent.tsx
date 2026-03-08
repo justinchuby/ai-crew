@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageSquare, Send, Zap, Square } from 'lucide-react';
 import type { AgentComm, ActivityEvent } from '../../stores/leadStore';
+import type { AgentInfo, Delegation } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { MentionText } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
@@ -8,22 +9,34 @@ import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { AgentReportBlock, formatTokens } from './AgentReportBlock';
 
+/** Minimal agent shape accepted by TeamStatusContent — compatible with AgentInfo, LeadProgress.teamAgents, and DerivedAgent */
+export interface TeamAgent {
+  id: string;
+  role: { name: string; icon: string; model?: string };
+  status: string;
+  model?: string;
+  sessionId?: string | null;
+  outputPreview?: string;
+  contextWindowSize?: number;
+  contextWindowUsed?: number;
+}
+
 interface TeamStatusContentProps {
-  agents: any[];
-  delegations: any[];
+  agents: TeamAgent[];
+  delegations: Delegation[];
   comms?: AgentComm[];
   activity?: ActivityEvent[];
-  allAgents?: any[];
+  allAgents?: AgentInfo[];
   onOpenChat?: (agentId: string) => void;
 }
 
 export function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: TeamStatusContentProps) {
-  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<TeamAgent | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   const [agentMsg, setAgentMsg] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
 
-  const selectedDelegation = selectedAgent ? [...delegations].reverse().find((d: any) => d.toAgentId === selectedAgent.id) : null;
+  const selectedDelegation = selectedAgent ? [...delegations].reverse().find((d) => d.toAgentId === selectedAgent.id) : null;
   const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
   const agentActivity = selectedAgent ? (activity ?? []).filter((e) => e.agentId === selectedAgent.id) : [];
 
@@ -33,8 +46,8 @@ export function TeamStatusContent({ agents, delegations, comms, activity, allAge
         {agents.length === 0 ? (
           <p className="text-xs text-th-text-muted text-center py-4 font-mono">No team members yet</p>
         ) : (
-          agents.map((agent: any) => {
-            const delegation = [...delegations].reverse().find((d: any) => d.toAgentId === agent.id);
+          agents.map((agent) => {
+            const delegation = [...delegations].reverse().find((d) => d.toAgentId === agent.id);
             const colorClass = agentStatusText(agent.status);
             return (
               <div
@@ -175,27 +188,30 @@ export function TeamStatusContent({ agents, delegations, comms, activity, allAge
               {/* Token Usage — hidden (issue #106) */}
 
               {/* Context Window — keep this, it's real data from ACP */}
-              {selectedAgent.contextWindowSize > 0 && (
+              {(selectedAgent.contextWindowSize ?? 0) > 0 && (() => {
+                const used = selectedAgent.contextWindowUsed ?? 0;
+                const size = selectedAgent.contextWindowSize ?? 1;
+                const pct = Math.round((used / size) * 100);
+                return (
                 <div className="px-5 py-3 border-b border-th-border">
                   <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Context Window</h4>
                   <div className="mt-1.5">
                     <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
-                      <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
-                      <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
+                      <span>Context: {formatTokens(used)} / {formatTokens(size)}</span>
+                      <span>({pct}%)</span>
                     </div>
                     <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
                       <div
                         className={`h-1 rounded-full transition-all ${
-                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
-                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
-                          'bg-blue-500'
+                          pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-yellow-500' : 'bg-blue-500'
                         }`}
-                        style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
+                        style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Agent Output Preview */}
               {selectedAgent.outputPreview && (

@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
-import type { DagStatus } from '../../types';
+import type { AgentInfo, DagStatus } from '../../types';
 
 /**
  * Handles all lead-specific WebSocket events: text streaming, decisions,
  * tool calls, delegations, comms, progress, groups, DAG updates, and context compaction.
  */
-export function useLeadWebSocket(agents: any[], historicalProjectId: string | null) {
+export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: string | null) {
   useEffect(() => {
     const handler = (event: Event) => {
       const msg = JSON.parse((event as MessageEvent).data);
@@ -189,19 +189,19 @@ export function useLeadWebSocket(agents: any[], historicalProjectId: string | nu
           const senderId = (msg.from ?? '').slice(0, 8);
           if (msg.from === 'system') {
             store.addMessage(leadId, {
-              type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+              type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system', timestamp: Date.now(),
             });
           } else if (isBroadcast) {
             // Broadcasts tracked in comms panel — don't duplicate in chat
           } else if (msg.to === leadId) {
             store.addMessage(leadId, {
-              type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+              type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system', timestamp: Date.now(),
             });
           } else if (msg.from === leadId) {
             const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
             const recipientId = (msg.to ?? '').slice(0, 8);
             store.addMessage(leadId, {
-              type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+              type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system', timestamp: Date.now(),
             });
           } else {
             // Inter-agent DMs tracked in comms panel — don't duplicate in chat
@@ -236,7 +236,7 @@ export function useLeadWebSocket(agents: any[], historicalProjectId: string | nu
 
       // DAG status updates
       if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
-        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
+        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: DagStatus) => {
           if (data && data.tasks) {
             store.setDagStatus(selectedLeadId!, data as DagStatus);
             if (historicalProjectId && historicalProjectId !== selectedLeadId) {

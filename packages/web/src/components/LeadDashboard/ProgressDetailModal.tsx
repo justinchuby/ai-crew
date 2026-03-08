@@ -1,5 +1,6 @@
 import { BarChart3, X, CheckCircle, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
 import type { AgentReport } from '../../stores/leadStore';
+import type { LeadProgress, Delegation } from '../../types';
 import { AgentReportBlock } from './AgentReportBlock';
 
 interface ProgressHistoryEntry {
@@ -11,7 +12,7 @@ interface ProgressHistoryEntry {
 }
 
 interface ProgressDetailModalProps {
-  progress: any;
+  progress: LeadProgress | null;
   progressHistory: ProgressHistoryEntry[];
   onClose: () => void;
 }
@@ -58,7 +59,7 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
             <div>
               <p className="text-xs font-semibold text-th-text-muted mb-2">Team Roster</p>
               <div className="space-y-1">
-                {progress.teamAgents.map((ta: any) => (
+                {progress.teamAgents.map((ta: LeadProgress['teamAgents'][number]) => (
                   <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-th-bg-muted/50 text-xs font-mono">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse motion-reduce:animate-none' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
                     <span className="text-th-text-alt">{ta.role?.name || 'Agent'}</span>
@@ -150,14 +151,14 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
             <div>
               <p className="text-xs font-semibold text-th-text-muted mb-2">Delegations</p>
               <div className="space-y-1">
-                {progress.delegations.map((d: any, i: number) => (
+                {progress.delegations.map((d: Delegation, i: number) => (
                   <div key={d.id || i} className="px-2 py-1.5 rounded bg-th-bg-muted/50 text-xs font-mono">
                     <div className="flex items-center gap-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-purple-500/20 text-purple-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
                         {d.status}
                       </span>
                       <span className="text-th-text-alt">{d.toRole}</span>
-                      <span className="text-th-text-muted ml-auto">{d.childId?.slice(0, 8)}</span>
+                      <span className="text-th-text-muted ml-auto">{d.toAgentId?.slice(0, 8)}</span>
                     </div>
                     {d.task && (
                       <p className="text-th-text-muted mt-1 break-words">{d.task.length > 120 ? d.task.slice(0, 120) + '…' : d.task}</p>
