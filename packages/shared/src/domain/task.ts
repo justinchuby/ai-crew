@@ -20,6 +20,7 @@ export const DagTaskSchema = z.object({
   priority: z.number(),
   model: z.string().optional(),
   assignedAgentId: z.string().optional(),
+  failureReason: z.string().optional(),
   createdAt: z.string(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),

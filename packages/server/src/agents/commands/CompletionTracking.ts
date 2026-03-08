@@ -204,7 +204,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
         // Warn lead if DAG coverage drops below 80%
         checkCoverageWarning(ctx, agent.parentId!);
       } else {
-        ctx.taskDAG.failTask(agent.parentId, dagTask.id);
+        ctx.taskDAG.failTask(agent.parentId, dagTask.id, `Agent exited with code ${exitCode}`);
         const dagParent = ctx.getAgent(agent.parentId);
         if (dagParent) {
           dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);

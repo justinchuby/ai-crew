@@ -1,0 +1,192 @@
+import { Router } from 'express';
+import type { AppContext } from './context.js';
+import type { DagTask } from '../tasks/TaskDAG.js';
+
+/**
+ * Global task routes — cross-project task queries and the attention items
+ * endpoint used by the KanbanBoard, AttentionBar, and HomeDashboard.
+ */
+export function tasksRoutes(ctx: AppContext): Router {
+  const { agentManager, decisionLog } = ctx;
+  const router = Router();
+
+  // ── Global task query ─────────────────────────────────────────────
+  /**
+   * GET /tasks
+   *   ?scope=global|project
+   *   &projectId=<id>        (required when scope=project)
+   *   &status=running,failed  (comma-separated filter)
+   *   &role=developer          (filter by role)
+   *   &assignedAgentId=<id>   (filter by assigned agent)
+   *
+   * Returns all tasks across all projects (scope=global) or filtered
+   * to a single project.
+   */
+  router.get('/tasks', (req, res) => {
+    const taskDAG = agentManager.getTaskDAG();
+    const scope = (req.query.scope as string) || 'global';
+    const projectId = req.query.projectId as string | undefined;
+    const statusFilter = req.query.status as string | undefined;
+    const roleFilter = req.query.role as string | undefined;
+    const agentFilter = req.query.assignedAgentId as string | undefined;
+
+    let tasks: DagTask[];
+
+    if (scope === 'project') {
+      if (!projectId) {
+        return res.status(400).json({ error: 'projectId is required when scope=project' });
+      }
+      tasks = taskDAG.getTasksByProject(projectId);
+    } else {
+      tasks = taskDAG.getAll();
+    }
+
+    // Apply optional filters
+    if (statusFilter) {
+      const statuses = new Set(statusFilter.split(',').map(s => s.trim()));
+      tasks = tasks.filter(t => statuses.has(t.dagStatus));
+    }
+    if (roleFilter) {
+      tasks = tasks.filter(t => t.role === roleFilter);
+    }
+    if (agentFilter) {
+      tasks = tasks.filter(t => t.assignedAgentId === agentFilter);
+    }
+
+    return res.json({
+      tasks,
+      total: tasks.length,
+      scope,
+      ...(projectId ? { projectId } : {}),
+    });
+  });
+
+  // ── Attention items endpoint ──────────────────────────────────────
+  /**
+   * GET /attention
+   *   ?scope=global|project
+   *   &projectId=<id>
+   *   &staleThresholdMs=900000  (default 15 min)
+   *
+   * Aggregates items that need user attention:
+   *   - Failed tasks (with failureReason)
+   *   - Blocked tasks (duration exceeds threshold)
+   *   - Stale running tasks (running longer than threshold)
+   *   - Pending decisions (needsConfirmation && status === 'recorded')
+   *
+   * Used by: AttentionBar, KanbanBoard Command Center, HomeDashboard
+   */
+  router.get('/attention', (req, res) => {
+    const taskDAG = agentManager.getTaskDAG();
+    const scope = (req.query.scope as string) || 'global';
+    const projectId = req.query.projectId as string | undefined;
+    const staleThresholdMs = parseInt(req.query.staleThresholdMs as string, 10) || 15 * 60 * 1000;
+
+    // Get tasks scoped appropriately
+    let tasks: DagTask[];
+    if (scope === 'project' && projectId) {
+      tasks = taskDAG.getTasksByProject(projectId);
+    } else {
+      tasks = taskDAG.getAll();
+    }
+
+    const now = Date.now();
+
+    // Failed tasks
+    const failed = tasks
+      .filter(t => t.dagStatus === 'failed')
+      .map(t => ({
+        type: 'failed' as const,
+        severity: 'critical' as const,
+        task: t,
+        reason: t.failureReason || 'Unknown failure',
+        failedAt: t.completedAt || t.startedAt || t.createdAt,
+      }));
+
+    // Blocked tasks
+    const blocked = tasks
+      .filter(t => t.dagStatus === 'blocked')
+      .map(t => {
+        const blockedSince = t.startedAt || t.createdAt;
+        const durationMs = now - new Date(blockedSince).getTime();
+        return {
+          type: 'blocked' as const,
+          severity: (durationMs > staleThresholdMs ? 'warning' : 'info') as 'warning' | 'info',
+          task: t,
+          durationMs,
+          blockedSince,
+        };
+      });
+
+    // Stale running tasks (running longer than threshold)
+    const stale = tasks
+      .filter(t => t.dagStatus === 'running' && t.startedAt)
+      .filter(t => {
+        const elapsed = now - new Date(t.startedAt!).getTime();
+        return elapsed > staleThresholdMs;
+      })
+      .map(t => {
+        const durationMs = now - new Date(t.startedAt!).getTime();
+        return {
+          type: 'stale' as const,
+          severity: (durationMs > staleThresholdMs * 2 ? 'critical' : 'warning') as 'critical' | 'warning',
+          task: t,
+          durationMs,
+          startedAt: t.startedAt!,
+        };
+      });
+
+    // Pending decisions
+    const pendingDecisions = decisionLog.getNeedingConfirmation()
+      .filter(d => {
+        if (scope === 'project' && projectId) {
+          return d.projectId === projectId;
+        }
+        return true;
+      })
+      .map(d => ({
+        type: 'decision' as const,
+        severity: 'warning' as const,
+        decision: {
+          id: d.id,
+          title: d.title,
+          rationale: d.rationale,
+          agentId: d.agentId,
+          agentRole: d.agentRole,
+          projectId: d.projectId,
+          timestamp: d.timestamp,
+          category: d.category,
+        },
+      }));
+
+    // Summary counts for the attention strip
+    const summary = {
+      failedCount: failed.length,
+      blockedCount: blocked.length,
+      staleCount: stale.length,
+      decisionCount: pendingDecisions.length,
+      totalCount: failed.length + blocked.length + stale.length + pendingDecisions.length,
+    };
+
+    // Escalation level: green / yellow / red
+    let escalation: 'green' | 'yellow' | 'red' = 'green';
+    if (summary.totalCount > 0) escalation = 'yellow';
+    if (failed.length > 0 || stale.some(s => s.severity === 'critical')) escalation = 'red';
+
+    return res.json({
+      scope,
+      ...(projectId ? { projectId } : {}),
+      escalation,
+      summary,
+      items: [
+        ...failed,
+        ...stale.filter(s => s.severity === 'critical'),
+        ...pendingDecisions,
+        ...stale.filter(s => s.severity === 'warning'),
+        ...blocked,
+      ],
+    });
+  });
+
+  return router;
+}

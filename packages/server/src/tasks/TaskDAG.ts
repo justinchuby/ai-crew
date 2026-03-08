@@ -116,6 +116,7 @@ function rowToTask(row: typeof dagTasks.$inferSelect): DagTask {
     priority: row.priority ?? 0,
     model: row.model || undefined,
     assignedAgentId: row.assignedAgentId || undefined,
+    failureReason: row.failureReason || undefined,
     createdAt: row.createdAt!,
     startedAt: row.startedAt || undefined,
     completedAt: row.completedAt || undefined,
@@ -417,12 +418,12 @@ export class TaskDAG extends EventEmitter {
   }
 
   /** Mark a task as failed. Block dependents. Returns false if transition is invalid. */
-  failTask(leadId: string, taskId: string): boolean {
+  failTask(leadId: string, taskId: string, reason?: string): boolean {
     const error = this.validateTransition(leadId, taskId, 'fail');
     if (error) return false;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'failed', completedAt: utcNow })
+      .set({ dagStatus: 'failed', completedAt: utcNow, ...(reason ? { failureReason: reason } : {}) })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     // Block all tasks that depend on this one
@@ -527,6 +528,19 @@ export class TaskDAG extends EventEmitter {
       .run();
     this.emit('dag:updated', { leadId });
     return this.getTask(leadId, taskId)!;
+  }
+
+  /** Update a task's priority. Returns the updated task, or null if not found. */
+  updatePriority(leadId: string, taskId: string, priority: number): DagTask | null {
+    const task = this.getTask(leadId, taskId);
+    if (!task) return null;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ priority })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return this.getTask(leadId, taskId);
   }
 
   /** Skip a task (mark as skipped, unblock dependents with warning).

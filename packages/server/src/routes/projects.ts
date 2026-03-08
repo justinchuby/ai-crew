@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
+import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 
 const PROJECT_TITLE_MAX = 100;
@@ -120,6 +121,220 @@ export function projectsRoutes(ctx: AppContext): Router {
       summary,
     });
   });
+
+  // ── Task mutation endpoints (for Kanban board drag-and-drop) ────────
+
+  /**
+   * Transition a task's status. Used by the KanbanBoard when dragging
+   * tasks between columns.
+   *
+   * The endpoint maps status changes to the appropriate TaskDAG method
+   * and validates the transition against the state machine.
+   */
+  router.patch('/projects/:id/tasks/:taskId/status', (req, res) => {
+    const { id: projectId, taskId } = req.params;
+    const { status } = req.body as { status?: string };
+
+    if (!status || typeof status !== 'string') {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    const validStatuses = ['pending', 'ready', 'running', 'done', 'failed', 'blocked', 'paused', 'skipped'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+
+    // Find the task to get its leadId (TaskDAG methods require leadId)
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const task = _db.drizzle.select().from(dagTasks)
+      .where(eq(dagTasks.id, taskId))
+      .get();
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.projectId && task.projectId !== projectId) {
+      return res.status(404).json({ error: 'Task not found in this project' });
+    }
+
+    const leadId = task.leadId;
+    const currentStatus = task.dagStatus ?? 'pending';
+
+    // Map target status → TaskDAG method
+    type TransitionResult = boolean | DagTask | DagTask[] | { skippedAgentId: string } | { oldAgentId: string } | null;
+    let result: TransitionResult = null;
+    let errorMsg: string | null = null;
+
+    try {
+      if (status === currentStatus) {
+        return res.json({ ok: true, task: formatTask(task) });
+      }
+
+      switch (status) {
+        case 'running':
+          // Can't manually start a task without an agent assignment
+          return res.status(400).json({ error: 'Cannot manually transition to running — tasks must be assigned to an agent' });
+        case 'done':
+          result = taskDAG.completeTask(leadId, taskId);
+          break;
+        case 'failed':
+          result = taskDAG.failTask(leadId, taskId) || null;
+          break;
+        case 'paused':
+          result = taskDAG.pauseTask(leadId, taskId) || null;
+          break;
+        case 'ready':
+          if (currentStatus === 'paused') {
+            result = taskDAG.resumeTask(leadId, taskId) || null;
+          } else if (currentStatus === 'failed') {
+            result = taskDAG.retryTask(leadId, taskId) || null;
+          } else if (currentStatus === 'pending' || currentStatus === 'blocked') {
+            result = taskDAG.forceReady(leadId, taskId);
+          } else if (currentStatus === 'done') {
+            result = taskDAG.reopenTask(leadId, taskId);
+          } else {
+            errorMsg = `Cannot transition from ${currentStatus} to ready`;
+          }
+          break;
+        case 'pending':
+          if (currentStatus === 'done') {
+            result = taskDAG.reopenTask(leadId, taskId);
+          } else {
+            errorMsg = `Cannot transition from ${currentStatus} to pending`;
+          }
+          break;
+        case 'skipped':
+          result = taskDAG.skipTask(leadId, taskId);
+          break;
+        case 'blocked':
+          errorMsg = 'Cannot manually transition to blocked — this status is set by dependency resolution';
+          break;
+        default:
+          errorMsg = `Unsupported target status: ${status}`;
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: `Transition failed: ${message}` });
+    }
+
+    if (errorMsg) {
+      return res.status(400).json({ error: errorMsg, currentStatus });
+    }
+    if (result === null || result === false) {
+      return res.status(409).json({
+        error: `Invalid transition from '${currentStatus}' to '${status}'`,
+        currentStatus,
+        targetStatus: status,
+      });
+    }
+
+    // Re-fetch the updated task
+    const updated = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    return res.json({ ok: true, task: updated ? formatTask(updated) : null });
+  });
+
+  /** Update a task's priority. Used by KanbanBoard for reordering within columns. */
+  router.patch('/projects/:id/tasks/:taskId/priority', (req, res) => {
+    const { id: projectId, taskId } = req.params;
+    const { priority } = req.body as { priority?: number };
+
+    if (typeof priority !== 'number' || !Number.isFinite(priority)) {
+      return res.status(400).json({ error: 'priority must be a finite number' });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const task = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.projectId && task.projectId !== projectId) {
+      return res.status(404).json({ error: 'Task not found in this project' });
+    }
+
+    const result = taskDAG.updatePriority(task.leadId, taskId, priority);
+    if (!result) return res.status(500).json({ error: 'Failed to update priority' });
+
+    const updated = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
+    return res.json({ ok: true, task: updated ? formatTask(updated) : null });
+  });
+
+  /** Create a new task from the Kanban board. */
+  router.post('/projects/:id/tasks', (req, res) => {
+    const { id: projectId } = req.params;
+    const { title, description, role, priority, dependsOn, files } = req.body as {
+      title?: string;
+      description?: string;
+      role?: string;
+      priority?: number;
+      dependsOn?: string[];
+      files?: string[];
+    };
+
+    if (!role || typeof role !== 'string') {
+      return res.status(400).json({ error: 'role is required' });
+    }
+    if (!title && !description) {
+      return res.status(400).json({ error: 'title or description is required' });
+    }
+
+    // Find an active lead for this project
+    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    const session = _db.drizzle.select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, projectId))
+      .orderBy(desc(projectSessions.startedAt))
+      .limit(1)
+      .get();
+
+    if (!session) {
+      return res.status(400).json({ error: 'No active session for this project. Start a session first.' });
+    }
+
+    const taskDAG = agentManager.getTaskDAG();
+    const taskId = `ui-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    try {
+      const result = taskDAG.declareTaskBatch(session.leadId, [{
+        taskId,
+        role,
+        title: title || undefined,
+        description: description || title || '',
+        priority: priority ?? 0,
+        dependsOn: dependsOn ?? [],
+        files: files ?? [],
+      }], projectId);
+
+      return res.status(201).json({
+        ok: true,
+        taskId,
+        tasks: result.tasks,
+        conflicts: result.conflicts,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: `Failed to create task: ${message}` });
+    }
+  });
+
+  // Helper to format a DB row as a DagTask response
+  function formatTask(t: typeof dagTasks.$inferSelect) {
+    return {
+      id: t.id,
+      leadId: t.leadId,
+      projectId: t.projectId ?? null,
+      role: t.role,
+      title: t.title,
+      description: t.description,
+      files: JSON.parse(t.files ?? '[]'),
+      dependsOn: JSON.parse(t.dependsOn ?? '[]'),
+      dagStatus: t.dagStatus ?? 'pending',
+      priority: t.priority,
+      assignedAgentId: t.assignedAgentId,
+      failureReason: t.failureReason ?? null,
+      createdAt: t.createdAt ?? '',
+      startedAt: t.startedAt ?? null,
+      completedAt: t.completedAt ?? null,
+    };
+  }
 
   // Historical group chats for a project (from database)
   router.get('/projects/:id/groups', (req, res) => {

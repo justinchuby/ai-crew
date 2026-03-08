@@ -165,6 +165,7 @@ export const dagTasks = sqliteTable('dag_tasks', {
   priority: integer('priority').default(0),
   model: text('model'),
   assignedAgentId: text('assigned_agent_id'),
+  failureReason: text('failure_reason'),
   createdAt: text('created_at').default(utcNow),
   startedAt: text('started_at'),
   completedAt: text('completed_at'),
