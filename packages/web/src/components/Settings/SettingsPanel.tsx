@@ -72,6 +72,7 @@ export function SettingsPanel({ api }: Props) {
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
+  // tabIndex enables keyboard scrolling (Page Down, arrows); focus:outline-none hides focus ring
   return (
     <div className="flex-1 overflow-auto focus:outline-none" tabIndex={0}>
     <div className="p-6 max-w-5xl mx-auto">
