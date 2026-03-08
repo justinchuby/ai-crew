@@ -156,6 +156,28 @@ describe('createContainer', () => {
     container = null; // prevent double shutdown
   });
 
+  it('shutdown awaits async handlers (no fire-and-forget)', async () => {
+    container = await createContainer(createTestContainerConfig());
+
+    // Replace a stop method with an async function that rejects after a delay.
+    // If shutdown properly awaits, the rejection is caught and warned.
+    const asyncError = new Error('async stop failed');
+    vi.spyOn(container.eagerScheduler!, 'stop').mockImplementation(
+      () => new Promise((_resolve, reject) => setTimeout(() => reject(asyncError), 10)) as any,
+    );
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(container.shutdown()).resolves.toBeUndefined();
+
+    // The async rejection should have been caught and warned
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('shutdown failed'),
+      asyncError,
+    );
+    warnSpy.mockRestore();
+    container = null;
+  });
+
   it('shutdown is idempotent', async () => {
     container = await createContainer(createTestContainerConfig());
 

@@ -155,7 +155,7 @@ function gracefulShutdown(signal: string) {
       console.log('Server closed.');
       process.exit(0);
     });
-    setTimeout(() => process.exit(1), 5000);
+    setTimeout(() => process.exit(1), 15000);
   });
 }
 

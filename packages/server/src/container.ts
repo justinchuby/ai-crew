@@ -136,9 +136,9 @@ export interface ServiceContainer extends AppContext {
 
 export async function createContainer(opts: ContainerConfig): Promise<ServiceContainer> {
   const { config, repoRoot } = opts;
-  const stopList: Array<{ name: string; fn: () => void }> = [];
+  const stopList: Array<{ name: string; fn: () => void | Promise<void> }> = [];
 
-  function onShutdown(name: string, fn: () => void): void {
+  function onShutdown(name: string, fn: () => void | Promise<void>): void {
     stopList.push({ name, fn });
   }
 
@@ -340,7 +340,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   integrationRouter.start().catch(err => {
     logger.warn({ module: 'container', msg: 'IntegrationRouter failed to start', error: (err as Error).message });
   });
-  onShutdown('integrationRouter', () => { integrationRouter.stop().catch(() => {}); });
+  onShutdown('integrationRouter', () => integrationRouter.stop());
 
   // ── Timers & Scheduler ─────────────────────────────────
   timerRegistry.start();
@@ -443,7 +443,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     // Lifecycle
     async shutdown() {
       for (const { name, fn } of [...stopList].reverse()) {
-        try { fn(); } catch (err) {
+        try { await Promise.resolve(fn()); } catch (err) {
           console.warn(`[container] ${name} shutdown failed:`, err);
         }
       }
@@ -592,7 +592,8 @@ function wireEvents(c: ServiceContainer): void {
 
   // ── Agent reconciliation on reconnect ─────────────────
   if (agentServerClient) {
-    wireReconciliationOnReconnect(agentServerClient, agentManager, c.internal.wsServer);
+    const unsubReconciliation = wireReconciliationOnReconnect(agentServerClient, agentManager, c.internal.wsServer);
+    onShutdown('reconciliationListener', unsubReconciliation);
   }
 
   // Alert engine → WS broadcast is wired in wireHttpLayer() after HTTP server creation
@@ -611,12 +612,12 @@ export function wireReconciliationOnReconnect(
   agentServerClient: AgentServerClient,
   agentManager: AgentManager,
   wsServer?: { broadcastEvent: (event: any, projectId?: string) => void } | null,
-): void {
+): () => void {
   const reconciliation = new AgentReconciliation(agentServerClient);
   let hasConnectedBefore = false;
   let isReconciling = false;
 
-  agentServerClient.on('connected', () => {
+  const handler = () => {
     if (!hasConnectedBefore) {
       hasConnectedBefore = true;
       return; // Skip reconciliation on initial connect
@@ -661,7 +662,12 @@ export function wireReconciliationOnReconnect(
       .finally(() => {
         isReconciling = false;
       });
-  });
+  };
+
+  agentServerClient.on('connected', handler);
+
+  // Return unsubscribe function for shutdown cleanup
+  return () => { agentServerClient.removeListener('connected', handler); };
 }
 
 /**
