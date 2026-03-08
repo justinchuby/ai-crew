@@ -1,25 +1,43 @@
 /**
  * End-to-end integration test for the knowledge pipeline.
  *
- * Tests the FULL lifecycle:
+ * Tests the FULL lifecycle at two levels:
+ *
+ * A) Component-level (real DB, real knowledge components):
  *   1. Pre-populate project knowledge (core rules)
- *   2. Spawn agent → knowledge injected into system prompt
- *   3. Agent "runs" (synthetic messages with decision/pattern/error signals)
- *   4. Session ends → SessionKnowledgeExtractor extracts learnings
- *   5. Verify learnings stored with correct categories + metadata
- *   6. Spawn second agent → verify it receives the first agent's learnings
+ *   2. KnowledgeInjector queries project knowledge → injects into prompt
+ *   3. SessionKnowledgeExtractor extracts learnings from agent sessions
+ *   4. Re-inject into next agent → verify learnings appear
+ *
+ * B) AgentManager-level (real AgentManager + real knowledge, mock non-knowledge deps):
+ *   1. Spawn agent via AgentManager.spawn() → verify systemPrompt has knowledge
+ *   2. SkillsLoader injects .github/skills/ content
+ *   3. Token budget is respected
+ *   4. Knowledge + skills compose correctly in the prompt
+ *   5. SessionKnowledgeExtractor wired to onExit
  *
  * Uses real Database (:memory:), KnowledgeStore, MemoryCategoryManager,
- * KnowledgeInjector, and SessionKnowledgeExtractor — no mocks except
- * for AgentManager dependencies unrelated to knowledge.
+ * KnowledgeInjector, SessionKnowledgeExtractor, and SkillsLoader.
+ * Mocks only AgentManager deps unrelated to knowledge.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import { MemoryCategoryManager } from '../MemoryCategoryManager.js';
 import { KnowledgeInjector } from '../KnowledgeInjector.js';
 import { SessionKnowledgeExtractor } from '../SessionKnowledgeExtractor.js';
-import type { SessionData, SessionMessage, KnowledgeCategory } from '../types.js';
+import { SkillsLoader } from '../SkillsLoader.js';
+import { AgentManager } from '../../agents/AgentManager.js';
+import type { SessionData, SessionMessage } from '../types.js';
+import type { Role } from '@flightdeck/shared';
+
+// Mock writeAgentFiles to avoid filesystem writes during AgentManager tests
+vi.mock('../../agents/agentFiles.js', () => ({
+  writeAgentFiles: vi.fn(),
+}));
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -37,6 +55,103 @@ function makeSession(overrides: Partial<SessionData> = {}): SessionData {
     messages: [],
     ...overrides,
   };
+}
+
+function makeRole(overrides: Partial<Role> = {}): Role {
+  return {
+    id: 'developer',
+    name: 'Developer',
+    description: 'A developer',
+    systemPrompt: 'You are a skilled developer.',
+    color: '#0088ff',
+    icon: '💻',
+    builtIn: true,
+    ...overrides,
+  };
+}
+
+/** Creates a stub where any property access returns a no-op vi.fn(). */
+function stubDep(): any {
+  const cache: Record<string | symbol, any> = {};
+  return new Proxy({}, {
+    get: (_target, prop) => {
+      if (prop === 'then') return undefined;
+      if (prop === Symbol.toPrimitive || prop === Symbol.toStringTag) return undefined;
+      if (!cache[prop]) {
+        cache[prop] = vi.fn().mockReturnValue([]);
+      }
+      return cache[prop];
+    },
+  });
+}
+
+function stubRegistry() {
+  return {
+    getRole: vi.fn((id: string) => makeRole({ id })),
+    getAll: vi.fn(() => [makeRole()]),
+    getAllRoles: vi.fn(() => [makeRole()]),
+    generateRoleList: vi.fn(() => '- developer: Developer'),
+    addRole: vi.fn(),
+    updateRole: vi.fn(),
+    deleteRole: vi.fn(),
+    registerRole: vi.fn(),
+    listRoles: vi.fn(() => []),
+  } as any;
+}
+
+function makeConfig() {
+  return {
+    port: 3000,
+    host: 'localhost',
+    cliCommand: 'copilot',
+    cliArgs: [],
+    provider: 'mock',
+    sdkMode: false,
+    maxConcurrentAgents: 10,
+    dbPath: ':memory:',
+  };
+}
+
+/** Create a temp skills directory with the given skills. */
+function createSkillsDir(skills: Array<{ name: string; description: string; content: string }>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'skills-e2e-'));
+  for (const skill of skills) {
+    const skillDir = join(dir, skill.name);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'),
+      `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n\n${skill.content}`
+    );
+  }
+  return dir;
+}
+
+/** Create an AgentManager wired with real knowledge components. */
+function createAgentManager(opts: {
+  knowledgeInjector?: KnowledgeInjector;
+  skillsLoader?: SkillsLoader;
+  sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
+} = {}): AgentManager {
+  const mgr = new AgentManager(
+    makeConfig(),
+    stubRegistry(),
+    stubDep() as any,  // lockRegistry
+    stubDep() as any,  // activityLedger
+    stubDep() as any,  // messageBus
+    stubDep() as any,  // decisionLog
+    stubDep() as any,  // agentMemory
+    stubDep() as any,  // chatGroupRegistry
+    stubDep() as any,  // taskDAG
+    {
+      knowledgeInjector: opts.knowledgeInjector,
+    },
+  );
+  if (opts.skillsLoader) {
+    mgr.setSkillsLoader(opts.skillsLoader);
+  }
+  if (opts.sessionKnowledgeExtractor) {
+    mgr.setSessionKnowledgeExtractor(opts.sessionKnowledgeExtractor);
+  }
+  return mgr;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -390,6 +505,299 @@ describe('Knowledge Pipeline E2E', () => {
       expect(injectionA.text).not.toContain('TypeScript');
       expect(injectionB.text).toContain('TypeScript');
       expect(injectionB.text).not.toContain('Python');
+    });
+  });
+
+  // ── Phase 5: AgentManager Integration ─────────────────────────
+
+  describe('Phase 5: AgentManager spawns with real knowledge injection', () => {
+    it('spawned agent system prompt includes injected project knowledge', () => {
+      categoryManager.putMemory(PROJECT_ID, 'core', 'stack', 'TypeScript + React + SQLite');
+      categoryManager.putMemory(PROJECT_ID, 'procedural', 'testing', 'Use vitest with describe/it blocks.');
+
+      const mgr = createAgentManager({ knowledgeInjector: injector });
+      const agent = mgr.spawn(
+        makeRole(), 'Build auth module',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      expect(agent.role.systemPrompt).toContain('You are a skilled developer.');
+      expect(agent.role.systemPrompt).toContain('TypeScript');
+      expect(agent.role.systemPrompt).toContain('vitest');
+      mgr.terminate(agent.id);
+    });
+
+    it('empty project yields unmodified system prompt', () => {
+      const mgr = createAgentManager({ knowledgeInjector: injector });
+      const agent = mgr.spawn(
+        makeRole(), 'Build feature',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: 'empty-project' },
+      );
+
+      expect(agent.role.systemPrompt).toBe('You are a skilled developer.');
+      mgr.terminate(agent.id);
+    });
+
+    it('multiple agents in same project share knowledge', () => {
+      categoryManager.putMemory(PROJECT_ID, 'core', 'rules', 'Always review PRs before merge.');
+
+      const mgr = createAgentManager({ knowledgeInjector: injector });
+
+      const agent1 = mgr.spawn(
+        makeRole({ id: 'developer' }), 'Task A',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+      const agent2 = mgr.spawn(
+        makeRole({ id: 'architect' }), 'Task B',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      expect(agent1.role.systemPrompt).toContain('review PRs');
+      expect(agent2.role.systemPrompt).toContain('review PRs');
+      mgr.terminate(agent1.id);
+      mgr.terminate(agent2.id);
+    });
+
+    it('full lifecycle: extract from session → spawn new agent → gets learned knowledge', () => {
+      // Step 1: Pre-populate core knowledge
+      categoryManager.putMemory(PROJECT_ID, 'core', 'stack', 'TypeScript + SQLite');
+
+      // Step 2: First agent spawns and gets core knowledge
+      const mgr = createAgentManager({
+        knowledgeInjector: injector,
+        sessionKnowledgeExtractor: extractor,
+      });
+      const agent1 = mgr.spawn(
+        makeRole(), 'Build auth',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+      expect(agent1.role.systemPrompt).toContain('TypeScript');
+      expect(agent1.role.systemPrompt).not.toContain('JWT');
+      mgr.terminate(agent1.id);
+
+      // Step 3: Simulate first agent's session producing learnings
+      // (Direct call — AgentManager.onExit calls this internally but requires
+      // message history which needs a real adapter. Component-level is correct here.)
+      extractor.extractFromSession(makeSession({
+        sessionId: 'session-agent-1',
+        agentId: agent1.id,
+        messages: [
+          msg('agent', 'Starting auth module implementation.'),
+          msg('agent', 'We decided to use JWT with RS256 signing for token security.'),
+          msg('agent', 'The pattern for middleware: validate token, extract user, attach to context.'),
+          msg('agent', 'Implementation complete.'),
+        ],
+        completionSummary: 'Built JWT auth with RS256 signing and validation middleware.',
+      }));
+
+      // Step 4: Verify learnings were stored
+      const stored = store.getAll(PROJECT_ID);
+      expect(stored.length).toBeGreaterThanOrEqual(3); // core + extracted
+
+      // Step 5: Second agent spawns via AgentManager → gets BOTH core + learned knowledge
+      const agent2 = mgr.spawn(
+        makeRole(), 'Build user profile',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      const prompt2 = agent2.role.systemPrompt;
+      expect(prompt2).toContain('TypeScript');  // core still there
+      const hasLearnedKnowledge =
+        prompt2.toLowerCase().includes('jwt') ||
+        prompt2.toLowerCase().includes('auth') ||
+        prompt2.toLowerCase().includes('rs256');
+      expect(hasLearnedKnowledge).toBe(true);
+      mgr.terminate(agent2.id);
+    });
+
+    it('session extractor is wired and does not crash on terminate', () => {
+      // Verifies the extractor is set up — terminate() triggers onExit which
+      // calls extractSessionKnowledge. With no message history, extraction
+      // gracefully skips (< 3 messages).
+      const mgr = createAgentManager({
+        knowledgeInjector: injector,
+        sessionKnowledgeExtractor: extractor,
+      });
+      const agent = mgr.spawn(
+        makeRole(), 'Quick task',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      // Should not throw — extraction gracefully handles empty history
+      expect(() => mgr.terminate(agent.id)).not.toThrow();
+    });
+  });
+
+  // ── Phase 6: SkillsLoader Integration ─────────────────────────
+
+  describe('Phase 6: SkillsLoader integration via AgentManager', () => {
+    let skillsDir: string;
+
+    afterEach(() => {
+      if (skillsDir) {
+        rmSync(skillsDir, { recursive: true, force: true });
+      }
+    });
+
+    it('skills from .github/skills/ appear in agent system prompt', () => {
+      skillsDir = createSkillsDir([
+        { name: 'testing-conventions', description: 'Testing standards', content: 'Always use vitest. Test files live next to source.' },
+        { name: 'error-handling', description: 'Error patterns', content: 'Wrap async handlers in try-catch. Use custom error classes.' },
+      ]);
+
+      const loader = new SkillsLoader(skillsDir);
+      loader.loadAll();
+
+      const mgr = createAgentManager({ skillsLoader: loader });
+      const agent = mgr.spawn(makeRole(), 'Build feature');
+
+      expect(agent.role.systemPrompt).toContain('Project Skills');
+      expect(agent.role.systemPrompt).toContain('vitest');
+      expect(agent.role.systemPrompt).toContain('try-catch');
+      mgr.terminate(agent.id);
+    });
+
+    it('knowledge + skills compose correctly in prompt order', () => {
+      categoryManager.putMemory(PROJECT_ID, 'core', 'stack', 'TypeScript + React');
+
+      skillsDir = createSkillsDir([
+        { name: 'code-style', description: 'Style guide', content: 'Use Prettier and ESLint.' },
+      ]);
+      const loader = new SkillsLoader(skillsDir);
+      loader.loadAll();
+
+      const mgr = createAgentManager({
+        knowledgeInjector: injector,
+        skillsLoader: loader,
+      });
+      const agent = mgr.spawn(
+        makeRole(), 'Build feature',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      const prompt = agent.role.systemPrompt;
+      // Order: base prompt → knowledge → skills
+      const baseIdx = prompt.indexOf('You are a skilled developer.');
+      const knowledgeIdx = prompt.indexOf('TypeScript');
+      const skillsIdx = prompt.indexOf('Project Skills');
+
+      expect(baseIdx).toBeLessThan(knowledgeIdx);
+      expect(knowledgeIdx).toBeLessThan(skillsIdx);
+      mgr.terminate(agent.id);
+    });
+
+    it('skills token budget limits injection size', () => {
+      // Create a skill with a lot of content
+      const longContent = 'This is a detailed coding standard. '.repeat(200);
+      skillsDir = createSkillsDir([
+        { name: 'verbose-skill', description: 'Very detailed skill', content: longContent },
+      ]);
+
+      const loader = new SkillsLoader(skillsDir);
+      loader.loadAll();
+
+      // Small budget should truncate
+      const small = loader.formatForInjection(50);
+      const large = loader.formatForInjection(5000);
+
+      // Small budget should still produce something (at least truncated header)
+      if (small) {
+        expect(small.length).toBeLessThan(large.length);
+      }
+      expect(large).toContain('coding standard');
+    });
+
+    it('empty skills directory yields unmodified prompt', () => {
+      skillsDir = mkdtempSync(join(tmpdir(), 'skills-empty-'));
+
+      const loader = new SkillsLoader(skillsDir);
+      loader.loadAll();
+
+      const mgr = createAgentManager({ skillsLoader: loader });
+      const agent = mgr.spawn(makeRole(), 'Task');
+
+      expect(agent.role.systemPrompt).toBe('You are a skilled developer.');
+      mgr.terminate(agent.id);
+    });
+
+    it('nonexistent skills directory is handled gracefully', () => {
+      const loader = new SkillsLoader('/tmp/nonexistent-skills-dir-xyz');
+      loader.loadAll();
+
+      const mgr = createAgentManager({ skillsLoader: loader });
+      const agent = mgr.spawn(makeRole(), 'Task');
+
+      expect(agent.role.systemPrompt).toBe('You are a skilled developer.');
+      mgr.terminate(agent.id);
+    });
+
+    it('full pipeline: knowledge + skills + extraction lifecycle', () => {
+      // This is the ultimate integration test:
+      // Pre-populate knowledge + skills → spawn agent → verify prompt → extract → re-spawn
+
+      // 1. Pre-populate project knowledge
+      categoryManager.putMemory(PROJECT_ID, 'core', 'architecture', 'Modular monolith with DI container');
+
+      // 2. Set up skills
+      skillsDir = createSkillsDir([
+        { name: 'commit-conventions', description: 'Git commit rules', content: 'Use conventional commits. Always sign off.' },
+      ]);
+      const loader = new SkillsLoader(skillsDir);
+      loader.loadAll();
+
+      // 3. Create fully-wired AgentManager
+      const mgr = createAgentManager({
+        knowledgeInjector: injector,
+        skillsLoader: loader,
+        sessionKnowledgeExtractor: extractor,
+      });
+
+      // 4. First agent: has knowledge + skills
+      const agent1 = mgr.spawn(
+        makeRole(), 'Initial setup',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+      expect(agent1.role.systemPrompt).toContain('Modular monolith');
+      expect(agent1.role.systemPrompt).toContain('conventional commits');
+      mgr.terminate(agent1.id);
+
+      // 5. Simulate first agent's session extraction
+      extractor.extractFromSession(makeSession({
+        sessionId: 'session-full-pipeline',
+        agentId: agent1.id,
+        messages: [
+          msg('agent', 'Setting up the project structure.'),
+          msg('agent', 'We decided to use barrel exports for clean module boundaries.'),
+          msg('agent', 'Best practice: each module exports types, service, and routes from index.ts.'),
+          msg('agent', 'Setup complete.'),
+        ],
+        completionSummary: 'Established module boundary conventions with barrel exports.',
+      }));
+
+      // 6. Second agent gets everything: core + learned + skills
+      const agent2 = mgr.spawn(
+        makeRole({ id: 'architect' }), 'Design new module',
+        undefined, false, undefined, undefined, undefined, undefined,
+        { projectId: PROJECT_ID },
+      );
+
+      const prompt2 = agent2.role.systemPrompt;
+      expect(prompt2).toContain('Modular monolith');       // core knowledge
+      expect(prompt2).toContain('conventional commits');    // skills
+      const hasLearned =
+        prompt2.toLowerCase().includes('barrel') ||
+        prompt2.toLowerCase().includes('module boundar');
+      expect(hasLearned).toBe(true);                       // extracted learning
+      mgr.terminate(agent2.id);
     });
   });
 });
