@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { RateLimitError } from '../integrations/IntegrationRouter.js';
 
 const integrationLimiter = rateLimit({ windowMs: 60_000, max: 60, message: 'Too many integration requests' });
 
@@ -106,9 +107,11 @@ export function integrationRoutes(ctx: AppContext): Router {
       }
 
       res.status(201).json(session);
-    } catch (err: any) {
-      const status = err.status || 500;
-      res.status(status).json({ error: err.message || 'Failed to verify session' });
+    } catch (err: unknown) {
+      if (err instanceof RateLimitError) {
+        return res.status(429).json({ error: err.message });
+      }
+      res.status(500).json({ error: (err as Error).message || 'Failed to verify session' });
     }
   });
 

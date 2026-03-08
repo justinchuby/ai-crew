@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { CollectiveMemory } from '../coordination/knowledge/CollectiveMemory.js';
+import { CollectiveMemory, KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
 import type { MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 
 /**
@@ -50,11 +50,8 @@ function rememberExtractedKnowledge(
   projectId: string,
 ): number {
   if (!collectiveMemory) return 0;
-  const categoryMap: Record<string, MemoryCategory> = {
-    semantic: 'decision', procedural: 'pattern', episodic: 'expertise',
-  };
   for (const entry of entries) {
-    const memCat = categoryMap[entry.category] ?? 'pattern';
+    const memCat = KNOWLEDGE_TO_MEMORY_CATEGORY[entry.category] ?? 'pattern';
     collectiveMemory.remember(memCat, entry.key, entry.content, agentId, projectId);
   }
   return entries.length;

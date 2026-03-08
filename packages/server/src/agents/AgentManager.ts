@@ -39,6 +39,7 @@ import type { SessionData, SessionMessage } from '../knowledge/types.js';
 import type { KnowledgeInjector, InjectionContext } from '../knowledge/KnowledgeInjector.js';
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
 import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
+import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -1250,12 +1251,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
       // Persist extracted knowledge into collective memory for cross-session recall
       if (this.collectiveMemory) {
-        const categoryMap: Record<string, MemoryCategory> = {
-          semantic: 'decision', procedural: 'pattern', episodic: 'expertise',
-        };
         const entries = [...result.decisions, ...result.patterns, ...result.errors];
         for (const entry of entries) {
-          const memCat = categoryMap[entry.category] ?? 'pattern';
+          const memCat = KNOWLEDGE_TO_MEMORY_CATEGORY[entry.category] ?? 'pattern';
           this.collectiveMemory.remember(memCat, entry.key, entry.content, agent.id, agent.projectId!);
         }
         if (entries.length > 0) {

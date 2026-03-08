@@ -52,6 +52,15 @@ const VERIFY_MAX_ATTEMPTS = 5;
 /** Rate limit window for verification attempts (1 minute). */
 const VERIFY_WINDOW_MS = 60_000;
 
+/** Typed error for rate-limited requests. */
+export class RateLimitError extends Error {
+  readonly status = 429;
+  constructor(message = 'Too many requests') {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
 export class IntegrationRouter {
   private adapters: Map<string, MessagingAdapter> = new Map();
   private sessions: Map<string, ChatSession> = new Map(); // chatId → session
@@ -232,9 +241,7 @@ export class IntegrationRouter {
     // Per-chatId rate limiting against brute-force
     if (this.isVerifyRateLimited(chatId)) {
       logger.warn({ module: 'integration-router', msg: 'Verification rate-limited', chatId });
-      const err = new Error('Too many verification attempts. Try again in 1 minute.');
-      (err as any).status = 429;
-      throw err;
+      throw new RateLimitError('Too many verification attempts. Try again in 1 minute.');
     }
     this.recordVerifyAttempt(chatId);
 

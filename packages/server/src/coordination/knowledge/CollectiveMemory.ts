@@ -11,6 +11,13 @@ function escapeLike(s: string): string {
 
 export type MemoryCategory = 'pattern' | 'decision' | 'expertise' | 'gotcha';
 
+/** Maps KnowledgeStore categories to CollectiveMemory categories. */
+export const KNOWLEDGE_TO_MEMORY_CATEGORY: Record<string, MemoryCategory> = {
+  semantic: 'decision',
+  procedural: 'pattern',
+  episodic: 'expertise',
+};
+
 export interface CollectiveMemoryEntry {
   id: number;
   category: MemoryCategory;
