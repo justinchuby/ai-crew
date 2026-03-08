@@ -58,6 +58,7 @@ function createMockTaskDAG() {
     getTasksByProject: vi.fn().mockImplementation((projectId: string) =>
       SAMPLE_TASKS.filter(t => t.projectId === projectId),
     ),
+    unarchiveTask: vi.fn(),
   };
 }
 
@@ -214,6 +215,22 @@ describe('GET /tasks — global task query', () => {
   it('defaults includeArchived to false', async () => {
     await fetch(`${baseUrl}/tasks`);
     expect(mockTaskDAG.getAll).toHaveBeenCalledWith({ includeArchived: false });
+  });
+
+  it('PATCH /tasks/:leadId/:taskId/unarchive calls unarchiveTask', async () => {
+    const restoredTask = { ...SAMPLE_TASKS[0], archivedAt: undefined };
+    mockTaskDAG.unarchiveTask.mockReturnValue(restoredTask);
+    const res = await fetch(`${baseUrl}/tasks/lead-1/task-1/unarchive`, { method: 'PATCH' });
+    expect(res.status).toBe(200);
+    expect(mockTaskDAG.unarchiveTask).toHaveBeenCalledWith('lead-1', 'task-1');
+    const body = await res.json();
+    expect(body.id).toBe('task-1');
+  });
+
+  it('PATCH /tasks/:leadId/:taskId/unarchive returns 404 for non-archived task', async () => {
+    mockTaskDAG.unarchiveTask.mockReturnValue(null);
+    const res = await fetch(`${baseUrl}/tasks/lead-1/task-99/unarchive`, { method: 'PATCH' });
+    expect(res.status).toBe(404);
   });
 });
 

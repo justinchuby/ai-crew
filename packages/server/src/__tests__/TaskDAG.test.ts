@@ -1288,6 +1288,40 @@ describe('TaskDAG', () => {
       expect(statusWithArchived.tasks).toHaveLength(1);
       expect(statusWithArchived.tasks[0].archivedAt).toBeDefined();
     });
+
+    it('unarchiveTask restores a single archived task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.resetDAG('lead-1');
+      expect(dag.getTasks('lead-1')).toHaveLength(0);
+      const restored = dag.unarchiveTask('lead-1', 'a');
+      expect(restored).not.toBeNull();
+      expect(restored!.id).toBe('a');
+      expect(restored!.archivedAt).toBeUndefined();
+      // Only 'a' is restored, 'b' stays archived
+      expect(dag.getTasks('lead-1')).toHaveLength(1);
+      expect(dag.getTasks('lead-1', { includeArchived: true })).toHaveLength(2);
+    });
+
+    it('unarchiveTask returns null for non-archived task', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.unarchiveTask('lead-1', 'a')).toBeNull();
+    });
+
+    it('unarchiveTask returns null for nonexistent task', () => {
+      expect(dag.unarchiveTask('lead-1', 'nonexistent')).toBeNull();
+    });
+
+    it('unarchiveTask emits dag:updated', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      let emitted = false;
+      dag.on('dag:updated', () => { emitted = true; });
+      dag.unarchiveTask('lead-1', 'a');
+      expect(emitted).toBe(true);
+    });
   });
 
   describe('addDependency', () => {

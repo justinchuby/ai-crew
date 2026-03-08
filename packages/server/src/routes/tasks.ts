@@ -74,6 +74,21 @@ export function tasksRoutes(ctx: AppContext): Router {
     });
   });
 
+  // ── Unarchive a task ────────────────────────────────────────────────
+  /**
+   * PATCH /tasks/:leadId/:taskId/unarchive
+   * Restores an archived task by clearing its archivedAt timestamp.
+   */
+  router.patch('/tasks/:leadId/:taskId/unarchive', (req, res) => {
+    const taskDAG = agentManager.getTaskDAG();
+    const { leadId, taskId } = req.params;
+    const restored = taskDAG.unarchiveTask(leadId, taskId);
+    if (!restored) {
+      return res.status(404).json({ error: 'Task not found or not archived' });
+    }
+    return res.json(restored);
+  });
+
   // ── Attention items endpoint ──────────────────────────────────────
   /**
    * GET /attention

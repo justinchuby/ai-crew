@@ -898,6 +898,23 @@ export class TaskDAG extends EventEmitter {
     return tasks.length;
   }
 
+  /** Unarchive a single task (clear archivedAt). Returns the restored task or null if not found/not archived. */
+  unarchiveTask(leadId: string, taskId: string): DagTask | null {
+    const row = this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId), sql`${dagTasks.archivedAt} IS NOT NULL`))
+      .get();
+    if (!row) return null;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ archivedAt: null })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return { ...rowToTask(row), archivedAt: undefined };
+  }
+
   /** Get tasks as they existed at a given timestamp (for replay) */
   getTasksAt(leadId: string, timestamp: string): DagTask[] {
     return this.db.drizzle

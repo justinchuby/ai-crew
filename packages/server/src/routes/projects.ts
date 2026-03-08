@@ -74,14 +74,13 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!_db) return res.json({ tasks: [], summary: {} });
     const projectId = req.params.id;
     const includeArchived = req.query.includeArchived === 'true';
+    const taskDAG = agentManager.getTaskDAG();
 
-    // Primary: query by project_id column directly
-    let allTasks = _db.drizzle.select().from(dagTasks)
-      .where(eq(dagTasks.projectId, projectId))
-      .all();
+    // Primary: SQL-level filtering via TaskDAG
+    let tasks = taskDAG.getTasksByProject(projectId, { includeArchived });
 
     // Fallback: older tasks without project_id — join through projectSessions
-    if (allTasks.length === 0) {
+    if (tasks.length === 0) {
       const leads = _db.drizzle
         .select({ leadId: projectSessions.leadId })
         .from(projectSessions)
@@ -89,44 +88,30 @@ export function projectsRoutes(ctx: AppContext): Router {
         .all();
       if (leads.length > 0) {
         const leadIds = leads.map((l) => l.leadId);
-        allTasks = _db.drizzle.select().from(dagTasks)
+        const rawTasks = _db.drizzle.select().from(dagTasks)
           .where(inArray(dagTasks.leadId, leadIds))
           .all();
+        // Map raw rows and filter archived in-memory (fallback path only)
+        const mapped = rawTasks.map((t) => ({
+          id: t.id, leadId: t.leadId, projectId: t.projectId ?? undefined,
+          role: t.role, title: t.title || undefined, description: t.description,
+          files: JSON.parse(t.files ?? '[]'), dependsOn: JSON.parse(t.dependsOn ?? '[]'),
+          dagStatus: t.dagStatus ?? 'pending', priority: t.priority ?? 0,
+          model: t.model || undefined, assignedAgentId: t.assignedAgentId || undefined,
+          failureReason: t.failureReason || undefined,
+          createdAt: t.createdAt ?? '', startedAt: t.startedAt || undefined,
+          completedAt: t.completedAt || undefined, archivedAt: t.archivedAt || undefined,
+        })) as DagTask[];
+        tasks = includeArchived ? mapped : mapped.filter(t => !t.archivedAt);
       }
-    }
-
-    // Filter archived unless explicitly included
-    if (!includeArchived) {
-      allTasks = allTasks.filter(t => !t.archivedAt);
     }
 
     // Build summary
     const summary: Record<string, number> = {};
-    for (const t of allTasks) {
-      const status = t.dagStatus ?? 'pending';
-      summary[status] = (summary[status] ?? 0) + 1;
+    for (const t of tasks) {
+      summary[t.dagStatus] = (summary[t.dagStatus] ?? 0) + 1;
     }
-    res.json({
-      tasks: allTasks.map((t) => ({
-        id: t.id,
-        leadId: t.leadId,
-        projectId: t.projectId ?? null,
-        role: t.role,
-        title: t.title,
-        description: t.description,
-        files: JSON.parse(t.files ?? '[]'),
-        dependsOn: JSON.parse(t.dependsOn ?? '[]'),
-        dagStatus: t.dagStatus ?? 'pending',
-        priority: t.priority,
-        assignedAgentId: t.assignedAgentId,
-        createdAt: t.createdAt ?? '',
-        startedAt: t.startedAt ?? null,
-        completedAt: t.completedAt ?? null,
-        archivedAt: t.archivedAt ?? null,
-      })),
-      fileLockMap: {},
-      summary,
-    });
+    res.json({ tasks, fileLockMap: {}, summary });
   });
 
   // ── Task mutation endpoints (for Kanban board drag-and-drop) ────────
