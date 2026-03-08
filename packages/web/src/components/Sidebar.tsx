@@ -7,6 +7,7 @@ const primaryLinks = [
   { to: '/', icon: Crown, label: 'Lead' },
   { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
   { to: '/agents', icon: Users, label: 'Agents' },
+  { to: '/team', icon: UserCheck, label: 'Team' },
   { to: '/tasks', icon: ListChecks, label: 'Tasks' },
   { to: '/timeline', icon: GanttChart, label: 'Timeline' },
   { to: '/mission-control', icon: Activity, label: 'Mission' },
@@ -16,7 +17,6 @@ const primaryLinks = [
 const moreLinks = [
   { to: '/projects', icon: FolderOpen, label: 'Projects' },
   { to: '/knowledge', icon: Brain, label: 'Knowledge' },
-  { to: '/team', icon: UserCheck, label: 'Team' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/groups', icon: MessageSquare, label: 'Groups' },
   { to: '/org', icon: Network, label: 'Org Chart' },

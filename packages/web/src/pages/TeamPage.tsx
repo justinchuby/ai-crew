@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users,
   Search,
@@ -20,6 +20,12 @@ import {
   Wifi,
   WifiOff,
   X,
+  Download,
+  Upload,
+  FolderDown,
+  Package,
+  CheckCircle,
+  Info,
 } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
 import { useToastStore } from '../components/Toast';
@@ -103,6 +109,32 @@ interface ServerStatus {
   latencyMs: number | null;
   pendingRequests: number;
   trackedAgents: number;
+}
+
+interface TeamDetail {
+  teamId: string;
+  agentCount: number;
+  agents: Array<{ agentId: string; role: string; model: string; status: string }>;
+  knowledgeCount: number;
+  trainingSummary: { corrections?: number; feedback?: number } | null;
+}
+
+interface ExportResult {
+  success: boolean;
+  bundle?: unknown;
+  bundlePath?: string;
+  manifest?: { exportedAt: string; agentCount: number; knowledgeCount: number };
+  filesWritten?: number;
+}
+
+interface ImportReport {
+  success: boolean;
+  teamId: string;
+  agents: Array<{ name: string; action: string; newAgentId: string; renamedTo?: string }>;
+  knowledge: { imported: number; skipped: number; conflicts: number };
+  training: { correctionsImported: number; feedbackImported: number };
+  warnings: string[];
+  validation: { valid: boolean; issues: Array<{ severity: string; message: string; phase?: string }> };
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -389,6 +421,378 @@ function ProfilePanel({ agentId, teamId, onClose }: {
   );
 }
 
+// ── Export Dialog ──────────────────────────────────────────
+
+function ExportDialog({ teamId, onClose }: { teamId: string; onClose: () => void }) {
+  const addToast = useToastStore(s => s.add);
+  const [includeKnowledge, setIncludeKnowledge] = useState(true);
+  const [includeTraining, setIncludeTraining] = useState(true);
+  const [excludeEpisodic, setExcludeEpisodic] = useState(false);
+  const [outputPath, setOutputPath] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [result, setResult] = useState<ExportResult | null>(null);
+
+  const handleExport = async (toDirectory: boolean) => {
+    setExporting(true);
+    setResult(null);
+    try {
+      const body: Record<string, unknown> = { includeKnowledge, includeTraining, excludeEpisodic };
+      if (toDirectory && outputPath.trim()) {
+        body.outputPath = outputPath.trim();
+      }
+      const data = await apiFetch<ExportResult>(
+        `/teams/${encodeURIComponent(teamId)}/export`,
+        { method: 'POST', body: JSON.stringify(body) },
+      );
+      setResult(data);
+      if (data.success && !toDirectory && data.bundle) {
+        // Download as JSON file
+        const blob = new Blob([JSON.stringify(data.bundle, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${teamId}-team-bundle.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        addToast('success', 'Team bundle downloaded');
+      } else if (data.success && toDirectory) {
+        addToast('success', `Exported to ${data.bundlePath ?? outputPath}`);
+      }
+    } catch (err: any) {
+      addToast('error', err.message ?? 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      data-testid="export-dialog"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-th-border">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-th-accent" />
+            <h2 className="text-base font-semibold text-th-text">Export Team</h2>
+          </div>
+          <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 flex items-start gap-2">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>
+              Export packages your team&apos;s agents, knowledge, and training data into a portable
+              bundle. Use <strong>&quot;Export to Directory&quot;</strong> to create a <code>.flightdeck-team/</code> folder
+              you can copy between machines, or download a JSON bundle file.
+            </span>
+          </div>
+
+          {/* Options */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-th-text cursor-pointer">
+              <input type="checkbox" checked={includeKnowledge} onChange={e => setIncludeKnowledge(e.target.checked)} className="rounded" />
+              Include knowledge entries
+            </label>
+            <label className="flex items-center gap-2 text-sm text-th-text cursor-pointer">
+              <input type="checkbox" checked={includeTraining} onChange={e => setIncludeTraining(e.target.checked)} className="rounded" />
+              Include training data (corrections &amp; feedback)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-th-text-alt cursor-pointer">
+              <input type="checkbox" checked={excludeEpisodic} onChange={e => setExcludeEpisodic(e.target.checked)} className="rounded" />
+              Exclude episodic knowledge (session-specific memories)
+            </label>
+          </div>
+
+          {/* Directory path */}
+          <div>
+            <label className="text-xs text-th-text-alt block mb-1">Export directory (optional — for .flightdeck-team/ folder)</label>
+            <input
+              type="text"
+              value={outputPath}
+              onChange={e => setOutputPath(e.target.value)}
+              placeholder="/path/to/export/directory"
+              className="w-full px-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt"
+              data-testid="export-path-input"
+            />
+          </div>
+
+          {/* Result */}
+          {result?.success && (
+            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              {result.bundlePath
+                ? `Exported to ${result.bundlePath} (${result.filesWritten ?? 0} files)`
+                : 'Bundle downloaded successfully'}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => handleExport(true)}
+              disabled={exporting || !outputPath.trim()}
+              className="px-4 py-2 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1.5 disabled:opacity-40"
+              data-testid="export-directory-btn"
+            >
+              <FolderDown className="w-4 h-4" />
+              Export to Directory
+            </button>
+            <button
+              onClick={() => handleExport(false)}
+              disabled={exporting}
+              className="px-4 py-2 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5 disabled:opacity-40"
+              data-testid="export-download-btn"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? 'Exporting…' : 'Download Bundle'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Import Dialog ─────────────────────────────────────────
+
+function ImportDialog({ teamId, onClose, onImported }: {
+  teamId: string;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const addToast = useToastStore(s => s.add);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bundleJson, setBundleJson] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [agentConflict, setAgentConflict] = useState<'skip' | 'rename' | 'overwrite'>('skip');
+  const [knowledgeConflict, setKnowledgeConflict] = useState<'prefer_existing' | 'prefer_import' | 'keep_both' | 'skip'>('prefer_existing');
+  const [importing, setImporting] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<ImportReport | null>(null);
+  const [importResult, setImportResult] = useState<ImportReport | null>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setBundleJson(text);
+      addToast('success', `Loaded ${file.name}`);
+    } catch {
+      addToast('error', 'Failed to read file');
+    }
+  };
+
+  const parseBundle = (): unknown | null => {
+    try {
+      return JSON.parse(bundleJson);
+    } catch {
+      addToast('error', 'Invalid JSON in bundle');
+      return null;
+    }
+  };
+
+  const handleDryRun = async () => {
+    const bundle = parseBundle();
+    if (!bundle || !projectId.trim()) {
+      addToast('error', 'Bundle and project ID are required');
+      return;
+    }
+    setImporting(true);
+    setDryRunResult(null);
+    try {
+      const data = await apiFetch<{ success: boolean; report: ImportReport }>(
+        '/teams/import',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            bundle,
+            projectId: projectId.trim(),
+            teamId,
+            agentConflict,
+            knowledgeConflict,
+            dryRun: true,
+          }),
+        },
+      );
+      setDryRunResult(data.report);
+    } catch (err: any) {
+      addToast('error', err.message ?? 'Dry run failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    const bundle = parseBundle();
+    if (!bundle || !projectId.trim()) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const data = await apiFetch<{ success: boolean; report: ImportReport }>(
+        '/teams/import',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            bundle,
+            projectId: projectId.trim(),
+            teamId,
+            agentConflict,
+            knowledgeConflict,
+            dryRun: false,
+          }),
+        },
+      );
+      setImportResult(data.report);
+      if (data.success) {
+        addToast('success', 'Team imported successfully');
+        onImported();
+      }
+    } catch (err: any) {
+      addToast('error', err.message ?? 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      data-testid="import-dialog"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-th-border sticky top-0 bg-th-bg z-10">
+          <div className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-th-accent" />
+            <h2 className="text-base font-semibold text-th-text">Import Team</h2>
+          </div>
+          <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* File picker */}
+          <div>
+            <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" data-testid="import-file-input" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full px-4 py-3 rounded-lg border-2 border-dashed border-th-border hover:border-th-accent/50 text-sm text-th-text-alt hover:text-th-text transition-colors flex items-center justify-center gap-2"
+              data-testid="import-file-btn"
+            >
+              <Package className="w-5 h-5" />
+              {bundleJson ? 'Bundle loaded ✓ — click to replace' : 'Choose team bundle file (.json)'}
+            </button>
+          </div>
+
+          {/* Project ID */}
+          <div>
+            <label className="text-xs text-th-text-alt block mb-1">Target project ID (required)</label>
+            <input
+              type="text"
+              value={projectId}
+              onChange={e => setProjectId(e.target.value)}
+              placeholder="my-project"
+              className="w-full px-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt"
+              data-testid="import-project-input"
+            />
+          </div>
+
+          {/* Conflict strategies */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-th-text-alt block mb-1">Agent conflicts</label>
+              <select
+                value={agentConflict}
+                onChange={e => setAgentConflict(e.target.value as typeof agentConflict)}
+                className="w-full px-2 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text"
+              >
+                <option value="skip">Skip existing</option>
+                <option value="rename">Rename new</option>
+                <option value="overwrite">Overwrite</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-th-text-alt block mb-1">Knowledge conflicts</label>
+              <select
+                value={knowledgeConflict}
+                onChange={e => setKnowledgeConflict(e.target.value as typeof knowledgeConflict)}
+                className="w-full px-2 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text"
+              >
+                <option value="prefer_existing">Keep existing</option>
+                <option value="prefer_import">Prefer import</option>
+                <option value="keep_both">Keep both</option>
+                <option value="skip">Skip all</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Dry-run result */}
+          {dryRunResult && (
+            <div className="p-3 rounded-lg border border-th-border bg-th-bg-alt space-y-2" data-testid="dry-run-result">
+              <h3 className="text-sm font-medium text-th-text">Import Preview</h3>
+              {dryRunResult.validation?.issues?.length > 0 && (
+                <div className="space-y-1">
+                  {dryRunResult.validation.issues.map((issue, i) => (
+                    <div key={i} className={`text-xs flex items-center gap-1 ${issue.severity === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                      <AlertTriangle className="w-3 h-3" />
+                      {issue.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-xs text-th-text-alt space-y-0.5">
+                <p>Agents: {dryRunResult.agents?.length ?? 0} to process</p>
+                <p>Knowledge: {dryRunResult.knowledge?.imported ?? 0} to import, {dryRunResult.knowledge?.skipped ?? 0} skipped</p>
+                <p>Training: {dryRunResult.training?.correctionsImported ?? 0} corrections, {dryRunResult.training?.feedbackImported ?? 0} feedback</p>
+              </div>
+              {dryRunResult.warnings?.length > 0 && (
+                <div className="text-xs text-yellow-400">
+                  {dryRunResult.warnings.map((w, i) => <p key={i}>⚠ {w}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Import result */}
+          {importResult?.success && (
+            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Team imported to {importResult.teamId}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={handleDryRun}
+              disabled={importing || !bundleJson || !projectId.trim()}
+              className="px-4 py-2 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1.5 disabled:opacity-40"
+              data-testid="import-preview-btn"
+            >
+              Preview Import
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={importing || !bundleJson || !projectId.trim()}
+              className="px-4 py-2 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5 disabled:opacity-40"
+              data-testid="import-confirm-btn"
+            >
+              <Upload className="w-4 h-4" />
+              {importing ? 'Importing…' : 'Import Team'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────
 
 export function TeamPage() {
@@ -402,6 +806,7 @@ export function TeamPage() {
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [teamDetail, setTeamDetail] = useState<TeamDetail | null>(null);
 
   // UI state
   const [search, setSearch] = useState('');
@@ -411,6 +816,8 @@ export function TeamPage() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [managingAgent, setManagingAgent] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   // ── Data fetching ────────────────────────────────────────
 
@@ -431,10 +838,11 @@ export function TeamPage() {
         ? `/teams/${selectedTeam}/agents`
         : `/teams/${selectedTeam}/agents?status=${statusFilter}`;
 
-      const [agentData, healthData, serverData] = await Promise.allSettled([
+      const [agentData, healthData, serverData, teamDetailData] = await Promise.allSettled([
         apiFetch<RosterAgent[]>(agentUrl),
         apiFetch<HealthData>(`/teams/${encodeURIComponent(selectedTeam)}/health`),
         apiFetch<ServerStatus>('/agent-server/status'),
+        apiFetch<TeamDetail>(`/teams/${encodeURIComponent(selectedTeam)}`),
       ]);
 
       if (agentData.status === 'fulfilled') {
@@ -457,6 +865,7 @@ export function TeamPage() {
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
       if (serverData.status === 'fulfilled') setServerStatus(serverData.value);
+      if (teamDetailData.status === 'fulfilled') setTeamDetail(teamDetailData.value);
     } catch (err: any) {
       setError(err.message ?? 'Failed to load team data');
     } finally {
@@ -551,30 +960,80 @@ export function TeamPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Users className="w-6 h-6 text-th-accent" />
-          <h1 className="text-xl font-bold text-th-text">Team</h1>
-          {teams.length > 1 && (
-            <select
-              value={selectedTeam}
-              onChange={e => setSelectedTeam(e.target.value)}
-              className="ml-2 px-2 py-1 text-sm rounded bg-th-bg-alt border border-th-border text-th-text"
+      {/* Header with team identity and actions */}
+      <div className="bg-surface-raised rounded-lg border border-th-border p-5">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-th-accent/20 flex items-center justify-center">
+              <Users className="w-6 h-6 text-th-accent" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-th-text capitalize">{selectedTeam}</h1>
+                {teams.length > 1 && (
+                  <select
+                    value={selectedTeam}
+                    onChange={e => setSelectedTeam(e.target.value)}
+                    className="px-2 py-0.5 text-xs rounded bg-th-bg-alt border border-th-border text-th-text"
+                  >
+                    {teams.map(t => (
+                      <option key={t.teamId} value={t.teamId}>{t.teamId}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <p className="text-sm text-th-text-alt">Persistent team — agents, knowledge, and training data</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowExport(true)}
+              className="px-3 py-1.5 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5"
+              data-testid="export-team-btn"
             >
-              {teams.map(t => (
-                <option key={t.teamId} value={t.teamId}>{t.teamId} ({t.agentCount})</option>
-              ))}
-            </select>
-          )}
+              <Download className="w-4 h-4" />
+              Export Team
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="px-3 py-1.5 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt border border-th-border transition-colors flex items-center gap-1.5"
+              data-testid="import-team-btn"
+            >
+              <Upload className="w-4 h-4" />
+              Import Team
+            </button>
+            <button
+              onClick={() => { setLoading(true); fetchData(); }}
+              className="px-3 py-1.5 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => { setLoading(true); fetchData(); }}
-          className="px-3 py-1.5 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh
-        </button>
+
+        {/* Team stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm" data-testid="team-identity">
+          <div>
+            <span className="text-th-text-alt">Agents</span>
+            <p className="font-semibold text-th-text text-lg">{teamDetail?.agentCount ?? agents.length}</p>
+          </div>
+          <div>
+            <span className="text-th-text-alt">Knowledge</span>
+            <p className="font-semibold text-th-text text-lg">{teamDetail?.knowledgeCount ?? 0} entries</p>
+          </div>
+          <div>
+            <span className="text-th-text-alt">Training</span>
+            <p className="font-semibold text-th-text text-lg">
+              {teamDetail?.trainingSummary
+                ? `${teamDetail.trainingSummary.corrections ?? 0} corrections`
+                : '—'}
+            </p>
+          </div>
+          <div>
+            <span className="text-th-text-alt">Team ID</span>
+            <p className="font-mono text-th-text text-sm">{selectedTeam}</p>
+          </div>
+        </div>
       </div>
 
       {/* Mass failure alert */}
@@ -726,6 +1185,20 @@ export function TeamPage() {
           agent={health?.agents.find(a => a.agentId === managingAgent)}
           onClose={() => setManagingAgent(null)}
           onActionComplete={() => { fetchData(); setManagingAgent(null); }}
+        />
+      )}
+
+      {/* Export dialog */}
+      {showExport && (
+        <ExportDialog teamId={selectedTeam} onClose={() => setShowExport(false)} />
+      )}
+
+      {/* Import dialog */}
+      {showImport && (
+        <ImportDialog
+          teamId={selectedTeam}
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); fetchData(); }}
         />
       )}
     </div>

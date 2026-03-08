@@ -121,18 +121,37 @@ const profileData = {
   },
 };
 
+const teamDetailData = {
+  teamId: 'default',
+  agentCount: 3,
+  agents: [
+    { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'busy' },
+    { agentId: 'bb22cc33-dd44-ee55-ff66-778899001122', role: 'developer', model: 'claude-sonnet-4-6', status: 'idle' },
+  ],
+  knowledgeCount: 42,
+  trainingSummary: { corrections: 5, feedback: 12 },
+};
+
 function setupMocks(overrides: Partial<{
   teams: any;
   agents: any;
   health: any;
   server: any;
   profile: any;
+  teamDetail: any;
+  exportResult: any;
+  importResult: any;
 }> = {}) {
-  mockApiFetch.mockImplementation((path: string) => {
+  mockApiFetch.mockImplementation((path: string, opts?: any) => {
     if (path === '/teams') return Promise.resolve(overrides.teams ?? teamsData);
+    if (path.includes('/export')) return Promise.resolve(overrides.exportResult ?? { success: true, bundle: { manifest: {} } });
+    if (path === '/teams/import') return Promise.resolve(overrides.importResult ?? { success: true, report: { success: true, teamId: 'default', agents: [], knowledge: { imported: 5, skipped: 0, conflicts: 0 }, training: { correctionsImported: 2, feedbackImported: 3 }, warnings: [], validation: { valid: true, issues: [] } } });
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/health')) return Promise.resolve(overrides.health ?? healthData);
     if (path === '/agent-server/status') return Promise.resolve(overrides.server ?? serverStatus);
+    if (path === '/agent-server/stop') return Promise.resolve({ ok: true });
+    // Match /teams/:teamId (but not /teams/:teamId/agents or /teams/:teamId/health)
+    if (/^\/teams\/[^/]+$/.test(path)) return Promise.resolve(overrides.teamDetail ?? teamDetailData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
     return Promise.resolve({});
   });
@@ -290,12 +309,10 @@ describe('TeamPage', () => {
 
     fireEvent.click(screen.getByText('aa11bb22'));
     await waitFor(() => {
-      expect(screen.getByText('Overview')).toBeInTheDocument();
+      // Profile tabs — check for the tab set
+      const tabs = ['Overview', 'History', 'Skills', 'Settings'];
+      tabs.forEach(t => expect(screen.getAllByText(t).length).toBeGreaterThan(0));
     });
-    expect(screen.getByText('History')).toBeInTheDocument();
-    expect(screen.getByText('Knowledge')).toBeInTheDocument();
-    expect(screen.getByText('Skills')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
   it('shows profile overview data', async () => {
@@ -401,10 +418,13 @@ describe('TeamPage', () => {
 
     fireEvent.click(screen.getByText('aa11bb22'));
     await waitFor(() => {
-      expect(screen.getByText('Overview')).toBeInTheDocument();
+      expect(screen.getAllByText('Overview').length).toBeGreaterThan(0);
     });
 
-    fireEvent.click(screen.getByText('Knowledge'));
+    // Click the Knowledge tab button (not the header stat)
+    const knowledgeBtns = screen.getAllByText('Knowledge');
+    const tabBtn = knowledgeBtns.find(el => el.closest('button')?.closest('.flex.border-b'));
+    if (tabBtn) fireEvent.click(tabBtn);
     await waitFor(() => {
       expect(screen.getByText(/12 knowledge entries/i)).toBeInTheDocument();
     });
@@ -435,5 +455,83 @@ describe('TeamPage', () => {
       expect(screen.getByText('Stopped')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('stop-server-btn')).not.toBeInTheDocument();
+  });
+
+  // ── Team identity section ─────────────────────────────
+
+  it('renders team identity section with stats', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('team-identity')).toBeInTheDocument();
+    });
+    expect(screen.getByText('42 entries')).toBeInTheDocument();
+    expect(screen.getByText('5 corrections')).toBeInTheDocument();
+  });
+
+  // ── Export/Import buttons ─────────────────────────────
+
+  it('shows export and import buttons in header', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+  });
+
+  it('opens export dialog', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('export-team-btn'));
+    expect(screen.getByTestId('export-dialog')).toBeInTheDocument();
+    expect(screen.getAllByText(/\.flightdeck-team\//).length).toBeGreaterThan(0);
+    expect(screen.getByText('Include knowledge entries')).toBeInTheDocument();
+  });
+
+  it('triggers export download', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('export-team-btn'));
+    fireEvent.click(screen.getByTestId('export-download-btn'));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/export'),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+  });
+
+  it('opens import dialog', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('import-team-btn'));
+    expect(screen.getByTestId('import-dialog')).toBeInTheDocument();
+    expect(screen.getByText(/choose team bundle/i)).toBeInTheDocument();
+    expect(screen.getByTestId('import-project-input')).toBeInTheDocument();
+  });
+
+  it('shows conflict strategy selectors in import dialog', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('import-team-btn'));
+    expect(screen.getByText('Agent conflicts')).toBeInTheDocument();
+    expect(screen.getByText('Knowledge conflicts')).toBeInTheDocument();
   });
 });
