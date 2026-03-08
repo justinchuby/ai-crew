@@ -146,7 +146,10 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
 });
 
 // ── Graceful shutdown ──────────────────────────────────────
+let shuttingDown = false;
 async function gracefulShutdown(signal: string) {
+  if (shuttingDown) return; // guard against double SIGINT
+  shuttingDown = true;
   console.log(`\n${signal} received. Shutting down gracefully...`);
   container.internal.contextRefresher.stop();
   wsServer.close();

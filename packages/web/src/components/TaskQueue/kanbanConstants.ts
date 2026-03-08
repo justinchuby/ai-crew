@@ -8,6 +8,7 @@ import {
   SkipForward,
   Play,
   Lock,
+  Eye,
 } from 'lucide-react';
 import type { DagTask, DagTaskStatus } from '../../types';
 
@@ -25,6 +26,7 @@ export const COLUMNS: ColumnDef[] = [
   { status: 'pending',  label: 'Pending',  icon: React.createElement(Clock, { size: 14 }),        accentClass: 'text-th-text-muted',  borderClass: 'border-th-border' },
   { status: 'ready',    label: 'Ready',    icon: React.createElement(Play, { size: 14 }),         accentClass: 'text-green-400',      borderClass: 'border-green-500/30' },
   { status: 'running',  label: 'Running',  icon: React.createElement(AlertCircle, { size: 14 }),  accentClass: 'text-blue-400',       borderClass: 'border-blue-500/30' },
+  { status: 'in_review', label: 'In Review', icon: React.createElement(Eye, { size: 14 }),        accentClass: 'text-violet-400',     borderClass: 'border-violet-500/30' },
   { status: 'blocked',  label: 'Blocked',  icon: React.createElement(Lock, { size: 14 }),         accentClass: 'text-orange-400',     borderClass: 'border-orange-500/30' },
   { status: 'done',     label: 'Done',     icon: React.createElement(CheckCircle2, { size: 14 }), accentClass: 'text-emerald-400',    borderClass: 'border-emerald-500/30' },
   { status: 'failed',   label: 'Failed',   icon: React.createElement(XCircle, { size: 14 }),      accentClass: 'text-red-400',        borderClass: 'border-red-500/30' },
@@ -40,14 +42,15 @@ export const UNDROP_TARGETS = new Set<DagTaskStatus>(['running', 'blocked']);
 // ── Status background styles (matches DagGraph conventions) ─────────
 
 export const STATUS_BG: Record<DagTaskStatus, string> = {
-  pending:  'bg-th-bg-muted/50',
-  ready:    'bg-green-500/5',
-  running:  'bg-blue-500/5',
-  blocked:  'bg-orange-500/5',
-  done:     'bg-emerald-500/5',
-  failed:   'bg-red-500/5',
-  paused:   'bg-yellow-500/5',
-  skipped:  'bg-th-bg-muted/30',
+  pending:    'bg-th-bg-muted/50',
+  ready:      'bg-green-500/5',
+  running:    'bg-blue-500/5',
+  in_review:  'bg-violet-500/5',
+  blocked:    'bg-orange-500/5',
+  done:       'bg-emerald-500/5',
+  failed:     'bg-red-500/5',
+  paused:     'bg-yellow-500/5',
+  skipped:    'bg-th-bg-muted/30',
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -106,6 +109,7 @@ export const COLUMN_TOOLTIPS: Record<DagTaskStatus, string> = {
   pending: 'Tasks waiting for dependencies to complete',
   ready: 'Tasks ready to be picked up by an agent',
   running: 'Tasks currently being worked on by an agent',
+  in_review: 'Tasks awaiting code review or approval',
   blocked: 'Tasks blocked by unresolved dependencies or failures',
   done: 'Successfully completed tasks',
   failed: 'Tasks that failed — click to retry or view error',

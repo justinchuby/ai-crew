@@ -737,7 +737,7 @@ export class TaskDAG extends EventEmitter {
   getStatus(leadId: string, activeAgents?: Array<{ id: string; role: string }>, opts?: { includeArchived?: boolean }): {
     tasks: DagTask[];
     fileLockMap: Record<string, { taskId: string; agentId?: string }>;
-    summary: { pending: number; ready: number; running: number; done: number; failed: number; blocked: number; paused: number; skipped: number };
+    summary: { pending: number; ready: number; running: number; in_review: number; done: number; failed: number; blocked: number; paused: number; skipped: number };
     coverage?: { tracked: number; untracked: number; total: number; percentage: number; untrackedAgents: Array<{ id: string; role: string }> };
   } {
     const tasks = this.getTasks(leadId, opts);
@@ -751,7 +751,7 @@ export class TaskDAG extends EventEmitter {
       }
     }
 
-    const summary = { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 };
+    const summary = { pending: 0, ready: 0, running: 0, in_review: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 };
     for (const task of tasks) {
       summary[task.dagStatus as keyof typeof summary]++;
     }

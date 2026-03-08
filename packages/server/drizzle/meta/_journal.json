@@ -176,6 +176,13 @@
             "when": 1773300000000,
             "tag": "0024_dag_task_archived_at",
             "breakpoints": true
+        },
+        {
+            "idx": 25,
+            "version": "6",
+            "when": 1773400000000,
+            "tag": "0025_dag_task_overridden_by",
+            "breakpoints": true
         }
     ]
 }
