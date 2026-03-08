@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, XCircle, Clock, MessageSquareWarning, Users, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, Clock, MessageSquareWarning, Users, Eye, WifiOff } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore, type OversightLevel } from '../../stores/settingsStore';
 import { useAttentionItems, type AttentionItem, type EscalationLevel } from './useAttentionItems';
@@ -58,6 +58,7 @@ const ITEM_COLORS: Record<AttentionItem['kind'], string> = {
 export function AttentionBar() {
   const state = useAttentionItems();
   const navigate = useNavigate();
+  const connected = useAppStore((s) => s.connected);
   const openApprovalQueue = useAppStore((s) => s.setApprovalQueueOpen);
   const oversightLevel = useSettingsStore((s) => s.oversightLevel);
   const cycleOversightLevel = useSettingsStore((s) => s.cycleOversightLevel);
@@ -116,7 +117,17 @@ export function AttentionBar() {
             'bg-emerald-400'
           }`}
         />
-        {escalation === 'green' && (
+        {!connected && (
+          <span
+            className="flex items-center gap-1 text-th-text-muted opacity-70"
+            title="Connection lost — data may be stale"
+            data-testid="connection-lost"
+          >
+            <WifiOff className="w-3 h-3" />
+            <span className="text-[10px]">Reconnecting…</span>
+          </span>
+        )}
+        {connected && escalation === 'green' && (
           <span className="text-th-text-muted flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             All healthy
