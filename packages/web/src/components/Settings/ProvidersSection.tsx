@@ -97,6 +97,28 @@ const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
   opencode: false,
 };
 
+/** Whether the provider is in preview (not production-ready). Copilot is GA. */
+const PROVIDER_PREVIEW: Record<string, boolean> = {
+  copilot: false,
+  claude: true,
+  gemini: true,
+  cursor: true,
+  codex: true,
+  opencode: true,
+};
+
+/** Small pill badge for preview providers. */
+function PreviewBadge() {
+  return (
+    <span
+      className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full"
+      data-testid="preview-badge"
+    >
+      Preview
+    </span>
+  );
+}
+
 // ── Provider Card ───────────────────────────────────────────────────
 
 function ProviderCard({
@@ -159,6 +181,7 @@ function ProviderCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
+            {PROVIDER_PREVIEW[provider.id] && <PreviewBadge />}
             <StatusBadge {...providerStatusProps(provider)} />
             {isActive && (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">

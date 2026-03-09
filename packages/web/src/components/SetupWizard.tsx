@@ -128,6 +128,11 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                       <div className="flex items-center gap-3">
                         <span className="text-lg">{PROVIDER_ICONS[p.id] ?? '🔧'}</span>
                         <span className="text-sm font-medium text-th-text">{p.name}</span>
+                        {p.id !== 'copilot' && (
+                          <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                            Preview
+                          </span>
+                        )}
                       </div>
                       {p.installed ? (
                         <span className="flex items-center gap-1 text-xs text-green-400">
