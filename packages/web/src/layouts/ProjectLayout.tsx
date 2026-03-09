@@ -266,7 +266,31 @@ export function ProjectLayout() {
   // Runtime state (isLive) overrides stale DB status to avoid showing
   // "active" badge when no agents are actually running (B-ON-1).
   const projectStatus = isLive ? 'active' : (details?.status === 'active' ? 'idle' : (details?.status ?? 'idle'));
-  const agentCount = details?.agentCount;
+
+  // Agent status breakdown for this project (replaces PulseStrip on project pages)
+  const agentStats = useMemo(() => {
+    const projectAgents = agents.filter(
+      (a) => a.projectId === id || a.id === id,
+    );
+    let running = 0;
+    let idle = 0;
+    let failed = 0;
+    for (const a of projectAgents) {
+      switch (a.status) {
+        case 'running':
+        case 'creating':
+          running++;
+          break;
+        case 'idle':
+          idle++;
+          break;
+        case 'failed':
+          failed++;
+          break;
+      }
+    }
+    return { total: projectAgents.length, running, idle, failed };
+  }, [agents, id]);
 
   return (
     <ProjectContext.Provider value={{ projectId: id }}>
@@ -304,10 +328,27 @@ export function ProjectLayout() {
                 dot
                 size="sm"
               />
-              {agentCount != null && (
-                <span className="text-xs text-th-text-muted flex items-center gap-1" data-testid="agent-count">
-                  <Users size={12} />
-                  {agentCount}
+              {agentStats.total > 0 && (
+                <span className="text-xs text-th-text-muted flex items-center gap-1.5 font-mono" data-testid="agent-count">
+                  <Users size={12} className="text-blue-400" />
+                  {agentStats.running > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                      <span className="text-green-400">{agentStats.running}</span>
+                    </span>
+                  )}
+                  {agentStats.idle > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                      <span className="text-yellow-400">{agentStats.idle}</span>
+                    </span>
+                  )}
+                  {agentStats.failed > 0 && (
+                    <span className="flex items-center gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      <span className="text-red-400">{agentStats.failed}</span>
+                    </span>
+                  )}
                 </span>
               )}
             </div>

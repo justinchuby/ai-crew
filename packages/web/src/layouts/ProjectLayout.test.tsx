@@ -32,8 +32,12 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+const mockAgents: any[] = [];
 vi.mock('../stores/appStore', () => ({
-  useAppStore: () => [],
+  useAppStore: (selector: any) => {
+    const state = { agents: mockAgents };
+    return typeof selector === 'function' ? selector(state) : state;
+  },
 }));
 
 vi.mock('../stores/leadStore', () => ({
@@ -77,6 +81,7 @@ const projectDetails = {
 describe('ProjectLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAgents.length = 0;
     mockApiFetch.mockResolvedValue(projectDetails);
   });
 
@@ -101,11 +106,22 @@ describe('ProjectLayout', () => {
     });
   });
 
-  it('shows agent count after fetch', async () => {
+  it('shows agent count from live agents', async () => {
+    mockAgents.length = 0;
+    mockAgents.push(
+      { id: 'a1', projectId: 'proj-123', status: 'running', role: { id: 'dev', name: 'Dev' } },
+      { id: 'a2', projectId: 'proj-123', status: 'running', role: { id: 'dev', name: 'Dev' } },
+      { id: 'a3', projectId: 'proj-123', status: 'idle', role: { id: 'dev', name: 'Dev' } },
+      { id: 'a4', projectId: 'proj-123', status: 'failed', role: { id: 'dev', name: 'Dev' } },
+      { id: 'a5', projectId: 'proj-123', status: 'creating', role: { id: 'dev', name: 'Dev' } },
+    );
     renderLayout();
-    await waitFor(() => {
-      expect(screen.getByTestId('agent-count')).toHaveTextContent('5');
-    });
+    const agentCount = screen.getByTestId('agent-count');
+    expect(agentCount).toBeInTheDocument();
+    // 3 running/creating shown as green, 1 idle yellow, 1 failed red
+    expect(agentCount.querySelectorAll('.bg-green-400').length).toBe(1);
+    expect(agentCount.querySelectorAll('.bg-yellow-400').length).toBe(1);
+    expect(agentCount.querySelectorAll('.bg-red-400').length).toBe(1);
   });
 
   it('renders primary tabs', () => {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Users, Brain } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
@@ -29,6 +29,11 @@ function pressureDotColor(pct: number): string {
 
 export function PulseStrip() {
   const agents = useAppStore((s) => s.agents);
+  const location = useLocation();
+
+  // Hide on project pages — ProjectLayout shows agent status inline in its header
+  const isProjectRoute = /^\/projects\/[^/]+/.test(location.pathname);
+
   const stats = useMemo(() => {
     let totalInput = 0;
     let totalOutput = 0;
@@ -87,8 +92,8 @@ export function PulseStrip() {
     };
   }, [agents]);
 
-  // Don't render if no agents are active
-  if (stats.agentCount === 0) return null;
+  // Don't render if no agents are active or on project pages
+  if (stats.agentCount === 0 || isProjectRoute) return null;
 
   return (
     <div className="h-10 border-b border-th-border bg-th-bg-alt/40 flex items-center px-4 gap-6 text-xs shrink-0 overflow-x-auto">
