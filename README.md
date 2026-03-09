@@ -139,7 +139,7 @@ npm run dev
 - **Trust Dial** — 3-level oversight (Detailed / Standard / Minimal) controls notification volume, card density, and escalation thresholds. Per-project overrides supported
 - **Event Pipeline** — Reactive handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
 - **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
-- **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting
+- **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting, archived-only project deletion, CWD path validation
 
 ### 💾 Persistence & Recovery
 - **Session Resume** — Resume from a previous Copilot session ID with full context recovery. Native SDK resume for Claude and Copilot adapters

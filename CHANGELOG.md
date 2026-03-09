@@ -136,6 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Navigation & UX
 
+- **Navigation redesign** — Simplified sidebar with global Crews page, project cards, and wired NewProjectModal.
+- **Teams → Crews rename (Phase 1)** — All UI labels, component names, routes, and test files renamed. `/team` redirects to `/crews`. DB schema and API URLs unchanged.
 - **Navigation store** — Zustand-based navigation state management tracking active project, tab, history, and badge counts.
 - **Recent projects** — Quick-access list of recent projects in the sidebar.
 - **New Project button** — Create projects directly from the sidebar.
@@ -145,6 +147,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Page transition animations** — Smooth transitions between pages; respects `prefers-reduced-motion`.
 - **Mobile tab layout** — Touch-scrollable tab bar for narrow viewports.
 - **Home empty state** — Onboarding guide shown when no projects exist.
+- **Redundant project selectors removed** — Tasks, Knowledge, Timeline, Groups, and OrgChart tabs now use `useOptionalProjectId()` to detect project context and hide their project pickers when inside ProjectLayout.
+- **Status indicator labels** — Clarified all 3 status indicators: "Agent Server: Stopped/Online" with daemon tooltip, "Server: Connected" with WebSocket tooltip, green dot with "Project has running agents" tooltip.
+- **CLI provider badges** — Agent cards display the CLI provider being used.
+- **Recent Progress feed** — Home dashboard shows recent activity feed.
+- **Knowledge category tooltips** — Info tooltips on Knowledge Browse category cards.
+- **Design tab → Artifacts tab** — Filtered to `.flightdeck/shared/` markdown files with organized project/session storage and symlinks.
+- **StatusPopover** — Clickable health breakdown from project status badges.
+- **Project status accuracy** — Active/Idle/Stopped/Error states derived from live agent states instead of static values.
 
 #### Task Management
 
@@ -162,6 +172,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Telegram rate limiting** — Challenge verification endpoint rate-limited to 5 requests per minute per chatId.
 - **Token usage chart** — Restored token economics visualization on the project overview.
+- **System prompts** — AI-aware velocity estimation (all agents), quality-over-speed principle (all agents), secure-by-design review principle (critical reviewer).
+- **Project management** — Stop project agents, edit working directory paths, batch archive/delete, active tab default for new projects.
 
 ### Changed
 
@@ -172,7 +184,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IntegrationAgent → IntegrationRouter** — Renamed to reflect its routing responsibility (not an agent).
 - **`formatRelativeTime` extraction** — Moved from inline implementations to a shared utility used across all timestamp displays.
 - **PulseStrip cleanup** — Removed pending decisions badge (moved to AttentionBar).
-- **LeadDashboard decomposition** — Two rounds of extraction reduced 1,965→795 LOC across 10 modules: `InputComposer`, `ChatMessages`, `SidebarTabs`, `DecisionPanel`, `ChatRenderers`, `TeamStatusContent`, `NewProjectModal`, `ProgressDetailModal`, `useLeadWebSocket`, `useDragResize`.
+- **LeadDashboard decomposition** — Two rounds of extraction reduced 1,965→795 LOC across 10 modules: `InputComposer`, `ChatMessages`, `SidebarTabs`, `DecisionPanel`, `ChatRenderers`, `CrewStatusContent`, `NewProjectModal`, `ProgressDetailModal`, `useLeadWebSocket`, `useDragResize`.
+- **Teams → Crews** — All UI components renamed: TeamPage→CrewPage, TeamHealth→CrewHealth, TeamRoster→CrewRoster, TeamStatus→CrewStatus, TeamStatusContent→CrewStatusContent. Route `/team` → `/crews` with backward-compat redirect.
 - **Locale-aware relative dates** — Replaced manual relative time strings with `Intl.RelativeTimeFormat` for proper localization.
 - **0 TypeScript errors** — Both `packages/server` and `packages/web` compile cleanly with `tsc --noEmit`.
 
@@ -195,6 +208,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **C-4: Task pagination** — `GET /tasks` now requires `limit`/`offset` parameters; unbounded queries blocked.
 - **C-5: Default-deny allowlist** — Changed from default-allow to default-deny when allowlist is empty. Prevents accidental open access.
 - **C-6: Permission handler race condition** — Fixed in all 3 SDK adapters (Claude, Copilot, ACP). Concurrent permission requests no longer corrupt handler state.
+- **C-7: DELETE projects not gated** — `DELETE /projects/:id` now requires `status=archived` before deletion. Prevents accidental deletion of active projects.
+- **C-8: CWD path traversal** — Project CWD validated against allowed roots, blocked system paths, and verified as existing directory on both POST and PATCH.
+- **C-9: Symlink bypass** — Artifact storage path validation prevents symlink-based directory traversal.
 
 #### Bug Fixes
 
@@ -206,7 +222,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AttentionBar hook cleanup** — Fixed memory leak from uncleared intervals in `useAttentionItems` hook.
 - **N+1 DAG progress fetches** — Parallelized with `Promise.all` to eliminate sequential API calls.
 - **NotificationBatcher event listener leak** — Event listeners now removed on `stop()`.
-- **AcpConnection stale mocks** — Fixed test mocks that referenced removed API surface.
+- **AcpConnection stale mocks** — Fixed test mocks that referenced removed API surface. Replaced plain EventEmitter mocks with real Writable/Readable streams and full ClientSideConnection mock class.
+- **Retired agent filter** — Server-side status validation now accepts 'retired' as valid filter. UI filter buttons include 'retired'.
 - **SkillsLoader token budget** — `formatForInjection()` now truncates skills that exceed the token budget.
 - **Responsive panel overflow** — Fixed sidebar and panel overflow on narrow viewports with `min-h-0` constraints.
 - **Crew route** — `/team` now renders standalone TeamRoster instead of redirecting to a project.
@@ -215,11 +232,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Stats
 
-- 120+ commits in this session
-- 69 DAG tasks created, 60+ completed
-- 1,351 web tests passing, 372 adapter tests passing
+- 150+ commits in this session
+- 80+ DAG tasks created and completed
+- 1,471 web tests passing, 4,616 server tests passing
 - 160 acceptance criteria defined (78 P0)
-- 6 critical security issues found and resolved
+- 9 critical security issues found and resolved
 - 13 agents active at peak concurrency
 - 0 TypeScript compilation errors (server + web)
 
