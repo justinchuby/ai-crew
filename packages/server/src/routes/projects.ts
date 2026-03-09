@@ -26,6 +26,52 @@ function validateProjectTitle(name: unknown): string | null {
   return null;
 }
 
+/** Allowed root directories for project CWD paths. */
+const CWD_ALLOWED_ROOTS = [
+  normalize(homedir()),
+  normalize(process.cwd()),
+];
+
+/** Sensitive system paths that must never be used as project CWD. */
+const CWD_BLOCKED_PATHS = process.platform === 'win32'
+  ? ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData']
+  : ['/etc', '/proc', '/sys', '/dev', '/boot', '/sbin', '/var/log', '/var/run', '/private/etc', '/private/var'];
+
+/** Validate a project CWD path. Returns an error string or null if valid. */
+function validateCwd(cwd: unknown): string | null {
+  if (cwd === undefined || cwd === null) return null; // optional field
+  if (typeof cwd !== 'string' || cwd.trim().length === 0) return 'cwd must be a non-empty string';
+  if (cwd.includes('\0')) return 'Invalid cwd: contains null bytes';
+
+  const normalized = normalize(cwd);
+
+  // Block sensitive system paths
+  const normCheck = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  for (const blocked of CWD_BLOCKED_PATHS) {
+    const blockedCheck = process.platform === 'win32' ? blocked.toLowerCase() : blocked;
+    if (normCheck === blockedCheck || normCheck.startsWith(blockedCheck + sep)) {
+      return 'Access denied: system directory';
+    }
+  }
+
+  // Must be under an allowed root
+  const underAllowedRoot = CWD_ALLOWED_ROOTS.some(
+    (root) => normalized === root || normalized.startsWith(root + sep),
+  );
+  if (!underAllowedRoot) return 'Access denied: path outside allowed directories';
+
+  // Must exist and be a directory
+  try {
+    if (!existsSync(normalized)) return 'Directory does not exist';
+    const stat = statSync(normalized);
+    if (!stat.isDirectory()) return 'Path is not a directory';
+  } catch {
+    return 'Cannot access path';
+  }
+
+  return null;
+}
+
 export function projectsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager } = ctx;
   const router = Router();
@@ -447,6 +493,8 @@ export function projectsRoutes(ctx: AppContext): Router {
     const { name, description, cwd } = req.body;
     const titleError = validateProjectTitle(name);
     if (titleError) return res.status(400).json({ error: titleError });
+    const cwdError = validateCwd(cwd);
+    if (cwdError) return res.status(400).json({ error: cwdError });
     const trimmedName = (name as string).trim();
     const project = projectRegistry.create(trimmedName, description, cwd);
     logger.info({ module: 'project', msg: 'Project created', projectId: project.id, name: trimmedName });
@@ -459,6 +507,11 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     const { name, description, cwd, status } = req.body;
+
+    // Validate CWD if provided
+    const cwdError = validateCwd(cwd);
+    if (cwdError) return res.status(400).json({ error: cwdError });
+
     projectRegistry.update(req.params.id, { name, description, cwd, status });
     logger.info({ module: 'project', msg: 'Project updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.get(req.params.id));
@@ -565,9 +618,14 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({ ok: true, terminated, total: agents.length });
   });
 
-  // Delete a project and all its sessions
+  // Delete a project and all its sessions (archived projects only)
   router.delete('/projects/:id', (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id as string);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.status !== 'archived') {
+      return res.status(400).json({ error: 'Only archived projects can be deleted' });
+    }
     const deleted = projectRegistry.delete(req.params.id as string);
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
     logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id });
