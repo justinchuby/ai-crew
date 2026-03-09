@@ -119,6 +119,14 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
 // ---------------------------------------------------------------------------
 // Reusable DAG task visualization panel
 // ---------------------------------------------------------------------------
+
+type TaskViewMode = 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | 'split';
+
+/** Split view constraints (percentage of container height) */
+const SPLIT_DEFAULT_PCT = 40;
+const SPLIT_MIN_PCT = 20;
+const SPLIT_MAX_PCT = 75;
+
 function DagPanel({
   dagStatus,
   dagView,
@@ -127,8 +135,8 @@ function DagPanel({
   onTaskUpdated,
 }: {
   dagStatus: DagStatus | null;
-  dagView: 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | 'split' | null;
-  setDagView: (v: 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | 'split' | null) => void;
+  dagView: TaskViewMode | null;
+  setDagView: (v: TaskViewMode | null) => void;
   projectId?: string;
   onTaskUpdated?: () => void;
 }) {
@@ -151,7 +159,7 @@ function DagPanel({
 
   // Split view: resizable Kanban (left) + DAG (right) with percentage-based split
   const [splitPct, setSplitPct] = useState(() => {
-    try { const v = localStorage.getItem('tasks-split-pct'); return v ? Number(v) : 40; } catch { return 40; }
+    try { const v = localStorage.getItem('tasks-split-pct'); return v ? Number(v) : SPLIT_DEFAULT_PCT; } catch { return SPLIT_DEFAULT_PCT; }
   });
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -166,7 +174,7 @@ function DagPanel({
     const onMouseMove = (ev: MouseEvent) => {
       const deltaY = ev.clientY - startY;
       const deltaPct = (deltaY / containerRect.height) * 100;
-      const newPct = Math.min(75, Math.max(20, startPct + deltaPct));
+      const newPct = Math.min(SPLIT_MAX_PCT, Math.max(SPLIT_MIN_PCT, startPct + deltaPct));
       setSplitPct(newPct);
     };
     const onMouseUp = () => {
@@ -260,6 +268,18 @@ function DagPanel({
     } catch (err) {
       console.warn('Failed to load more global tasks', err);
     }
+  };
+
+  const kanbanProps = {
+    dagStatus: kanbanScope === 'global' ? globalDagStatus : dagStatus,
+    projectId: kanbanScope === 'global' ? undefined : projectId,
+    onTaskUpdated: kanbanScope === 'global' ? undefined : onTaskUpdated,
+    scope: kanbanScope as 'project' | 'global',
+    projectNameMap,
+    hasMore: kanbanScope === 'global' ? globalHasMore : false,
+    onLoadMore: kanbanScope === 'global' ? loadMoreGlobalTasks : undefined,
+    showArchived,
+    onShowArchivedChange: handleShowArchivedChange,
   };
 
   const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
@@ -394,32 +414,12 @@ function DagPanel({
 
           {/* Kanban panel (bottom) */}
           <div className="flex-1 overflow-auto min-h-[200px]">
-            <KanbanBoard
-              dagStatus={kanbanScope === 'global' ? globalDagStatus : dagStatus}
-              projectId={kanbanScope === 'global' ? undefined : projectId}
-              onTaskUpdated={kanbanScope === 'global' ? undefined : onTaskUpdated}
-              scope={kanbanScope}
-              projectNameMap={projectNameMap}
-              hasMore={kanbanScope === 'global' ? globalHasMore : false}
-              onLoadMore={kanbanScope === 'global' ? loadMoreGlobalTasks : undefined}
-              showArchived={showArchived}
-              onShowArchivedChange={handleShowArchivedChange}
-            />
+            <KanbanBoard {...kanbanProps} />
           </div>
         </div>
       ) : effectiveView === 'kanban' ? (
         <div style={{ minHeight: 400 }}>
-          <KanbanBoard
-            dagStatus={kanbanScope === 'global' ? globalDagStatus : dagStatus}
-            projectId={kanbanScope === 'global' ? undefined : projectId}
-            onTaskUpdated={kanbanScope === 'global' ? undefined : onTaskUpdated}
-            scope={kanbanScope}
-            projectNameMap={projectNameMap}
-            hasMore={kanbanScope === 'global' ? globalHasMore : false}
-            onLoadMore={kanbanScope === 'global' ? loadMoreGlobalTasks : undefined}
-            showArchived={showArchived}
-            onShowArchivedChange={handleShowArchivedChange}
-          />
+          <KanbanBoard {...kanbanProps} />
         </div>
       ) : effectiveView === 'graph' ? (
         <div className="flex-1" style={{ minHeight: 400 }}>
@@ -462,7 +462,7 @@ export function TaskQueuePanel({ api }: Props) {
   const projectId = useOptionalProjectId();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
-  const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | 'split' | null>(null);
+  const [dagView, setDagView] = useState<TaskViewMode | null>(null);
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
   const [historicalDag, setHistoricalDag] = useState<DagStatus | null>(null);
