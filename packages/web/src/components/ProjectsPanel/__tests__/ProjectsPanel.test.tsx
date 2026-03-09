@@ -4,7 +4,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { MemoryRouter } from 'react-router-dom';
 
 // Mock apiFetch
 const mockApiFetch = vi.fn();
@@ -158,8 +157,9 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    // Click to expand
-    fireEvent.click(screen.getByText('Alpha Project'));
+    // Click the toggle details button (chevron) to expand
+    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('proj-1')).toBeTruthy();
       expect(screen.getByText('/home/user/alpha')).toBeTruthy();
@@ -179,8 +179,9 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    // Expand first
-    fireEvent.click(screen.getByText('Alpha Project'));
+    // Expand first via toggle button
+    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Delete')).toBeTruthy();
     });
@@ -215,7 +216,8 @@ describe('ProjectsPanel', () => {
     });
 
     // Expand and click Delete
-    fireEvent.click(screen.getByText('Alpha Project'));
+    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Delete')).toBeTruthy();
     });
@@ -244,7 +246,8 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByText('Alpha Project'));
+    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Resume')).toBeTruthy();
     });

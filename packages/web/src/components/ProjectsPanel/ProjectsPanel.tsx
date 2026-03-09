@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FolderOpen,
   Plus,
@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Archive,
   AlertTriangle,
+  ListChecks,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -43,6 +44,7 @@ interface EnrichedProject {
     task: string | null;
   }>;
   activeLeadId?: string;
+  taskProgress?: { done: number; total: number };
 }
 
 function formatDate(iso: string): string {
@@ -90,6 +92,7 @@ function ProjectCard({
   project,
   isExpanded,
   onToggle,
+  onNavigate,
   onResume,
   onArchive,
   onDelete,
@@ -100,6 +103,7 @@ function ProjectCard({
   project: EnrichedProject;
   isExpanded: boolean;
   onToggle: () => void;
+  onNavigate: (id: string) => void;
   onResume: (id: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
@@ -110,13 +114,12 @@ function ProjectCard({
   const isConfirmingDelete = confirmingDeleteId === project.id;
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover">
-      {/* Card header */}
+      {/* Card header — click navigates to project, chevron toggles details */}
       <div
         className="flex items-center gap-3 p-3 cursor-pointer"
-        onClick={onToggle}
-        role="button"
-        aria-expanded={isExpanded}
-        aria-label={`${project.name} project details`}
+        onClick={() => onNavigate(project.id)}
+        role="link"
+        aria-label={`Open ${project.name}`}
       >
         <FolderOpen className="w-5 h-5 text-accent shrink-0" />
         <div className="flex-1 min-w-0">
@@ -128,6 +131,21 @@ function ProjectCard({
           {project.description && (
             <div className="text-xs text-th-text-muted truncate mt-0.5">{project.description}</div>
           )}
+          <div className="flex items-center gap-3 mt-1 text-[10px] text-th-text-muted">
+            {project.activeAgentCount > 0 && (
+              <span className="flex items-center gap-1">
+                <Users className="w-2.5 h-2.5" />
+                {project.activeAgentCount} agent{project.activeAgentCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {project.taskProgress && project.taskProgress.total > 0 && (
+              <span className="flex items-center gap-1">
+                <ListChecks className="w-2.5 h-2.5" />
+                {project.taskProgress.done}/{project.taskProgress.total} tasks
+              </span>
+            )}
+            <span>{formatRelativeTime(project.updatedAt)}</span>
+          </div>
         </div>
 
         {/* Agent count badge */}
@@ -138,11 +156,18 @@ function ProjectCard({
           </span>
         )}
 
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-th-text-muted shrink-0" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-th-text-muted shrink-0" />
-        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          className="p-1 rounded hover:bg-th-bg-muted transition-colors shrink-0"
+          aria-expanded={isExpanded}
+          aria-label="Toggle details"
+        >
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-th-text-muted" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-th-text-muted" />
+          )}
+        </button>
       </div>
 
       {/* Expanded details */}
@@ -281,9 +306,10 @@ export function ProjectsPanel() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-  const addToast = useToastStore((s) => s.add);
-  const [searchParams, setSearchParams] = useSearchParams();
   const [showNewProject, setShowNewProject] = useState(false);
+  const addToast = useToastStore((s) => s.add);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Consume ?action=new param — auto-open the new project modal
   useEffect(() => {
@@ -403,6 +429,14 @@ export function ProjectsPanel() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowNewProject(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-black rounded-lg hover:bg-accent/90 transition-colors"
+            data-testid="new-project-btn"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Project
+          </button>
+          <button
             onClick={fetchProjects}
             disabled={loading}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-th-text-muted hover:text-th-text rounded-lg hover:bg-th-bg-muted transition-colors"
@@ -461,11 +495,20 @@ export function ProjectsPanel() {
       ) : filtered.length === 0 ? (
         <div className="bg-surface-raised border border-th-border rounded-lg p-12 text-center">
           <FolderOpen className="w-12 h-12 text-th-text-muted/30 mx-auto mb-3" />
-          <p className="text-sm text-th-text-muted">
+          <p className="text-sm text-th-text-muted mb-3">
             {filter === 'all'
-              ? 'No projects yet. Start a new session to create your first project.'
+              ? 'No projects yet. Create your first project to get started.'
               : `No ${filter} projects.`}
           </p>
+          {filter === 'all' && (
+            <button
+              onClick={() => setShowNewProject(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-accent text-black rounded-lg hover:bg-accent/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Project
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -475,6 +518,7 @@ export function ProjectsPanel() {
               project={project}
               isExpanded={expandedId === project.id}
               onToggle={() => handleToggle(project.id)}
+              onNavigate={(id) => navigate(`/projects/${id}`)}
               onResume={handleResume}
               onArchive={handleArchive}
               onDelete={handleRequestDelete}
