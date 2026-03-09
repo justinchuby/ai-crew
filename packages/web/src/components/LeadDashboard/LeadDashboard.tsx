@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Users, CheckCircle, Clock, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, AlertCircle } from 'lucide-react';
+import { Crown, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, FolderOpen } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
@@ -9,7 +9,6 @@ import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
 import { AgentReportBlock } from './AgentReportBlock';
 import { BannerDecisionActions } from './DecisionPanel';
-import { CwdBar } from './CwdBar';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { useAttachments } from '../../hooks/useAttachments';
 import { DropOverlay } from '../DropOverlay';
@@ -563,45 +562,30 @@ export function LeadDashboard({ api, ws }: Props) {
             {/* Progress banner — clickable to open detail */}
             {progress && progress.totalDelegations > 0 && (
               <div
-                className="border-b border-th-border px-4 py-2 flex items-center gap-4 text-sm font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
+                className="border-b border-th-border px-4 py-1 flex items-center gap-3 text-xs font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-blue-400" />
-                  <span>{progress.crewSize} agents</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  <span>{progress.active} active</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                  <span>{progress.completed} done</span>
-                </div>
+                <span className="text-blue-400">{progress.crewSize} agents</span>
+                <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
+                <span className="text-green-400">{progress.completed} done</span>
                 {progress.failed > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 text-red-400" />
-                    <span>{progress.failed} failed</span>
-                  </div>
+                  <span className="text-red-400">{progress.failed} failed</span>
                 )}
-                {(() => {
-                  return null;
-                })()}
-                <div className="ml-auto">
-                  <div className="w-32 bg-th-bg-muted rounded-full h-2">
+                <div className="ml-auto flex items-center gap-2">
+                  <div className="w-24 bg-th-bg-muted rounded-full h-1.5">
                     <div
-                      className="bg-green-500 h-2 rounded-full transition-all"
+                      className="bg-green-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${progress.completionPct}%` }}
                     />
                   </div>
+                  <span className="text-th-text-muted">{progress.completionPct}%</span>
                 </div>
-                <span className="text-th-text-muted">{progress.completionPct}%</span>
               </div>
             )}
             {progressSummary && (
               <div
-                className="border-b border-th-border px-4 py-1.5 text-xs text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
+                className="border-b border-th-border px-4 py-0.5 text-[11px] text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
@@ -609,54 +593,59 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
-            {/* Working directory bar */}
-            <CwdBar leadId={selectedLeadId!} cwd={leadAgent?.cwd} />
-
-            {/* Session ID bar — copyable for resume */}
-            {leadAgent?.sessionId && (
-              <div className="border-b border-th-border px-4 py-1 flex items-center gap-2 text-xs font-mono bg-th-bg-alt/20">
-                <GitBranch className="w-3 h-3 text-th-text-muted shrink-0" />
-                <span className="text-th-text-muted">Session:</span>
-                <span className="text-th-text-muted truncate" title={leadAgent.sessionId}>{leadAgent.sessionId}</span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(leadAgent.sessionId!);
-                    const btn = document.activeElement as HTMLElement;
-                    btn.textContent = 'copied!';
-                    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
-                  }}
-                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
-                >
-                  copy
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(`/api/export/${selectedLeadId}`);
-                      const data = await res.json();
-                      if (data.error) {
-                        alert(`Export failed: ${data.error}`);
-                      } else {
-                        alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+            {/* Session info bar — cwd + session ID merged into one line */}
+            <div className="border-b border-th-border px-4 py-0.5 flex items-center gap-3 text-[11px] font-mono text-th-text-muted bg-th-bg-alt/20">
+              {leadAgent?.cwd && (
+                <span className="flex items-center gap-1 truncate" title={leadAgent.cwd}>
+                  <FolderOpen className="w-3 h-3 shrink-0" />
+                  <span className="truncate max-w-[200px]">{leadAgent.cwd}</span>
+                </span>
+              )}
+              {leadAgent?.sessionId && (
+                <span className="flex items-center gap-1 truncate ml-auto" title={leadAgent.sessionId}>
+                  <GitBranch className="w-3 h-3 shrink-0" />
+                  <span className="truncate max-w-[180px]">{leadAgent.sessionId}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(leadAgent.sessionId!);
+                      const btn = e.currentTarget;
+                      btn.textContent = '✓';
+                      setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+                    }}
+                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
+                  >
+                    copy
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const res = await fetch(`/api/export/${selectedLeadId}`);
+                        const data = await res.json();
+                        if (data.error) {
+                          alert(`Export failed: ${data.error}`);
+                        } else {
+                          alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+                        }
+                      } catch {
+                        alert('Export failed — server may be unavailable');
                       }
-                    } catch {
-                      alert('Export failed — server may be unavailable');
-                    }
-                  }}
-                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-1"
-                  title="Export session to disk (summary, agents, decisions, DAG)"
-                >
-                  <Download className="w-3 h-3" />
-                  export
-                </button>
-              </div>
-            )}
+                    }}
+                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-0.5"
+                    title="Export session to disk"
+                  >
+                    <Download className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+            </div>
 
-            {/* Agent Reports — separate from lead output */}
+            {/* Agent Reports — compact toggle */}
             {agentReports.length > 0 && (
               <div className="border-b border-th-border bg-amber-500/5 dark:bg-amber-500/10">
                 <button
-                  className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
                   onClick={() => setReportsExpanded(!reportsExpanded)}
                 >
                   {reportsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}

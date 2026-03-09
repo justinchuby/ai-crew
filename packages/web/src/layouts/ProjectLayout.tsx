@@ -32,7 +32,6 @@ import { useProjects } from '../hooks/useProjects';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Tabs, type TabItem } from '../components/ui/Tabs';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import { Breadcrumb } from '../components/Breadcrumb';
 import { PageTransition } from '../components/PageTransition';
 import { apiFetch } from '../hooks/useApi';
 
@@ -370,9 +369,6 @@ export function ProjectLayout() {
             </div>
           </div>
         </div>
-
-        {/* Breadcrumb trail */}
-        <Breadcrumb />
 
         {/* Route content with transition animation */}
         <PageTransition transitionKey={activeTab}>
