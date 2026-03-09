@@ -63,11 +63,11 @@ export function LeadDashboard({ api, ws }: Props) {
   const reportsScrollRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<string>('team');
+  const [sidebarTab, setSidebarTab] = useState<string>('crew');
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
-    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
+    const allSupportedTabs = ['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
@@ -348,8 +348,8 @@ export function LeadDashboard({ api, ws }: Props) {
       if (next.has(tabId)) {
         setSidebarTab((current) => {
           if (current === tabId) {
-            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
-            return allSupportedTabs.find((id) => !next.has(id)) ?? 'team';
+            const allSupportedTabs = ['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
+            return allSupportedTabs.find((id) => !next.has(id)) ?? 'crew';
           }
           return current;
         });
