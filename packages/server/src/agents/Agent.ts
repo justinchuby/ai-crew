@@ -63,6 +63,10 @@ export interface AgentJSON {
   isSubLead: boolean;
   hierarchyLevel: number;
   isSystemAgent?: boolean;
+  /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
+  provider?: string;
+  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  backend?: string;
 }
 
 export class Agent {
@@ -101,6 +105,10 @@ export class Agent {
   public hierarchyLevel: number = 0;
   /** Whether this agent was auto-created by the system (e.g., auto-secretary) */
   public isSystemAgent: boolean = false;
+  /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
+  public provider?: string;
+  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  public backend?: string;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -723,6 +731,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       isSubLead: this.role.id === 'lead' && !!this.parentId,
       hierarchyLevel: this.hierarchyLevel,
       isSystemAgent: this.isSystemAgent || undefined,
+      provider: this.provider,
+      backend: this.backend,
     };
   }
 }

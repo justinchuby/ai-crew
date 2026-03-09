@@ -75,6 +75,8 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   });
 
   agent._setAcpConnection(conn);
+  agent.provider = config.provider || 'copilot';
+  agent.backend = backend;
   agent.status = 'running';
   wireAcpEvents(agent, conn);
 

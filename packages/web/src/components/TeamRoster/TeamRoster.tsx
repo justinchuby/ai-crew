@@ -46,6 +46,7 @@ interface RosterAgent {
   lastTaskSummary: string | null;
   createdAt: string;
   updatedAt: string;
+  provider: string | null;
 }
 
 interface AgentProfile {
@@ -66,6 +67,8 @@ interface AgentProfile {
     autopilot: boolean;
     model: string | null;
     sessionId: string | null;
+    provider: string | null;
+    backend: string | null;
   } | null;
 }
 
@@ -110,6 +113,11 @@ function AgentCard({ agent, onSelect }: { agent: RosterAgent; onSelect: (id: str
           </div>
         </div>
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.bg}`}>{badge.label}</span>
+        {agent.provider && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-th-bg-alt text-th-text-alt border border-th-border capitalize">
+            {agent.provider}
+          </span>
+        )}
         <ChevronRight className="w-4 h-4 text-th-text-alt" />
       </div>
     </button>
@@ -329,6 +337,9 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
               <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
               <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleDateString()}</span></div>
               <div><span className="text-th-text-alt">Last Active:</span> <span className="text-th-text">{new Date(profile.updatedAt).toLocaleDateString()}</span></div>
+              {profile.live?.provider && (
+                <div><span className="text-th-text-alt">CLI:</span> <span className="text-th-text capitalize">{profile.live.provider}{profile.live.backend && profile.live.backend !== 'acp' ? ` (${profile.live.backend})` : ''}</span></div>
+              )}
               {profile.live?.sessionId && (
                 <div className="col-span-2">
                   <span className="text-th-text-alt">Session:</span>{' '}
@@ -388,6 +399,12 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
             <div className="grid grid-cols-2 gap-3">
               <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
               <div><span className="text-th-text-alt">Autopilot:</span> <span className="text-th-text">{profile.live?.autopilot ? 'On' : 'Off'}</span></div>
+              {profile.live?.provider && (
+                <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>
+              )}
+              {profile.live?.backend && (
+                <div><span className="text-th-text-alt">Backend:</span> <span className="text-th-text">{profile.live.backend}</span></div>
+              )}
             </div>
           </div>
         )}

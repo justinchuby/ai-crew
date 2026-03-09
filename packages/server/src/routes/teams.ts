@@ -238,6 +238,7 @@ export function teamsRoutes(ctx: AppContext): Router {
           lastTaskSummary: a.lastTaskSummary ?? null,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
+          provider: live?.provider ?? null,
         };
       });
 
@@ -297,6 +298,8 @@ export function teamsRoutes(ctx: AppContext): Router {
         autopilot: liveJson.autopilot ?? false,
         model: liveJson.model ?? null,
         sessionId: liveJson.sessionId ?? null,
+        provider: liveJson.provider ?? null,
+        backend: liveJson.backend ?? null,
       } : null,
     });
   });
