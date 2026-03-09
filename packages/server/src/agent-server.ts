@@ -357,6 +357,17 @@ export class AgentServer {
   // ── Handlers ──────────────────────────────────────────────────
 
   private async handleSpawn(msg: SpawnAgentMessage, conn: TransportConnection): Promise<void> {
+    const resumeSessionId = msg.context?.resumeSessionId as string | undefined;
+
+    // Resume is a deliberate user action — clear stale failure counts from
+    // previous sessions so the circuit breaker doesn't block resume spawns.
+    // Also clear for project spawns (projectId present) since these come from
+    // user-initiated resume/start flows, not cascading automated spawns.
+    if (this.massFailure.isPaused && (resumeSessionId || msg.context?.projectId)) {
+      logger.info({ module: 'agent-server', msg: 'Resetting mass failure detector for user-initiated spawn', resumeSessionId, projectId: msg.context?.projectId });
+      this.massFailure.reset();
+    }
+
     if (this.massFailure.isPaused) {
       this.sendError(conn, 'SPAWN_FAILED', 'Spawning paused due to mass failure', msg.requestId);
       return;
@@ -399,7 +410,6 @@ export class AgentServer {
     this.wireAdapterEvents(agent);
 
     // Start the adapter
-    const resumeSessionId = msg.context?.resumeSessionId as string | undefined;
     const startOpts = buildStartOptions(config, { cwd: process.cwd(), sessionId: resumeSessionId });
     adapter.start(startOpts).then((sessionId) => {
       agent.sessionId = sessionId;
