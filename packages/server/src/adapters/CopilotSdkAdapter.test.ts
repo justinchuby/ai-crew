@@ -287,7 +287,7 @@ describe('CopilotSdkAdapter', () => {
       expect(mockClient.createSession).not.toHaveBeenCalled();
     });
 
-    it('should fallback to createSession if resume fails', async () => {
+    it('should fallback to createSession with fresh sessionId if resume fails', async () => {
       mockClient.resumeSession.mockRejectedValueOnce(new Error('Session not found'));
 
       const sessionId = await adapter.start({
@@ -295,27 +295,29 @@ describe('CopilotSdkAdapter', () => {
         sessionId: 'missing-session',
       });
 
-      expect(sessionId).toBe('missing-session');
+      // Fallback generates a new UUID — should NOT reuse the failed one
+      expect(sessionId).not.toBe('missing-session');
+      expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
       expect(mockClient.resumeSession).toHaveBeenCalled();
       expect(mockClient.createSession).toHaveBeenCalled();
     });
 
-    it('should emit session_resume_failed when resume fails and falls back', async () => {
+    it('should emit session_resume_failed with fresh newSessionId on fallback', async () => {
       mockClient.resumeSession.mockRejectedValueOnce(new Error('Session not found'));
       const handler = vi.fn();
       adapter.on('session_resume_failed', handler);
 
-      await adapter.start({
+      const sessionId = await adapter.start({
         ...defaultStartOpts(),
         sessionId: 'dead-session-id',
       });
 
       expect(handler).toHaveBeenCalledOnce();
-      expect(handler).toHaveBeenCalledWith({
-        requestedSessionId: 'dead-session-id',
-        newSessionId: 'dead-session-id',
-        error: 'Session not found',
-      });
+      const payload = handler.mock.calls[0][0];
+      expect(payload.requestedSessionId).toBe('dead-session-id');
+      expect(payload.newSessionId).toBe(sessionId);
+      expect(payload.newSessionId).not.toBe('dead-session-id');
+      expect(payload.error).toBe('Session not found');
     });
   });
 

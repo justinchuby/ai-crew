@@ -193,12 +193,15 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
           sdkSessionId: this.sdkSessionId,
         });
       } catch (err) {
-        // Resume failed — create new session instead
+        // Resume failed — create new session with a FRESH ID to avoid
+        // overwriting or conflicting with the old session in the SDK store.
         const message = (err as Error)?.message || String(err);
+        this.flightdeckSessionId = randomUUID();
         logger.warn({
           module: 'copilot-sdk',
           msg: `Resume failed, creating new session: ${message}`,
-          sessionId: opts.sessionId,
+          requestedSessionId: opts.sessionId,
+          newSessionId: this.flightdeckSessionId,
         });
         this.session = await withTimeout(
           this.client.createSession({ ...sessionConfig, sessionId: this.flightdeckSessionId }), SDK_TIMEOUT_MS, 'createSession (fallback)',
