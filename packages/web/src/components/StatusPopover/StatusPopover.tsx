@@ -62,6 +62,7 @@ export function StatusPopover() {
   const [daemon, setDaemon] = useState<AgentServerStatus | null>(null);
   const [daemonError, setDaemonError] = useState(false);
   const [agentServerState, setAgentServerState] = useState<AgentServerConnectionState>('connected');
+  const prevConnectedRef = useRef(connected);
 
   // Listen for agent server status via WS
   useEffect(() => {
@@ -71,6 +72,10 @@ export function StatusPopover() {
         const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (msg?.type === 'agentServerStatus' && typeof msg.state === 'string') {
           setAgentServerState(msg.state as AgentServerConnectionState);
+        }
+        // Server sends current health state in init message on connect
+        if (msg?.type === 'init' && typeof msg.agentServerState === 'string') {
+          setAgentServerState(msg.agentServerState as AgentServerConnectionState);
         }
       } catch { /* ignore non-JSON */ }
     }
@@ -89,6 +94,17 @@ export function StatusPopover() {
       setDaemonError(true);
     }
   }, []);
+
+  // Reset stale state and re-fetch daemon status when WS reconnects
+  useEffect(() => {
+    if (connected && !prevConnectedRef.current) {
+      setAgentServerState('connected');
+      setDaemonError(false);
+      setDaemon(null);
+      fetchDaemon();
+    }
+    prevConnectedRef.current = connected;
+  }, [connected, fetchDaemon]);
 
   useEffect(() => {
     if (open) fetchDaemon();

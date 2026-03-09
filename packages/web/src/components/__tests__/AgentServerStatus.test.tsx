@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+
+const mockAppState = { connected: true };
+vi.mock('../../stores/appStore', () => ({
+  useAppStore: (selector: (s: typeof mockAppState) => unknown) => selector(mockAppState),
+}));
+
 import { AgentServerStatus } from '../AgentServerStatus';
 
 function fireWsEvent(data: Record<string, unknown>) {
@@ -10,6 +16,7 @@ function fireWsEvent(data: Record<string, unknown>) {
 
 describe('AgentServerStatus', () => {
   beforeEach(() => {
+    mockAppState.connected = true;
     vi.useFakeTimers();
   });
 
@@ -113,5 +120,41 @@ describe('AgentServerStatus', () => {
     unmount();
     expect(removeSpy).toHaveBeenCalledWith('ws-message', expect.any(Function));
     removeSpy.mockRestore();
+  });
+
+  it('resets to connected when WS reconnects (connected goes false→true)', () => {
+    mockAppState.connected = true;
+    const { container, rerender } = render(<AgentServerStatus />);
+
+    // Set to disconnected via WS event
+    act(() => {
+      fireWsEvent({ type: 'agentServerStatus', state: 'disconnected' });
+    });
+    expect(screen.getByTestId('agent-server-disconnected')).toBeInTheDocument();
+
+    // Simulate WS disconnect
+    mockAppState.connected = false;
+    rerender(<AgentServerStatus />);
+
+    // Simulate WS reconnect
+    mockAppState.connected = true;
+    rerender(<AgentServerStatus />);
+
+    // Should reset to connected (no banner)
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('reads agentServerState from init message', () => {
+    const { container } = render(<AgentServerStatus />);
+    act(() => {
+      fireWsEvent({ type: 'init', agents: [], agentServerState: 'degraded' });
+    });
+    expect(screen.getByTestId('agent-server-degraded')).toBeInTheDocument();
+
+    // Connected state in init clears banner
+    act(() => {
+      fireWsEvent({ type: 'init', agents: [], agentServerState: 'connected' });
+    });
+    expect(container.innerHTML).toBe('');
   });
 });

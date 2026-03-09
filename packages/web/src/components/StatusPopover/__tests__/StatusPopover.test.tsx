@@ -180,4 +180,26 @@ describe('StatusPopover', () => {
       expect(screen.getByText('relative(2026-03-08T10:00:00Z)')).toBeInTheDocument();
     });
   });
+
+  it('re-fetches daemon status when WS reconnects', async () => {
+    mockApiFetch.mockResolvedValue({ running: true, connected: true, state: 'connected', agentCount: 2, latencyMs: 5, pendingRequests: 0, trackedAgents: 2 });
+    mockAppState.connected = true;
+
+    const { rerender } = render(<StatusPopover />);
+
+    // Simulate disconnect
+    mockAppState.connected = false;
+    rerender(<StatusPopover />);
+
+    mockApiFetch.mockClear();
+
+    // Simulate reconnect
+    mockAppState.connected = true;
+    rerender(<StatusPopover />);
+
+    // Should have triggered a daemon fetch on reconnect
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith('/agent-server/status');
+    });
+  });
 });

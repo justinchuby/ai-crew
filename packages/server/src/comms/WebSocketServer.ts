@@ -33,6 +33,7 @@ export class WebSocketServer {
   private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
   private textFlushTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly TEXT_FLUSH_MS = 100;
+  private agentServerHealth: AgentServerHealth | null = null;
 
   constructor(
     server: HttpServer,
@@ -102,6 +103,7 @@ export class WebSocketServer {
           agents: agentManager.getAll().map((a) => a.toJSON()),
           locks: lockRegistry.getAll(),
           systemPaused: agentManager.isSystemPaused,
+          agentServerState: this.agentServerHealth?.state ?? 'connected',
         }),
       );
     });
@@ -533,6 +535,7 @@ export class WebSocketServer {
    * status banner (AS19) can show degraded/disconnected state.
    */
   wireAgentServerHealth(health: AgentServerHealth): () => void {
+    this.agentServerHealth = health;
     const unsub = health.onStateChange((change: HealthStateChange) => {
       let detail: string | undefined;
       if (change.current === 'degraded') {

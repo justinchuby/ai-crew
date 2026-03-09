@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WifiOff, AlertTriangle } from 'lucide-react';
+import { useAppStore } from '../stores/appStore';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -29,10 +30,23 @@ function isAgentServerStatusEvent(msg: unknown): msg is AgentServerStatusEvent {
  * - Disconnected: red error banner (non-dismissible until recovery)
  *
  * Listens for 'agentServerStatus' events via the WebSocket message bus.
+ * Resets to 'connected' when the WS reconnects (avoids stale state from
+ * before disconnect / server restart).
  */
 export function AgentServerStatus() {
   const [state, setState] = useState<AgentServerConnectionState>('connected');
   const [detail, setDetail] = useState<string | undefined>();
+  const connected = useAppStore((s) => s.connected);
+  const prevConnectedRef = useRef(connected);
+
+  // Reset to 'connected' when WS reconnects after a disconnect
+  useEffect(() => {
+    if (connected && !prevConnectedRef.current) {
+      setState('connected');
+      setDetail(undefined);
+    }
+    prevConnectedRef.current = connected;
+  }, [connected]);
 
   useEffect(() => {
     function onWsMessage(event: Event) {
@@ -42,6 +56,11 @@ export function AgentServerStatus() {
         if (isAgentServerStatusEvent(msg)) {
           setState(msg.state);
           setDetail(msg.detail);
+        }
+        // Server sends current health state in init message on connect
+        if (msg?.type === 'init' && typeof msg.agentServerState === 'string') {
+          setState(msg.agentServerState as AgentServerConnectionState);
+          setDetail(undefined);
         }
       } catch {
         // Ignore parse errors from non-JSON messages
