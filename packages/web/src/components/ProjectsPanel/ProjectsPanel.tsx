@@ -28,6 +28,7 @@ import { useToastStore } from '../Toast';
 import { NewProjectModal } from '../LeadDashboard/NewProjectModal';
 import { StatusBadge, projectStatusProps } from '../ui/StatusBadge';
 import { sessionStatusDot } from '../../utils/statusColors';
+import { SessionViewer, type ViewableSession } from '../SessionHistory';
 
 /** Extended project type with storage and agent count info from the enriched API */
 interface EnrichedProject {
@@ -93,6 +94,7 @@ function ProjectCard({
   onCwdChange,
   onSaveCwd,
   onCancelCwdEdit,
+  onViewSession,
 }: {
   project: EnrichedProject;
   isExpanded: boolean;
@@ -112,6 +114,7 @@ function ProjectCard({
   onCwdChange: (value: string) => void;
   onSaveCwd: (id: string) => void;
   onCancelCwdEdit: () => void;
+  onViewSession: (session: ViewableSession) => void;
 }) {
   const isConfirmingDelete = confirmingDeleteId === project.id;
   return (
@@ -275,7 +278,11 @@ function ProjectCard({
                 {project.sessions.slice(-5).reverse().map((s) => {
                   const isRunning = s.status === 'active' && s.leadId === project.activeLeadId;
                   return (
-                  <div key={s.id} className="flex items-center gap-2 text-[11px]">
+                  <div key={s.id}
+                    className="flex items-center gap-2 text-[11px] cursor-pointer hover:bg-th-bg-hover/30 rounded px-1 -mx-1 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onViewSession({ leadId: s.leadId, task: s.task, startedAt: s.startedAt, endedAt: s.endedAt }); }}
+                    title="Click to view conversation"
+                  >
                     <span
                       className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                         isRunning
@@ -378,6 +385,7 @@ export function ProjectsPanel() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importPath, setImportPath] = useState('');
   const [importLoading, setImportLoading] = useState(false);
+  const [viewSession, setViewSession] = useState<ViewableSession | null>(null);
   const addToast = useToastStore((s) => s.add);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -777,6 +785,7 @@ export function ProjectsPanel() {
               onCwdChange={setCwdValue}
               onSaveCwd={handleSaveCwd}
               onCancelCwdEdit={handleCancelCwdEdit}
+              onViewSession={setViewSession}
             />
           ))}
         </div>
@@ -824,6 +833,10 @@ export function ProjectsPanel() {
           </div>
         </div>
       </div>
+    )}
+
+    {viewSession && (
+      <SessionViewer session={viewSession} onClose={() => setViewSession(null)} />
     )}
     </div>
   );

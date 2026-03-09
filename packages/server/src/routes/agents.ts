@@ -117,8 +117,32 @@ export function agentsRoutes(ctx: AppContext): Router {
   // Get message history for an agent (persisted across refreshes)
   router.get('/agents/:id/messages', (req, res) => {
     const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
-    const messages = agentManager.getMessageHistory(req.params.id as string, limit);
-    res.json({ agentId: req.params.id, messages });
+    const agentId = req.params.id as string;
+
+    // Get messages for this agent
+    let messages = agentManager.getMessageHistory(agentId, limit);
+
+    // For resumed sessions: also include messages from prior sessions of the same project
+    if (messages.length === 0 && ctx.projectRegistry) {
+      const agent = agentManager.get(agentId);
+      const projectId = agent?.projectId;
+      if (projectId) {
+        const sessions = ctx.projectRegistry.getSessions(projectId);
+        // Find prior session lead IDs (excluding current agent)
+        const priorLeadIds = sessions
+          .map(s => s.leadId)
+          .filter(id => id !== agentId);
+        for (const leadId of priorLeadIds) {
+          const prior = agentManager.getMessageHistory(leadId, limit);
+          if (prior.length > 0) {
+            messages = [...prior, ...messages];
+            break; // most recent prior session is enough
+          }
+        }
+      }
+    }
+
+    res.json({ agentId, messages });
   });
 
   router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {
