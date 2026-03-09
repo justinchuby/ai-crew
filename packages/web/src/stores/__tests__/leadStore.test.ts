@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useLeadStore } from '../leadStore';
+import { useLeadStore, _resetAppendDedup } from '../leadStore';
 
 const LEAD_ID = 'lead-test-001';
 
 function resetStore() {
   useLeadStore.getState().reset();
   useLeadStore.getState().addProject(LEAD_ID);
+  _resetAppendDedup();
 }
 
 describe('leadStore', () => {

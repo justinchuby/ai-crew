@@ -105,6 +105,9 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
+  /** Suppress assistant events during resume hydration to prevent historical replay */
+  private _isHydrating = false;
+  private _hydrationTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts?: { model?: string; autopilot?: boolean; sendTimeout?: number }) {
     super();
@@ -186,6 +189,9 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
           SDK_TIMEOUT_MS, 'resumeSession',
         );
         this.sdkSessionId = this.session.sessionId;
+        // Suppress historical event replay during hydration
+        this._isHydrating = true;
+        this._hydrationTimer = setTimeout(() => { this._isHydrating = false; }, 2000);
         logger.info({
           module: 'copilot-sdk',
           msg: 'Resumed session via SDK',
@@ -252,6 +258,11 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     // Set prompting BEFORE any async gap to prevent race conditions
     this._isPrompting = true;
     this._promptingStartedAt = Date.now();
+    // Clear hydration guard on first prompt — real events expected now
+    if (this._isHydrating) {
+      this._isHydrating = false;
+      if (this._hydrationTimer) { clearTimeout(this._hydrationTimer); this._hydrationTimer = null; }
+    }
     this.emit('prompting', true);
     this.emit('response_start');
 
@@ -294,6 +305,11 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   // ── Event Processing ───────────────────────────────────────
 
   private processEvent(event: CopilotSessionEvent): void {
+    // During resume hydration, suppress assistant events (historical replay)
+    if (this._isHydrating && event.type.startsWith('assistant.')) {
+      return;
+    }
+
     switch (event.type) {
       case 'assistant.message': {
         const content = (event.data as { content?: string }).content;
@@ -487,6 +503,8 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
   terminate(): void {
     this.abortController?.abort();
+    if (this._hydrationTimer) { clearTimeout(this._hydrationTimer); this._hydrationTimer = null; }
+    this._isHydrating = false;
 
     // Unsubscribe from events
     if (this.unsubscribeEvents) {
