@@ -956,16 +956,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (!secretaryRole) return null;
 
     try {
-      // Look up previous secretary's sessionId for resume
+      // Look up most recent secretary's sessionId for resume (targeted indexed query)
       let resumeSessionId: string | undefined;
       if (this.agentRosterRepository && leadAgent.projectId) {
-        const allRoster = this.agentRosterRepository.getAllAgents();
-        const prevSecretary = allRoster.find(a =>
-          a.projectId === leadAgent.projectId &&
-          a.role === 'secretary' &&
-          a.sessionId &&
-          a.agentId !== leadAgent.id
-        );
+        const prevSecretary = this.agentRosterRepository.findLatestByRoleAndProject('secretary', leadAgent.projectId);
         if (prevSecretary?.sessionId) {
           resumeSessionId = prevSecretary.sessionId;
           logger.info({ module: 'agent', msg: 'Resuming secretary session', sessionId: resumeSessionId, projectId: leadAgent.projectId });

@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, desc } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { agentRoster } from './schema.js';
 
@@ -162,6 +162,22 @@ export class AgentRosterRepository {
       .where(eq(agentRoster.agentId, agentId))
       .run();
     return result.changes > 0;
+  }
+
+  /** Find the most recent agent with a given role and project that has a sessionId. */
+  findLatestByRoleAndProject(role: string, projectId: string): AgentRecord | undefined {
+    const rows = this.db.drizzle
+      .select()
+      .from(agentRoster)
+      .where(and(
+        eq(agentRoster.role, role),
+        eq(agentRoster.projectId, projectId),
+        isNotNull(agentRoster.sessionId),
+      ))
+      .orderBy(desc(agentRoster.updatedAt))
+      .limit(1)
+      .all();
+    return rows.length > 0 ? this.rowToRecord(rows[0]) : undefined;
   }
 
   cloneAgent(sourceAgentId: string, newAgentId: string): AgentRecord | undefined {
