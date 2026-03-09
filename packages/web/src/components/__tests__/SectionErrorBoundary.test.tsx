@@ -59,4 +59,26 @@ describe('SectionErrorBoundary', () => {
     expect(screen.getByText('Test encountered an error.')).toBeTruthy();
     vi.restoreAllMocks();
   });
+
+  it('auto-resets error when resetKey changes', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    let shouldThrow = true;
+    const { rerender } = render(
+      <SectionErrorBoundary name="Route" resetKey="/old-path">
+        <ThrowingChild shouldThrow={shouldThrow} />
+      </SectionErrorBoundary>,
+    );
+    expect(screen.getByText('Route encountered an error.')).toBeTruthy();
+
+    // Simulate navigation — resetKey changes, child now healthy
+    shouldThrow = false;
+    rerender(
+      <SectionErrorBoundary name="Route" resetKey="/new-path">
+        <ThrowingChild shouldThrow={shouldThrow} />
+      </SectionErrorBoundary>,
+    );
+    expect(screen.getByText('healthy content')).toBeTruthy();
+    vi.restoreAllMocks();
+  });
 });

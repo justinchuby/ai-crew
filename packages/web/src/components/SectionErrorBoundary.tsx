@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   name?: string;
   /** Extra CSS classes for the fallback container */
   className?: string;
+  /** When this value changes, error state auto-resets (e.g. route path) */
+  resetKey?: string;
 }
 
 interface State {
@@ -21,12 +24,21 @@ interface State {
  * this renders a compact inline fallback so the rest of the page stays
  * functional. Use it around feed sections, sidebar, header, and route
  * content to isolate failures.
+ *
+ * Pass `resetKey` (e.g. location.pathname) to auto-clear errors on navigation.
+ * Or use `<RouteErrorBoundary>` which does this automatically.
  */
 export class SectionErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && this.props.resetKey !== prevProps.resetKey) {
+      this.setState({ hasError: false, error: null });
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -57,4 +69,13 @@ export class SectionErrorBoundary extends Component<Props, State> {
     }
     return this.props.children;
   }
+}
+
+/**
+ * SectionErrorBoundary that auto-resets on route changes.
+ * Use this for route-level boundaries in App.tsx.
+ */
+export function RouteErrorBoundary(props: Omit<Props, 'resetKey'>) {
+  const { pathname } = useLocation();
+  return <SectionErrorBoundary {...props} resetKey={pathname} />;
 }
