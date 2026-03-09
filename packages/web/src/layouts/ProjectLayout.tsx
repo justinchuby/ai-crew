@@ -23,6 +23,7 @@ import {
   BarChart3,
   Workflow,
   MoreHorizontal,
+  TrendingUp,
 } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useLeadStore } from '../stores/leadStore';
@@ -53,6 +54,7 @@ const PRIMARY_TABS: TabItem[] = [
   { id: 'artifacts',  label: 'Artifacts',  icon: <ScrollText size={14} /> },
   { id: 'knowledge',  label: 'Knowledge',  icon: <Brain size={14} /> },
   { id: 'timeline',   label: 'Timeline',   icon: <GanttChart size={14} /> },
+  { id: 'analysis',   label: 'Analysis',   icon: <TrendingUp size={14} /> },
   { id: 'groups',     label: 'Groups',     icon: <MessageSquare size={14} /> },
   { id: 'org-chart',  label: 'Org Chart',  icon: <Network size={14} /> },
 ];

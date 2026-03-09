@@ -44,6 +44,7 @@ const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m =
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
 const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
+const AnalysisPage = lazy(() => import('./components/AnalysisPage').then(m => ({ default: m.AnalysisPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
@@ -341,6 +342,7 @@ export function App() {
               <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
               <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
               <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="analysis" element={<AnalysisPage api={api} ws={ws} />} />
               <Route path="canvas" element={<CanvasPage />} />
             </Route>
 
