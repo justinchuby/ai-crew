@@ -151,7 +151,7 @@ function DagPanel({
 
   // Split view: resizable Kanban (left) + DAG (right) with percentage-based split
   const [splitPct, setSplitPct] = useState(() => {
-    try { const v = localStorage.getItem('tasks-split-pct'); return v ? Number(v) : 60; } catch { return 60; }
+    try { const v = localStorage.getItem('tasks-split-pct'); return v ? Number(v) : 40; } catch { return 40; }
   });
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -159,14 +159,14 @@ function DagPanel({
     e.preventDefault();
     const container = splitContainerRef.current;
     if (!container) return;
-    const startX = e.clientX;
+    const startY = e.clientY;
     const containerRect = container.getBoundingClientRect();
     const startPct = splitPct;
 
     const onMouseMove = (ev: MouseEvent) => {
-      const deltaX = ev.clientX - startX;
-      const deltaPct = (deltaX / containerRect.width) * 100;
-      const newPct = Math.min(80, Math.max(25, startPct + deltaPct));
+      const deltaY = ev.clientY - startY;
+      const deltaPct = (deltaY / containerRect.height) * 100;
+      const newPct = Math.min(75, Math.max(20, startPct + deltaPct));
       setSplitPct(newPct);
     };
     const onMouseUp = () => {
@@ -174,9 +174,8 @@ function DagPanel({
       document.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      try { localStorage.setItem('tasks-split-pct', String(splitPct)); } catch { /* ignore */ }
     };
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -286,7 +285,7 @@ function DagPanel({
     <LayoutList size={14} className="text-blue-400" />;
 
   return (
-    <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
+    <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col flex-1 min-h-0">
       <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
         <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
           {viewIcon}
@@ -368,18 +367,33 @@ function DagPanel({
         </div>
       </div>
       {effectiveView === 'split' ? (
-        /* Split view: Kanban + DAG side by side */
+        /* Split view: DAG on top, Kanban below (vertical stack) */
         <div
           ref={splitContainerRef}
-          className="flex flex-col lg:flex-row w-full"
-          style={{ minHeight: 500 }}
+          className="flex flex-col w-full flex-1"
+          style={{ minHeight: 600 }}
           data-testid="split-view"
         >
-          {/* Kanban panel (left) */}
+          {/* DAG panel (top) */}
           <div
-            className="overflow-auto lg:overflow-y-auto"
-            style={{ flex: `0 0 ${splitPct}%`, minWidth: 0 }}
+            className="overflow-hidden"
+            style={{ flex: `0 0 ${splitPct}%`, minHeight: 150 }}
           >
+            <DagGraph dagStatus={dagStatus} fillContainer />
+          </div>
+
+          {/* Horizontal drag handle */}
+          <div
+            className="flex items-center justify-center h-1.5 cursor-row-resize hover:bg-blue-500/20 active:bg-blue-500/30 transition-colors group flex-shrink-0"
+            onMouseDown={handleSplitDragStart}
+            title="Drag to resize"
+            data-testid="split-handle"
+          >
+            <div className="h-0.5 w-8 bg-th-border group-hover:bg-blue-400 rounded-full transition-colors" />
+          </div>
+
+          {/* Kanban panel (bottom) */}
+          <div className="flex-1 overflow-auto min-h-[200px]">
             <KanbanBoard
               dagStatus={kanbanScope === 'global' ? globalDagStatus : dagStatus}
               projectId={kanbanScope === 'global' ? undefined : projectId}
@@ -391,23 +405,6 @@ function DagPanel({
               showArchived={showArchived}
               onShowArchivedChange={handleShowArchivedChange}
             />
-          </div>
-
-          {/* Drag handle */}
-          <div
-            className="hidden lg:flex items-center justify-center w-1.5 cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/30 transition-colors group flex-shrink-0"
-            onMouseDown={handleSplitDragStart}
-            title="Drag to resize"
-            data-testid="split-handle"
-          >
-            <div className="w-0.5 h-8 bg-th-border group-hover:bg-blue-400 rounded-full transition-colors" />
-          </div>
-
-          {/* DAG panel (right) */}
-          <div
-            className="flex-1 min-w-0 min-h-[300px] lg:min-h-0"
-          >
-            <DagGraph dagStatus={dagStatus} fillContainer />
           </div>
         </div>
       ) : effectiveView === 'kanban' ? (
@@ -662,7 +659,7 @@ export function TaskQueuePanel({ api }: Props) {
       )}
 
       {/* ---- Content for selected tab ---- */}
-      <div className="flex-1 overflow-auto p-4 focus:outline-none" tabIndex={0}>
+      <div className="flex-1 overflow-auto p-2 focus:outline-none" tabIndex={0}>
         {!currentTab ? (
           <div className="flex flex-col items-center justify-center py-12 text-th-text-muted">
             <Network size={32} className="mb-2 opacity-50" />
@@ -731,9 +728,9 @@ export function TaskQueuePanel({ api }: Props) {
           </div>
         ) : (
           /* Active lead — show progress and tasks */
-          <div className="space-y-4">
-            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
-              <h3 className="text-sm font-medium text-th-text mb-3 flex items-center gap-2">
+          <div className="space-y-2 flex flex-col flex-1 min-h-0">
+            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-3 shrink-0">
+              <h3 className="text-sm font-medium text-th-text mb-2 flex items-center gap-2">
                 <Network size={14} className="text-cyan-400" />
                 Progress
               </h3>
