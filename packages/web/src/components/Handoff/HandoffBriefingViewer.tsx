@@ -20,7 +20,7 @@ export function HandoffBriefingViewer({ handoffId, onClose }: HandoffBriefingVie
   useEffect(() => {
     apiFetch<HandoffRecord>(`/handoffs/${handoffId}`)
       .then((data) => { setRecord(data); setNarrative(data.briefing.narrative); })
-      .catch(() => {})
+      .catch(() => { /* initial fetch — will retry */ })
       .finally(() => setLoading(false));
   }, [handoffId]);
 

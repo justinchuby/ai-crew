@@ -101,7 +101,7 @@ export function AcpOutput({ agentId }: Props) {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get activity events for this agent from leadStore

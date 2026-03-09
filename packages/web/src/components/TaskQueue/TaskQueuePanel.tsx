@@ -195,7 +195,7 @@ function DagPanel({
         for (const p of projects) map.set(p.id, p.name);
         setProjectNameMap(map);
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [kanbanScope]);
 
   // Load next page of global tasks (appends to existing)
@@ -412,7 +412,7 @@ export function TaskQueuePanel({ api }: Props) {
   useEffect(() => {
     apiFetch<Project[]>('/projects')
       .then((data) => setPersistedProjects(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [leads.length]); // re-fetch when leads change
 
   // Build tabs: active leads + inactive persisted projects
@@ -454,7 +454,7 @@ export function TaskQueuePanel({ api }: Props) {
         .then((data) => {
           if (data) setPersistedProjects(prev => prev.map(p => p.id === data.id ? data : p));
         })
-        .catch(() => {});
+        .catch(() => { /* data will load on next poll */ });
     }
   }, [selectedTab, currentTab?.type]);
 
@@ -468,7 +468,7 @@ export function TaskQueuePanel({ api }: Props) {
       .then((data) => {
         if (data?.tasks?.length > 0) setHistoricalDag(data);
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [selectedTab, currentTab?.type]);
 
   // Fetch progress + DAG for active leads

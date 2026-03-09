@@ -207,7 +207,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 }
               }
             })
-            .catch(() => {});
+            .catch(() => { /* data will load on next poll */ });
         });
         // Auto-select first running lead if none selected
         if (!useLeadStore.getState().selectedLeadId) {
@@ -215,7 +215,7 @@ export function LeadDashboard({ api, ws }: Props) {
           if (running) useLeadStore.getState().selectLead(running.id);
         }
       }
-    }).catch(() => {});
+    }).catch(() => { /* initial fetch — will retry */ });
     return () => controller.abort();
   }, []);
 
@@ -254,7 +254,7 @@ export function LeadDashboard({ api, ws }: Props) {
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { /* data will load on next poll */ });
     }
     return () => {
       controller.abort();
@@ -295,7 +295,7 @@ export function LeadDashboard({ api, ws }: Props) {
     const fetchProgress = () => {
       fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
         if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
-      }).catch(() => {});
+      }).catch(() => { /* poll — retry on next interval */ });
     };
     fetchProgress();
     const interval = setInterval(fetchProgress, 5000);
@@ -309,7 +309,7 @@ export function LeadDashboard({ api, ws }: Props) {
     const fetchDecisions = () => {
       fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
         if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
-      }).catch(() => {});
+      }).catch(() => { /* poll — retry on next interval */ });
     };
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
@@ -322,7 +322,7 @@ export function LeadDashboard({ api, ws }: Props) {
     const controller = new AbortController();
     fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
       if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
-    }).catch(() => {});
+    }).catch(() => { /* data will load on next poll */ });
     return () => controller.abort();
   }, [selectedLeadId, isActiveAgent]);
 
@@ -340,7 +340,7 @@ export function LeadDashboard({ api, ws }: Props) {
             store.setDagStatus(historicalProjectId, data as DagStatus);
           }
         }
-      }).catch(() => {});
+      }).catch(() => { /* poll — retry on next interval */ });
     };
     fetchDag();
     const interval = setInterval(fetchDag, 10000);

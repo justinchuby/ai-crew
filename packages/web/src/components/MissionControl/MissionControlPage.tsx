@@ -249,7 +249,7 @@ export function MissionControlPage() {
         }
         setHistoricalAgents(derived);
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [liveAgents.length, leadId]);
 
   // Auto-register discovered leads into leadStore so panels can use them (run once per leadId)

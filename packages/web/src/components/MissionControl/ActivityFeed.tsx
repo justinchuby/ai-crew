@@ -95,7 +95,7 @@ export function ActivityFeed({ leadId }: ActivityFeedProps) {
         }));
         setHistoricalEvents(items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 30));
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [leadId, activity.length, comms.length]);
 
   const liveFeedItems = useMemo(() => buildFeedItems(activity, comms), [activity, comms]);

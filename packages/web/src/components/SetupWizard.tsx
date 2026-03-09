@@ -54,7 +54,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     apiFetch<ProviderStatus[]>('/settings/providers')
       .then(setProviders)
-      .catch(() => {})
+      .catch(() => { /* initial fetch — will retry */ })
       .finally(() => setLoading(false));
   }, []);
 

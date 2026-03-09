@@ -401,7 +401,7 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
           setProjects(active);
           if (!selectedProjectId && active.length > 0) setSelectedProjectId(active[0].id);
         })
-        .catch(() => {});
+        .catch(() => { /* data will load on next poll */ });
     }
   }, [resolvedProjectId, selectedProjectId]);
 

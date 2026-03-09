@@ -257,14 +257,14 @@ export function App() {
               }
             }
           })
-          .catch(() => {});
+          .catch(() => { /* initial fetch — will retry */ });
       });
       // Auto-select first running lead
       if (!store.selectedLeadId) {
         const running = leads.find((l) => l.status === 'running');
         if (running) store.selectLead(running.id);
       }
-    }).catch(() => {});
+    }).catch(() => { /* initial fetch — will retry */ });
 
     // Load persisted projects and register them in leadStore
     fetch('/api/projects').then((r) => r.json()).then((projects: Project[]) => {
@@ -280,7 +280,7 @@ export function App() {
         const first = projects.find((p) => p.status !== 'archived');
         if (first) store.selectLead(`project:${first.id}`);
       }
-    }).catch(() => {});
+    }).catch(() => { /* initial fetch — will retry */ });
   }, []);
 
   return (
