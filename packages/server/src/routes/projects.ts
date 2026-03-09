@@ -73,7 +73,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -124,6 +124,54 @@ export function projectsRoutes(ctx: AppContext): Router {
       failedAgentCount: failedCount,
       storageMode: storageManager?.getStorageMode(project.id) ?? 'user',
     });
+  });
+
+  // Enriched session history for SessionHistory UI component
+  router.get('/projects/:id/sessions/detail', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const sessions = projectRegistry.getSessions(project.id);
+    const taskDAG = agentManager.getTaskDAG();
+    const rosterAgents = ctx.agentRoster?.getAllAgents() ?? [];
+
+    const detailed = sessions.map((session: any) => {
+      // Agent composition: filter roster by metadata.parentId === leadId OR agentId === leadId
+      const agents = rosterAgents
+        .filter(a => {
+          if (a.agentId === session.leadId) return true;
+          const meta = a.metadata ?? {};
+          return meta.parentId === session.leadId;
+        })
+        .map(a => ({ role: a.role, model: a.model || 'unknown', agentId: a.agentId, sessionId: a.sessionId || null }));
+
+      // Task summary from DAG
+      const tasks = taskDAG.getTasks(session.leadId);
+      const done = tasks.filter((t: any) => t.dagStatus === 'done').length;
+      const failed = tasks.filter((t: any) => t.dagStatus === 'failed').length;
+
+      // Retro check
+      const hasRetro = (ctx.sessionRetro?.getRetros(session.leadId) ?? []).length > 0;
+
+      const startMs = new Date(session.startedAt).getTime();
+      const endMs = session.endedAt ? new Date(session.endedAt).getTime() : null;
+
+      return {
+        id: session.id,
+        leadId: session.leadId,
+        status: session.status,
+        task: session.task || null,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt || null,
+        durationMs: endMs ? endMs - startMs : null,
+        agents,
+        taskSummary: { total: tasks.length, done, failed },
+        hasRetro,
+      };
+    });
+
+    res.json(detailed);
   });
 
   // Historical DAG tasks for a project (from database)
@@ -501,6 +549,100 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.status(201).json(project);
   });
 
+  // ── POST /projects/import — import project from existing .flightdeck/ directory ──
+  router.post('/projects/import', (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+
+    const { cwd, name } = req.body;
+    if (!cwd || typeof cwd !== 'string') {
+      return res.status(400).json({ error: 'cwd is required (path to project directory)' });
+    }
+
+    // Validate the CWD path
+    const cwdError = validateCwd(cwd);
+    if (cwdError) return res.status(400).json({ error: cwdError });
+
+    const normalizedCwd = normalize(cwd);
+
+    // Check for .flightdeck/ directory
+    const flightdeckDir = join(normalizedCwd, '.flightdeck');
+    if (!existsSync(flightdeckDir)) {
+      return res.status(400).json({
+        error: 'No .flightdeck/ directory found. This directory may not contain a Flightdeck project.',
+      });
+    }
+
+    // Check it's actually a directory
+    try {
+      const stat = statSync(flightdeckDir);
+      if (!stat.isDirectory()) {
+        return res.status(400).json({ error: '.flightdeck exists but is not a directory' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Cannot access .flightdeck/ directory' });
+    }
+
+    // Check if this CWD is already registered
+    const existing = projectRegistry.list().find(p => p.cwd && normalize(p.cwd) === normalizedCwd);
+    if (existing) {
+      return res.status(409).json({
+        error: `A project already exists for this directory: "${existing.name}" (${existing.id})`,
+        existingProjectId: existing.id,
+      });
+    }
+
+    // Derive project name: explicit name > flightdeck.config.yaml > directory basename
+    let projectName = typeof name === 'string' && name.trim() ? name.trim() : null;
+
+    if (!projectName) {
+      // Try reading flightdeck.config.yaml for a project name
+      const configPath = join(normalizedCwd, 'flightdeck.config.yaml');
+      if (existsSync(configPath)) {
+        try {
+          const configContent = readFileSync(configPath, 'utf-8');
+          const nameMatch = configContent.match(/^\s*(?:name|projectName)\s*:\s*["']?(.+?)["']?\s*$/m);
+          if (nameMatch) projectName = nameMatch[1].trim();
+        } catch { /* ignore config read errors */ }
+      }
+    }
+
+    if (!projectName) {
+      // Fall back to directory basename
+      const parts = normalizedCwd.replace(/[/\\]+$/, '').split(/[/\\]/);
+      projectName = parts[parts.length - 1] || 'Imported Project';
+    }
+
+    // Gather metadata about what's in .flightdeck/
+    const hasShared = existsSync(join(flightdeckDir, 'shared'));
+    const hasScreenshots = existsSync(join(flightdeckDir, 'screenshots'));
+    let sharedAgentCount = 0;
+    if (hasShared) {
+      try {
+        sharedAgentCount = readdirSync(join(flightdeckDir, 'shared')).length;
+      } catch { /* ignore */ }
+    }
+
+    const project = projectRegistry.create(projectName, `Imported from ${normalizedCwd}`, normalizedCwd);
+    logger.info({
+      module: 'project',
+      msg: 'Project imported from directory',
+      projectId: project.id,
+      name: projectName,
+      cwd: normalizedCwd,
+      hasShared,
+      sharedAgentCount,
+    });
+
+    res.status(201).json({
+      ...project,
+      imported: {
+        hasShared,
+        hasScreenshots,
+        sharedAgentCount,
+      },
+    });
+  });
+
   router.patch('/projects/:id', (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(req.params.id);
@@ -524,6 +666,59 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({ ...briefing, formatted: projectRegistry.formatBriefing(briefing) });
   });
 
+  // Enriched session history with agent composition, task summary, and duration
+  router.get('/projects/:id/sessions/detail', (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const sessions = projectRegistry.getSessions(project.id);
+    const taskDAG = agentManager.getTaskDAG();
+    const allRosterAgents = agentRoster?.getAllAgents() ?? [];
+
+    const detailed = sessions.map((session) => {
+      // Find agents that participated in this session via metadata.parentId
+      const agents = allRosterAgents
+        .filter((a) => {
+          if (a.agentId === session.leadId) return true;
+          const meta = a.metadata as Record<string, unknown> | undefined;
+          return a.projectId === project.id && meta?.parentId === session.leadId;
+        })
+        .map((a) => ({
+          agentId: a.agentId,
+          role: a.role,
+          model: a.model,
+          sessionId: a.sessionId ?? null,
+        }));
+
+      // Task summary from DAG
+      const tasks = taskDAG.getTasks(session.leadId);
+      const done = tasks.filter((t) => t.dagStatus === 'done').length;
+      const failed = tasks.filter((t) => t.dagStatus === 'failed').length;
+
+      // Check if retro exists
+      const retros = sessionRetro?.getRetros(session.leadId) ?? [];
+
+      const startMs = new Date(session.startedAt).getTime();
+      const endMs = session.endedAt ? new Date(session.endedAt).getTime() : null;
+
+      return {
+        id: session.id,
+        leadId: session.leadId,
+        status: session.status,
+        task: session.task,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        durationMs: endMs ? endMs - startMs : null,
+        agents,
+        taskSummary: { total: tasks.length, done, failed },
+        hasRetro: retros.length > 0,
+      };
+    });
+
+    res.json(detailed);
+  });
+
   // Resume a project — starts a new lead session with project context + message history
   router.post('/projects/:id/resume', (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
@@ -541,7 +736,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
-    const { task, model } = req.body;
+    const { task, model, freshStart, resumeAll, agents: agentIds } = req.body;
     try {
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, undefined, undefined, { projectName: project.name, projectId: project.id });
       projectRegistry.startSession(project.id, agent.id, task);
@@ -585,7 +780,57 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Auto-spawn Secretary for DAG tracking (skips if one exists)
       agentManager.autoSpawnSecretary(agent);
 
-      res.status(201).json(agent.toJSON());
+      // Team respawn: bring back agents from last session (unless freshStart)
+      let respawnedCount = 0;
+      if (!freshStart && agentRoster) {
+        const sessions = projectRegistry.getSessions(project.id);
+        // Find last completed session (skip current active one we just created)
+        const lastSession = sessions.find((s) => s.leadId !== agent.id);
+        if (lastSession && (resumeAll || agentIds)) {
+          const allRosterAgents = agentRoster.getAllAgents();
+          const previousAgents = allRosterAgents.filter((a) => {
+            const meta = a.metadata as Record<string, unknown> | undefined;
+            return (
+              a.projectId === project.id &&
+              meta?.parentId === lastSession.leadId &&
+              a.role !== 'lead' &&
+              a.role !== 'secretary'
+            );
+          });
+
+          // Filter to selected agents if specific IDs provided
+          const toResume = Array.isArray(agentIds)
+            ? previousAgents.filter((a) => agentIds.includes(a.agentId))
+            : previousAgents;
+
+          // Stagger spawns to avoid rate limits (6s base + 2s per agent)
+          for (const [i, prev] of toResume.entries()) {
+            setTimeout(() => {
+              const prevRole = roleRegistry.get(prev.role);
+              if (!prevRole) return;
+              try {
+                agentManager.spawn(
+                  prevRole,
+                  prev.lastTaskSummary || undefined,
+                  agent.id,
+                  true,
+                  prev.model,
+                  project.cwd ?? undefined,
+                  prev.sessionId || undefined,
+                  undefined,
+                  { projectId: project.id, projectName: project.name },
+                );
+                logger.info({ module: 'project', msg: 'Respawned agent', role: prev.role, model: prev.model, parentId: agent.id });
+              } catch (err: any) {
+                logger.warn({ module: 'project', msg: 'Failed to respawn agent', role: prev.role, err: err.message });
+              }
+            }, 6000 + i * 2000);
+          }
+          respawnedCount = toResume.length;
+        }
+      }
+
+      res.status(201).json({ ...agent.toJSON(), respawning: respawnedCount });
     } catch (err: any) {
       logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
       // Only expose rate-limit messages; sanitize all other errors

@@ -19,6 +19,7 @@ import {
   ListChecks,
   Pencil,
   Square,
+  Upload,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -376,6 +377,9 @@ export function ProjectsPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingCwdId, setEditingCwdId] = useState<string | null>(null);
   const [cwdValue, setCwdValue] = useState('');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importPath, setImportPath] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
   const addToast = useToastStore((s) => s.add);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -584,6 +588,29 @@ export function ProjectsPanel() {
     setEditingCwdId(null);
   }, []);
 
+  // ── Import project ────────────────────────────────────────
+  const handleImportProject = useCallback(async () => {
+    if (!importPath.trim()) return;
+    setImportLoading(true);
+    try {
+      const result = await apiFetch<{ id: string; name: string; imported?: { hasShared: boolean; sharedAgentCount: number } }>('/projects/import', {
+        method: 'POST',
+        body: JSON.stringify({ cwd: importPath.trim() }),
+      });
+      const extra = result.imported?.sharedAgentCount
+        ? ` (${result.imported.sharedAgentCount} shared artifacts found)`
+        : '';
+      addToast('success', `Imported "${result.name}"${extra}`);
+      setShowImportDialog(false);
+      setImportPath('');
+      await fetchProjects();
+    } catch (err: any) {
+      addToast('error', `Import failed: ${err.message}`);
+    } finally {
+      setImportLoading(false);
+    }
+  }, [importPath, addToast, fetchProjects]);
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
@@ -616,6 +643,14 @@ export function ProjectsPanel() {
           >
             <Plus className="w-3.5 h-3.5" />
             New Project
+          </button>
+          <button
+            onClick={() => setShowImportDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-th-text-alt border border-th-border rounded-lg hover:bg-th-bg-muted transition-colors"
+            data-testid="import-project-btn"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Import
           </button>
           <button
             onClick={fetchProjects}
@@ -745,6 +780,47 @@ export function ProjectsPanel() {
       )}
     </div>
     {showNewProject && <NewProjectModal onClose={() => { setShowNewProject(false); fetchProjects(); }} />}
+
+    {/* Import Project Dialog */}
+    {showImportDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowImportDialog(false)}>
+        <div className="bg-surface-raised border border-th-border rounded-xl shadow-xl w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-semibold text-th-text mb-1">Import Project</h3>
+          <p className="text-xs text-th-text-muted mb-4">
+            Enter the path to a directory containing a <code className="bg-th-bg-alt px-1 rounded">.flightdeck/</code> folder.
+          </p>
+          <input
+            type="text"
+            value={importPath}
+            onChange={e => setImportPath(e.target.value)}
+            placeholder="/path/to/your/project"
+            className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-accent mb-4"
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter' && importPath.trim()) handleImportProject(); }}
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => { setShowImportDialog(false); setImportPath(''); }}
+              className="px-3 py-1.5 text-xs text-th-text-muted rounded-md hover:bg-th-bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleImportProject}
+              disabled={!importPath.trim() || importLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-black rounded-md hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {importLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              ) : (
+                <Upload className="w-3.5 h-3.5" />
+              )}
+              Import
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
