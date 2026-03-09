@@ -264,7 +264,9 @@ export function ProjectLayout() {
 
   if (!id) return null;
 
-  const projectStatus = details?.status ?? (isLive ? 'active' : 'idle');
+  // Runtime state (isLive) overrides stale DB status to avoid showing
+  // "active" badge when no agents are actually running (B-ON-1).
+  const projectStatus = isLive ? 'active' : (details?.status === 'active' ? 'idle' : (details?.status ?? 'idle'));
   const agentCount = details?.agentCount;
 
   return (
