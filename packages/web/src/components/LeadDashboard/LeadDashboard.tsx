@@ -532,7 +532,13 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const groupMessages = currentProject?.groupMessages ?? EMPTY_GROUP_MESSAGES;
   const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = (() => {
-    const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+    // When selectedLeadId is 'project:xxx', resolve to the active lead agent
+    const effectiveLeadId = selectedLeadId?.startsWith('project:')
+      ? agents.find(
+          (a) => a.projectId === selectedLeadId.slice(8) && a.role?.id === 'lead' && a.status !== 'terminated',
+        )?.id ?? selectedLeadId
+      : selectedLeadId;
+    const live = agents.filter((a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId);
     if (live.length > 0) return live;
     // Fallback: progress endpoint, then keyframe-derived agents
     const progressTeam = progress?.crewAgents ?? EMPTY_CREW_AGENTS;
