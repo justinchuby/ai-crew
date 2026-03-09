@@ -708,6 +708,9 @@ export function projectsRoutes(ctx: AppContext): Router {
 
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, undefined, { projectName: project.name, projectId: project.id });
 
+      // Capture previous lead ID BEFORE reactivation overwrites it
+      const previousLeadId = lastSession?.leadId;
+
       // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
       // Don't check lastSession.status — after a stop the session may still show 'active'
       // if the exit event didn't fire (e.g. ServerClientAdapter bug).
@@ -717,8 +720,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
-      // Gather context from previous session
-      const lastLeadId = projectRegistry.getLastLeadId(project.id);
+      // Gather context from previous session (use saved previousLeadId, not DB which is now overwritten)
       const briefing = projectRegistry.buildBriefing(project.id);
 
       // Send project briefing
@@ -730,8 +732,8 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
 
       // Send condensed message history from previous lead so the new lead has conversation context
-      if (lastLeadId && lastLeadId !== agent.id) {
-        const prevMessages = agentManager.getMessageHistory(lastLeadId, 100);
+      if (previousLeadId && previousLeadId !== agent.id) {
+        const prevMessages = agentManager.getMessageHistory(previousLeadId, 100);
         if (prevMessages.length > 0) {
           const historyLines = prevMessages.map((m) => {
             const role = m.sender === 'human' ? 'Human' : m.sender === 'agent' ? 'Lead' : 'System';
@@ -756,51 +758,46 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Team respawn: bring back agents from last session (unless freshStart)
       let respawnedCount = 0;
       let secretaryResumed = false;
-      if (!freshStart && agentRoster) {
-        const sessions = projectRegistry.getSessions(project.id);
-        // Find last completed session (skip current active one we just created)
-        const lastSession = sessions.find((s) => s.leadId !== agent.id);
-        if (lastSession && (resumeAll || agentIds)) {
-          const allRosterAgents = agentRoster.getByProject(project.id);
-          const previousAgents = allRosterAgents.filter((a) => {
-            const meta = a.metadata as Record<string, unknown> | undefined;
-            return (
-              meta?.parentId === lastSession.leadId &&
-              a.role !== 'lead'
-            );
-          });
+      if (!freshStart && agentRoster && previousLeadId && (resumeAll || agentIds)) {
+        const allRosterAgents = agentRoster.getByProject(project.id);
+        const previousAgents = allRosterAgents.filter((a) => {
+          const meta = a.metadata as Record<string, unknown> | undefined;
+          return (
+            meta?.parentId === previousLeadId &&
+            a.role !== 'lead'
+          );
+        });
 
-          // Filter to selected agents if specific IDs provided
-          const toResume = Array.isArray(agentIds)
-            ? previousAgents.filter((a) => agentIds.includes(a.agentId))
-            : previousAgents;
+        // Filter to selected agents if specific IDs provided
+        const toResume = Array.isArray(agentIds)
+          ? previousAgents.filter((a) => agentIds.includes(a.agentId))
+          : previousAgents;
 
-          // Stagger spawns to avoid rate limits (6s base + 2s per agent)
-          for (const [i, prev] of toResume.entries()) {
-            setTimeout(() => {
-              const prevRole = roleRegistry.get(prev.role);
-              if (!prevRole) return;
-              try {
-                agentManager.spawn(
-                  prevRole,
-                  prev.lastTaskSummary || undefined,
-                  agent.id,
-                  true,
-                  prev.model,
-                  project.cwd ?? undefined,
-                  prev.sessionId || undefined,
-                  prev.agentId,
-                  { projectId: project.id, projectName: project.name },
-                );
-                logger.info({ module: 'project', msg: 'Respawned agent', role: prev.role, model: prev.model, parentId: agent.id });
-              } catch (err: any) {
-                logger.warn({ module: 'project', msg: 'Failed to respawn agent', role: prev.role, err: err.message });
-              }
-            }, 6000 + i * 2000);
-          }
-          respawnedCount = toResume.length;
-          secretaryResumed = toResume.some((a) => a.role === 'secretary');
+        // Stagger spawns to avoid rate limits (6s base + 2s per agent)
+        for (const [i, prev] of toResume.entries()) {
+          setTimeout(() => {
+            const prevRole = roleRegistry.get(prev.role);
+            if (!prevRole) return;
+            try {
+              agentManager.spawn(
+                prevRole,
+                prev.lastTaskSummary || undefined,
+                agent.id,
+                true,
+                prev.model,
+                project.cwd ?? undefined,
+                prev.sessionId || undefined,
+                prev.agentId,
+                { projectId: project.id, projectName: project.name },
+              );
+              logger.info({ module: 'project', msg: 'Respawned agent', role: prev.role, model: prev.model, parentId: agent.id });
+            } catch (err: any) {
+              logger.warn({ module: 'project', msg: 'Failed to respawn agent', role: prev.role, err: err.message });
+            }
+          }, 6000 + i * 2000);
         }
+        respawnedCount = toResume.length;
+        secretaryResumed = toResume.some((a) => a.role === 'secretary');
       }
 
       // Auto-spawn Secretary for DAG tracking — only if not already resumed from previous session
