@@ -543,6 +543,28 @@ export function projectsRoutes(ctx: AppContext): Router {
     }
   });
 
+  // Stop all running agents for a project
+  router.post('/projects/:id/stop', (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const agents = agentManager.getByProject(project.id);
+    let terminated = 0;
+    for (const agent of agents) {
+      if (agent.status === 'running' || agent.status === 'idle') {
+        try {
+          agentManager.terminate(agent.id);
+          terminated++;
+        } catch (err: any) {
+          logger.warn({ module: 'project', msg: 'Failed to terminate agent', agentId: agent.id, err: err.message });
+        }
+      }
+    }
+    logger.info({ module: 'project', msg: 'Stopped project agents', projectId: project.id, terminated, total: agents.length });
+    res.json({ ok: true, terminated, total: agents.length });
+  });
+
   // Delete a project and all its sessions
   router.delete('/projects/:id', (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });

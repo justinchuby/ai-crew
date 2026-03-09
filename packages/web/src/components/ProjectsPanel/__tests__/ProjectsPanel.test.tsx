@@ -68,7 +68,7 @@ describe('ProjectsPanel', () => {
     mockApiFetch.mockResolvedValue([]);
     renderPanel();
     await waitFor(() => {
-      expect(screen.getByText(/No projects yet/)).toBeTruthy();
+      expect(screen.getByText(/No active projects/)).toBeTruthy();
     });
   });
 
@@ -89,7 +89,7 @@ describe('ProjectsPanel', () => {
     });
 
     const buttons = screen.getAllByRole('button');
-    const allFilterBtn = buttons.find((b) => b.textContent?.startsWith('All') && b.textContent?.includes('('));
+    const allFilterBtn = buttons.find((b) => b.textContent === 'All');
     expect(allFilterBtn).toBeTruthy();
     fireEvent.click(allFilterBtn!);
     expect(screen.getByText('Alpha Project')).toBeTruthy();
@@ -113,7 +113,7 @@ describe('ProjectsPanel', () => {
     });
     // Switch to All to see both
     const buttons = screen.getAllByRole('button');
-    const allFilterBtn = buttons.find((b) => b.textContent?.startsWith('All') && b.textContent?.includes('('));
+    const allFilterBtn = buttons.find((b) => b.textContent === 'All');
     fireEvent.click(allFilterBtn!);
     expect(screen.getByText('local')).toBeTruthy();
   });
