@@ -55,6 +55,15 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     return lead?.projectId ?? selectedLeadId;
   }, [selectedLeadId, agents]);
 
+  // Resolve 'project:xxx' selectedLeadId to the actual active lead agent ID
+  const effectiveLeadId = useMemo(() => {
+    if (!selectedLeadId?.startsWith('project:')) return selectedLeadId;
+    const projectId = selectedLeadId.slice(8);
+    return agents.find(
+      (a) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated',
+    )?.id ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
   const { agents: derivedAgents } = useHistoricalAgents(agents.length, historicalProjectId);
   const activeTimerCount = useTimerStore(selectActiveTimerCount);
   const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
@@ -147,7 +156,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     const project = selectedLeadId ? projects[selectedLeadId] : null;
     if (!project) return;
     const currentCounts = {
-      tasks: agents.filter(a => a.parentId === selectedLeadId && (a.status === 'completed' || a.status === 'failed')).length,
+      tasks: agents.filter(a => a.parentId === effectiveLeadId && (a.status === 'completed' || a.status === 'failed')).length,
       decisions: (project.decisions ?? EMPTY_DECISIONS).filter((d: any) => d.needsConfirmation && d.status === 'recorded').length,
       comms: (project.comms ?? EMPTY_COMMS).length,
       reports: (project.agentReports ?? EMPTY_REPORTS).length,
@@ -532,12 +541,6 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const groupMessages = currentProject?.groupMessages ?? EMPTY_GROUP_MESSAGES;
   const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = (() => {
-    // When selectedLeadId is 'project:xxx', resolve to the active lead agent
-    const effectiveLeadId = selectedLeadId?.startsWith('project:')
-      ? agents.find(
-          (a) => a.projectId === selectedLeadId.slice(8) && a.role?.id === 'lead' && a.status !== 'terminated',
-        )?.id ?? selectedLeadId
-      : selectedLeadId;
     const live = agents.filter((a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId);
     if (live.length > 0) return live;
     // Fallback: progress endpoint, then keyframe-derived agents
