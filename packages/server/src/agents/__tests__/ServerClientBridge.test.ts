@@ -692,10 +692,11 @@ describe('startRemoteBridge', () => {
     await bridgePromise;
   });
 
-  it('skips initial prompt on resume', async () => {
+  it('sends context manifest and preamble on resume', async () => {
     const agent = createMockAgent({ resumeSessionId: 'sess-old' });
+    const resumePrompt = 'Context manifest here\n\nResume preamble';
 
-    const bridgePromise = startRemoteBridge(agent as any, client);
+    const bridgePromise = startRemoteBridge(agent as any, client, resumePrompt);
 
     const spawnMsg = transport.sent.find(m => m.type === 'spawn_agent')!;
     transport.receiveMessage({
@@ -709,9 +710,10 @@ describe('startRemoteBridge', () => {
 
     await bridgePromise;
 
-    // No initial prompt sent (undefined passed)
+    // Resume prompt IS sent (context manifest + preamble, no system prompt)
     const sends = transport.sent.filter(m => m.type === 'send_message');
-    expect(sends.length).toBe(0);
+    expect(sends.length).toBe(1);
+    expect((sends[0] as any).content).toBe(resumePrompt);
   });
 
   it('handles spawn failure gracefully', async () => {

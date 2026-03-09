@@ -287,7 +287,7 @@ export async function startRemoteBridge(
     agent.sessionId = sessionId;
     agent._notifySessionReady(sessionId);
 
-    // Send initial prompt if this is a fresh spawn (not resume)
+    // Send initial prompt (always provided — includes context manifest on resume, full system prompt on fresh start)
     if (initialPrompt) {
       await adapter.prompt(initialPrompt);
     }
