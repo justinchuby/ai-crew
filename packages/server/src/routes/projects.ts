@@ -731,24 +731,6 @@ export function projectsRoutes(ctx: AppContext): Router {
         }, 3000);
       }
 
-      // Send condensed message history from previous lead so the new lead has conversation context.
-      // Since agent ID is preserved on resume (agent.id === lastSession.leadId), look up
-      // the agent's own history from a previous run.
-      if (lastSession) {
-        const prevMessages = agentManager.getMessageHistory(agent.id, 100);
-        if (prevMessages.length > 0) {
-          const historyLines = prevMessages.map((m) => {
-            const role = m.sender === 'human' ? 'Human' : m.sender === 'agent' ? 'Lead' : 'System';
-            const text = m.content.length > 500 ? m.content.slice(0, 500) + '...' : m.content;
-            return `[${role}] ${text}`;
-          });
-          const historyText = historyLines.join('\n\n');
-          setTimeout(() => {
-            agent.sendMessage(`[System — Previous Session Conversation]\nHere is the conversation from the previous session for context:\n\n${historyText}`);
-          }, 4000);
-        }
-      }
-
       if (task) {
         setTimeout(() => {
           agent.sendMessage(task);
