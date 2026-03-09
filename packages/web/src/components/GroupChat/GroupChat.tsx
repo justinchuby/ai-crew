@@ -7,6 +7,8 @@ import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils
 import { FilterTabs } from '../FilterTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 
+const EMPTY_GROUP_MSGS: GroupMessage[] = [];
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
@@ -286,8 +288,8 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
   /* ---- Auto-scroll on new messages ---- */
   const currentMessages = selectedGroup
-    ? messages[groupKey(selectedGroup.leadId, selectedGroup.name)] ?? []
-    : [];
+    ? messages[groupKey(selectedGroup.leadId, selectedGroup.name)] ?? EMPTY_GROUP_MSGS
+    : EMPTY_GROUP_MSGS;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
