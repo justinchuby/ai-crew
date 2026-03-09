@@ -368,13 +368,49 @@ describe('CopilotSdkAdapter', () => {
       expect(promptComplete).toHaveBeenCalledWith('end_turn');
     });
 
-    it('should emit text from response content', async () => {
+    it('should emit text from response content when no streaming deltas', async () => {
       const text = vi.fn();
       adapter.on('text', text);
 
       await adapter.prompt('hello');
 
+      // No streaming_delta events fired — return value text IS emitted
       expect(text).toHaveBeenCalledWith('Hello from Copilot');
+    });
+
+    it('should NOT re-emit text from response when streaming deltas already delivered it', async () => {
+      // Simulate streaming deltas firing during sendAndWait (SDK delivers
+      // streaming_delta events while the promise is in flight)
+      mockSession.sendAndWait.mockImplementationOnce(async () => {
+        // Fire streaming deltas via the session event handler (simulating
+        // what the SDK does during response generation)
+        mockSessionEventHandler!({
+          id: 'delta-1', timestamp: new Date().toISOString(),
+          parentId: null, type: 'assistant.streaming_delta',
+          data: { content: 'Hello ' },
+        });
+        mockSessionEventHandler!({
+          id: 'delta-2', timestamp: new Date().toISOString(),
+          parentId: null, type: 'assistant.streaming_delta',
+          data: { content: 'from Copilot' },
+        });
+        // Return the full content (same as what streaming delivered)
+        return {
+          id: 'msg-1', timestamp: new Date().toISOString(),
+          parentId: null, type: 'assistant.message',
+          data: { content: 'Hello from Copilot' },
+        };
+      });
+
+      const text = vi.fn();
+      adapter.on('text', text);
+
+      await adapter.prompt('hello');
+
+      // Text should only be emitted from streaming deltas, NOT from the return value
+      expect(text).toHaveBeenCalledTimes(2);
+      expect(text).toHaveBeenNthCalledWith(1, 'Hello ');
+      expect(text).toHaveBeenNthCalledWith(2, 'from Copilot');
     });
 
     it('should handle empty response', async () => {

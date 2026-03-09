@@ -301,7 +301,10 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       const stopReason: StopReason = 'end_turn';
       const result: PromptResult = { stopReason };
 
-      if (response?.data?.content) {
+      // Only emit text from the return value if streaming deltas didn't already
+      // deliver it. sendAndWait() fires streaming_delta events during the async
+      // call, then returns the full content — emitting both doubles every message.
+      if (response?.data?.content && !this._currentTurnStreamed) {
         this.emit('text', response.data.content as string);
       }
 
