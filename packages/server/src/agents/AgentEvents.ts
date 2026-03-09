@@ -4,7 +4,7 @@
  */
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 
-/** Preamble appended to the system prompt when resuming a previous session */
+/** Short notice sent as the initial prompt on successful session resume */
 export const RESUME_PREAMBLE = '[System] Session resumed.';
 import type { AgentStatus } from './Agent.js';
 
