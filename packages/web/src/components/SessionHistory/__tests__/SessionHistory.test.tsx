@@ -23,6 +23,7 @@ vi.mock('lucide-react', () => ({
   Loader2: (p: any) => <span data-testid="icon-loader" {...p} />,
   UserPlus: (p: any) => <span data-testid="icon-userplus" {...p} />,
   Sparkles: (p: any) => <span data-testid="icon-sparkles" {...p} />,
+  Eye: (p: any) => <span data-testid="icon-eye" {...p} />,
 }));
 
 const MOCK_SESSIONS: SessionDetail[] = [
@@ -205,5 +206,34 @@ describe('SessionHistory', () => {
     // ResumeSessionDialog should appear
     expect(screen.getByTestId('resume-session-dialog')).toBeInTheDocument();
     expect(screen.getByText('Resume Project')).toBeInTheDocument();
+  });
+
+  it('shows View full session button in expanded session', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_SESSIONS);
+    render(<MemoryRouter><SessionHistory projectId="proj-1" /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(screen.getByText('Build the dashboard')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Build the dashboard'));
+    expect(screen.getByText('View full session')).toBeInTheDocument();
+  });
+
+  it('View full session button navigates to correct route', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_SESSIONS);
+    render(
+      <MemoryRouter initialEntries={['/projects/proj-1/overview']}>
+        <SessionHistory projectId="proj-1" />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Build the dashboard')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Build the dashboard'));
+    const viewBtn = screen.getByText('View full session');
+    expect(viewBtn.closest('button')).toBeTruthy();
   });
 });
