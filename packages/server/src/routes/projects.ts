@@ -697,7 +697,14 @@ export function projectsRoutes(ctx: AppContext): Router {
         : undefined;
 
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, undefined, { projectName: project.name, projectId: project.id });
-      projectRegistry.startSession(project.id, agent.id, task);
+
+      // Reactivate existing session row when resuming; only INSERT for fresh/new sessions
+      const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
+      if (lastSession && lastSession.status !== 'active') {
+        projectRegistry.reactivateSession(lastSession.id, agent.id, task, role.id);
+      } else {
+        projectRegistry.startSession(project.id, agent.id, task);
+      }
 
       // Gather context from previous session
       const lastLeadId = projectRegistry.getLastLeadId(project.id);
