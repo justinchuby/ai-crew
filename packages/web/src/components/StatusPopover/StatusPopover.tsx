@@ -7,7 +7,7 @@ import { formatRelativeTime } from '../../utils/formatRelativeTime';
 
 // ── Types ─────────────────────────────────────────────────
 
-interface DaemonStatus {
+interface AgentServerStatus {
   running: boolean;
   connected: boolean;
   state: string;
@@ -59,7 +59,7 @@ export function StatusPopover() {
   const systemPaused = useAppStore((s) => s.systemPaused);
   const agents = useAppStore((s) => s.agents);
 
-  const [daemon, setDaemon] = useState<DaemonStatus | null>(null);
+  const [daemon, setDaemon] = useState<AgentServerStatus | null>(null);
   const [daemonError, setDaemonError] = useState(false);
   const [agentServerState, setAgentServerState] = useState<AgentServerConnectionState>('connected');
 
@@ -81,7 +81,7 @@ export function StatusPopover() {
   // Fetch daemon status when popover opens
   const fetchDaemon = useCallback(async () => {
     try {
-      const data = await apiFetch<DaemonStatus>('/agent-server/status');
+      const data = await apiFetch<AgentServerStatus>('/agent-server/status');
       setDaemon(data);
       setDaemonError(false);
     } catch {
@@ -162,6 +162,9 @@ export function StatusPopover() {
     ? { icon: AlertCircle as typeof CheckCircle, color: 'text-yellow-400' }
     : statusIcon(daemonOk);
 
+  // Connection row — destructure once to avoid calling statusIcon twice
+  const connIcon = statusIcon(connected);
+
   return (
     <div className="relative" ref={popoverRef}>
       {/* Trigger — clickable status indicator */}
@@ -204,8 +207,8 @@ export function StatusPopover() {
           {/* Status rows */}
           <div className="px-4 py-2 space-y-0.5">
             <StatusRow
-              icon={statusIcon(connected).icon}
-              iconColor={statusIcon(connected).color}
+              icon={connIcon.icon}
+              iconColor={connIcon.color}
               label="Server Connection"
               value={connected ? (systemPaused ? 'Paused' : 'Connected') : 'Disconnected'}
               detail={connected ? 'WebSocket active' : 'Attempting to reconnect...'}
@@ -214,7 +217,7 @@ export function StatusPopover() {
             <StatusRow
               icon={daemonIcon.icon}
               iconColor={daemonIcon.color}
-              label="Agent Daemon"
+              label="Agent Server"
               value={daemonValue}
               detail={daemon?.latencyMs != null ? `${daemon.latencyMs}ms latency` : undefined}
             />

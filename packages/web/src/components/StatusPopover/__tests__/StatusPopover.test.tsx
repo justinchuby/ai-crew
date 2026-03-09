@@ -86,7 +86,7 @@ describe('StatusPopover', () => {
 
     expect(screen.getByText('System Status')).toBeInTheDocument();
     expect(screen.getByText('Server Connection')).toBeInTheDocument();
-    expect(screen.getByText('Agent Daemon')).toBeInTheDocument();
+    expect(screen.getByText('Agent Server')).toBeInTheDocument();
     expect(screen.getByText('Active Agents')).toBeInTheDocument();
     expect(screen.getByText('Last Activity')).toBeInTheDocument();
   });

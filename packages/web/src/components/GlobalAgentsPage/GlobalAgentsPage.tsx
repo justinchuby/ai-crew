@@ -16,32 +16,14 @@ import {
 import { apiFetch } from '../../hooks/useApi';
 import { getRoleIcon } from '../../utils/getRoleIcon';
 import { useToastStore } from '../Toast';
+import type { AgentInfo } from '../../types';
 
 // ── Types ─────────────────────────────────────────────────
 
 type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
 type StatusFilter = AgentStatus | 'all';
 
-interface AgentRole {
-  id: string;
-  name: string;
-  icon: string;
-  model: string;
-  color?: string;
-}
-
-interface AgentInfo {
-  id: string;
-  role: AgentRole;
-  status: AgentStatus;
-  autopilot: boolean;
-  task: string | null;
-  sessionId: string | null;
-  projectName: string | null;
-  projectId: string | null;
-  model: string;
-  createdAt: string;
-}
+const STATUS_OPTIONS: StatusFilter[] = ['all', 'running', 'idle', 'creating', 'completed', 'failed', 'terminated'];
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -320,8 +302,6 @@ export function GlobalAgentsPage() {
       </div>
     );
   }
-
-  const STATUS_OPTIONS: StatusFilter[] = ['all', 'running', 'idle', 'creating', 'completed', 'failed', 'terminated'];
 
   return (
     <div className="flex flex-col h-full min-h-0 p-6 max-w-5xl mx-auto">

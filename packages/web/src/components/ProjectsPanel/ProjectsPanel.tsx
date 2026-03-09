@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   FolderOpen,
   Plus,
@@ -92,7 +92,6 @@ function ProjectCard({
   project,
   isExpanded,
   onToggle,
-  onNavigate,
   onResume,
   onArchive,
   onDelete,
@@ -103,7 +102,6 @@ function ProjectCard({
   project: EnrichedProject;
   isExpanded: boolean;
   onToggle: () => void;
-  onNavigate: (id: string) => void;
   onResume: (id: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
@@ -114,11 +112,10 @@ function ProjectCard({
   const isConfirmingDelete = confirmingDeleteId === project.id;
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover">
-      {/* Card header — click navigates to project, chevron toggles details */}
-      <div
-        className="flex items-center gap-3 p-3 cursor-pointer"
-        onClick={() => onNavigate(project.id)}
-        role="link"
+      {/* Card header — Link for proper accessibility and keyboard navigation */}
+      <Link
+        to={`/projects/${project.id}`}
+        className="flex items-center gap-3 p-3 no-underline text-inherit"
         aria-label={`Open ${project.name}`}
       >
         <FolderOpen className="w-5 h-5 text-accent shrink-0" />
@@ -168,7 +165,7 @@ function ProjectCard({
             <ChevronRight className="w-4 h-4 text-th-text-muted" />
           )}
         </button>
-      </div>
+      </Link>
 
       {/* Expanded details */}
       {isExpanded && (
@@ -308,7 +305,6 @@ export function ProjectsPanel() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
   const addToast = useToastStore((s) => s.add);
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Consume ?action=new param — auto-open the new project modal
@@ -545,7 +541,6 @@ export function ProjectsPanel() {
               project={project}
               isExpanded={expandedId === project.id}
               onToggle={() => handleToggle(project.id)}
-              onNavigate={(id) => navigate(`/projects/${id}`)}
               onResume={handleResume}
               onArchive={handleArchive}
               onDelete={handleRequestDelete}
