@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ConfigWatcher } from './ConfigWatcher';
+import { ConfigWatcher } from './ConfigWatcher.js';
 import * as fsPromises from 'fs/promises';
+import type { Stats } from 'fs';
 
 vi.mock('fs/promises');
 vi.mock('fs', () => ({
@@ -49,7 +50,7 @@ describe('ConfigWatcher', () => {
     watcher.on('warning', (msg: string) => warnings.push(msg));
 
     const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-    const fakeStat = { mtimeMs: 1000, size: 42 } as fsPromises.Stats;
+    const fakeStat = { mtimeMs: 1000, size: 42 } as Stats;
 
     // Phase 1: file missing
     mockStat.mockRejectedValue(enoent);

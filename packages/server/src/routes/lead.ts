@@ -78,18 +78,20 @@ export function leadRoutes(ctx: AppContext): Router {
           const briefing = projectRegistry.buildBriefing(resolvedProjectId);
           if (briefing && briefing.sessions.length > 1) {
             const briefingText = projectRegistry.formatBriefing(briefing);
+            const BRIEFING_DELAY_MS = 3000;
             setTimeout(() => {
               agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
-            }, 3000);
+            }, BRIEFING_DELAY_MS);
           }
         }
       }
 
       if (task) {
+        const TASK_DELIVERY_DELAY_MS = 2000;
         setTimeout(() => {
           logger.info('lead', `Sending initial task to ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
           agent.sendMessage(task);
-        }, 2000);
+        }, TASK_DELIVERY_DELAY_MS);
       }
 
       // Auto-spawn Secretary agent for DAG tracking and dependency analysis

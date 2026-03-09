@@ -10,6 +10,7 @@ import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateMod
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
+import { parseIntBounded } from '../utils/validation.js';
 
 const PROJECT_TITLE_MAX = 100;
 
@@ -509,7 +510,7 @@ export function projectsRoutes(ctx: AppContext): Router {
   // Historical chat messages for a project (from lead conversations)
   router.get('/projects/:id/messages', (req, res) => {
     if (!_db) return res.json({ messages: [] });
-    const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
+    const limit = parseIntBounded(req.query.limit, 1, 1000, 200);
     // Find all lead IDs for this project
     const leads = _db.drizzle
       .select({ leadId: projectSessions.leadId })
@@ -726,15 +727,17 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Send project briefing
       if (briefing && briefing.sessions.length > 1) {
         const briefingText = projectRegistry.formatBriefing(briefing);
+        const BRIEFING_DELAY_MS = 3000;
         setTimeout(() => {
           agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
-        }, 3000);
+        }, BRIEFING_DELAY_MS);
       }
 
       if (task) {
+        const TASK_DELIVERY_DELAY_MS = 5000;
         setTimeout(() => {
           agent.sendMessage(task);
-        }, 5000);
+        }, TASK_DELIVERY_DELAY_MS);
       }
 
       logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
@@ -818,7 +821,7 @@ export function projectsRoutes(ctx: AppContext): Router {
           // The terminate → exit event chain should handle this, but if the
           // adapter doesn't emit 'exit' the session stays 'active' forever.
           if (agent.role.id === 'lead' && !agent.parentId) {
-            projectRegistry.endSession(agent.id, 'completed');
+            projectRegistry.endSession(agent.id, 'stopped');
           }
         } catch (err: any) {
           logger.warn({ module: 'project', msg: 'Failed to terminate agent', agentId: agent.id, err: err.message });

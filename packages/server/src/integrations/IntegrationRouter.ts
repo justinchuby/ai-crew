@@ -351,7 +351,9 @@ export class IntegrationRouter {
           platform: msg.platform,
           chatId: msg.chatId,
           text: '⚠️ Usage: bind <project-id>',
-        }).catch(() => {});
+        }).catch((err) => {
+          logger.warn({ module: 'integration-router', msg: 'Failed to send bind usage hint', error: (err as Error).message });
+        });
         return;
       }
       this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
@@ -361,7 +363,9 @@ export class IntegrationRouter {
           platform: msg.platform,
           chatId: msg.chatId,
           text: `✅ Chat bound to project: ${projectId}`,
-        }).catch(() => {});
+        }).catch((err) => {
+          logger.warn({ module: 'integration-router', msg: 'Failed to send bind confirmation', error: (err as Error).message });
+        });
       }
       return;
     }
@@ -376,7 +380,9 @@ export class IntegrationRouter {
           platform: msg.platform,
           chatId: msg.chatId,
           text: 'No active project session. Use /projects to see available projects, then send "bind <project-id>" to connect this chat.',
-        }).catch(() => { /* swallowed — adapter handles logging */ });
+        }).catch((err) => {
+          logger.warn({ module: 'integration-router', msg: 'Failed to send no-session hint', error: (err as Error).message });
+        });
       }
       return;
     }
@@ -412,7 +418,9 @@ export class IntegrationRouter {
           platform: msg.platform,
           chatId: msg.chatId,
           text: '⚠️ No active project lead found for this project. The lead may have exited.',
-        }).catch(() => {});
+        }).catch((err) => {
+          logger.warn({ module: 'integration-router', msg: 'Failed to send no-lead warning', error: (err as Error).message });
+        });
       }
     } catch (err) {
       logger.warn({
@@ -566,7 +574,9 @@ export class IntegrationRouter {
       // Disable Telegram
       const adapter = this.adapters.get('telegram');
       if (adapter) {
-        adapter.stop().catch(() => {});
+        adapter.stop().catch((err) => {
+          logger.warn({ module: 'integration-router', msg: 'Failed to stop Telegram adapter', error: (err as Error).message });
+        });
         this.adapters.delete('telegram');
       }
     }
