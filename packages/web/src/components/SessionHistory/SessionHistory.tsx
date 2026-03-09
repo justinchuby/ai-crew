@@ -117,6 +117,14 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
                 onClick={() => setExpandedId(isExpanded ? null : session.id)}
               >
                 <StatusDot status={session.status} />
+                <span
+                  className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors shrink-0"
+                  title={`Session: ${session.leadId} — click to copy`}
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(session.leadId); }}
+                >
+                  {session.leadId.slice(0, 8)}
+                </span>
                 <span className="text-xs flex-1 truncate text-th-text">
                   {session.task || 'No task description'}
                 </span>
