@@ -65,7 +65,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
 
   router.get('/coordination/activity', (req, res) => {
     const { agentId, type, limit, since, projectId } = req.query;
-    const limitNum = limit ? Number(limit) : 50;
+    const limitNum = Math.min(limit ? Number(limit) : 50, 1000);
     const pid = projectId as string | undefined;
     let activities;
     if (since) {
