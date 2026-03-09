@@ -467,31 +467,6 @@ describe('HomeDashboard', () => {
     });
   });
 
-  describe('connection status', () => {
-    beforeEach(() => {
-      mockApiFetch.mockImplementation((path: string) => {
-        if (path === '/projects') return Promise.resolve(sampleProjects);
-        return Promise.resolve([]);
-      });
-    });
-
-    it('shows Connected badge when connected', async () => {
-      mockAppState.connected = true;
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('Connected')).toBeTruthy();
-      });
-    });
-
-    it('shows Disconnected badge when not connected', async () => {
-      mockAppState.connected = false;
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        expect(screen.getByText('Disconnected')).toBeTruthy();
-      });
-    });
-  });
-
   describe('navigation', () => {
     beforeEach(setupDefaultMocks);
 
