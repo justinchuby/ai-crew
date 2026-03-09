@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, FolderOpen, Users, Settings, Plus } from 'lucide-react';
+import { Home, FolderOpen, Users, Bot, Settings, Plus } from 'lucide-react';
 import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
@@ -41,6 +41,7 @@ export function Sidebar() {
       <NavItem to="/" icon={Home} label="Home" end />
       <NavItem to="/projects" icon={FolderOpen} label="Projects" />
       <NavItem to="/crews" icon={Users} label="Crews" />
+      <NavItem to="/agents" icon={Bot} label="Agents" />
 
       <button
         onClick={() => setShowNewProject(true)}

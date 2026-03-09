@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
@@ -112,6 +112,16 @@ function HomeRedirect() {
 
   if (!projectId) return <Navigate to="/projects" replace />;
   return <Navigate to={`/projects/${projectId}/session`} replace />;
+}
+
+function NotFoundPage() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-th-text-muted" data-testid="not-found">
+      <span className="text-4xl">404</span>
+      <p className="text-sm">Page not found</p>
+      <Link to="/" className="text-sm text-accent hover:underline">← Back to Home</Link>
+    </div>
+  );
 }
 
 export function App() {
@@ -370,7 +380,7 @@ export function App() {
             <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
 
             {/* ── Catch-all ─────────────────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </Suspense>
           </ErrorBoundary>
