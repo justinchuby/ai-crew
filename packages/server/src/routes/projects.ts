@@ -695,7 +695,14 @@ export function projectsRoutes(ctx: AppContext): Router {
       const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
 
       // Don't attempt SDK resume for crashed sessions — the SDK won't have the data
-      const resumeSessionId = lastSession && lastSession.status !== 'crashed'
+      if (!freshStart && lastSession?.status === 'crashed') {
+        return res.status(409).json({
+          error: 'This session crashed and cannot be resumed. Please start a new session.',
+          crashed: true,
+        });
+      }
+
+      const resumeSessionId = lastSession
         ? lastSession.sessionId ?? undefined
         : undefined;
 
