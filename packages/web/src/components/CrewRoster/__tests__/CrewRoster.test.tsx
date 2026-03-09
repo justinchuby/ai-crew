@@ -40,6 +40,8 @@ const rosterAgents = [
     liveStatus: 'running',
     teamId: 'default',
     projectId: 'proj-1',
+    parentId: 'lead-0001-0000-0000-000000000000',
+    sessionId: 'sess-1',
     lastTaskSummary: 'Designing auth module',
     createdAt: '2026-03-01T10:00:00Z',
     updatedAt: '2026-03-07T14:00:00Z',
@@ -52,6 +54,8 @@ const rosterAgents = [
     liveStatus: null,
     teamId: 'default',
     projectId: 'proj-1',
+    parentId: 'lead-0001-0000-0000-000000000000',
+    sessionId: 'sess-1',
     lastTaskSummary: null,
     createdAt: '2026-03-02T10:00:00Z',
     updatedAt: '2026-03-06T14:00:00Z',
@@ -64,9 +68,27 @@ const rosterAgents = [
     liveStatus: null,
     teamId: 'default',
     projectId: null,
+    parentId: 'lead-0001-0000-0000-000000000000',
+    sessionId: null,
     lastTaskSummary: 'Final code review',
     createdAt: '2026-03-01T08:00:00Z',
     updatedAt: '2026-03-05T12:00:00Z',
+  },
+];
+
+const crewSummaryData = [
+  {
+    leadId: 'lead-0001-0000-0000-000000000000',
+    projectId: 'proj-1',
+    projectName: 'Test Project',
+    agentCount: 3,
+    activeAgentCount: 1,
+    sessionCount: 2,
+    lastActivity: '2026-03-07T14:00:00Z',
+    agents: rosterAgents.map(a => ({
+      agentId: a.agentId, role: a.role, model: a.model,
+      status: a.status, liveStatus: a.liveStatus,
+    })),
   },
 ];
 
@@ -94,8 +116,10 @@ function setupMocks(overrides: Partial<{
   teams: any;
   agents: any;
   profile: any;
+  crewSummary: any;
 }> = {}) {
   mockApiFetch.mockImplementation((path: string) => {
+    if (path === '/crews/summary') return Promise.resolve(overrides.crewSummary ?? crewSummaryData);
     if (path === '/teams') return Promise.resolve(overrides.teams ?? teamsData);
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
@@ -170,7 +194,7 @@ describe('CrewRoster', () => {
       expect(screen.getByText('architect')).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/search agents/i);
+    const searchInput = screen.getByPlaceholderText(/search crews/i);
     fireEvent.change(searchInput, { target: { value: 'developer' } });
     expect(screen.queryByText('architect')).not.toBeInTheDocument();
     expect(screen.getByText('developer')).toBeInTheDocument();
@@ -246,7 +270,7 @@ describe('CrewRoster', () => {
     setupMocks({ agents: [] });
     renderPanel();
     await waitFor(() => {
-      expect(screen.getByText(/No agents in this crew/i)).toBeInTheDocument();
+      expect(screen.getByText(/No agents in any crew/i)).toBeInTheDocument();
     });
   });
 
@@ -257,7 +281,7 @@ describe('CrewRoster', () => {
       expect(screen.getByText('architect')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText(/search agents/i), { target: { value: 'nonexistent' } });
+    fireEvent.change(screen.getByPlaceholderText(/search crews/i), { target: { value: 'nonexistent' } });
     expect(screen.getByText(/no agents match your search/i)).toBeInTheDocument();
   });
 
@@ -455,5 +479,117 @@ describe('CrewRoster', () => {
       // Architect emoji from getRoleIcon
       expect(screen.getByText('\u{1F3D7}')).toBeInTheDocument();
     });
+  });
+
+  // ── Crew grouping tests ──────────────────────────────────
+
+  it('groups agents by lead with project name header', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      // Crew summary provides project name for the group header
+      expect(screen.getByText('Test Project')).toBeInTheDocument();
+    });
+    // Group header shows active count
+    expect(screen.getByText(/active/)).toBeInTheDocument();
+  });
+
+  it('shows multiple crew groups for different leads', async () => {
+    const leadAgent = {
+      agentId: 'ee55ff66-7788-9900-1122-334455667788',
+      role: 'lead',
+      model: 'claude-sonnet-4-6',
+      status: 'busy',
+      liveStatus: 'running',
+      teamId: 'team-alpha',
+      projectId: 'proj-2',
+      parentId: null,
+      sessionId: 'sess-2',
+      lastTaskSummary: 'Leading alpha team',
+      createdAt: '2026-03-01T10:00:00Z',
+      updatedAt: '2026-03-07T15:00:00Z',
+    };
+    const multiTeamAgents = [...rosterAgents, leadAgent];
+    const multiTeamsData = {
+      teams: [
+        { teamId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
+        { teamId: 'team-alpha', agentCount: 1, roles: ['lead'] },
+      ],
+    };
+    const multiCrewSummary = [
+      ...crewSummaryData,
+      {
+        leadId: leadAgent.agentId,
+        projectId: 'proj-2',
+        projectName: 'Alpha Project',
+        agentCount: 1,
+        activeAgentCount: 1,
+        sessionCount: 1,
+        lastActivity: '2026-03-07T15:00:00Z',
+        agents: [{ agentId: leadAgent.agentId, role: 'lead', model: leadAgent.model, status: leadAgent.status, liveStatus: leadAgent.liveStatus }],
+      },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/crews/summary') return Promise.resolve(multiCrewSummary);
+      if (path === '/teams') return Promise.resolve(multiTeamsData);
+      if (path.includes('/profile')) return Promise.resolve(profileData);
+      if (path.includes('team-alpha') && path.includes('/agents'))
+        return Promise.resolve(multiTeamAgents.filter(a => a.teamId === 'team-alpha'));
+      if (path.includes('/agents'))
+        return Promise.resolve(multiTeamAgents.filter(a => a.teamId === 'default'));
+      return Promise.resolve({});
+    });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('Test Project')).toBeInTheDocument();
+      expect(screen.getByText('Alpha Project')).toBeInTheDocument();
+    });
+    // Header shows crew count
+    expect(screen.getByText(/2 crews/)).toBeInTheDocument();
+  });
+
+  it('shows session history when crew is expanded', async () => {
+    const sessionDetails = [
+      {
+        id: 'sess-1',
+        leadId: 'lead-0001-0000-0000-000000000000',
+        status: 'completed',
+        task: 'Implement auth module',
+        startedAt: '2026-03-05T10:00:00Z',
+        endedAt: '2026-03-05T12:30:00Z',
+        durationMs: 9_000_000,
+        taskSummary: { total: 5, done: 4, failed: 1 },
+        hasRetro: true,
+      },
+      {
+        id: 'sess-2',
+        leadId: 'lead-0001-0000-0000-000000000000',
+        status: 'running',
+        task: 'Database migration',
+        startedAt: '2026-03-07T14:00:00Z',
+        endedAt: null,
+        durationMs: null,
+        taskSummary: { total: 3, done: 1, failed: 0 },
+        hasRetro: false,
+      },
+    ];
+
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/crews/summary') return Promise.resolve(crewSummaryData);
+      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path.includes('/sessions/detail')) return Promise.resolve(sessionDetails);
+      if (path.includes('/profile')) return Promise.resolve(profileData);
+      if (path.includes('/agents')) return Promise.resolve(rosterAgents);
+      return Promise.resolve({});
+    });
+
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('Implement auth module')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Database migration')).toBeInTheDocument();
+    // Task counts shown
+    expect(screen.getByText(/4\/5 tasks/)).toBeInTheDocument();
+    expect(screen.getByText(/1 failed/)).toBeInTheDocument();
   });
 });
