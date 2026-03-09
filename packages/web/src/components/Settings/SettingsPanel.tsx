@@ -202,34 +202,8 @@ export function SettingsPanel({ api }: Props) {
         </div>
       </section>
 
-      {/* CLI Config */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5" /> CLI Configuration
-        </h3>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <label className="text-xs text-th-text-muted block mb-1">Command</label>
-            <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono">
-              {config?.cliCommand || 'copilot'}
-            </code>
-          </div>
-          {config?.cliArgs && config.cliArgs.length > 0 && (
-            <div className="flex-1">
-              <label className="text-xs text-th-text-muted block mb-1">Arguments</label>
-              <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono truncate">
-                {config.cliArgs.join(' ')}
-              </code>
-            </div>
-          )}
-        </div>
-        <p className="text-xs text-th-text-muted mt-2">
-          Set via <code className="text-th-text-muted">COPILOT_CLI_PATH</code> environment variable
-        </p>
-      </section>
-
-      {/* Providers */}
-      <ProvidersSection />
+      {/* Providers (includes CLI configuration per provider) */}
+      <ProvidersSection activeProviderId={config?.provider?.id} />
 
       {/* Telegram Integration */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">

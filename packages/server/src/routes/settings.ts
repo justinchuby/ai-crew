@@ -87,6 +87,18 @@ export function settingsRoutes(ctx: AppContext): Router {
     res.json({ ...status, modelPreferences: prefs });
   });
 
+  /**
+   * PUT /settings/provider — set the active provider.
+   */
+  router.put('/settings/provider', (req, res) => {
+    const { id } = req.body as { id?: string };
+    if (!id || !isValidProviderId(id)) {
+      return res.status(400).json({ error: `Invalid provider: ${id}` });
+    }
+    pm.setActiveProviderId(id as ProviderId);
+    res.json({ activeProvider: id });
+  });
+
   return router;
 }
 

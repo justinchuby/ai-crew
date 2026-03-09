@@ -144,4 +144,18 @@ export class ProviderManager {
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}${provider}:models`, JSON.stringify(prefs));
   }
+
+  // ── Active Provider ─────────────────────────────────────
+
+  getActiveProviderId(): ProviderId {
+    if (!this.db) return 'copilot';
+    const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
+    if (raw && raw in PROVIDER_PRESETS) return raw as ProviderId;
+    return 'copilot';
+  }
+
+  setActiveProviderId(provider: ProviderId): void {
+    if (!this.db) return;
+    this.db.setSetting(`${SETTING_PREFIX}active`, provider);
+  }
 }

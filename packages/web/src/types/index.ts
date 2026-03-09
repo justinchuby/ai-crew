@@ -139,6 +139,7 @@ export interface ServerConfig {
   cliArgs: string[];
   maxConcurrentAgents: number;
   dbPath: string;
+  provider?: { id?: string };
 }
 
 export interface WsMessage {

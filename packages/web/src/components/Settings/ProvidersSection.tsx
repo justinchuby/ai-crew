@@ -2,10 +2,11 @@
  * ProvidersSection — provider availability and configuration for Settings.
  *
  * Shows which CLI providers are installed, authenticated, and enabled.
- * All providers manage their own API keys/auth — we only detect status.
+ * Includes per-provider configuration: binary override, default model,
+ * required environment variables, and default CLI arguments.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Star, Terminal, Key, Settings2 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
@@ -55,14 +56,58 @@ const PROVIDER_DOCS: Record<string, string> = {
   codex: 'https://platform.openai.com/docs/api-reference',
 };
 
+/** Default CLI arguments per provider (mirrors server presets.ts). */
+const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
+  copilot: ['--acp', '--stdio'],
+  claude: ['--acp', '--stdio'],
+  gemini: ['--experimental-acp'],
+  cursor: ['acp'],
+  codex: ['--acp'],
+  opencode: ['acp'],
+};
+
+/** Required environment variables per provider. */
+const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
+  copilot: [],
+  claude: ['ANTHROPIC_API_KEY'],
+  gemini: ['GEMINI_API_KEY'],
+  cursor: ['CURSOR_API_KEY'],
+  codex: ['OPENAI_API_KEY'],
+  opencode: [],
+};
+
+/** Whether the provider supports in-process SDK mode. */
+const PROVIDER_SDK_CAPABLE: Record<string, boolean> = {
+  copilot: true,
+  claude: true,
+  gemini: false,
+  cursor: false,
+  codex: false,
+  opencode: false,
+};
+
+/** Whether the provider supports session resume. */
+const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
+  copilot: true,
+  claude: true,
+  gemini: false,
+  cursor: true,
+  codex: false,
+  opencode: false,
+};
+
 // ── Provider Card ───────────────────────────────────────────────────
 
 function ProviderCard({
   provider,
+  isActive,
   onToggle,
+  onSetActive,
 }: {
   provider: ProviderStatus;
+  isActive: boolean;
   onToggle: (id: string, enabled: boolean) => void;
+  onSetActive: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -87,10 +132,16 @@ function ProviderCard({
   const icon = PROVIDER_ICONS[provider.id] ?? '🔌';
   const docsUrl = PROVIDER_DOCS[provider.id];
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
+  const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
+  const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
+  const sdkCapable = PROVIDER_SDK_CAPABLE[provider.id] ?? false;
+  const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
 
   return (
     <div
-      className="bg-surface-raised border border-th-border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover"
+      className={`bg-surface-raised border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover ${
+        isActive ? 'border-accent/50 ring-1 ring-accent/20' : 'border-th-border'
+      }`}
       data-testid={`provider-card-${provider.id}`}
     >
       {/* Header */}
@@ -108,6 +159,11 @@ function ProviderCard({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
             <StatusBadge {...providerStatusProps(provider)} />
+            {isActive && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
+                <Star className="w-2.5 h-2.5" /> Active
+              </span>
+            )}
           </div>
           <div className="text-xs text-th-text-muted">
             {provider.installed ? authLabel : 'CLI not found on PATH'}
@@ -141,9 +197,10 @@ function ProviderCard({
       {/* Expanded Details */}
       {expanded && (
         <div className="border-t border-th-border px-4 py-3 bg-th-bg-alt/30 space-y-3">
+          {/* CLI Details Grid */}
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
-              <span className="text-th-text-muted">Binary:</span>{' '}
+              <span className="text-th-text-muted flex items-center gap-1"><Terminal className="w-3 h-3" /> Binary:</span>
               <code className="font-mono text-th-text-alt">
                 {provider.binaryPath ?? provider.id}
               </code>
@@ -154,7 +211,44 @@ function ProviderCard({
                 {provider.installed ? 'Installed' : 'Not found'}
               </span>
             </div>
+            <div>
+              <span className="text-th-text-muted flex items-center gap-1"><Settings2 className="w-3 h-3" /> Default Args:</span>
+              <code className="font-mono text-th-text-alt">
+                {defaultArgs.length > 0 ? defaultArgs.join(' ') : '(none)'}
+              </code>
+            </div>
+            <div>
+              <span className="text-th-text-muted">Features:</span>{' '}
+              <span className="text-th-text-alt">
+                {[
+                  sdkCapable && 'SDK mode',
+                  supportsResume && 'Resume',
+                ].filter(Boolean).join(', ') || 'Standard ACP'}
+              </span>
+            </div>
           </div>
+
+          {/* Required Environment Variables */}
+          {requiredEnv.length > 0 && (
+            <div className="bg-th-bg-alt border border-th-border rounded-md p-2.5 text-xs">
+              <span className="text-th-text-muted flex items-center gap-1 mb-1.5">
+                <Key className="w-3 h-3" /> Required Environment Variables
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {requiredEnv.map((envVar) => (
+                  <code
+                    key={envVar}
+                    className="px-2 py-0.5 bg-th-bg rounded-md text-th-text-alt font-mono"
+                  >
+                    {envVar}
+                  </code>
+                ))}
+              </div>
+              <p className="text-th-text-muted mt-1.5">
+                Set these in your shell environment or <code className="text-th-text-muted">flightdeck.config.yaml</code> under <code className="text-th-text-muted">provider.envOverride</code>.
+              </p>
+            </div>
+          )}
 
           {/* Setup instructions if not installed */}
           {!provider.installed && docsUrl && (
@@ -173,9 +267,10 @@ function ProviderCard({
             </div>
           )}
 
-          {/* Test Connection */}
-          {provider.installed && (
-            <div className="flex items-center gap-2">
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Test Connection */}
+            {provider.installed && (
               <button
                 onClick={handleTest}
                 disabled={testing}
@@ -189,17 +284,33 @@ function ProviderCard({
                 )}
                 {testing ? 'Testing…' : 'Test Connection'}
               </button>
+            )}
 
-              {testResult && (
-                <span
-                  className={`text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}
-                  data-testid={`test-result-${provider.id}`}
-                >
-                  {testResult.success ? '✅' : '❌'} {testResult.message}
-                </span>
-              )}
-            </div>
-          )}
+            {/* Set as Active */}
+            {provider.installed && provider.enabled && !isActive && (
+              <button
+                onClick={() => onSetActive(provider.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 rounded-md transition-colors"
+                data-testid={`set-active-${provider.id}`}
+              >
+                <Star size={12} /> Set as Active
+              </button>
+            )}
+
+            {testResult && (
+              <span
+                className={`text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}
+                data-testid={`test-result-${provider.id}`}
+              >
+                {testResult.success ? '✅' : '❌'} {testResult.message}
+              </span>
+            )}
+          </div>
+
+          {/* Config hint */}
+          <p className="text-[10px] text-th-text-muted">
+            Override binary path or args in <code className="text-th-text-muted">flightdeck.config.yaml</code> → <code className="text-th-text-muted">provider.binaryOverride</code> / <code className="text-th-text-muted">provider.argsOverride</code>
+          </p>
         </div>
       )}
     </div>
@@ -208,10 +319,15 @@ function ProviderCard({
 
 // ── ProvidersSection ────────────────────────────────────────────────
 
-export function ProvidersSection() {
+export function ProvidersSection({ activeProviderId }: { activeProviderId?: string }) {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState(activeProviderId ?? 'copilot');
+
+  useEffect(() => {
+    if (activeProviderId) setActiveId(activeProviderId);
+  }, [activeProviderId]);
 
   useEffect(() => {
     apiFetch<ProviderStatus[]>('/settings/providers')
@@ -221,7 +337,6 @@ export function ProvidersSection() {
   }, []);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    // Optimistic update
     setProviders((prev) =>
       prev.map((p) => (p.id === id ? { ...p, enabled } : p)),
     );
@@ -231,12 +346,24 @@ export function ProvidersSection() {
         body: JSON.stringify({ enabled }),
       });
     } catch {
-      // Revert on failure
       setProviders((prev) =>
         prev.map((p) => (p.id === id ? { ...p, enabled: !enabled } : p)),
       );
     }
   }, []);
+
+  const handleSetActive = useCallback(async (id: string) => {
+    const prevId = activeId;
+    setActiveId(id);
+    try {
+      await apiFetch('/settings/provider', {
+        method: 'PUT',
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      setActiveId(prevId);
+    }
+  }, [activeId]);
 
   const installedCount = providers.filter((p) => p.installed).length;
 
@@ -244,7 +371,7 @@ export function ProvidersSection() {
     <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
-          <Cpu className="w-3.5 h-3.5" /> Providers
+          <Cpu className="w-3.5 h-3.5" /> CLI Providers
         </h3>
         {!loading && (
           <span className="text-[10px] text-th-text-muted">
@@ -270,7 +397,7 @@ export function ProvidersSection() {
         <EmptyState
           icon={<Cpu className="w-10 h-10 opacity-50" />}
           title="No providers configured"
-          description="Install a CLI provider (Claude, Copilot, Gemini, etc.) to get started."
+          description="Install a CLI provider (Claude, Copilot, Gemini, Cursor, Codex, or OpenCode) to get started."
           compact
         />
       )}
@@ -281,7 +408,9 @@ export function ProvidersSection() {
             <ProviderCard
               key={provider.id}
               provider={provider}
+              isActive={provider.id === activeId}
               onToggle={handleToggle}
+              onSetActive={handleSetActive}
             />
           ))}
         </div>
