@@ -39,7 +39,7 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
             <div>
               <p className="text-xs font-semibold text-th-text-muted mb-2">Delegation Overview</p>
               <div className="flex items-center gap-4 text-sm font-mono mb-2">
-                <span className="text-blue-400">{progress.teamSize} agents</span>
+                <span className="text-blue-400">{progress.crewSize} agents</span>
                 <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
                 <span className="text-purple-400">{progress.completed} done</span>
                 {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
@@ -55,11 +55,11 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
           )}
 
           {/* Agent crew roster */}
-          {progress && progress.teamAgents && progress.teamAgents.length > 0 && (
+          {progress && progress.crewAgents && progress.crewAgents.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-th-text-muted mb-2">Crew Roster</p>
               <div className="space-y-1">
-                {progress.teamAgents.map((ta: LeadProgress['teamAgents'][number]) => (
+                {progress.crewAgents.map((ta: LeadProgress['crewAgents'][number]) => (
                   <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-th-bg-muted/50 text-xs font-mono">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse motion-reduce:animate-none' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
                     <span className="text-th-text-alt">{ta.role?.name || 'Agent'}</span>

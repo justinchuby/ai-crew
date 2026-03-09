@@ -17,7 +17,7 @@ import {
 
 // ── Types ───────────────────────────────────────────────────────────
 
-export interface TeamHealthData {
+export interface CrewHealthData {
   teamId: string;
   totalAgents: number;
   statusCounts: Record<string, number>;
@@ -71,8 +71,8 @@ function statusLabel(status: string): string {
 
 // ── Component ───────────────────────────────────────────────────────
 
-export function TeamHealth({ teamId = 'default' }: Props) {
-  const [health, setHealth] = useState<TeamHealthData | null>(null);
+export function CrewHealth({ teamId = 'default' }: Props) {
+  const [health, setHealth] = useState<CrewHealthData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -80,10 +80,10 @@ export function TeamHealth({ teamId = 'default' }: Props) {
   const fetchHealth = useCallback(async () => {
     try {
       setError(null);
-      const data = await apiFetch<TeamHealthData>(`/teams/${encodeURIComponent(teamId)}/health`);
+      const data = await apiFetch<CrewHealthData>(`/teams/${encodeURIComponent(teamId)}/health`);
       setHealth(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load team health');
+      setError(err.message || 'Failed to load crew health');
     } finally {
       setLoading(false);
     }
@@ -112,7 +112,7 @@ export function TeamHealth({ teamId = 'default' }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64" data-testid="team-health-loading">
+      <div className="flex items-center justify-center h-64" data-testid="crew-health-loading">
         <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
       </div>
     );
@@ -122,17 +122,17 @@ export function TeamHealth({ teamId = 'default' }: Props) {
     // Friendly empty state for team-not-found or no data
     if (error.includes('404') || error.includes('not found') || error.toLowerCase().includes('no team')) {
       return (
-        <div className="p-6" data-testid="team-health-empty">
+        <div className="p-6" data-testid="crew-health-empty">
           <EmptyState
             icon={<Users className="w-10 h-10 text-th-text-muted/40" />}
-            title="No team found"
-            description={`Team "${teamId}" doesn't exist yet. Create a team to see health data.`}
+            title="No crew found"
+            description={`Team "${teamId}" doesn't exist yet. Create a crew to see health data.`}
           />
         </div>
       );
     }
     return (
-      <div className="p-6" data-testid="team-health-error">
+      <div className="p-6" data-testid="crew-health-error">
         <EmptyState
           icon={<AlertTriangle className="w-10 h-10 text-red-400" />}
           title="Unable to load health data"
@@ -147,9 +147,9 @@ export function TeamHealth({ teamId = 'default' }: Props) {
   const { statusCounts, massFailurePaused, agents } = health;
 
   return (
-    <div className="p-6 space-y-6 overflow-auto" data-testid="team-health-dashboard">
+    <div className="p-6 space-y-6 overflow-auto" data-testid="crew-health-dashboard">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-th-text">Team Health — {teamId}</h1>
+        <h1 className="text-lg font-semibold text-th-text">Crew Health — {teamId}</h1>
         <button
           onClick={fetchHealth}
           className="text-xs text-th-text-muted hover:text-th-text px-2 py-1 rounded border border-th-border"

@@ -27,18 +27,18 @@ function shortModel(model?: string): string {
   return model;
 }
 
-export function TeamStatus({ agents, delegations }: Props) {
+export function CrewStatus({ agents, delegations }: Props) {
   return (
     <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t border-th-border">
       <div className="px-3 py-2 border-b border-th-border flex items-center gap-2 shrink-0">
         <Bot className="w-4 h-4 text-blue-400" />
-        <span className="text-sm font-semibold">Team</span>
+        <span className="text-sm font-semibold">Crew</span>
         <span className="text-xs text-th-text-muted ml-auto">{agents.length}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
         {agents.length === 0 ? (
           <p className="text-xs text-th-text-muted text-center py-4 font-mono">
-            No team members yet
+            No crew members yet
           </p>
         ) : (
           agents.map((agent) => {

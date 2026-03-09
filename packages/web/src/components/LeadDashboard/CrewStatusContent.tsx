@@ -9,8 +9,8 @@ import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { AgentReportBlock, formatTokens } from './AgentReportBlock';
 
-/** Minimal agent shape accepted by TeamStatusContent — compatible with AgentInfo, LeadProgress.teamAgents, and DerivedAgent */
-export interface TeamAgent {
+/** Minimal agent shape accepted by CrewStatusContent — compatible with AgentInfo, LeadProgress.crewAgents, and DerivedAgent */
+export interface CrewAgent {
   id: string;
   role: { name: string; icon: string; model?: string };
   status: string;
@@ -21,8 +21,8 @@ export interface TeamAgent {
   contextWindowUsed?: number;
 }
 
-interface TeamStatusContentProps {
-  agents: TeamAgent[];
+interface CrewStatusContentProps {
+  agents: CrewAgent[];
   delegations: Delegation[];
   comms?: AgentComm[];
   activity?: ActivityEvent[];
@@ -30,8 +30,8 @@ interface TeamStatusContentProps {
   onOpenChat?: (agentId: string) => void;
 }
 
-export function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: TeamStatusContentProps) {
-  const [selectedAgent, setSelectedAgent] = useState<TeamAgent | null>(null);
+export function CrewStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: CrewStatusContentProps) {
+  const [selectedAgent, setSelectedAgent] = useState<CrewAgent | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   const [agentMsg, setAgentMsg] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
@@ -75,7 +75,7 @@ export function TeamStatusContent({ agents, delegations, comms, activity, allAge
     <>
       <div className="h-full overflow-y-auto p-1.5 space-y-1">
         {agents.length === 0 ? (
-          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No team members yet</p>
+          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No crew members yet</p>
         ) : (
           agents.map((agent) => {
             const delegation = [...delegations].reverse().find((d) => d.toAgentId === agent.id);

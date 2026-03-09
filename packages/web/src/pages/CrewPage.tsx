@@ -37,7 +37,7 @@ import type { TabItem } from '../components/ui/Tabs';
 
 // ── Types ─────────────────────────────────────────────────
 
-type TeamTab = 'roster' | 'health' | 'export';
+type CrewTab = 'roster' | 'health' | 'export';
 type AgentStatus = 'idle' | 'busy' | 'terminated' | 'retired';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 type ProfileTab = 'overview' | 'history' | 'knowledge' | 'skills' | 'settings';
@@ -45,7 +45,7 @@ type SortField = 'role' | 'status' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 type StatusFilter = AgentStatus | 'all';
 
-interface TeamInfo {
+interface CrewInfo {
   teamId: string;
   agentCount: number;
   roles: string[];
@@ -116,7 +116,7 @@ interface ServerStatus {
   trackedAgents: number;
 }
 
-interface TeamDetail {
+interface CrewDetail {
   teamId: string;
   agentCount: number;
   agents: Array<{ agentId: string; role: string; model: string; status: string }>;
@@ -435,7 +435,7 @@ function ExportDialog({ teamId, onClose }: { teamId: string; onClose: () => void
         a.download = `${teamId}-team-bundle.json`;
         a.click();
         URL.revokeObjectURL(url);
-        addToast('success', 'Team bundle downloaded');
+        addToast('success', 'Crew bundle downloaded');
       } else if (data.success && toDirectory) {
         addToast('success', `Exported to ${data.bundlePath ?? outputPath}`);
       }
@@ -456,7 +456,7 @@ function ExportDialog({ teamId, onClose }: { teamId: string; onClose: () => void
         <div className="flex items-center justify-between px-5 py-4 border-b border-th-border">
           <div className="flex items-center gap-2">
             <Download className="w-5 h-5 text-th-accent" />
-            <h2 className="text-base font-semibold text-th-text">Export Team</h2>
+            <h2 className="text-base font-semibold text-th-text">Export Crew</h2>
           </div>
           <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close">
             <X className="w-4 h-4" />
@@ -467,7 +467,7 @@ function ExportDialog({ teamId, onClose }: { teamId: string; onClose: () => void
           <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 flex items-start gap-2">
             <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span>
-              Export packages your team&apos;s agents, knowledge, and training data into a portable
+              Export packages your crew&apos;s agents, knowledge, and training data into a portable
               bundle. Use <strong>&quot;Export to Directory&quot;</strong> to create a <code>.flightdeck-team/</code> folder
               you can copy between machines, or download a JSON bundle file.
             </span>
@@ -630,7 +630,7 @@ function ImportDialog({ teamId, onClose, onImported }: {
       );
       setImportResult(data.report);
       if (data.success) {
-        addToast('success', 'Team imported successfully');
+        addToast('success', 'Crew imported successfully');
         onImported();
       }
     } catch (err: any) {
@@ -650,7 +650,7 @@ function ImportDialog({ teamId, onClose, onImported }: {
         <div className="flex items-center justify-between px-5 py-4 border-b border-th-border sticky top-0 bg-th-bg z-10">
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5 text-th-accent" />
-            <h2 className="text-base font-semibold text-th-text">Import Team</h2>
+            <h2 className="text-base font-semibold text-th-text">Import Crew</h2>
           </div>
           <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close">
             <X className="w-4 h-4" />
@@ -667,7 +667,7 @@ function ImportDialog({ teamId, onClose, onImported }: {
               data-testid="import-file-btn"
             >
               <Package className="w-5 h-5" />
-              {bundleJson ? 'Bundle loaded ✓ — click to replace' : 'Choose team bundle file (.json)'}
+              {bundleJson ? 'Bundle loaded ✓ — click to replace' : 'Choose crew bundle file (.json)'}
             </button>
           </div>
 
@@ -744,7 +744,7 @@ function ImportDialog({ teamId, onClose, onImported }: {
           {importResult?.success && (
             <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex items-center gap-2">
               <CheckCircle className="w-4 h-4" />
-              Team imported to {importResult.teamId}
+              Crew imported to {importResult.teamId}
             </div>
           )}
 
@@ -765,7 +765,7 @@ function ImportDialog({ teamId, onClose, onImported }: {
               data-testid="import-confirm-btn"
             >
               <Upload className="w-4 h-4" />
-              {importing ? 'Importing…' : 'Import Team'}
+              {importing ? 'Importing…' : 'Import Crew'}
             </button>
           </div>
         </div>
@@ -776,18 +776,18 @@ function ImportDialog({ teamId, onClose, onImported }: {
 
 // ── Main Component ────────────────────────────────────────
 
-export function TeamPage() {
+export function CrewPage() {
   const addToast = useToastStore(s => s.add);
 
   // Data state
-  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [teams, setTeams] = useState<CrewInfo[]>([]);
   const [selectedTeam, setSelectedTeam] = useState('default');
   const [agents, setAgents] = useState<RosterAgent[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [teamDetail, setTeamDetail] = useState<TeamDetail | null>(null);
+  const [teamDetail, setTeamDetail] = useState<CrewDetail | null>(null);
 
   // UI state
   const [search, setSearch] = useState('');
@@ -799,13 +799,13 @@ export function TeamPage() {
   const [confirmStop, setConfirmStop] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activeTab, setActiveTab] = useState<TeamTab>('roster');
+  const [activeTab, setActiveTab] = useState<CrewTab>('roster');
 
   // ── Data fetching ────────────────────────────────────────
 
   const fetchTeams = useCallback(async () => {
     try {
-      const data = await apiFetch<{ teams: TeamInfo[] }>('/teams');
+      const data = await apiFetch<{ teams: CrewInfo[] }>('/teams');
       setTeams(data.teams ?? []);
       if (data.teams?.length && !data.teams.find(t => t.teamId === selectedTeam)) {
         setSelectedTeam(data.teams[0].teamId);
@@ -820,11 +820,11 @@ export function TeamPage() {
         ? `/teams/${selectedTeam}/agents`
         : `/teams/${selectedTeam}/agents?status=${statusFilter}`;
 
-      const [agentData, healthData, serverData, teamDetailData] = await Promise.allSettled([
+      const [agentData, healthData, serverData, crewDetailData] = await Promise.allSettled([
         apiFetch<RosterAgent[]>(agentUrl),
         apiFetch<HealthData>(`/teams/${encodeURIComponent(selectedTeam)}/health`),
         apiFetch<ServerStatus>('/agent-server/status'),
-        apiFetch<TeamDetail>(`/teams/${encodeURIComponent(selectedTeam)}`),
+        apiFetch<CrewDetail>(`/teams/${encodeURIComponent(selectedTeam)}`),
       ]);
 
       if (agentData.status === 'fulfilled') {
@@ -847,9 +847,9 @@ export function TeamPage() {
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
       if (serverData.status === 'fulfilled') setServerStatus(serverData.value);
-      if (teamDetailData.status === 'fulfilled') setTeamDetail(teamDetailData.value);
+      if (crewDetailData.status === 'fulfilled') setTeamDetail(crewDetailData.value);
     } catch (err: any) {
-      setError(err.message ?? 'Failed to load team data');
+      setError(err.message ?? 'Failed to load crew data');
     } finally {
       setLoading(false);
     }
@@ -924,7 +924,7 @@ export function TeamPage() {
     return (
       <div className="flex items-center justify-center h-64 text-th-text-alt">
         <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-        Loading team…
+        Loading crew…
       </div>
     );
   }
@@ -964,7 +964,7 @@ export function TeamPage() {
                   </select>
                 )}
               </div>
-              <p className="text-sm text-th-text-alt">Persistent team — agents, knowledge, and training data</p>
+              <p className="text-sm text-th-text-alt">Persistent crew — agents, knowledge, and training data</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -979,7 +979,7 @@ export function TeamPage() {
         </div>
 
         {/* Team stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm" data-testid="team-identity">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm" data-testid="crew-identity">
           <div>
             <span className="text-th-text-alt">Agents</span>
             <p className="font-semibold text-th-text text-lg">{teamDetail?.agentCount ?? agents.length}</p>
@@ -997,14 +997,14 @@ export function TeamPage() {
             </p>
           </div>
           <div>
-            <span className="text-th-text-alt">Team ID</span>
+            <span className="text-th-text-alt">Crew ID</span>
             <p className="font-mono text-th-text text-sm">{selectedTeam}</p>
           </div>
         </div>
       </div>
 
       {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-th-border" data-testid="team-tabs">
+      <div className="flex gap-1 border-b border-th-border" data-testid="crew-tabs">
         {([
           { id: 'roster' as const, label: 'Roster', icon: Users },
           { id: 'health' as const, label: 'Health', icon: Activity },
@@ -1073,8 +1073,8 @@ export function TeamPage() {
               {filtered.length === 0 ? (
                 <EmptyState
                   icon={<Cpu className="w-10 h-10 opacity-50" />}
-                  title={search ? 'No agents match your search' : 'No agents in this team'}
-                  description={search ? 'Try a different search term.' : 'Agents will appear here when they join the team.'}
+                  title={search ? 'No agents match your search' : 'No agents in this crew'}
+                  description={search ? 'Try a different search term.' : 'Agents will appear here when they join the crew.'}
                   compact
                 />
               ) : (
@@ -1187,20 +1187,20 @@ export function TeamPage() {
             <div className="bg-surface-raised rounded-lg border border-th-border p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Download className="w-5 h-5 text-th-accent" />
-                <h2 className="font-semibold text-th-text">Export Team</h2>
+                <h2 className="font-semibold text-th-text">Export Crew</h2>
               </div>
               <p className="text-sm text-th-text-alt mb-4">
-                Package your team&apos;s agents, knowledge, and training data into a portable
+                Package your crew&apos;s agents, knowledge, and training data into a portable
                 bundle. Creates a <code className="text-th-accent">.flightdeck-team/</code> directory
                 you can copy between machines, or download a JSON file.
               </p>
               <button
                 onClick={() => setShowExport(true)}
                 className="px-4 py-2 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5"
-                data-testid="export-team-btn"
+                data-testid="export-crew-btn"
               >
                 <Download className="w-4 h-4" />
-                Export Team
+                Export Crew
               </button>
             </div>
 
@@ -1208,19 +1208,19 @@ export function TeamPage() {
             <div className="bg-surface-raised rounded-lg border border-th-border p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Upload className="w-5 h-5 text-th-accent" />
-                <h2 className="font-semibold text-th-text">Import Team</h2>
+                <h2 className="font-semibold text-th-text">Import Crew</h2>
               </div>
               <p className="text-sm text-th-text-alt mb-4">
-                Import a team bundle from another Flightdeck instance. Validates the bundle,
+                Import a crew bundle from another Flightdeck instance. Validates the bundle,
                 previews changes, and lets you choose how to handle conflicts.
               </p>
               <button
                 onClick={() => setShowImport(true)}
                 className="px-4 py-2 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt border border-th-border transition-colors flex items-center gap-1.5"
-                data-testid="import-team-btn"
+                data-testid="import-crew-btn"
               >
                 <Upload className="w-4 h-4" />
-                Import Team
+                Import Crew
               </button>
             </div>
           </div>

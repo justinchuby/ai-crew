@@ -16,7 +16,7 @@ import { DropOverlay } from '../DropOverlay';
 import { InputComposer } from './InputComposer';
 import { ChatMessages, type CatchUpSummary } from './ChatMessages';
 import { SidebarTabs } from './SidebarTabs';
-import { TeamStatusContent } from './TeamStatusContent';
+import { CrewStatusContent } from './CrewStatusContent';
 import { NewProjectModal } from './NewProjectModal';
 import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
 import { useLeadWebSocket } from './useLeadWebSocket';
@@ -500,7 +500,7 @@ export function LeadDashboard({ api, ws }: Props) {
     const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
     if (live.length > 0) return live;
     // Fallback: progress endpoint, then keyframe-derived agents
-    const progressTeam = progress?.teamAgents ?? [];
+    const progressTeam = progress?.crewAgents ?? [];
     return progressTeam.length > 0 ? progressTeam : derivedAgents;
   })();
 
@@ -539,7 +539,7 @@ export function LeadDashboard({ api, ws }: Props) {
               >
                 <div className="flex items-center gap-1.5">
                   <Users className="w-4 h-4 text-blue-400" />
-                  <span>{progress.teamSize} agents</span>
+                  <span>{progress.crewSize} agents</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
@@ -752,8 +752,8 @@ export function LeadDashboard({ api, ws }: Props) {
               onReject: handleRejectDecision,
               onDismiss: handleDismissDecision,
             }}
-            teamTabContent={
-              <TeamStatusContent
+            crewTabContent={
+              <CrewStatusContent
                 agents={teamAgents}
                 delegations={progress?.delegations ?? []}
                 comms={comms}
@@ -769,7 +769,7 @@ export function LeadDashboard({ api, ws }: Props) {
             leadAgent={leadAgent}
             selectedLeadId={selectedLeadId}
             activeTimerCount={activeTimerCount}
-            teamAgentIds={teamAgentIds}
+            crewAgentIds={teamAgentIds}
           />
         </>
       )}

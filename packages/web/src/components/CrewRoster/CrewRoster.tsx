@@ -415,7 +415,7 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
 
 // ── Main Component ────────────────────────────────────────
 
-export function TeamRoster() {
+export function CrewRoster() {
   const addToast = useToastStore(s => s.add);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>('default');
@@ -447,7 +447,7 @@ export function TeamRoster() {
       const data = await apiFetch<RosterAgent[]>(url);
       setAgents(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.message ?? 'Failed to fetch team roster');
+      setError(err.message ?? 'Failed to fetch crew roster');
     } finally {
       setLoading(false);
     }
@@ -491,7 +491,7 @@ export function TeamRoster() {
     return (
       <div className="flex items-center justify-center h-64 text-th-text-alt">
         <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-        Loading team roster…
+        Loading crew roster…
       </div>
     );
   }
@@ -511,7 +511,7 @@ export function TeamRoster() {
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Users className="w-6 h-6 text-th-accent" />
-          <h1 className="text-xl font-bold text-th-text">Team Roster</h1>
+          <h1 className="text-xl font-bold text-th-text">Crew Roster</h1>
           {teams.length > 1 && (
             <select
               value={selectedTeam}
@@ -578,7 +578,7 @@ export function TeamRoster() {
           {filtered.length === 0 ? (
             <div className="text-center py-8 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
               <Cpu className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              {search ? 'No agents match your search' : 'No agents in this team'}
+              {search ? 'No agents match your search' : 'No agents in this crew'}
             </div>
           ) : (
             filtered.map(agent => (

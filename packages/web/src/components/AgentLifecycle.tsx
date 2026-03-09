@@ -8,7 +8,7 @@ import {
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
-import type { AgentHealthInfo } from '../pages/TeamPage';
+import type { AgentHealthInfo } from '../pages/CrewPage';
 
 // ── Types ───────────────────────────────────────────────────────────
 

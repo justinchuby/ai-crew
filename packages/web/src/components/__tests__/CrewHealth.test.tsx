@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
-import { TeamHealth } from '../../pages/TeamHealth';
-import type { TeamHealthData } from '../../pages/TeamHealth';
+import { CrewHealth } from '../../pages/CrewHealth';
+import type { CrewHealthData } from '../../pages/CrewHealth';
 
 // ── Mock apiFetch ───────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ vi.mock('../AgentLifecycle', () => ({
 
 // ── Test Data ───────────────────────────────────────────────────────
 
-const MOCK_HEALTH: TeamHealthData = {
+const MOCK_HEALTH: CrewHealthData = {
   teamId: 'team-1',
   totalAgents: 4,
   statusCounts: { busy: 2, idle: 1, retired: 1, terminated: 0 },
@@ -39,23 +39,23 @@ const MOCK_HEALTH: TeamHealthData = {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
-describe('TeamHealth', () => {
+describe('CrewHealth', () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
   });
 
   it('shows loading spinner initially', () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<TeamHealth teamId="team-1" />);
-    expect(screen.getByTestId('team-health-loading')).toBeInTheDocument();
+    render(<CrewHealth teamId="team-1" />);
+    expect(screen.getByTestId('crew-health-loading')).toBeInTheDocument();
   });
 
   it('renders health dashboard with status cards', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-health-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
     });
 
     expect(screen.getByTestId('card-total')).toHaveTextContent('4');
@@ -66,7 +66,7 @@ describe('TeamHealth', () => {
 
   it('shows agent table with all agents', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
       expect(screen.getByTestId('agent-table')).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('TeamHealth', () => {
 
   it('shows mass failure alert when paused', async () => {
     mockApiFetch.mockResolvedValue({ ...MOCK_HEALTH, massFailurePaused: true });
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
       expect(screen.getByTestId('mass-failure-alert')).toBeInTheDocument();
@@ -91,10 +91,10 @@ describe('TeamHealth', () => {
 
   it('does not show mass failure alert when not paused', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-health-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
     });
 
     expect(screen.queryByTestId('mass-failure-alert')).not.toBeInTheDocument();
@@ -102,10 +102,10 @@ describe('TeamHealth', () => {
 
   it('shows error state on API failure', async () => {
     mockApiFetch.mockRejectedValue(new Error('Server error'));
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-health-error')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-health-error')).toBeInTheDocument();
     });
 
     expect(screen.getByText(/server error/i)).toBeInTheDocument();
@@ -113,7 +113,7 @@ describe('TeamHealth', () => {
 
   it('shows connection healthy when not paused', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
       expect(screen.getByTestId('connection-status')).toBeInTheDocument();
@@ -124,7 +124,7 @@ describe('TeamHealth', () => {
 
   it('shows spawning paused when mass failure detected', async () => {
     mockApiFetch.mockResolvedValue({ ...MOCK_HEALTH, massFailurePaused: true });
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
       expect(screen.getByTestId('connection-status')).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('TeamHealth', () => {
       ],
     };
     mockApiFetch.mockResolvedValue(healthWithClone);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
       expect(screen.getByText('🧬')).toBeInTheDocument();
@@ -151,10 +151,10 @@ describe('TeamHealth', () => {
 
   it('refreshes on team WS events', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-health-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
     });
 
     const callsBefore = mockApiFetch.mock.calls.length;
@@ -173,7 +173,7 @@ describe('TeamHealth', () => {
 
   it('uses default teamId when not provided', async () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
-    render(<TeamHealth />);
+    render(<CrewHealth />);
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/teams/default/health');
@@ -184,10 +184,10 @@ describe('TeamHealth', () => {
     mockApiFetch.mockResolvedValue(MOCK_HEALTH);
     const spy = vi.spyOn(globalThis, 'setInterval');
 
-    render(<TeamHealth teamId="team-1" />);
+    render(<CrewHealth teamId="team-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-health-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
     });
 
     expect(spy).toHaveBeenCalledWith(expect.any(Function), 15_000);

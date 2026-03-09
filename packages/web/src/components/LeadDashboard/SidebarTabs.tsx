@@ -57,7 +57,7 @@ interface SidebarTabsProps {
   layout: SidebarLayoutProps;
   tabs: TabStateProps;
   decision: DecisionProps;
-  teamTabContent: React.ReactNode;
+  crewTabContent: React.ReactNode;
   comms: AgentComm[];
   groups: any[];
   groupMessages: Record<string, any>;
@@ -65,14 +65,14 @@ interface SidebarTabsProps {
   leadAgent: AgentInfo | undefined;
   selectedLeadId: string | null;
   activeTimerCount: number;
-  teamAgentIds: Set<string>;
+  crewAgentIds: Set<string>;
 }
 
 export function SidebarTabs({
   layout,
   tabs,
   decision,
-  teamTabContent,
+  crewTabContent,
   comms,
   groups,
   groupMessages,
@@ -80,7 +80,7 @@ export function SidebarTabs({
   leadAgent,
   selectedLeadId,
   activeTimerCount,
-  teamAgentIds,
+  crewAgentIds,
 }: SidebarTabsProps) {
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
 
@@ -113,7 +113,7 @@ export function SidebarTabs({
   }, []);
 
   const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
-    team: { icon: <Bot className="w-3 h-3" />, label: 'Team' },
+    crew: { icon: <Bot className="w-3 h-3" />, label: 'Crew' },
     comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
     groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
     dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
@@ -234,7 +234,7 @@ export function SidebarTabs({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => tabs.onToggleConfig()} />
                   <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
-                    {(['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
+                    {(['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
                       <button
                         key={tabId}
                         onClick={() => tabs.onToggleTabVisibility(tabId)}
@@ -253,7 +253,7 @@ export function SidebarTabs({
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden">
-            {tabs.activeTab === 'team' && teamTabContent}
+            {tabs.activeTab === 'crew' && crewTabContent}
             {tabs.activeTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId ?? undefined} />}
 
             {tabs.activeTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
@@ -269,7 +269,7 @@ export function SidebarTabs({
               </div>
             )}
             {tabs.activeTab === 'costs' && <CostBreakdown />}
-            {tabs.activeTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
+            {tabs.activeTab === 'timers' && <TimerDisplay projectAgentIds={crewAgentIds} />}
           </div>
           {/* Resize handle for tabbed section */}
           <div

@@ -251,14 +251,14 @@ function DecisionTimelineItem({
 function ProjectProgressCard({
   leadId,
   projectName,
-  teamSize,
+  crewSize,
   completionPct,
   latestSnapshot,
   onClick,
 }: {
   leadId: string;
   projectName: string;
-  teamSize: number;
+  crewSize: number;
   completionPct: number;
   latestSnapshot: ProgressSnapshot | null;
   onClick: () => void;
@@ -269,7 +269,7 @@ function ProjectProgressCard({
         <h3 className="text-sm font-semibold text-th-text truncate" title={projectName}>
           {projectName}
         </h3>
-        <span className="text-xs text-th-text-muted font-mono">{teamSize} agents</span>
+        <span className="text-xs text-th-text-muted font-mono">{crewSize} agents</span>
       </div>
 
       {/* Progress bar */}
@@ -350,7 +350,7 @@ function ProjectProgressCard({
 export function OverviewPage({ api, ws }: Props) {
   const [allDecisions, setAllDecisions] = useState<Decision[]>([]);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
-  const [selectedProject, setSelectedProject] = useState<{ leadId: string; projectName: string; teamSize: number; completionPct: number; latestSnapshot: ProgressSnapshot | null } | null>(null);
+  const [selectedProject, setSelectedProject] = useState<{ leadId: string; projectName: string; crewSize: number; completionPct: number; latestSnapshot: ProgressSnapshot | null } | null>(null);
   const [feedbackDecisionId, setFeedbackDecisionId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [timelineProjectFilter, setTimelineProjectFilter] = useState<string | null>(null);
@@ -493,7 +493,7 @@ export function OverviewPage({ api, ws }: Props) {
   // Build project progress data
   const projectCards = leadAgents.map((lead) => {
     const proj = projects[lead.id];
-    const teamSize = lead.childIds.length;
+    const crewSize = lead.childIds.length;
     const completionPct = proj?.progress?.completionPct ?? 0;
     const latestSnapshot =
       proj?.progressHistory && proj.progressHistory.length > 0
@@ -503,7 +503,7 @@ export function OverviewPage({ api, ws }: Props) {
     return {
       leadId: lead.id,
       projectName: lead.projectName || `Project ${lead.id.slice(0, 8)}`,
-      teamSize,
+      crewSize,
       completionPct,
       latestSnapshot,
     };
@@ -699,7 +699,7 @@ export function OverviewPage({ api, ws }: Props) {
         <DetailPopup title={selectedProject.projectName} onClose={() => setSelectedProject(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-4 text-sm">
-              <span className="text-th-text-muted">{selectedProject.teamSize} agents</span>
+              <span className="text-th-text-muted">{selectedProject.crewSize} agents</span>
               <span className="text-accent font-semibold">{selectedProject.completionPct}% complete</span>
             </div>
             <div className="w-full bg-th-bg-muted rounded-full h-2">

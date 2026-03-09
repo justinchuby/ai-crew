@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TeamRoster } from '../TeamRoster';
+import { CrewRoster } from '../CrewRoster';
 
 // ── Mocks ─────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ vi.mock('../../Toast', () => ({
 function renderPanel() {
   return render(
     <MemoryRouter>
-      <TeamRoster />
+      <CrewRoster />
     </MemoryRouter>,
   );
 }
@@ -105,7 +105,7 @@ function setupMocks(overrides: Partial<{
 
 // ── Tests ─────────────────────────────────────────────────
 
-describe('TeamRoster', () => {
+describe('CrewRoster', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -113,7 +113,7 @@ describe('TeamRoster', () => {
   it('shows loading state initially', () => {
     mockApiFetch.mockImplementation(() => new Promise(() => {}));
     renderPanel();
-    expect(screen.getByText(/loading team roster/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading crew roster/i)).toBeInTheDocument();
   });
 
   it('shows error state on API failure', async () => {
@@ -248,7 +248,7 @@ describe('TeamRoster', () => {
     setupMocks({ agents: [] });
     renderPanel();
     await waitFor(() => {
-      expect(screen.getByText(/no agents in this team/i)).toBeInTheDocument();
+      expect(screen.getByText(/No agents in this crew/i)).toBeInTheDocument();
     });
   });
 

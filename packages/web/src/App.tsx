@@ -50,8 +50,8 @@ const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m =
 const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
 const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
-const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
-const TeamRoster = lazy(() => import('./components/TeamRoster/TeamRoster').then(m => ({ default: m.TeamRoster })));
+const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
+const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
 const GlobalAgentsPage = lazy(() => import('./components/GlobalAgentsPage').then(m => ({ default: m.GlobalAgentsPage })));
 
 function RouteSpinner() {
@@ -334,7 +334,7 @@ export function App() {
               <Route path="overview" element={<OverviewPage api={api} ws={ws} />} />
               <Route path="session" element={<LeadDashboard api={api} ws={ws} />} />
               <Route path="tasks" element={<TaskQueuePanel api={api} />} />
-              <Route path="agents" element={<TeamPage />} />
+              <Route path="agents" element={<CrewPage />} />
               <Route path="knowledge" element={<KnowledgePanel />} />
               <Route path="artifacts" element={<ArtifactsPanel />} />
               <Route path="timeline" element={<TimelinePage api={api} ws={ws} />} />
@@ -355,7 +355,8 @@ export function App() {
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
             <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><GlobalAgentsPage /></Suspense>} />
-            <Route path="/team" element={<Suspense fallback={<RouteSpinner />}><TeamRoster /></Suspense>} />
+            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><CrewRoster /></Suspense>} />
+            <Route path="/team" element={<Navigate to="/crews" replace />} />
             <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
             <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
             <Route path="/timeline" element={<ProjectRedirect page="timeline" />} />

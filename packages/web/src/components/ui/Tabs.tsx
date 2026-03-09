@@ -3,7 +3,7 @@
  *
  * Supports icons, count badges, and controlled/uncontrolled usage.
  * Replaces inline tab implementations in FocusPanel, DataBrowser,
- * TeamRoster, and TeamPage.
+ * CrewRoster, and CrewPage.
  */
 import { type ReactNode } from 'react';
 

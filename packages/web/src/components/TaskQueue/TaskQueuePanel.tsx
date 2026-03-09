@@ -86,14 +86,14 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
       )}
 
       {/* Crew agents */}
-      {progress && progress.teamAgents.length > 0 && (
+      {progress && progress.crewAgents.length > 0 && (
         <div>
           <div className="flex items-center gap-1 mb-1">
             <Users size={12} className="text-th-text-muted" />
-            <span className="text-xs text-th-text-muted font-medium">Crew ({progress.teamSize})</span>
+            <span className="text-xs text-th-text-muted font-medium">Crew ({progress.crewSize})</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {progress.teamAgents.map((a) => (
+            {progress.crewAgents.map((a) => (
               <span
                 key={a.id}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border ${
@@ -451,7 +451,13 @@ export function TaskQueuePanel({ api }: Props) {
         apiFetch<LeadProgress>(`/lead/${leadId}/progress`),
       ]);
       if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
-      setProgress(progressData);
+      // Normalize server-side property names (team→crew rename, Phase 1)
+      const raw = progressData as any;
+      setProgress({
+        ...progressData,
+        crewAgents: progressData.crewAgents ?? raw.teamAgents ?? [],
+        crewSize: progressData.crewSize ?? raw.teamSize ?? 0,
+      });
     } catch { /* ignore */ }
   }, [api]);
 

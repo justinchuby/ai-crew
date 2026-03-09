@@ -169,9 +169,9 @@ export interface LeadProgress {
   completed: number;
   failed: number;
   completionPct: number;
-  teamSize: number;
+  crewSize: number;
   leadTokens?: { input: number; output: number };
-  teamAgents: Array<{
+  crewAgents: Array<{
     id: string;
     role: Role;
     status: AgentStatus;

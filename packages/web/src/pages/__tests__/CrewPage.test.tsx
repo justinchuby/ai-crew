@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TeamPage } from '../TeamPage';
+import { CrewPage } from '../CrewPage';
 
 // ── Mocks ─────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ vi.mock('../../components/AgentLifecycle', () => ({
 function renderPage() {
   return render(
     <MemoryRouter>
-      <TeamPage />
+      <CrewPage />
     </MemoryRouter>,
   );
 }
@@ -159,7 +159,7 @@ function setupMocks(overrides: Partial<{
 
 // ── Tests ─────────────────────────────────────────────────
 
-describe('TeamPage', () => {
+describe('CrewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -172,7 +172,7 @@ describe('TeamPage', () => {
   it('shows loading state initially', () => {
     mockApiFetch.mockImplementation(() => new Promise(() => {}));
     renderPage();
-    expect(screen.getByText(/loading team/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading crew/i)).toBeInTheDocument();
   });
 
   it('shows error state on API failure', async () => {
@@ -303,7 +303,7 @@ describe('TeamPage', () => {
     setupMocks({ agents: [] });
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/no agents in this team/i)).toBeInTheDocument();
+      expect(screen.getByText(/No agents in this crew/i)).toBeInTheDocument();
     });
   });
 
@@ -494,11 +494,11 @@ describe('TeamPage', () => {
 
   // ── Team identity section ─────────────────────────────
 
-  it('renders team identity section with stats', async () => {
+  it('renders crew identity section with stats', async () => {
     setupMocks();
     renderPage();
     await waitFor(() => {
-      expect(screen.getByTestId('team-identity')).toBeInTheDocument();
+      expect(screen.getByTestId('crew-identity')).toBeInTheDocument();
     });
     expect(screen.getByText('42 entries')).toBeInTheDocument();
     expect(screen.getByText('5 corrections')).toBeInTheDocument();
@@ -515,9 +515,9 @@ describe('TeamPage', () => {
     // Switch to Export tab
     switchTab('Export');
     await waitFor(() => {
-      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
   });
 
   it('opens export dialog', async () => {
@@ -529,10 +529,10 @@ describe('TeamPage', () => {
     // Switch to Export tab
     switchTab('Export');
     await waitFor(() => {
-      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('export-team-btn'));
+    fireEvent.click(screen.getByTestId('export-crew-btn'));
     expect(screen.getByTestId('export-dialog')).toBeInTheDocument();
     expect(screen.getAllByText(/\.flightdeck-team\//).length).toBeGreaterThan(0);
     expect(screen.getByText('Include knowledge entries')).toBeInTheDocument();
@@ -547,10 +547,10 @@ describe('TeamPage', () => {
     // Switch to Export tab
     switchTab('Export');
     await waitFor(() => {
-      expect(screen.getByTestId('export-team-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('export-team-btn'));
+    fireEvent.click(screen.getByTestId('export-crew-btn'));
     fireEvent.click(screen.getByTestId('export-download-btn'));
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
@@ -569,12 +569,12 @@ describe('TeamPage', () => {
     // Switch to Export tab
     switchTab('Export');
     await waitFor(() => {
-      expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('import-team-btn'));
+    fireEvent.click(screen.getByTestId('import-crew-btn'));
     expect(screen.getByTestId('import-dialog')).toBeInTheDocument();
-    expect(screen.getByText(/choose team bundle/i)).toBeInTheDocument();
+    expect(screen.getByText(/choose crew bundle/i)).toBeInTheDocument();
     expect(screen.getByTestId('import-project-input')).toBeInTheDocument();
   });
 
@@ -587,10 +587,10 @@ describe('TeamPage', () => {
     // Switch to Export tab
     switchTab('Export');
     await waitFor(() => {
-      expect(screen.getByTestId('import-team-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('import-team-btn'));
+    fireEvent.click(screen.getByTestId('import-crew-btn'));
     expect(screen.getByText('Agent conflicts')).toBeInTheDocument();
     expect(screen.getByText('Knowledge conflicts')).toBeInTheDocument();
   });
