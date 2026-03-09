@@ -281,4 +281,181 @@ describe('TeamRoster', () => {
       expect(screen.getByText(/12 knowledge entries/i)).toBeInTheDocument();
     });
   });
+
+  // ── Action Buttons ───────────────────────────────────────
+
+  it('shows action buttons for live agents', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    // Click the running agent card
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Message')).toBeInTheDocument();
+      expect(screen.getByText('Interrupt')).toBeInTheDocument();
+      expect(screen.getByText('Stop')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show action buttons for terminated agents', async () => {
+    setupMocks({
+      profile: {
+        ...profileData,
+        status: 'terminated',
+        liveStatus: null,
+        live: null,
+      },
+    });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Overview')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Interrupt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Stop')).not.toBeInTheDocument();
+  });
+
+  it('sends interrupt when Interrupt button clicked', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Interrupt')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Interrupt'));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        `/agents/${profileData.agentId}/interrupt`,
+        { method: 'POST' },
+      );
+    });
+  });
+
+  it('shows confirmation before stopping agent', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => {
+      expect(screen.getByText(/are you sure you want to terminate/i)).toBeInTheDocument();
+      expect(screen.getByText('Confirm Stop')).toBeInTheDocument();
+    });
+  });
+
+  it('terminates agent on confirm', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => {
+      expect(screen.getByText('Confirm Stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Confirm Stop'));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        `/agents/${profileData.agentId}/terminate`,
+        { method: 'POST' },
+      );
+    });
+  });
+
+  it('cancels stop confirmation', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => {
+      expect(screen.getByText('Confirm Stop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => {
+      expect(screen.queryByText('Confirm Stop')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows message input and sends message', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getByText('Message')).toBeInTheDocument();
+    });
+
+    // Open message input
+    fireEvent.click(screen.getByText('Message'));
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/type a message/i)).toBeInTheDocument();
+    });
+
+    // Type and send
+    const input = screen.getByPlaceholderText(/type a message/i);
+    fireEvent.change(input, { target: { value: 'Hello agent' } });
+    fireEvent.click(screen.getByText('Send'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        `/agents/${profileData.agentId}/message`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ content: 'Hello agent' }),
+        }),
+      );
+    });
+  });
+
+  it('shows role emoji in profile panel header', async () => {
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      // Architect emoji from getRoleIcon
+      expect(screen.getByText('\u{1F3D7}')).toBeInTheDocument();
+    });
+  });
 });

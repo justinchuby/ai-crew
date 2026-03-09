@@ -119,9 +119,14 @@ function AgentCard({ agent, onSelect }: { agent: RosterAgent; onSelect: (id: str
 // ── Agent Profile Panel ───────────────────────────────────
 
 function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: string; onClose: () => void }) {
+  const addToast = useToastStore(s => s.add);
   const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [showMessageInput, setShowMessageInput] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -130,6 +135,55 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [agentId, teamId]);
+
+  const isAlive = profile?.liveStatus === 'running' || profile?.liveStatus === 'creating' || profile?.liveStatus === 'idle';
+
+  const handleInterrupt = async () => {
+    setActionLoading('interrupt');
+    try {
+      await apiFetch(`/agents/${agentId}/interrupt`, { method: 'POST' });
+      addToast('success', 'Interrupt sent');
+    } catch (err: any) {
+      addToast('error', `Failed to interrupt agent: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim()) return;
+    setActionLoading('message');
+    try {
+      await apiFetch(`/agents/${agentId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: messageText.trim() }),
+      });
+      addToast('success', 'Message sent');
+      setMessageText('');
+      setShowMessageInput(false);
+    } catch (err: any) {
+      addToast('error', `Failed to send message: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleStop = async () => {
+    setActionLoading('stop');
+    try {
+      await apiFetch(`/agents/${agentId}/terminate`, { method: 'POST' });
+      addToast('success', 'Agent terminated');
+      setConfirmStop(false);
+      // Refresh profile to reflect new status
+      const data = await apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`);
+      setProfile(data);
+    } catch (err: any) {
+      addToast('error', `Failed to stop agent: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -165,7 +219,7 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-th-bg-alt flex items-center justify-center">
-              <User className="w-5 h-5 text-th-text-alt" />
+              <span className="text-xl">{getRoleIcon(profile.role)}</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -179,6 +233,81 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Action Buttons */}
+        {isAlive && (
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={() => setShowMessageInput(v => !v)}
+              disabled={actionLoading !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Message
+            </button>
+            <button
+              onClick={handleInterrupt}
+              disabled={actionLoading !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
+            >
+              {actionLoading === 'interrupt' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              Interrupt
+            </button>
+            <button
+              onClick={() => setConfirmStop(true)}
+              disabled={actionLoading !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            >
+              <Square className="w-3.5 h-3.5" />
+              Stop
+            </button>
+          </div>
+        )}
+
+        {/* Confirm Stop Dialog */}
+        {confirmStop && (
+          <div className="mt-2 p-3 rounded bg-red-500/10 border border-red-500/30">
+            <p className="text-xs text-red-300 mb-2">Are you sure you want to terminate this agent? This cannot be undone.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleStop}
+                disabled={actionLoading === 'stop'}
+                className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading === 'stop' ? 'Stopping...' : 'Confirm Stop'}
+              </button>
+              <button
+                onClick={() => setConfirmStop(false)}
+                className="px-3 py-1 text-xs rounded bg-th-bg-alt text-th-text-alt hover:bg-th-border transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Message Input */}
+        {showMessageInput && (
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={messageText}
+              onChange={e => setMessageText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+              placeholder="Type a message to this agent..."
+              className="flex-1 px-3 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt"
+              autoFocus
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!messageText.trim() || actionLoading === 'message'}
+              className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+            >
+              {actionLoading === 'message' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Send
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
