@@ -12,7 +12,7 @@ import { CostCurve } from './CostCurve';
 import { KeyStats } from './KeyStats';
 import { AgentHeatmap } from './AgentHeatmap';
 import { MilestoneTimeline } from './MilestoneTimeline';
-import { SessionHistory } from '../SessionHistory';
+import { SessionHistory, NewSessionDialog } from '../SessionHistory';
 import {
   Square,
   Plus,
@@ -76,7 +76,7 @@ export function OverviewPage(_props: Props) {
   }, [agents, effectiveId]);
 
   const [stopping, setStopping] = useState(false);
-  const [starting, setStarting] = useState(false);
+  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
 
   const handleStopSession = useCallback(async () => {
     if (!effectiveId) return;
@@ -85,18 +85,6 @@ export function OverviewPage(_props: Props) {
       await apiFetch(`/projects/${effectiveId}/stop`, { method: 'POST' });
     } catch { /* ignore */ }
     finally { setStopping(false); }
-  }, [effectiveId]);
-
-  const handleNewSession = useCallback(async () => {
-    if (!effectiveId) return;
-    setStarting(true);
-    try {
-      await apiFetch(`/projects/${effectiveId}/resume`, {
-        method: 'POST',
-        body: JSON.stringify({ freshStart: true }),
-      });
-    } catch { /* ignore */ }
-    finally { setStarting(false); }
   }, [effectiveId]);
 
   // ── Data state ─────────────────────────────────────────────────
@@ -288,13 +276,12 @@ export function OverviewPage(_props: Props) {
         <div className="flex items-center gap-3" data-testid="no-session-controls">
           <button
             type="button"
-            onClick={handleNewSession}
-            disabled={starting}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded-md transition-colors font-medium disabled:opacity-50"
+            onClick={() => setShowNewSessionDialog(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded-md transition-colors font-medium"
             data-testid="new-session-btn"
           >
-            {starting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            {starting ? 'Starting…' : 'New Session'}
+            <Plus size={14} />
+            New Session
           </button>
           <span className="text-xs text-th-text-muted">
             No active session. Start a new one or resume from history below.
@@ -328,6 +315,15 @@ export function OverviewPage(_props: Props) {
         <SessionHistory projectId={effectiveId} hasActiveLead={true} />
       )}
       </div>
+
+      {/* New Session Dialog */}
+      {showNewSessionDialog && effectiveId && (
+        <NewSessionDialog
+          projectId={effectiveId}
+          onClose={() => setShowNewSessionDialog(false)}
+          onStarted={() => setShowNewSessionDialog(false)}
+        />
+      )}
     </div>
   );
 }
