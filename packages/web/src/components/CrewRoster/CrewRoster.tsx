@@ -165,7 +165,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${lead.projectId.slice(0, 8)}` : `Crew ${leadId.slice(0, 8)}`);
 
   return (
-    <div className="border border-th-border rounded-lg overflow-hidden bg-surface-raised">
+    <div className="border border-th-border rounded-lg overflow-hidden bg-surface-raised min-w-[280px]">
       {/* Group header */}
       <button
         onClick={() => setExpanded(v => !v)}
@@ -375,7 +375,7 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
   ];
 
   return (
-    <div className="bg-surface-raised rounded-lg border border-th-border">
+    <div className="bg-surface-raised rounded-lg border border-th-border w-full">
       {/* Profile Header */}
       <div className="p-4 border-b border-th-border">
         <div className="flex items-center justify-between">
@@ -715,8 +715,8 @@ export function CrewRoster() {
 
       {/* Content: Grouped List + Profile */}
       <div className="flex gap-6 flex-1 min-h-0 overflow-y-auto mt-4">
-        {/* Crew Groups */}
-        <div className={`space-y-3 ${selectedAgent ? 'w-1/2' : 'w-full'}`}>
+        {/* Crew Groups — fixed min-width prevents layout shift when profile opens/closes */}
+        <div className={`space-y-3 min-w-[320px] lg:min-w-[400px] ${selectedAgent ? 'w-1/2' : 'w-full'}`}>
           {crewGroups.length === 0 ? (
             <div className="text-center py-8 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
               <Cpu className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -739,7 +739,7 @@ export function CrewRoster() {
 
         {/* Profile Panel */}
         {selectedAgent && (
-          <div className="w-1/2">
+          <div className="w-1/2 min-w-[320px] lg:min-w-[400px]">
             <ProfilePanel
               agentId={selectedAgent}
               teamId={selectedAgentTeamId}
