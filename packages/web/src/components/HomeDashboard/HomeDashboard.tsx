@@ -894,13 +894,13 @@ export function HomeDashboard() {
           </div>
         )}
 
-        {/* Section 4: Recent Activity */}
-        {recentActivity.length > 0 && (
-          <div data-testid="activity-feed-section">
-            <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-th-text-muted" />
-              <h2 className="text-sm font-medium text-th-text-alt">Recent Progress</h2>
-            </div>
+        {/* Section 4: Recent Progress */}
+        <div data-testid="activity-feed-section">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-th-text-muted" />
+            <h2 className="text-sm font-medium text-th-text-alt">Recent Progress</h2>
+          </div>
+          {recentActivity.length > 0 ? (
             <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border max-h-64 overflow-y-auto">
               {recentActivity.map((a) => {
                 const pName = resolveProjectName(a.projectId, projects, agents);
@@ -914,8 +914,12 @@ export function HomeDashboard() {
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="bg-surface-raised border border-th-border rounded-lg px-3 py-4 text-center text-xs text-th-text-muted">
+              No progress updates yet. Updates appear here when the lead reports progress.
+            </div>
+          )}
+        </div>
 
         {/* Section 5: Progress */}
         {progressByProject.length > 0 && (
