@@ -169,13 +169,12 @@ export class Agent {
 
     // On resume, the SDK restores conversation history which already contains
     // system prompt, context manifest, and task. Only send the resume notice.
+    // If resume fails, the session_resume_failed handler sends the full prompt.
     let initialPrompt: string;
     if (isResume) {
       initialPrompt = RESUME_PREAMBLE;
     } else {
-      const contextManifest = this.buildContextManifest(this.peers, this.budget);
-      const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
-      initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+      initialPrompt = this.buildFullPrompt();
     }
     // Errors are handled internally by the bridge (sets agent status to 'failed').
     const bridgePromise = startAcpBridge(this, this.config, initialPrompt);
@@ -383,6 +382,13 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 - Examples: "This repo uses factory pattern for services", "Tests must be run with --experimental-vm-modules", "The API uses snake_case not camelCase"
 - This prevents other agents from making the same mistakes or rediscovering the same things.
 [/CREW CONTEXT]`;
+  }
+
+  /** Build the full initial prompt (system prompt + context manifest + task assignment). */
+  buildFullPrompt(): string {
+    const contextManifest = this.buildContextManifest(this.peers, this.budget);
+    const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
+    return `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
   }
 
   injectContextUpdate(peers: AgentContextInfo[], _recentActivity: string[], healthHeader?: string, alerts?: string[]): boolean {

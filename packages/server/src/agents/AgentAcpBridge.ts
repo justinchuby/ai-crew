@@ -75,7 +75,6 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
 
   const adapterConfig = {
     provider: config.provider || 'copilot',
-    sdkMode: config.sdkMode,
     autopilot: agent.autopilot,
     model: rawModel,
     binaryOverride: config.providerBinaryOverride,
@@ -190,6 +189,12 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
 
   conn.on('session_resume_failed', (info: { requestedSessionId: string; newSessionId: string; error: string }) => withCtx(() => {
     agent._notifySessionResumeFailed(info);
+    // Resume fell back to a blank new session — send the full system prompt
+    // so the agent isn't left without instructions.
+    logger.info({ module: 'agent-bridge', msg: 'Sending full prompt after resume failure', agentId: agent.id });
+    conn.prompt(agent.buildFullPrompt()).catch((err) => {
+      logger.error({ module: 'agent-bridge', msg: 'Failed to send recovery prompt', agentId: agent.id, err: (err as Error).message });
+    });
   }));
 
   conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => withCtx(() => {

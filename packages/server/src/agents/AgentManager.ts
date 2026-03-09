@@ -577,6 +577,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onSessionResumeFailed((info) => {
       this.emit('agent:session_resume_failed', { agentId: agent.id, ...info });
+      // Resume fell back to a blank new session — send full prompt as recovery.
+      // For the local ACP path, AgentAcpBridge handles this directly.
+      // For the remote bridge path, send via agent.sendMessage.
+      if (this.agentServerClient) {
+        logger.info({ module: 'agent-mgr', msg: 'Sending full prompt after resume failure (remote)', agentId: agent.id });
+        agent.sendMessage(agent.buildFullPrompt());
+      }
     });
 
     agent.onContextCompacted((info) => {
@@ -769,15 +776,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const startAgent = () => {
       if (this.agentServerClient) {
         const isResume = !!agent.resumeSessionId;
-        let initialPrompt: string;
-        if (isResume) {
-          // SDK restores conversation history — only send the resume notice.
-          initialPrompt = RESUME_PREAMBLE;
-        } else {
-          const contextManifest = agent.buildContextManifest(peers, agent.budget);
-          const taskAssignment = `You are acting as the "${effectiveRole.name}" role. ${task ? `Your assigned task is: ${task}` : 'Awaiting task assignment.'}`;
-          initialPrompt = `${effectiveRole.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
-        }
+        // On resume, SDK restores conversation — only send short notice.
+        // If resume fails, onSessionResumeFailed handler sends the full prompt.
+        const initialPrompt = isResume ? RESUME_PREAMBLE : agent.buildFullPrompt();
         startRemoteBridge(agent, this.agentServerClient, initialPrompt);
       } else {
         agent.start();
