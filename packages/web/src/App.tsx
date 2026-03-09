@@ -19,10 +19,11 @@ import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
-import { Search, Pause, Play } from 'lucide-react';
+import { Search, Pause, Play, Bug } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SectionErrorBoundary, RouteErrorBoundary } from './components/SectionErrorBoundary';
+import { buildFeedbackUrl } from './components/ProvideFeedback';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
 import { AttentionBar } from './components/AttentionBar';
@@ -330,6 +331,17 @@ export function App() {
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <StatusPopover />
+              <a
+                href={buildFeedbackUrl({ title: 'User feedback' })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
+                title="Submit Issue"
+                data-testid="top-bar-submit-issue"
+              >
+                <Bug className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Submit Issue</span>
+              </a>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
