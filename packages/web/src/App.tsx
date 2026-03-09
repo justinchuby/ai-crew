@@ -342,7 +342,7 @@ export function App() {
               <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
               <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
               <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="analysis" element={<AnalysisPage api={api} ws={ws} />} />
+              <Route path="analysis" element={<AnalysisPage />} />
               <Route path="canvas" element={<CanvasPage />} />
             </Route>
 

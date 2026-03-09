@@ -11,6 +11,7 @@ export const TAB_LABELS: Record<string, string> = {
   agents:      'Agents',
   knowledge:   'Knowledge',
   artifacts:   'Artifacts',
+  analysis:    'Analysis',
   timeline:    'Timeline',
   groups:      'Groups',
   'org-chart': 'Org Chart',

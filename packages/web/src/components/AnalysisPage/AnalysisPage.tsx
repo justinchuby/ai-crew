@@ -8,11 +8,10 @@
  * Data fetching mirrors the old OverviewPage keyframes-based approach
  * but only runs when this tab is active (performance win).
  */
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { useLeadStore } from '../../stores/leadStore';
-import { useProjects } from '../../hooks/useProjects';
 import { apiFetch } from '../../hooks/useApi';
+import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
 import { deriveAgentsFromKeyframes } from '../../hooks/useHistoricalAgents';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
 import { CumulativeFlow } from '../OverviewPage/TaskBurndown';
@@ -23,32 +22,17 @@ import type { FlowPoint } from '../OverviewPage/TaskBurndown';
 import type { CostPoint } from '../OverviewPage/CostCurve';
 import type { HeatmapBucket } from '../OverviewPage/AgentHeatmap';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
+import type { AgentInfo } from '../../types';
 
-interface Props {
-  api?: any;
-  ws?: any;
-}
-
-export function AnalysisPage(_props: Props) {
+export function AnalysisPage() {
   const agents = useAppStore((s) => s.agents);
-  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
-  const { projects } = useProjects();
-
-  const effectiveId = useMemo(() => {
-    if (selectedLeadId) {
-      const lead = agents.find((a) => a.id === selectedLeadId);
-      return lead?.projectId || selectedLeadId;
-    }
-    const lead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
-    if (lead) return lead.projectId || lead.id;
-    return projects.length > 0 ? projects[0].id : null;
-  }, [selectedLeadId, agents, projects]);
+  const effectiveId = useEffectiveProjectId();
 
   // ── Data state ─────────────────────────────────────────────────
   const [flowData, setFlowData] = useState<FlowPoint[]>([]);
   const [costData, setCostData] = useState<CostPoint[]>([]);
   const [heatmapBuckets, setHeatmapBuckets] = useState<HeatmapBucket[]>([]);
-  const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
+  const [historicalAgents, setHistoricalAgents] = useState<AgentInfo[]>([]);
   const [totalTokens, setTotalTokens] = useState(0);
   const [sessionStart, setSessionStart] = useState<string | undefined>();
   const mountedRef = useRef(true);
@@ -65,14 +49,14 @@ export function AnalysisPage(_props: Props) {
       const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(`/replay/${effectiveId}/keyframes`);
       const kf: ReplayKeyframe[] = kfData.keyframes ?? [];
 
-      let resolvedAgents: any[] = [];
+      let resolvedAgents: AgentInfo[] = [];
       if (agents.length === 0) {
         try {
-          const agentData = await apiFetch<any[]>('/agents');
+          const agentData = await apiFetch<AgentInfo[]>('/agents');
           resolvedAgents = Array.isArray(agentData) ? agentData : [];
         } catch { /* API may not have agent list endpoint */ }
         if (resolvedAgents.length === 0 && kf.length > 0) {
-          resolvedAgents = deriveAgentsFromKeyframes(kf);
+          resolvedAgents = deriveAgentsFromKeyframes(kf) as unknown as AgentInfo[];
         }
         if (mountedRef.current) setHistoricalAgents(resolvedAgents);
       }
@@ -88,8 +72,8 @@ export function AnalysisPage(_props: Props) {
           const cPoints: CostPoint[] = [];
           const hBuckets: HeatmapBucket[] = [];
 
-          const totalInput = currentAgents.reduce((s: number, a: any) => s + (a.inputTokens ?? 0), 0);
-          const totalOutput = currentAgents.reduce((s: number, a: any) => s + (a.outputTokens ?? 0), 0);
+          const totalInput = currentAgents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
+          const totalOutput = currentAgents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
           const realTokens = totalInput + totalOutput;
 
           for (const frame of kf) {

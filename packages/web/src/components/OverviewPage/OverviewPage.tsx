@@ -15,6 +15,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
+import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
 import { formatDateTime } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
@@ -45,7 +46,8 @@ const SEVERITY_BG: Record<AlertSeverity, string> = {
   info: 'bg-blue-500/10 border border-blue-500/20',
 };
 
-/** Unified progress item — merges activity feed with milestone keyframes */
+const DECISIONS_FEED_LIMIT = 6;
+const PROGRESS_FEED_LIMIT = 8;
 interface ProgressItem {
   id: string;
   icon: string;
@@ -65,19 +67,8 @@ interface Props {
 
 export function OverviewPage(_props: Props) {
   const agents = useAppStore((s) => s.agents);
-  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const { projects } = useProjects();
-
-  // Derive effective project ID
-  const effectiveId = useMemo(() => {
-    if (selectedLeadId) {
-      const lead = agents.find((a) => a.id === selectedLeadId);
-      return lead?.projectId || selectedLeadId;
-    }
-    const lead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
-    if (lead) return lead.projectId || lead.id;
-    return projects.length > 0 ? projects[0].id : null;
-  }, [selectedLeadId, agents, projects]);
+  const effectiveId = useEffectiveProjectId();
 
   const projectName = useMemo(() => {
     if (!effectiveId) return '';
@@ -106,6 +97,10 @@ export function OverviewPage(_props: Props) {
   // ── Session controls state ────────────────────────────────────
   const [stopping, setStopping] = useState(false);
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(!hasActiveLead);
+
+  // Auto-expand history when session stops, collapse when it starts
+  useEffect(() => { setHistoryOpen(!hasActiveLead); }, [hasActiveLead]);
 
   const handleStopSession = useCallback(async () => {
     if (!effectiveId) return;
@@ -209,7 +204,7 @@ export function OverviewPage(_props: Props) {
       items.push({
         id: `milestone-${kf.timestamp}`,
         icon: kf.type === 'milestone' ? '🏁' : '📊',
-        text: (kf as any).label ?? (kf as any).summary ?? `${kf.type} reached`,
+        text: kf.label || `${kf.type} reached`,
         detail: formatRelativeTime(kf.timestamp),
         timestamp: new Date(kf.timestamp).getTime(),
       });
@@ -342,7 +337,7 @@ export function OverviewPage(_props: Props) {
             <p className="text-zinc-500 text-sm px-4 py-6 text-center">No decisions yet</p>
           ) : (
             <div className="divide-y divide-th-border/30">
-              {(actionableDecisions.length > 0 ? actionableDecisions : decisions).slice(0, 6).map(d => (
+              {(actionableDecisions.length > 0 ? actionableDecisions : decisions).slice(0, DECISIONS_FEED_LIMIT).map(d => (
                 <DecisionFeedItem
                   key={d.id}
                   decision={d}
@@ -350,10 +345,10 @@ export function OverviewPage(_props: Props) {
                   onClick={() => setSelectedDecision(d)}
                 />
               ))}
-              {(actionableDecisions.length > 6 || decisions.length > 6) && (
+              {(actionableDecisions.length > DECISIONS_FEED_LIMIT || decisions.length > DECISIONS_FEED_LIMIT) && (
                 <div className="px-4 py-2 text-center">
                   <span className="text-[10px] text-zinc-500">
-                    +{Math.max(actionableDecisions.length, decisions.length) - 6} more
+                    +{Math.max(actionableDecisions.length, decisions.length) - DECISIONS_FEED_LIMIT} more
                   </span>
                 </div>
               )}
@@ -370,7 +365,7 @@ export function OverviewPage(_props: Props) {
             <p className="text-zinc-500 text-sm px-4 py-6 text-center">No progress events yet</p>
           ) : (
             <div className="divide-y divide-th-border/30">
-              {progressItems.slice(0, 8).map(item => (
+              {progressItems.slice(0, PROGRESS_FEED_LIMIT).map(item => (
                 <div key={item.id} className="flex items-start gap-2.5 px-3 py-2">
                   <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
                   <div className="flex-1 min-w-0">
@@ -379,9 +374,9 @@ export function OverviewPage(_props: Props) {
                   </div>
                 </div>
               ))}
-              {progressItems.length > 8 && (
+              {progressItems.length > PROGRESS_FEED_LIMIT && (
                 <div className="px-4 py-2 text-center">
-                  <span className="text-[10px] text-zinc-500">+{progressItems.length - 8} more</span>
+                  <span className="text-[10px] text-zinc-500">+{progressItems.length - PROGRESS_FEED_LIMIT} more</span>
                 </div>
               )}
             </div>
@@ -391,14 +386,21 @@ export function OverviewPage(_props: Props) {
 
       {/* ── Session History (collapsible, always visible) ──────── */}
       {effectiveId && (
-        <details className="mt-2" open={!hasActiveLead}>
-          <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-300 select-none">
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(o => !o)}
+            className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-300 select-none flex items-center gap-1"
+          >
+            <span className={`transition-transform ${historyOpen ? 'rotate-90' : ''}`}>▸</span>
             Session History
-          </summary>
-          <div className="mt-2">
-            <SessionHistory projectId={effectiveId} hasActiveLead={hasActiveLead} />
-          </div>
-        </details>
+          </button>
+          {historyOpen && (
+            <div className="mt-2">
+              <SessionHistory projectId={effectiveId} hasActiveLead={hasActiveLead} />
+            </div>
+          )}
+        </div>
       )}
 
       </div>
