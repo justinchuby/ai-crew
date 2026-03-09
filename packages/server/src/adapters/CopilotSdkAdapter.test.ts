@@ -368,13 +368,29 @@ describe('CopilotSdkAdapter', () => {
       expect(promptComplete).toHaveBeenCalledWith('end_turn');
     });
 
-    it('should emit text from response content when no streaming deltas', async () => {
+    it('should emit text from assistant.message event for non-streaming responses', async () => {
+      // Simulate the SDK firing assistant.message event during sendAndWait
+      // (this is what happens for non-streaming responses)
+      mockSession.sendAndWait.mockImplementationOnce(async () => {
+        mockSessionEventHandler!({
+          id: 'msg-1', timestamp: new Date().toISOString(),
+          parentId: null, type: 'assistant.message',
+          data: { content: 'Hello from Copilot' },
+        });
+        return {
+          id: 'msg-1', timestamp: new Date().toISOString(),
+          parentId: null, type: 'assistant.message',
+          data: { content: 'Hello from Copilot' },
+        };
+      });
+
       const text = vi.fn();
       adapter.on('text', text);
 
       await adapter.prompt('hello');
 
-      // No streaming_delta events fired — return value text IS emitted
+      // Text emitted once from the event handler, NOT from the return value
+      expect(text).toHaveBeenCalledTimes(1);
       expect(text).toHaveBeenCalledWith('Hello from Copilot');
     });
 
