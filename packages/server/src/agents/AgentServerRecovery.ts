@@ -2,7 +2,7 @@
  * AgentServerRecovery — recovers agent state on agent server startup.
  *
  * Loads non-terminated agents from the roster and attempts to resume them.
- * For providers that support session resume (e.g. Copilot, Cursor, Claude Code),
+ * For providers that support session resume (e.g. Copilot, Cursor, Claude SDK),
  * the stored sessionId is passed to the adapter to restore conversation context.
  * Providers without resume support have their agents marked as 'stale'.
  *

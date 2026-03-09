@@ -102,7 +102,7 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
 
   claude: {
     id: 'claude',
-    name: 'Claude Code',
+    name: 'Claude SDK',
     binary: 'claude',
     args: ['--acp', '--stdio'],
     requiredEnvVars: ['ANTHROPIC_API_KEY'],

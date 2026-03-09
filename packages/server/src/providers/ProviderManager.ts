@@ -25,6 +25,8 @@ export interface ProviderStatus {
   enabled: boolean;
   /** Path to the binary, or null if not installed. */
   binaryPath: string | null;
+  /** CLI version string, or null if not detectable. */
+  version: string | null;
 }
 
 export interface AuthCheckResult {
@@ -94,6 +96,34 @@ export class ProviderManager {
     }
   }
 
+  /** Detect CLI version. Returns version string or null. */
+  detectVersion(provider: ProviderId): string | null {
+    const preset = PROVIDER_PRESETS[provider];
+    if (!preset) return null;
+
+    // Version commands vary by provider
+    const versionCommands: Partial<Record<ProviderId, string>> = {
+      copilot: `${preset.binary} --version`,
+      claude: `${preset.binary} --version`,
+      gemini: `${preset.binary} --version`,
+      codex: `${preset.binary} --version`,
+      cursor: `${preset.binary} --version`,
+      opencode: `${preset.binary} --version`,
+    };
+
+    const cmd = versionCommands[provider];
+    if (!cmd) return null;
+
+    try {
+      const raw = this.exec(cmd);
+      // Extract version-like pattern (e.g., "v1.2.3" or "1.2.3")
+      const match = raw.match(/v?(\d+\.\d+(?:\.\d+)?(?:[-.]\w+)*)/);
+      return match ? match[0] : raw.split('\n')[0].trim().slice(0, 50);
+    } catch {
+      return null;
+    }
+  }
+
   /** Get full status for a single provider. */
   getProviderStatus(provider: ProviderId): ProviderStatus {
     const preset = PROVIDER_PRESETS[provider];
@@ -101,6 +131,7 @@ export class ProviderManager {
 
     const { installed, binaryPath } = this.detectInstalled(provider);
     const auth = installed ? this.checkAuthenticated(provider) : null;
+    const version = installed ? this.detectVersion(provider) : null;
 
     return {
       id: provider,
@@ -109,6 +140,7 @@ export class ProviderManager {
       authenticated: auth?.authenticated ?? null,
       enabled: this.isProviderEnabled(provider),
       binaryPath,
+      version,
     };
   }
 

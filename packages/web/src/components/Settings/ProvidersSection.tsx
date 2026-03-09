@@ -20,6 +20,7 @@ interface ProviderStatus {
   authenticated: boolean | null;
   enabled: boolean;
   binaryPath: string | null;
+  version: string | null;
 }
 
 interface TestResult {
@@ -40,7 +41,7 @@ const PROVIDER_ICONS: Record<string, string> = {
 
 const PROVIDER_AUTH_LABELS: Record<string, string> = {
   copilot: 'Authenticated via GitHub',
-  claude: 'Authenticated via Claude platform',
+  claude: 'Authenticated via Anthropic API key',
   gemini: 'Authenticated via Google',
   opencode: 'Manages own keys',
   cursor: 'Authenticated via Cursor',
@@ -49,7 +50,7 @@ const PROVIDER_AUTH_LABELS: Record<string, string> = {
 
 const PROVIDER_DOCS: Record<string, string> = {
   copilot: 'https://docs.github.com/en/copilot',
-  claude: 'https://platform.claude.com/docs/en/agent-sdk/overview',
+  claude: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-agent-sdk',
   gemini: 'https://ai.google.dev/gemini-api/docs/api-key',
   opencode: 'https://opencode.ai/docs/providers/',
   cursor: 'https://docs.cursor.com',
@@ -166,7 +167,9 @@ function ProviderCard({
             )}
           </div>
           <div className="text-xs text-th-text-muted">
-            {provider.installed ? authLabel : 'CLI not found on PATH'}
+            {provider.installed
+              ? `${authLabel}${provider.version ? ` · ${provider.version}` : ''}`
+              : 'CLI not found on PATH'}
           </div>
         </div>
         {/* Enable/disable toggle */}
@@ -209,6 +212,7 @@ function ProviderCard({
               <span className="text-th-text-muted">Status:</span>{' '}
               <span className={provider.installed ? 'text-green-400' : 'text-th-text-muted'}>
                 {provider.installed ? 'Installed' : 'Not found'}
+                {provider.version && ` (${provider.version})`}
               </span>
             </div>
             <div>

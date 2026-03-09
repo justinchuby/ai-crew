@@ -111,7 +111,7 @@ const EQUIVALENCES: Record<string, Record<string, string>> = {
 
 // ── Claude CLI Aliases ──────────────────────────────────────
 
-/** Claude Code CLI accepts short aliases instead of full model names */
+/** Claude SDK CLI accepts short aliases instead of full model names */
 const CLAUDE_ALIASES: Record<string, string> = {
   'claude-opus-4.6': 'opus',
   'claude-opus-4.5': 'opus',
