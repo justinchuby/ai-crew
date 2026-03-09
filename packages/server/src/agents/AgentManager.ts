@@ -956,16 +956,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (!secretaryRole) return null;
 
     try {
-      // Look up most recent secretary's sessionId for resume (targeted indexed query)
-      let resumeSessionId: string | undefined;
-      if (this.agentRosterRepository && leadAgent.projectId) {
-        const prevSecretary = this.agentRosterRepository.findLatestByRoleAndProject('secretary', leadAgent.projectId);
-        if (prevSecretary?.sessionId) {
-          resumeSessionId = prevSecretary.sessionId;
-          logger.info({ module: 'agent', msg: 'Resuming secretary session', sessionId: resumeSessionId, projectId: leadAgent.projectId });
-        }
-      }
-
+      // autoSpawnSecretary is a fallback for fresh starts only — resume is handled
+      // by the team respawn path in projects.ts which includes all crew members.
       const secretary = this.spawn(
         secretaryRole,
         'You are the auto-created project secretary. Track DAG progress, provide status reports when asked, and assist with dependency inference for auto-DAG tasks.',
@@ -973,7 +965,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         true,
         'gpt-4.1',
         leadAgent.cwd,
-        resumeSessionId,
+        undefined,
         undefined,
         { projectName: leadAgent.projectName, projectId: leadAgent.projectId },
       );
