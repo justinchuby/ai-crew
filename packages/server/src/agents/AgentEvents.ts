@@ -16,10 +16,9 @@ export interface UsageInfo {
   dagTaskId?: string;
 }
 
-/** Info emitted when session resume fails and falls back to a new session */
+/** Info emitted when session resume fails */
 export interface SessionResumeFailedInfo {
   requestedSessionId: string;
-  newSessionId: string;
   error: string;
 }
 

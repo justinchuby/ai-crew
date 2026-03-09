@@ -150,29 +150,21 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         // LoadSessionResponse has no sessionId — the session ID stays the same on successful load
         sessionId = opts.sessionId;
       } catch (err) {
-        // Intentional fallback: if resume fails for any reason (provider doesn't
-        // support it, session expired, network error), start a fresh session.
-        // Log the failure so operators can diagnose resume issues.
+        // Resume failed — do NOT fall back to a new session.
+        // Emit event for observability, then propagate the error so the
+        // caller (AgentManager / API) can surface it to the user.
         const message = err instanceof Error ? err.message : String(err);
         logger.warn({
           module: 'acp',
-          msg: 'Session resume failed, falling back to new session',
+          msg: 'Session resume failed',
           requestedSessionId: opts.sessionId,
           error: message,
         });
-        const newResult = await withTimeout(
-          this.connection!.newSession({
-            cwd: opts.cwd || process.cwd(),
-            mcpServers: [],
-          }),
-          SDK_TIMEOUT_MS, 'newSession (fallback)',
-        );
-        sessionId = newResult.sessionId;
         this.emit('session_resume_failed', {
           requestedSessionId: opts.sessionId,
-          newSessionId: sessionId,
           error: message,
         });
+        throw new Error(`Session resume failed: ${message}`);
       }
     } else {
       const sessionResult = await withTimeout(

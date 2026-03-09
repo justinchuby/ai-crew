@@ -179,7 +179,7 @@ export function handleAgentSessionResumeFailed(msg: any, _ctx: HandlerContext): 
   const roleName = agent?.role?.name ?? msg.agentId?.slice(0, 8) ?? 'Agent';
   const errorReason = msg.error || 'unknown error';
   useToastStore.getState().add('error',
-    `⚠️ Failed to resume ${roleName} session — started a new one instead.\n${errorReason}`
+    `⚠️ Failed to resume ${roleName} session.\n${errorReason}`
   );
 }
 
