@@ -207,6 +207,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project management** — Stop project agents, edit working directory paths, batch archive/delete, active tab default for new projects.
 - **Resume rate limiting** — Project resume endpoint rate-limited via `spawnLimiter` to prevent agent spawn storms.
 
+#### Overview & Analysis
+
+- **Overview page redesign** — Rebuilt as a command center with status bar, attention items, decisions feed, and progress feed.
+- **Analysis tab** — Chart visualizations (cumulative flow, token usage, agent heatmap) moved from Overview to dedicated Analysis tab.
+- **Project directories** — Working directory displayed with inline editing on the Overview page.
+- **Shared feed components** — Extracted `DecisionFeedItem`, `ActivityFeedItem`, and detail modals into reusable `Shared/` package.
+
+#### Session & Tasks
+
+- **NewSessionDialog** — Dynamic model selection from `/models` API, role toggles, and Escape key support.
+- **Tasks split layout** — DAG stacked above Kanban in a vertical layout; removed drag divider and redundant scope dropdown in project context.
+
+#### Reliability
+
+- **Error boundaries** — Granular `SectionErrorBoundary` and `RouteErrorBoundary` on all 19 routes, sidebar, header, and feed sections. Auto-reset on navigation.
+- **Fetch timeouts** — 30-second default timeout on all API calls via `AbortController` in `useApi`. Configurable per-call.
+- **Fetch/WS race condition** — `AbortController` added to 7 effects in LeadDashboard to prevent stale responses.
+- **Silent error handling** — Replaced 34 `.catch(() => {})` instances across 15 files with descriptive `console.warn` and comments.
+- **Async button states** — Disabled states on all async action buttons to prevent double-clicks.
+- **404 page** — Added Not Found page for invalid routes.
+- **Agents sidebar link** — Direct link to agents view in the sidebar.
+
 ### Changed
 
 - **Daemon removal** — Removed ~7,400 lines of unnecessary daemon code after agent server migration. Daemon concept replaced by two-process agent server architecture.
@@ -244,6 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **C-8: CWD path traversal** — Project CWD validated against allowed roots, blocked system paths, and verified as existing directory on both POST and PATCH.
 - **C-9: Symlink bypass** — Artifact storage path validation prevents symlink-based directory traversal.
 - **C-10: ProjectImporter hardening** — File size cap, path validation against traversal, and role extraction sanitization on imported project data.
+- **C-11: Coordination lock path traversal** — Path traversal validation added to file lock endpoints to prevent lock operations outside project scope.
+- **C-12: Activity query limit** — Activity log queries capped at 1,000 results to prevent unbounded responses.
 
 #### Bug Fixes
 
@@ -262,14 +286,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Crew route** — `/team` now renders standalone TeamRoster instead of redirecting to a project.
 - **Session tab height** — Chat and sidebar now use full viewport height in the session view.
 - **Async graceful shutdown** — Server shutdown awaits all handlers in sequence to prevent data loss.
+- **Infinite re-render crash (P0)** — Fixed unstable array references in store selectors causing infinite re-render loop when viewing a project with a running session.
+- **Session history disappearing** — `useEffectiveProjectId` now caches the resolved project ID so session history persists when agents stop.
+- **ProjectsPanel card click** — Card click now expands details inline; navigation moved to the project name link.
+- **Light theme Overview colors** — Fixed status banner colors in light mode.
+- **Status badge inconsistency** — Runtime agent state now overrides stale DB status values in header and Overview.
+- **Tasks scope dropdown** — Removed redundant scope dropdown from Tasks view when inside project context.
 
 ### Stats
 
-- 200+ commits in this session
+- 230+ commits in this session
 - 80+ DAG tasks created and completed
 - 1,471 web tests passing, 4,616 server tests passing
 - 160 acceptance criteria defined (78 P0)
-- 10 critical security issues found and resolved
+- 12 critical security issues found and resolved
 - 13 agents active at peak concurrency
 - 0 TypeScript compilation errors (server + web)
 
