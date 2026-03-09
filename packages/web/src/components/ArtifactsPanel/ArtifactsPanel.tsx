@@ -51,6 +51,7 @@ interface FileData {
 export function ArtifactsPanel() {
   const projectId = useProjectId();
   const [groups, setGroups] = useState<ArtifactGroup[]>([]);
+  const [sharedPath, setSharedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -60,15 +61,17 @@ export function ArtifactsPanel() {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pathCopied, setPathCopied] = useState(false);
 
   const fetchArtifacts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ groups: ArtifactGroup[] }>(
+      const data = await apiFetch<{ groups: ArtifactGroup[]; sharedPath?: string }>(
         `/projects/${projectId}/artifacts`,
       );
       setGroups(data.groups);
+      if (data.sharedPath) setSharedPath(data.sharedPath);
       // Auto-expand all groups
       setExpandedGroups(new Set(data.groups.map(g => g.agentDir)));
     } catch (err: any) {
@@ -110,6 +113,15 @@ export function ArtifactsPanel() {
 
   useEffect(() => { setCopied(false); }, [selectedPath]);
 
+  const copyPath = useCallback(async () => {
+    if (!sharedPath) return;
+    try {
+      await navigator.clipboard.writeText(sharedPath);
+      setPathCopied(true);
+      setTimeout(() => setPathCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
+  }, [sharedPath]);
+
   const toggleGroup = (dir: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -139,6 +151,24 @@ export function ArtifactsPanel() {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
+
+        {/* Path info bar */}
+        {sharedPath && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-th-border bg-th-bg-alt/30" data-testid="artifacts-path-bar">
+            <span className="text-[10px] text-th-text-muted">📁</span>
+            <span className="text-[10px] font-mono text-th-text-muted truncate flex-1" title={sharedPath}>
+              {sharedPath}
+            </span>
+            <button
+              onClick={copyPath}
+              className="p-0.5 rounded hover:bg-th-bg-alt text-th-text-muted transition-colors shrink-0"
+              aria-label="Copy artifacts path"
+              title="Copy path to clipboard"
+            >
+              {pathCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto py-1">
           {loading && groups.length === 0 && (

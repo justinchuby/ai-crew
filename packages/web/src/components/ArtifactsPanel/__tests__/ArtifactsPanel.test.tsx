@@ -30,6 +30,7 @@ function renderPanel() {
 // ── Fixtures ──────────────────────────────────────────────────────
 
 const artifactGroups = {
+  sharedPath: '/home/user/project/.flightdeck/shared',
   groups: [
     {
       agentDir: 'architect-3973583e',
@@ -203,5 +204,24 @@ describe('ArtifactsPanel', () => {
       expect(screen.getByText('Agent Artifacts')).toBeInTheDocument();
       expect(screen.getByText(/specs, reports, audits/i)).toBeInTheDocument();
     });
+  });
+
+  it('shows artifacts directory path with copy button', async () => {
+    mockApiFetch.mockResolvedValue(artifactGroups);
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTestId('artifacts-path-bar')).toBeInTheDocument();
+    });
+    expect(screen.getByText('/home/user/project/.flightdeck/shared')).toBeInTheDocument();
+    expect(screen.getByLabelText('Copy artifacts path')).toBeInTheDocument();
+  });
+
+  it('does not show path bar when sharedPath is missing', async () => {
+    mockApiFetch.mockResolvedValue({ groups: [] });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTestId('artifacts-empty')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('artifacts-path-bar')).not.toBeInTheDocument();
   });
 });
