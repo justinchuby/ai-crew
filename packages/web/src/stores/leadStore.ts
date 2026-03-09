@@ -1,27 +1,6 @@
 import { create } from 'zustand';
 import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
 
-// UI-side dedup: track recent text appends to avoid duplicate renders.
-// Uses a simple time-based check — if the exact same (leadId, text) is appended
-// within DEDUP_TTL_MS, the second append is skipped.
-const recentAppends = new Map<string, number>();
-const DEDUP_TTL_MS = 2000;
-function isDuplicateAppend(leadId: string, text: string): boolean {
-  const key = `${leadId}:${text}`;
-  const now = Date.now();
-  if (recentAppends.has(key) && now - recentAppends.get(key)! < DEDUP_TTL_MS) return true;
-  recentAppends.set(key, now);
-  // Prune old entries periodically
-  if (recentAppends.size > 200) {
-    for (const [k, t] of recentAppends) {
-      if (now - t > DEDUP_TTL_MS) recentAppends.delete(k);
-    }
-  }
-  return false;
-}
-/** @internal — exposed for test cleanup */
-export function _resetAppendDedup(): void { recentAppends.clear(); }
-
 export interface ActivityEvent {
   id: string;
   agentId: string;
@@ -205,8 +184,7 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, messages } } };
     }),
 
-  appendToLastAgentMessage: (leadId, text) => {
-    if (isDuplicateAppend(leadId, text)) return;
+  appendToLastAgentMessage: (leadId, text) =>
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       const msgs = [...proj.messages];
@@ -220,8 +198,7 @@ export const useLeadStore = create<LeadState>((set) => ({
         msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
       }
       return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
-    });
-  },
+    }),
 
   appendToThinkingMessage: (leadId, text) =>
     set((s) => {

@@ -133,35 +133,13 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   });
 }
 
-/** Simple hash for dedup — fast, not cryptographic */
-function simpleHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  }
-  return h;
-}
-
-const DEDUP_WINDOW = 50;
-
 /** Wire ACP protocol events to Agent state and listeners. */
 export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   const withCtx = <T>(fn: () => T): T =>
     runWithAgentContext(agent.id, agent.role.name, agent.projectId, fn);
 
-  // Content-hash dedup: skip duplicate text chunks (e.g. from SDK history replay)
-  const recentHashes = new Set<number>();
-
   conn.on('text', (text: string) => withCtx(() => {
     if (agent._isTerminated) return;
-
-    const hash = simpleHash(text);
-    if (recentHashes.has(hash)) return;
-    recentHashes.add(hash);
-    if (recentHashes.size > DEDUP_WINDOW) {
-      recentHashes.delete(recentHashes.values().next().value!);
-    }
-
     agent.messages.push(text);
     if (agent.messages.length > agent._maxMessages) {
       agent.messages = agent.messages.slice(-agent._maxMessages);
