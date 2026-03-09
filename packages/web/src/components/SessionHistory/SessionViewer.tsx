@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Clock, MessageSquare, Users, Play, Eye, ListChecks } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, formatDuration } from '../../utils/format';
 
 /** Minimal session info needed by the viewer */
 export interface ViewableSession {
@@ -26,16 +26,9 @@ interface SessionViewerProps {
   onResume?: () => void;
 }
 
-function formatDuration(start: string, end: string | null): string {
+function sessionDuration(start: string, end: string | null): string {
   if (!end) return 'ongoing';
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+  return formatDuration(new Date(end).getTime() - new Date(start).getTime());
 }
 
 export function SessionViewer({ session, onClose, onResume }: SessionViewerProps) {
@@ -118,7 +111,7 @@ export function SessionViewer({ session, onClose, onResume }: SessionViewerProps
               <div
                 className="text-xs font-mono text-th-text cursor-pointer hover:text-accent transition-colors"
                 title="Click to copy full ID"
-                onClick={() => navigator.clipboard.writeText(session.leadId)}
+                onClick={() => navigator.clipboard?.writeText(session.leadId).catch(() => {})}
               >
                 {session.leadId.slice(0, 12)}…
               </div>
@@ -144,7 +137,7 @@ export function SessionViewer({ session, onClose, onResume }: SessionViewerProps
                 Duration
               </div>
               <div className="text-xs font-mono text-th-text">
-                {formatDuration(session.startedAt, session.endedAt)}
+                {sessionDuration(session.startedAt, session.endedAt)}
               </div>
             </div>
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, formatDuration } from '../../utils/format';
 import {
   ChevronRight,
   Clock,
@@ -38,17 +38,6 @@ export interface SessionDetail {
 interface SessionHistoryProps {
   projectId: string;
   hasActiveLead?: boolean;
-}
-
-function formatDuration(ms: number | null): string {
-  if (ms == null) return 'ongoing';
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {

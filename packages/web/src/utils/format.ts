@@ -45,6 +45,21 @@ export function formatDateTime(iso: string): string {
  * Format an ISO date string as relative time (e.g., '2 minutes ago').
  * Falls back to the raw string on parse errors.
  */
+/**
+ * Format a duration in milliseconds as a human-readable string (e.g., "2h 30m", "45s").
+ * Returns 'ongoing' for null/undefined input.
+ */
+export function formatDuration(ms: number | null | undefined): string {
+  if (ms == null) return 'ongoing';
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+}
+
 export function relativeTime(iso: string): string {
   try {
     const diff = Date.now() - new Date(iso).getTime();
