@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
 import { deriveAgentsFromKeyframes } from '../../hooks/useHistoricalAgents';
+import { formatDateTime } from '../../utils/format';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
 import { ProgressTimeline } from './ProgressTimeline';
 import { CumulativeFlow } from './TaskBurndown';
@@ -12,6 +13,14 @@ import { KeyStats } from './KeyStats';
 import { AgentHeatmap } from './AgentHeatmap';
 import { MilestoneTimeline } from './MilestoneTimeline';
 import { SessionHistory } from '../SessionHistory';
+import {
+  Square,
+  Plus,
+  Users,
+  Clock,
+  Crown,
+  Loader2,
+} from 'lucide-react';
 import type { TimelineDataPoint } from './ProgressTimeline';
 import type { FlowPoint } from './TaskBurndown';
 import type { CostPoint } from './CostCurve';
@@ -53,6 +62,42 @@ export function OverviewPage(_props: Props) {
     return agents.some(a => a.role?.id === 'lead' && a.projectId === effectiveId &&
       (a.status === 'running' || a.status === 'idle'));
   }, [agents, effectiveId]);
+
+  // Active session info
+  const activeLeadAgent = useMemo(() => {
+    if (!hasActiveLead || !effectiveId) return null;
+    return agents.find(a => a.role?.id === 'lead' && a.projectId === effectiveId &&
+      (a.status === 'running' || a.status === 'idle')) ?? null;
+  }, [agents, effectiveId, hasActiveLead]);
+
+  const projectAgents = useMemo(() => {
+    if (!effectiveId) return [];
+    return agents.filter(a => a.projectId === effectiveId && (a.status === 'running' || a.status === 'idle'));
+  }, [agents, effectiveId]);
+
+  const [stopping, setStopping] = useState(false);
+  const [starting, setStarting] = useState(false);
+
+  const handleStopSession = useCallback(async () => {
+    if (!effectiveId) return;
+    setStopping(true);
+    try {
+      await apiFetch(`/projects/${effectiveId}/stop`, { method: 'POST' });
+    } catch { /* ignore */ }
+    finally { setStopping(false); }
+  }, [effectiveId]);
+
+  const handleNewSession = useCallback(async () => {
+    if (!effectiveId) return;
+    setStarting(true);
+    try {
+      await apiFetch(`/projects/${effectiveId}/resume`, {
+        method: 'POST',
+        body: JSON.stringify({ freshStart: true }),
+      });
+    } catch { /* ignore */ }
+    finally { setStarting(false); }
+  }, [effectiveId]);
 
   // ── Data state ─────────────────────────────────────────────────
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
@@ -196,6 +241,72 @@ export function OverviewPage(_props: Props) {
   return (
     <div className="flex-1 overflow-y-auto space-y-4" data-testid="overview-page">
       <div className="px-4 pt-2 space-y-4">
+
+      {/* ── Session Lifecycle Controls ─────────────────────────── */}
+      {effectiveId && hasActiveLead && activeLeadAgent && (
+        <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="active-session-banner">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Crown className="w-5 h-5 text-yellow-500" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-th-text">Active Session</div>
+                <div className="text-xs text-th-text-muted flex items-center gap-2 mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Users size={11} />
+                    {projectAgents.length} agent{projectAgents.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock size={11} />
+                    Started {formatDateTime(activeLeadAgent.createdAt ?? '')}
+                  </span>
+                  {activeLeadAgent.task && (
+                    <span className="truncate max-w-xs" title={activeLeadAgent.task}>
+                      · {activeLeadAgent.task}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleStopSession}
+              disabled={stopping}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 text-red-400 rounded-md hover:bg-red-500/30 transition-colors font-medium disabled:opacity-50"
+              data-testid="stop-session-btn"
+            >
+              {stopping ? <Loader2 size={12} className="animate-spin" /> : <Square size={12} />}
+              {stopping ? 'Stopping…' : 'Stop Session'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {effectiveId && !hasActiveLead && (
+        <div className="flex items-center gap-3" data-testid="no-session-controls">
+          <button
+            type="button"
+            onClick={handleNewSession}
+            disabled={starting}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded-md transition-colors font-medium disabled:opacity-50"
+            data-testid="new-session-btn"
+          >
+            {starting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {starting ? 'Starting…' : 'New Session'}
+          </button>
+          <span className="text-xs text-th-text-muted">
+            No active session. Start a new one or resume from history below.
+          </span>
+        </div>
+      )}
+
+      {/* Session History — prominent when no active session */}
+      {effectiveId && !hasActiveLead && (
+        <SessionHistory projectId={effectiveId} hasActiveLead={false} />
+      )}
+
       {/* Hero: Progress Timeline */}
       <ProgressTimeline data={timelineData} width={800} height={240} />
 
@@ -212,9 +323,9 @@ export function OverviewPage(_props: Props) {
       {/* Agent Activity Heatmap */}
       <AgentHeatmap agents={displayAgents} buckets={heatmapBuckets} />
 
-      {/* Session History */}
-      {effectiveId && (
-        <SessionHistory projectId={effectiveId} hasActiveLead={hasActiveLead} />
+      {/* Session History — secondary when active session is running */}
+      {effectiveId && hasActiveLead && (
+        <SessionHistory projectId={effectiveId} hasActiveLead={true} />
       )}
       </div>
     </div>
