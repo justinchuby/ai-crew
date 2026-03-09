@@ -115,11 +115,13 @@ function ProjectCard({
   const isConfirmingDelete = confirmingDeleteId === project.id;
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover">
-      {/* Card header — Link for proper accessibility and keyboard navigation */}
-      <Link
-        to={`/projects/${project.id}`}
-        className="flex items-center gap-3 p-3 no-underline text-inherit"
-        aria-label={`Open ${project.name}`}
+      {/* Card header — click to expand/collapse, name link navigates */}
+      <div
+        onClick={onToggle}
+        className="flex items-center gap-3 p-3 cursor-pointer"
+        role="button"
+        aria-expanded={isExpanded}
+        aria-label={`Toggle details for ${project.name}`}
       >
         {/* Batch selection checkbox */}
         <input
@@ -133,7 +135,13 @@ function ProjectCard({
         <FolderOpen className="w-5 h-5 text-accent shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-th-text-alt">{project.name}</span>
+            <Link
+              to={`/projects/${project.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm font-medium text-th-text-alt hover:text-accent hover:underline transition-colors no-underline"
+            >
+              {project.name}
+            </Link>
             <StatusBadge {...projectStatusProps(project)} dot />
             <StorageBadge mode={project.storageMode} />
           </div>
@@ -165,19 +173,14 @@ function ProjectCard({
           </span>
         )}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          className="p-1 rounded hover:bg-th-bg-muted transition-colors shrink-0"
-          aria-expanded={isExpanded}
-          aria-label="Toggle details"
-        >
+        <div className="p-1 shrink-0">
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-th-text-muted" />
           ) : (
             <ChevronRight className="w-4 h-4 text-th-text-muted" />
           )}
-        </button>
-      </Link>
+        </div>
+      </div>
 
       {/* Expanded details */}
       {isExpanded && (

@@ -168,7 +168,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('proj-1')).toBeTruthy();
@@ -191,7 +191,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Crew')).toBeTruthy();
@@ -213,7 +213,7 @@ describe('ProjectsPanel', () => {
     });
 
     // Expand active project - should NOT show Delete
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Resume')).toBeTruthy();
@@ -243,7 +243,7 @@ describe('ProjectsPanel', () => {
     });
 
     // Expand archived project
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Delete')).toBeTruthy();
@@ -286,7 +286,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Beta Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Delete')).toBeTruthy();
@@ -315,7 +315,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Resume')).toBeTruthy();
@@ -345,7 +345,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Stop All Agents')).toBeTruthy();
@@ -369,7 +369,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Alpha Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Stop All Agents')).toBeTruthy();
@@ -402,7 +402,7 @@ describe('ProjectsPanel', () => {
       expect(screen.getByText('Beta Project')).toBeTruthy();
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Toggle details' });
+    const toggleButtons = screen.getAllByRole('button', { name: /Toggle details/ });
     fireEvent.click(toggleButtons[0]);
     await waitFor(() => {
       expect(screen.getByText('Delete')).toBeTruthy();
