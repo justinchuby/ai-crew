@@ -309,7 +309,7 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
     const roleName = target.role.name;
     const shortId = target.id.slice(0, 8);
 
-    ctx.terminateAgent(target.id);
+    Promise.resolve(ctx.terminateAgent(target.id)).catch(() => {});
 
     const ackMsg = `[System] Terminated ${roleName} (${shortId}).${sessionId ? ` Session ID: ${sessionId} — use this in CREATE_AGENT with "sessionId" to resume later.` : ''} Freed 1 agent slot. ${req.reason ? `Reason: ${req.reason}` : ''}`;
     agent.sendMessage(ackMsg);
