@@ -10,17 +10,30 @@ interface RoleInfo {
   model: string;
 }
 
-const LEAD_MODELS = [
-  { id: '', label: 'Default' },
-  { id: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
-  { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
-  { id: 'claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
-  { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
-  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
-  { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
-  { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
-  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro' },
-];
+interface ModelsListResponse {
+  models: string[];
+  defaults: Record<string, string[]>;
+}
+
+/** Human-readable display names for model IDs (mirrors ModelConfigPanel) */
+const MODEL_NAMES: Record<string, string> = {
+  'claude-opus-4.6': 'Claude Opus 4.6',
+  'claude-opus-4.5': 'Claude Opus 4.5',
+  'claude-sonnet-4.6': 'Claude Sonnet 4.6',
+  'claude-sonnet-4.5': 'Claude Sonnet 4.5',
+  'claude-sonnet-4': 'Claude Sonnet 4',
+  'claude-haiku-4.5': 'Claude Haiku 4.5',
+  'gemini-3-pro-preview': 'Gemini 3 Pro',
+  'gpt-5.3-codex': 'GPT-5.3 Codex',
+  'gpt-5.2-codex': 'GPT-5.2 Codex',
+  'gpt-5.2': 'GPT-5.2',
+  'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
+  'gpt-5.1-codex': 'GPT-5.1 Codex',
+  'gpt-5.1': 'GPT-5.1',
+  'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
+  'gpt-5-mini': 'GPT-5 Mini',
+  'gpt-4.1': 'GPT-4.1',
+};
 
 export interface NewSessionDialogProps {
   projectId: string;
@@ -32,6 +45,7 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
   const [task, setTask] = useState('');
   const [leadModel, setLeadModel] = useState('');
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +54,9 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
     apiFetch<RoleInfo[]>('/roles')
       .then((roles) => setAvailableRoles(roles.filter((r) => r.id !== 'lead')))
       .catch(() => { /* role fetch failure is non-critical */ });
+    apiFetch<ModelsListResponse>('/models')
+      .then((data) => setAvailableModels(data.models ?? []))
+      .catch(() => { /* model fetch failure is non-critical */ });
   }, []);
 
   const toggleRole = useCallback((roleId: string) => {
@@ -118,8 +135,9 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
               className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm text-th-text focus:outline-none focus:border-accent/50"
               data-testid="new-session-model"
             >
-              {LEAD_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+              <option value="">Default</option>
+              {availableModels.map((id) => (
+                <option key={id} value={id}>{MODEL_NAMES[id] ?? id}</option>
               ))}
             </select>
           </div>

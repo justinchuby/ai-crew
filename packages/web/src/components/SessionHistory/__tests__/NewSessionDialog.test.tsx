@@ -14,16 +14,28 @@ const MOCK_ROLES = [
   { id: 'code-reviewer', name: 'Code Reviewer', icon: '📖', description: 'Reviews code', model: 'gemini-3-pro-preview' },
 ];
 
+const MOCK_MODELS_RESPONSE = {
+  models: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5', 'gemini-3-pro-preview'],
+  defaults: { lead: ['claude-opus-4.6'], developer: ['claude-opus-4.6'] },
+};
+
 describe('NewSessionDialog', () => {
   const onClose = vi.fn();
   const onStarted = vi.fn();
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  /** Default mock that handles /roles and /models; override resume path as needed */
+  function mockDefaultEndpoints(resumeHandler?: (path: string) => Promise<any>) {
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
+      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
+      if (resumeHandler) return resumeHandler(path);
       return Promise.resolve({});
     });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDefaultEndpoints();
   });
 
   function renderDialog() {
@@ -39,6 +51,19 @@ describe('NewSessionDialog', () => {
     expect(screen.getByTestId('new-session-model')).toBeInTheDocument();
     expect(screen.getByTestId('start-session-btn')).toBeInTheDocument();
     expect(screen.getByText('Cancel')).toBeInTheDocument();
+  });
+
+  it('fetches models from /models API and populates dropdown', async () => {
+    renderDialog();
+    await waitFor(() => {
+      const select = screen.getByTestId('new-session-model') as HTMLSelectElement;
+      const options = Array.from(select.options).map(o => o.value);
+      expect(options).toContain('');
+      expect(options).toContain('claude-opus-4.6');
+      expect(options).toContain('claude-sonnet-4.6');
+      expect(options).toContain('gemini-3-pro-preview');
+    });
+    expect(mockApiFetch).toHaveBeenCalledWith('/models');
   });
 
   it('fetches and displays roles (excluding lead)', async () => {
@@ -66,10 +91,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('calls resume endpoint with freshStart on start', async () => {
-    mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      return Promise.resolve({ id: 'lead-1' });
-    });
+    mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
     renderDialog();
 
     fireEvent.click(screen.getByTestId('start-session-btn'));
@@ -87,10 +109,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('includes task in the request body', async () => {
-    mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      return Promise.resolve({ id: 'lead-1' });
-    });
+    mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
     renderDialog();
 
     fireEvent.change(screen.getByTestId('new-session-task'), {
@@ -110,10 +129,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('includes selected roles as team hint in task', async () => {
-    mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      return Promise.resolve({ id: 'lead-1' });
-    });
+    mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
     renderDialog();
 
     await waitFor(() => expect(screen.getByTestId('role-developer')).toBeInTheDocument());
@@ -134,11 +150,14 @@ describe('NewSessionDialog', () => {
   });
 
   it('sends selected lead model', async () => {
-    mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      return Promise.resolve({ id: 'lead-1' });
-    });
+    mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
     renderDialog();
+
+    // Wait for models to load into the dropdown
+    await waitFor(() => {
+      const select = screen.getByTestId('new-session-model') as HTMLSelectElement;
+      expect(select.options.length).toBeGreaterThan(1);
+    });
 
     fireEvent.change(screen.getByTestId('new-session-model'), {
       target: { value: 'claude-sonnet-4.6' },
@@ -157,6 +176,7 @@ describe('NewSessionDialog', () => {
   it('shows error on API failure', async () => {
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
+      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
       return Promise.reject(new Error('Server down'));
     });
     renderDialog();
@@ -186,6 +206,7 @@ describe('NewSessionDialog', () => {
     let resolveResume: (v: any) => void;
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
+      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
       return new Promise((r) => { resolveResume = r; });
     });
     renderDialog();
