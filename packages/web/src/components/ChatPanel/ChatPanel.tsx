@@ -143,7 +143,7 @@ export function ChatPanel({ agentId, ws }: Props) {
     const mentionPattern = /@([a-f0-9]{4,8})\b/g;
     let m;
     while ((m = mentionPattern.exec(inputText)) !== null) {
-      const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
+      const fullId = resolveShortId(m![1]);
       if (fullId && fullId !== agentId) {
         sendToAgent(fullId, inputText, mode);
       }
