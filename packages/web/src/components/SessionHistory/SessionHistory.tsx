@@ -43,6 +43,7 @@ interface SessionHistoryProps {
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
   completed: { icon: CheckCircle2, color: 'text-green-500', label: 'Completed' },
   active: { icon: AlertCircle, color: 'text-yellow-500', label: 'Active' },
+  stopped: { icon: XCircle, color: 'text-orange-500', label: 'Stopped' },
   crashed: { icon: XCircle, color: 'text-red-500', label: 'Crashed' },
 };
 
@@ -177,7 +178,7 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
                       <Eye size={12} />
                       View full session
                     </button>
-                    {session.status !== 'active' && !hasActiveLead && (
+                    {!hasActiveLead && (
                       <button
                         type="button"
                         onClick={() => setResumeSession(session)}

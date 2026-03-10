@@ -243,8 +243,8 @@ export function OverviewPage(_props: Props) {
 
       {/* ── Quick Status Bar ───────────────────────────────────── */}
       <div className="flex items-center gap-4 px-4 py-2 bg-surface-raised border border-th-border rounded-lg text-sm text-th-text-muted" data-testid="quick-status-bar">
-        <span className={hasActiveLead ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-          {hasActiveLead ? '● Running' : '● Stopped'}
+        <span className={hasActiveLead ? 'text-green-600 dark:text-green-400' : projectAgents.length > 0 ? 'text-orange-500' : 'text-red-600 dark:text-red-400'}>
+          {hasActiveLead ? '● Running' : projectAgents.length > 0 ? '● No Lead' : '● Stopped'}
         </span>
         <span>{projectAgents.length} agent{projectAgents.length !== 1 ? 's' : ''}</span>
         {tasksTotal > 0 && <span>{tasksDone}/{tasksTotal} tasks</span>}
