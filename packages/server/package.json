@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --exclude './src/agent-server*.ts' --exclude './src/adapters/**' --exclude './src/acp/**' src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
