@@ -391,7 +391,7 @@ export function App() {
             <Route path="/" element={<RouteErrorBoundary name="Home"><HomeDashboard /></RouteErrorBoundary>} />
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
-            <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Global Agents"><GlobalAgentsPage /></RouteErrorBoundary></Suspense>} />
+            <Route path="/agents" element={<Navigate to="/crews" replace />} />
             <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Crews"><UnifiedCrewPage scope="global" /></RouteErrorBoundary></Suspense>} />
             <Route path="/team" element={<Navigate to="/crews" replace />} />
             <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
