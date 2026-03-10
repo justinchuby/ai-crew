@@ -55,6 +55,7 @@ const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
 const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
+const UnifiedCrewPage = lazy(() => import('./components/CrewRoster/UnifiedCrewPage').then(m => ({ default: m.UnifiedCrewPage })));
 const GlobalAgentsPage = lazy(() => import('./components/GlobalAgentsPage').then(m => ({ default: m.GlobalAgentsPage })));
 
 function RouteSpinner() {
@@ -368,7 +369,8 @@ export function App() {
               <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></RouteErrorBoundary>} />
               <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession api={api} ws={ws} /></RouteErrorBoundary>} />
               <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></RouteErrorBoundary>} />
-              <Route path="agents" element={<RouteErrorBoundary name="Agents"><CrewPage /></RouteErrorBoundary>} />
+              <Route path="crew" element={<RouteErrorBoundary name="Crew"><UnifiedCrewPage scope="project" /></RouteErrorBoundary>} />
+              <Route path="agents" element={<Navigate to="../crew" replace />} />
               <Route path="knowledge" element={<RouteErrorBoundary name="Knowledge"><KnowledgePanel /></RouteErrorBoundary>} />
               <Route path="artifacts" element={<RouteErrorBoundary name="Artifacts"><ArtifactsPanel /></RouteErrorBoundary>} />
               <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage api={api} ws={ws} /></RouteErrorBoundary>} />
@@ -390,7 +392,7 @@ export function App() {
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
             <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Global Agents"><GlobalAgentsPage /></RouteErrorBoundary></Suspense>} />
-            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Crews"><CrewRoster /></RouteErrorBoundary></Suspense>} />
+            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Crews"><UnifiedCrewPage scope="global" /></RouteErrorBoundary></Suspense>} />
             <Route path="/team" element={<Navigate to="/crews" replace />} />
             <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
             <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
