@@ -104,25 +104,19 @@ export function TokenUsageSection({ projectId }: Props) {
       {/* Summary header — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-th-bg-alt/30 rounded-xl transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-th-bg-alt/30 rounded-xl transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <Coins className="w-4 h-4 text-amber-500" />
-          <span className="text-sm font-medium text-th-text-alt">Token Usage</span>
-          <span className="text-xs text-th-text-muted">
-            ({projectCost?.agentCount ?? 0} agent{(projectCost?.agentCount ?? 0) !== 1 ? 's' : ''})
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span className="text-blue-500">↓{formatTokens(totalInput)}</span>
+          <span className="text-emerald-500">↑{formatTokens(totalOutput)}</span>
+          <span className="font-semibold text-th-text-alt">{formatTokens(totalTokens)}</span>
+          <span className="text-th-text-muted">
+            · {projectCost?.agentCount ?? 0} agent{(projectCost?.agentCount ?? 0) !== 1 ? 's' : ''}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <span className="text-blue-500">↓{formatTokens(totalInput)}</span>
-            <span className="text-emerald-500">↑{formatTokens(totalOutput)}</span>
-            <span className="font-semibold text-th-text-alt">{formatTokens(totalTokens)}</span>
-          </div>
-          {expanded
-            ? <ChevronDown className="w-3.5 h-3.5 text-th-text-muted" />
-            : <ChevronRight className="w-3.5 h-3.5 text-th-text-muted" />}
-        </div>
+        {expanded
+          ? <ChevronDown className="w-3.5 h-3.5 text-th-text-muted" />
+          : <ChevronRight className="w-3.5 h-3.5 text-th-text-muted" />}
       </button>
 
       {/* Expanded breakdown */}
