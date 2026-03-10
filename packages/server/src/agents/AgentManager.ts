@@ -66,7 +66,7 @@ export interface AgentManagerEvents {
   'agent:content': { agentId: string; content: string };
   'agent:thinking': { agentId: string; text: string };
   'agent:plan': { agentId: string; plan: PlanEntry[] };
-  'agent:permission_request': { agentId: string; request: any };
+  'agent:permission_request': { agentId: string; request: any; dangerous?: boolean };
   'agent:session_ready': { agentId: string; sessionId: string };
   'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
@@ -643,7 +643,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           return;
         }
       }
-      this.emit('agent:permission_request', { agentId: agent.id, request });
+      const dangerous = request.toolName ? isDangerousTool(request.toolName, request.arguments ?? {}) : false;
+      this.emit('agent:permission_request', { agentId: agent.id, request, dangerous });
     });
 
     // When an agent's session is established, broadcast session ID

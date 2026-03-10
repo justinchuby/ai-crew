@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, FileText, Terminal, X } from 'lucide-react';
+import { Shield, AlertTriangle, FileText, Terminal, X } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useApi, apiFetch } from '../hooks/useApi';
 import type { AgentInfo, AcpPermissionRequest } from '../types';
@@ -97,8 +97,12 @@ export function PermissionDialog() {
       <div className="bg-surface-raised border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-th-border">
-          <Shield size={20} className="text-amber-400" />
-          <h2 className="text-base font-semibold text-th-text flex-1">Permission Request</h2>
+          {request.dangerous
+            ? <AlertTriangle size={20} className="text-red-400" />
+            : <Shield size={20} className="text-amber-400" />}
+          <h2 className="text-base font-semibold text-th-text flex-1">
+            {request.dangerous ? 'Dangerous Operation' : 'Permission Request'}
+          </h2>
           <span className="text-xs text-th-text-muted tabular-nums">{countdown}s</span>
           <button
             onClick={() => handleResolve(false)}
@@ -144,16 +148,18 @@ export function PermissionDialog() {
             </pre>
           </details>
 
-          {/* Always allow checkbox */}
-          <label className="flex items-center gap-2 text-sm text-th-text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={alwaysAllow}
-              onChange={(e) => setAlwaysAllow(e.target.checked)}
-              className="rounded border-th-border bg-th-bg-alt text-blue-500 focus:ring-blue-500/30"
-            />
-            Always allow <code className="text-xs bg-th-bg-alt px-1 rounded">{request.toolName ?? 'this tool'}</code>
-          </label>
+          {/* Always allow checkbox — hidden for dangerous tools */}
+          {!request.dangerous && (
+            <label className="flex items-center gap-2 text-sm text-th-text-muted cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={alwaysAllow}
+                onChange={(e) => setAlwaysAllow(e.target.checked)}
+                className="rounded border-th-border bg-th-bg-alt text-blue-500 focus:ring-blue-500/30"
+              />
+              Always allow <code className="text-xs bg-th-bg-alt px-1 rounded">{request.toolName ?? 'this tool'}</code>
+            </label>
+          )}
         </div>
 
         {/* Footer */}

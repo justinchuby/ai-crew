@@ -86,6 +86,7 @@ export interface AcpPermissionRequest {
   toolName: string;
   arguments: Record<string, any>;
   timestamp: string;
+  dangerous?: boolean;
 }
 
 export interface AcpSessionInfo {
