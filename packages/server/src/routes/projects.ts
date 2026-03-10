@@ -840,10 +840,14 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (project.status !== 'archived') {
       return res.status(400).json({ error: 'Only archived projects can be deleted' });
     }
+
+    // Cascade: remove all roster agents for this project
+    const rosterDeleted = agentRoster?.deleteByProject(req.params.id as string) ?? 0;
+
     const deleted = projectRegistry.delete(req.params.id as string);
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
-    logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id });
-    res.json({ ok: true });
+    logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id, rosterDeleted });
+    res.json({ ok: true, rosterDeleted });
   });
 
   // --- Model Config ---

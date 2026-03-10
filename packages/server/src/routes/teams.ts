@@ -490,5 +490,25 @@ export function teamsRoutes(ctx: AppContext): Router {
     }
   });
 
+  // Delete a crew (lead + all child agents) from the roster
+  router.delete('/crews/:leadId', writeLimiter, (req, res) => {
+    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+
+    const { leadId } = req.params;
+    const lead = agentRoster.getAgent(leadId);
+    if (!lead) return res.status(404).json({ error: 'Crew not found — lead agent not in roster' });
+
+    // Don't allow deleting active crews — only terminated/retired
+    const liveAgents = agentManager.getAll();
+    const liveLeadAgent = liveAgents.find(a => a.id === leadId);
+    if (liveLeadAgent && (liveLeadAgent.status === 'running' || liveLeadAgent.status === 'idle')) {
+      return res.status(409).json({ error: 'Cannot delete an active crew. Stop the project first.' });
+    }
+
+    const deleted = agentRoster.deleteCrew(leadId);
+    logger.info({ module: 'teams', msg: 'Crew deleted', leadId, deleted });
+    res.json({ ok: true, deleted });
+  });
+
   return router;
 }

@@ -153,6 +153,36 @@ export class AgentRosterRepository {
     return result.changes > 0;
   }
 
+  /** Hard-delete all roster entries for a project (used when project is deleted) */
+  deleteByProject(projectId: string): number {
+    const result = this.db.drizzle
+      .delete(agentRoster)
+      .where(eq(agentRoster.projectId, projectId))
+      .run();
+    return result.changes;
+  }
+
+  /** Hard-delete all roster entries for a specific crew (lead + children) */
+  deleteCrew(leadId: string): number {
+    // Delete the lead entry
+    const leadResult = this.db.drizzle
+      .delete(agentRoster)
+      .where(eq(agentRoster.agentId, leadId))
+      .run();
+
+    // Delete all agents parented to this lead (metadata.parentId)
+    const all = this.getAllAgents();
+    let childCount = 0;
+    for (const agent of all) {
+      const meta = agent.metadata as Record<string, unknown> | undefined;
+      if (meta?.parentId === leadId) {
+        this.deleteAgent(agent.agentId);
+        childCount++;
+      }
+    }
+    return leadResult.changes + childCount;
+  }
+
   retireAgent(agentId: string, reason?: string): boolean {
     const now = new Date().toISOString();
     const existing = this.getAgent(agentId);
