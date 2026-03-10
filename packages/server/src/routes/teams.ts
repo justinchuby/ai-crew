@@ -205,7 +205,6 @@ export function teamsRoutes(ctx: AppContext): Router {
       live: liveJson ? {
         task: liveJson.task ?? null,
         outputPreview: liveJson.outputPreview ?? null,
-        autopilot: liveJson.autopilot ?? false,
         model: liveJson.model ?? null,
         sessionId: liveJson.sessionId ?? null,
         provider: liveJson.provider ?? null,

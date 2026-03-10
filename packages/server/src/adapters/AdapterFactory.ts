@@ -34,8 +34,6 @@ import { logger } from '../utils/logger.js';
 export interface AdapterConfig {
   /** Provider ID (e.g., 'copilot', 'claude', 'gemini') */
   provider: string;
-  /** Run in autopilot mode (auto-approve tool calls) */
-  autopilot?: boolean;
   /** Model name or tier alias */
   model?: string;
 
@@ -166,7 +164,6 @@ export async function createAdapterForProvider(config: AdapterConfig): Promise<A
     try {
       const { ClaudeSdkAdapter } = await import('./ClaudeSdkAdapter.js');
       const adapter = new ClaudeSdkAdapter({
-        autopilot: config.autopilot,
         model: config.model,
       });
       logger.info({
@@ -184,7 +181,7 @@ export async function createAdapterForProvider(config: AdapterConfig): Promise<A
         provider: config.provider,
       });
       const { AcpAdapter } = await import('./AcpAdapter.js');
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
+      const adapter = new AcpAdapter();
       return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
     }
   }
@@ -193,7 +190,6 @@ export async function createAdapterForProvider(config: AdapterConfig): Promise<A
     try {
       const { CopilotSdkAdapter } = await import('./CopilotSdkAdapter.js');
       const adapter = new CopilotSdkAdapter({
-        autopilot: config.autopilot,
         model: config.model,
       });
       logger.info({
@@ -211,13 +207,13 @@ export async function createAdapterForProvider(config: AdapterConfig): Promise<A
         provider: config.provider,
       });
       const { AcpAdapter } = await import('./AcpAdapter.js');
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
+      const adapter = new AcpAdapter();
       return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
     }
   }
 
   // Default: ACP adapter for all subprocess-based CLIs
   const { AcpAdapter } = await import('./AcpAdapter.js');
-  const adapter = new AcpAdapter({ autopilot: config.autopilot });
+  const adapter = new AcpAdapter();
   return { adapter, backend: 'acp', fallback: false };
 }

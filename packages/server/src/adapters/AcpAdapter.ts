@@ -114,16 +114,10 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   private _promptingStartedAt: number | null = null;
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
-  private autopilot: boolean;
   private agentCapabilities: acp.AgentCapabilities | null = null;
 
-  constructor(opts?: { autopilot?: boolean }) {
+  constructor() {
     super();
-    this.autopilot = opts?.autopilot ?? false;
-  }
-
-  setAutopilot(enabled: boolean): void {
-    this.autopilot = enabled;
   }
 
   get isConnected(): boolean { return this._isConnected; }
@@ -416,10 +410,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     } else {
       this.emit('idle');
     }
-  }
-
-  resolvePermission(_approved: boolean): void {
-    // No-op — all permissions auto-approved
   }
 
   resolveUserInput(_response: string): void {

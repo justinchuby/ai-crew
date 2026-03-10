@@ -26,7 +26,6 @@ import type {
   UsageInfo,
   ToolCallInfo,
   ToolUpdateInfo,
-  PermissionRequest,
   ContentBlock,
 } from './types.js';
 import type {
@@ -98,13 +97,9 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
 
-  constructor(opts?: { model?: string; autopilot?: boolean }) {
+  constructor(opts?: { model?: string }) {
     super();
     this.model = opts?.model ?? 'claude-sonnet-4-6';
-  }
-
-  setAutopilot(_enabled: boolean): void {
-    // No-op — oversight is prompt-only
   }
 
   // ── Getters ────────────────────────────────────────────────
@@ -311,10 +306,6 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   }
 
   // ── Permission Handling ────────────────────────────────────
-
-  resolvePermission(_approved: boolean): void {
-    // No-op — all permissions auto-approved
-  }
 
   resolveUserInput(_response: string): void {
     // Not yet supported by Claude SDK adapter

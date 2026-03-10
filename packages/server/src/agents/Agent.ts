@@ -39,7 +39,6 @@ export interface AgentJSON {
   id: string;
   role: Role;
   status: AgentStatus;
-  autopilot: boolean;
   task?: string;
   dagTaskId?: string;
   parentId?: string;
@@ -73,7 +72,6 @@ export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
-  public autopilot: boolean;
   public status: AgentStatus = 'creating';
   public task?: string;
   public dagTaskId?: string;
@@ -155,14 +153,13 @@ export class Agent {
   /** @internal */ readonly _maxToolCalls = 200;
   /** @internal */ get _isTerminated(): boolean { return this.terminated; }
 
-  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], autopilot?: boolean, id?: string) {
+  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], id?: string) {
     this.id = id || uuid();
     this.role = role;
     this.config = config;
     this.task = task;
     this.parentId = parentId;
     this.createdAt = new Date();
-    this.autopilot = autopilot ?? false;
     this.peers = peers;
   }
 
@@ -192,7 +189,6 @@ export class Agent {
   /** @internal */ _notifyStatusChange(status: AgentStatus): void { this.events.notifyStatus(status); }
   /** @internal */ _notifyToolCall(info: ToolCallInfo): void { this.events.notifyToolCall(info); }
   /** @internal */ _notifyPlan(entries: PlanEntry[]): void { this.events.notifyPlan(entries); }
-  /** @internal */ _notifyPermissionRequest(request: any): void { this.events.notifyPermissionRequest(request); }
   /** @internal */ _notifyUserInputRequest(request: UserInputRequest): void { this.events.notifyUserInputRequest(request); }
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
   /** @internal */ _notifySessionResumeFailed(info: { requestedSessionId: string; error: string }): void { this.events.notifySessionResumeFailed(info); }
@@ -602,22 +598,9 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     }
   }
 
-  resolvePermission(approved: boolean): void {
-    if (this.acpConnection) {
-      this.acpConnection.resolvePermission(approved);
-    }
-  }
-
   resolveUserInput(response: string): void {
     if (this.acpConnection) {
       this.acpConnection.resolveUserInput(response);
-    }
-  }
-
-  setAutopilot(enabled: boolean): void {
-    this.autopilot = enabled;
-    if (this.acpConnection) {
-      this.acpConnection.setAutopilot(enabled);
     }
   }
 
@@ -650,7 +633,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onStatus(listener: (status: AgentStatus) => void): void { this.events.onStatus(listener); }
   onToolCall(listener: (info: ToolCallInfo) => void): void { this.events.onToolCall(listener); }
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.events.onPlan(listener); }
-  onPermissionRequest(listener: (request: any) => void): void { this.events.onPermissionRequest(listener); }
   onUserInputRequest(listener: (request: UserInputRequest) => void): void { this.events.onUserInputRequest(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.events.onSessionReady(listener); }
   onSessionResumeFailed(listener: (info: { requestedSessionId: string; error: string }) => void): void { this.events.onSessionResumeFailed(listener); }
@@ -735,7 +717,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       id: this.id,
       role: this.role,
       status: this.status,
-      autopilot: this.autopilot,
       task: this.task,
       dagTaskId: this.dagTaskId,
       parentId: this.parentId,

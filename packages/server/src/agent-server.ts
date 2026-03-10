@@ -46,7 +46,6 @@ export type {
   ToolUpdateInfo,
   PlanEntry,
   AdapterCapabilities,
-  PermissionRequest,
 } from './adapters/types.js';
 
 // Model resolution

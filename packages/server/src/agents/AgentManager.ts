@@ -64,7 +64,6 @@ export interface AgentManagerEvents {
   'agent:content': { agentId: string; content: string };
   'agent:thinking': { agentId: string; text: string };
   'agent:plan': { agentId: string; plan: PlanEntry[] };
-  'agent:permission_request': { agentId: string; request: any; dangerous?: boolean };
   'agent:user_input_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
   'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
@@ -181,7 +180,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       getAllAgents: () => this.getAll(),
       getProjectIdForAgent: (agentId) => this.getProjectIdForAgent(agentId),
       getRunningCount: () => this.getRunningCount(),
-      spawnAgent: (role, task, parentId, autopilot, model, cwd, options) => this.spawn(role, task, parentId, autopilot, model, cwd, undefined, undefined, options),
+      spawnAgent: (role, task, parentId, model, cwd, options) => this.spawn(role, task, parentId, model, cwd, undefined, undefined, options),
       terminateAgent: (id) => this.terminate(id),
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
       roleRegistry: this.roleRegistry,
@@ -362,7 +361,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     };
   }
 
-  spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
+  spawn(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error({ module: 'agent', msg: 'Concurrency limit reached', maxConcurrent: this.maxConcurrent, role: role.id });
       throw new Error(
@@ -485,12 +484,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (projectOverride) effectiveOversightLevel = projectOverride;
     }
 
-    // Override autopilot based on effective oversight level (if not explicitly set by caller)
-    // Always use autopilot=true — oversight is prompt-only, not permission-gated
-    if (autopilot === undefined) {
-      autopilot = true;
-    }
-
     if (this.configStore) {
       const oversightConfig = this.configStore.current.oversight;
       const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[effectiveOversightLevel] ?? '';
@@ -506,7 +499,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
 
-    const agent = new Agent(effectiveRole, this.config, task, parentId, peers, autopilot, id);
+    const agent = new Agent(effectiveRole, this.config, task, parentId, peers, id);
     if (effectiveModel) agent.model = effectiveModel;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
@@ -623,10 +616,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           })
           .run();
       }
-    });
-
-    agent.onPermissionRequest(() => {
-      // No-op — permissions auto-approved at adapter level
     });
 
     agent.onUserInputRequest((request) => {
@@ -814,7 +803,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
                   return;
                 }
               }
-              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, agent.id, { projectName: agent.projectName, projectId: agent.projectId });
+              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, agent.model || undefined, agent.cwd, agent.sessionId || undefined, agent.id, { projectName: agent.projectName, projectId: agent.projectId });
               this.emit('agent:auto_restarted', { agentId: newAgent.id, crashCount: count });
             } catch (err) {
               logger.error({ module: 'agent', msg: 'Auto-restart failed', err: (err as Error).message });
@@ -851,7 +840,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Helper: post-start actions (emit events after cwd is set)
     const postSpawn = () => {
-      logger.info({ module: 'agent', msg: 'Agent spawned', role: role.name, autopilot: agent.autopilot, parentAgentId: parentId, task });
+      logger.info({ module: 'agent', msg: 'Agent spawned', role: role.name, parentAgentId: parentId, task });
       this.emit('agent:spawned', agent.toJSON());
       this.updateLeadBudgets();
       // Auto-add to groups with matching role criteria (B4: group auto-add)
@@ -1050,7 +1039,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         secretaryRole,
         'You are the auto-created project secretary. Track DAG progress, provide status reports when asked, and assist with dependency inference for auto-DAG tasks.',
         leadAgent.id,
-        true,
         'gpt-4.1',
         leadAgent.cwd,
         undefined,
@@ -1088,7 +1076,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     await agent.terminate();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
-    const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id, { projectName, projectId });
+    const newAgent = this.spawn(role, task, parentId, model || undefined, cwd, sessionId || undefined, id, { projectName, projectId });
     this.emit('agent:restarted', { oldId: id, newAgent: newAgent.toJSON() });
     return newAgent;
   }
@@ -1176,11 +1164,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /** Set auto-terminate timeout (ms) for hung agents. Pass null to disable. */
   setAutoTerminateTimeout(ms: number | null): void {
     this.autoTerminateTimeoutMs = ms;
-  }
-
-  resolvePermission(_agentId: string, _approved: boolean): boolean {
-    // No-op — all permissions auto-approved at adapter level
-    return true;
   }
 
   resolveUserInput(agentId: string, response: string): boolean {

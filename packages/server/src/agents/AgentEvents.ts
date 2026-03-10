@@ -47,7 +47,6 @@ export class AgentEventEmitter {
   private statusListeners: Array<(status: AgentStatus) => void> = [];
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
-  private permissionRequestListeners: Array<(request: any) => void> = [];
   private userInputRequestListeners: Array<(request: UserInputRequest) => void> = [];
   private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private sessionResumeFailedListeners: Array<(info: SessionResumeFailedInfo) => void> = [];
@@ -68,7 +67,6 @@ export class AgentEventEmitter {
   onStatus(listener: (status: AgentStatus) => void): void { this.statusListeners.push(listener); }
   onToolCall(listener: (info: ToolCallInfo) => void): void { this.toolCallListeners.push(listener); }
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.planListeners.push(listener); }
-  onPermissionRequest(listener: (request: any) => void): void { this.permissionRequestListeners.push(listener); }
   onUserInputRequest(listener: (request: UserInputRequest) => void): void { this.userInputRequestListeners.push(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.sessionReadyListeners.push(listener); }
   onSessionResumeFailed(listener: (info: SessionResumeFailedInfo) => void): void { this.sessionResumeFailedListeners.push(listener); }
@@ -85,7 +83,6 @@ export class AgentEventEmitter {
   notifyHung(elapsedMs: number): void { for (const l of this.hungListeners) l(elapsedMs); }
   notifyToolCall(info: ToolCallInfo): void { for (const l of this.toolCallListeners) l(info); }
   notifyPlan(entries: PlanEntry[]): void { for (const l of this.planListeners) l(entries); }
-  notifyPermissionRequest(request: any): void { for (const l of this.permissionRequestListeners) l(request); }
   notifyUserInputRequest(request: UserInputRequest): void { for (const l of this.userInputRequestListeners) l(request); }
   notifySessionReady(sessionId: string): void { for (const l of this.sessionReadyListeners) l(sessionId); }
   notifySessionResumeFailed(info: SessionResumeFailedInfo): void { for (const l of this.sessionResumeFailedListeners) l(info); }
@@ -122,7 +119,6 @@ export class AgentEventEmitter {
     this.statusListeners.length = 0;
     this.toolCallListeners.length = 0;
     this.planListeners.length = 0;
-    this.permissionRequestListeners.length = 0;
     this.sessionReadyListeners.length = 0;
     this.contextCompactedListeners.length = 0;
     this.thinkingListeners.length = 0;

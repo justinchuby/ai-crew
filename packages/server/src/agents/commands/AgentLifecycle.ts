@@ -79,7 +79,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       (subLeadName || agent.projectId)
         ? { projectName: subLeadName, projectId: agent.projectId }
         : undefined;
-    const child = ctx.spawnAgent(role, req.task, agent.id, true, req.model, agent.cwd, spawnOptions);
+    const child = ctx.spawnAgent(role, req.task, agent.id, req.model, agent.cwd, spawnOptions);
     if (role.id === 'lead') {
       child.hierarchyLevel = agent.hierarchyLevel + 1;
     }

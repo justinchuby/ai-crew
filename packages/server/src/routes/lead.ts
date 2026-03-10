@@ -62,7 +62,7 @@ export function leadRoutes(ctx: AppContext): Router {
         logger.warn('lead', `ProjectRegistry unavailable — generated fallback projectId ${resolvedProjectId.slice(0, 8)}`);
       }
 
-      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId, undefined, { projectName: resolvedProjectName, projectId: resolvedProjectId });
+      const agent = agentManager.spawn(role, task, undefined, model, cwd, resumeSessionId, undefined, { projectName: resolvedProjectName, projectId: resolvedProjectId });
       logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,

@@ -74,15 +74,6 @@ export interface AdapterCapabilities {
   supportsPlans: boolean;
 }
 
-// ── Permission Types (deprecated — kept for interface compat) ───────
-
-export interface PermissionRequest {
-  id: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  timestamp: string;
-}
-
 export interface UserInputRequest {
   id: string;
   question: string;
@@ -126,7 +117,6 @@ export interface AdapterStartOptions {
  *   'prompting'       (active: boolean)
  *   'prompt_complete'  (reason: string)
  *   'response_start'  ()
- *   'permission_request' (req: PermissionRequest)
  *   'user_input_request' (req: UserInputRequest)
  *   'exit'            (code: number)
  *   'usage'           (usage: UsageInfo)
@@ -143,16 +133,13 @@ export interface AgentAdapter extends EventEmitter {
   prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;
   cancel(): Promise<void>;
   terminate(): void | Promise<void>;
-  resolvePermission(approved: boolean): void;
   resolveUserInput(response: string): void;
-  setAutopilot(enabled: boolean): void;
 }
 
 // ── Factory Types ───────────────────────────────────────────────────
 
 export interface AdapterFactoryOptions {
   type: 'acp' | 'mock' | 'claude-sdk' | 'copilot-sdk' | 'daemon';
-  autopilot?: boolean;
   model?: string;
 }
 

@@ -132,26 +132,11 @@ export class ServerClientAdapter extends EventEmitter implements AgentAdapter {
     this.emit('exit', 0);
   }
 
-  /**
-   * Permission resolution (forwarded as a message to the remote agent).
-   */
-  resolvePermission(approved: boolean): void {
-    if (this._disposed) return;
-    const text = approved ? '[System] Permission approved.' : '[System] Permission denied.';
-    this.client.prompt(this.agentId, text).catch((err) => {
-      logger.warn({ module: 'server-client-bridge', msg: 'resolvePermission send failed', err: String(err) });
-    });
-  }
-
   resolveUserInput(response: string): void {
     if (this._disposed) return;
     this.client.prompt(this.agentId, `[User Response] ${response}`).catch((err) => {
       logger.warn({ module: 'server-client-bridge', msg: 'resolveUserInput send failed', err: String(err) });
     });
-  }
-
-  setAutopilot(_enabled: boolean): void {
-    // No-op for server-client bridge — remote agents manage their own autopilot
   }
 
   // ── Event Translation ─────────────────────────────────────────
@@ -270,7 +255,6 @@ export async function startRemoteBridge(
         projectId: agent.projectId,
         projectName: agent.projectName,
         cwd: agent.cwd || process.cwd(),
-        autopilot: agent.autopilot,
         resumeSessionId: agent.resumeSessionId,
       },
     );

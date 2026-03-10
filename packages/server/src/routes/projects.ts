@@ -719,7 +719,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Preserve task from previous session if none provided
       const task = requestTask || (lastSession ? lastSession.task : undefined);
 
-      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
+      const agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
 
       // Verify the invariant: spawn must reuse the same agent ID on resume
       if (lastSession && agent.id !== lastSession.leadId) {
@@ -790,7 +790,6 @@ export function projectsRoutes(ctx: AppContext): Router {
                   prevRole,
                   prev.lastTaskSummary || undefined,
                   agent.id,
-                  true,
                   prev.model,
                   project.cwd ?? undefined,
                   prev.sessionId || undefined,

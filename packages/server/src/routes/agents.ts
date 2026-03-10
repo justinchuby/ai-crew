@@ -39,7 +39,7 @@ export function agentsRoutes(ctx: AppContext): Router {
   });
 
   router.post('/agents', spawnLimiter, validateBody(spawnAgentSchema), (req, res) => {
-    const { roleId, task, mode, autopilot, model, sessionId } = req.body;
+    const { roleId, task, model, sessionId } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
       logger.warn({ module: 'api', msg: 'POST /agents — unknown role', roleId });
@@ -56,7 +56,7 @@ export function agentsRoutes(ctx: AppContext): Router {
         options = { projectName: project.name, projectId: project.id };
       }
 
-      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined, undefined, options);
+      const agent = agentManager.spawn(role, task, undefined, model, undefined, sessionId || undefined, undefined, options);
       logger.info({ module: 'api', msg: `POST /agents — ${sessionId ? 'resumed' : 'spawned'}`, agentId: agent.id, roleName: role.name, model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
@@ -226,13 +226,6 @@ export function agentsRoutes(ctx: AppContext): Router {
     const ok = agent.reorderPendingMessage(from, to);
     if (!ok) return res.status(400).json({ error: 'Invalid indices' });
     res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
-  });
-
-  router.post('/agents/:id/permission', (req, res) => {
-    const { approved } = req.body;
-    const ok = agentManager.resolvePermission(req.params.id, approved);
-    if (!ok) return res.status(404).json({ error: 'Agent not found' });
-    res.json({ ok: true });
   });
 
   router.post('/agents/:id/user-input', (req, res) => {

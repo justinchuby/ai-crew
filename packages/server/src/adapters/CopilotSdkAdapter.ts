@@ -24,7 +24,6 @@ import type {
   UsageInfo,
   ToolCallInfo,
   ToolUpdateInfo,
-  PermissionRequest,
   UserInputRequest,
   ContentBlock,
 } from './types.js';
@@ -112,14 +111,10 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   /** Tracks whether streaming deltas delivered text for the current turn */
   private _currentTurnStreamed = false;
 
-  constructor(opts?: { model?: string; autopilot?: boolean; sendTimeout?: number }) {
+  constructor(opts?: { model?: string; sendTimeout?: number }) {
     super();
     this.model = opts?.model ?? 'gpt-4.1';
     this.sendTimeout = opts?.sendTimeout ?? 300_000; // 5 min default
-  }
-
-  setAutopilot(_enabled: boolean): void {
-    // No-op — oversight is prompt-only
   }
 
   // ── Getters ────────────────────────────────────────────────
@@ -561,12 +556,6 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
         // Unknown events are silently ignored (forward compat)
         break;
     }
-  }
-
-  // ── Permission Handling ────────────────────────────────────
-
-  resolvePermission(_approved: boolean): void {
-    // No-op — all permissions auto-approved
   }
 
   // ── User Input Handling ─────────────────────────────────────

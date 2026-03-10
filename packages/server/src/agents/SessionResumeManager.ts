@@ -244,7 +244,6 @@ export class SessionResumeManager {
         role,
         metadata?.task,
         metadata?.parentId,
-        undefined,           // autopilot — use default
         record.model !== 'default' ? record.model : undefined,
         metadata?.cwd,
         record.sessionId,    // resumeSessionId — triggers resume flow
@@ -284,7 +283,6 @@ export class SessionResumeManager {
         role,
         metadata?.task,
         metadata?.parentId,
-        undefined,
         record.model !== 'default' ? record.model : undefined,
         metadata?.cwd,
         undefined,           // no resumeSessionId — fresh start

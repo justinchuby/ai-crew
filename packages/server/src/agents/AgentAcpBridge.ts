@@ -75,7 +75,6 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
 
   const adapterConfig = {
     provider: config.provider || 'copilot',
-    autopilot: agent.autopilot,
     model: rawModel,
     binaryOverride: config.providerBinaryOverride,
     argsOverride: config.providerArgsOverride,
@@ -186,10 +185,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   conn.on('plan', (entries: PlanEntry[]) => withCtx(() => {
     agent.plan = entries;
     agent._notifyPlan(entries);
-  }));
-
-  conn.on('permission_request', (request: any) => withCtx(() => {
-    agent._notifyPermissionRequest(request);
   }));
 
   conn.on('user_input_request', (request: any) => withCtx(() => {

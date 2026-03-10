@@ -18,7 +18,6 @@ export type {
   ToolUpdateInfo,
   PlanEntry,
   AdapterCapabilities,
-  PermissionRequest,
 } from './types.js';
 
 export { AcpAdapter } from './AcpAdapter.js';
