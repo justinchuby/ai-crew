@@ -574,15 +574,6 @@ describe('ServerClientAdapter', () => {
     });
   });
 
-  describe('resolvePermission (no-op)', () => {
-    it('does not throw when called', async () => {
-      const adapter = new ServerClientAdapter(client, 'agent-001');
-      await adapter.start({ cliCommand: '' });
-
-      // resolvePermission was removed; verify no crash if not present
-      expect(typeof (adapter as any).resolvePermission).not.toBe('function');
-    });
-  });
 });
 
 describe('startRemoteBridge', () => {

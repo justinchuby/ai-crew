@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { GovernanceAction, HookContext } from '../types.js';
-import { createPermissionHook } from '../hooks/PermissionHook.js';
 import { createRateLimitHook } from '../hooks/RateLimitHook.js';
 import { createCommitMessageValidationHook } from '../hooks/CommitMessageValidationHook.js';
 import { createFileWriteGuardHook } from '../hooks/FileWriteGuardHook.js';
@@ -31,53 +30,6 @@ function makeContext(overrides: Partial<HookContext> = {}): HookContext {
     ...overrides,
   };
 }
-
-// ── PermissionHook tests ──
-
-describe('PermissionHook', () => {
-  it('allows lead to CREATE_AGENT', () => {
-    const hook = createPermissionHook();
-    const result = hook.evaluate(makeAction(), makeContext());
-    expect(result.decision).toBe('allow');
-  });
-
-  it('allows architect to CREATE_AGENT', () => {
-    const hook = createPermissionHook();
-    const action = makeAction({ agent: { id: 'a1', roleId: 'architect', roleName: 'Architect', status: 'running' } });
-    expect(hook.evaluate(action, makeContext()).decision).toBe('allow');
-  });
-
-  it('blocks developer from CREATE_AGENT', () => {
-    const hook = createPermissionHook();
-    const action = makeAction({ agent: { id: 'a1', roleId: 'developer', roleName: 'Developer', status: 'running' } });
-    const result = hook.evaluate(action, makeContext());
-    expect(result.decision).toBe('block');
-    expect(result.reason).toContain('lead or architect');
-  });
-
-  it('allows capability-acquired CREATE_AGENT for developer', () => {
-    const hook = createPermissionHook({
-      hasCapability: (agentId, cmd) => cmd === 'CREATE_AGENT',
-    });
-    const action = makeAction({ agent: { id: 'a1', roleId: 'developer', roleName: 'Developer', status: 'running' } });
-    expect(hook.evaluate(action, makeContext()).decision).toBe('allow');
-  });
-
-  it('does not match unrestricted commands', () => {
-    const hook = createPermissionHook();
-    const action = makeAction({ commandName: 'AGENT_MESSAGE' });
-    expect(hook.match(action)).toBe(false);
-  });
-
-  it('supports custom permission rules', () => {
-    const hook = createPermissionHook({
-      rules: { CUSTOM_CMD: { allowedRoles: ['admin'] } },
-    });
-    const action = makeAction({ commandName: 'CUSTOM_CMD' });
-    expect(hook.match(action)).toBe(true);
-    expect(hook.evaluate(action, makeContext()).decision).toBe('block');
-  });
-});
 
 // ── RateLimitHook tests ──
 

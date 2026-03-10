@@ -47,7 +47,6 @@ function createMockAdapter(): EventEmitter & {
   prompt: ReturnType<typeof vi.fn>;
   cancel: ReturnType<typeof vi.fn>;
   terminate: ReturnType<typeof vi.fn>;
-  resolvePermission: ReturnType<typeof vi.fn>;
 } {
   const adapter = new EventEmitter() as any;
   adapter.type = 'mock';
@@ -60,7 +59,6 @@ function createMockAdapter(): EventEmitter & {
   adapter.prompt = vi.fn().mockResolvedValue({ stopReason: 'end_turn' });
   adapter.cancel = vi.fn().mockResolvedValue(undefined);
   adapter.terminate = vi.fn();
-  adapter.resolvePermission = vi.fn();
   return adapter;
 }
 
