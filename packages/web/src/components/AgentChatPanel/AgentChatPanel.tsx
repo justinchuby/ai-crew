@@ -20,6 +20,10 @@ export interface AgentChatPanelProps {
   readOnly?: boolean;
   /** Max height of the message list. Defaults to 100% of parent. */
   maxHeight?: string;
+  /** Compact mode for panel context — reduces padding and font size */
+  compact?: boolean;
+  /** When true, auto-focuses the input on mount (e.g., Message button → Chat tab) */
+  autoFocusInput?: boolean;
 }
 
 /** Sender label and styling for chat bubbles */
@@ -50,7 +54,7 @@ function apiMessageToChunk(msg: ApiMessage): AcpTextChunk {
  * Works for both live agents (real-time via store) and historical agents (fetched from API).
  * Designed for use in the unified crew page profile panel.
  */
-export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelProps) {
+export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocusInput }: AgentChatPanelProps) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const storeMessages = agent?.messages ?? [];
 
@@ -117,6 +121,13 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
     messagesEndRef.current?.scrollIntoView();
   }, [agentId]);
 
+  // Auto-focus input when requested (e.g., Message button → Chat tab)
+  useEffect(() => {
+    if (autoFocusInput && showInput) {
+      inputRef.current?.focus();
+    }
+  }, [autoFocusInput, showInput]);
+
   // Send message to agent
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
@@ -171,7 +182,7 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
       {/* Message list */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto min-h-0 px-3 py-2 space-y-3"
+        className={`flex-1 overflow-y-auto min-h-0 ${compact ? 'px-2 py-1.5 space-y-2' : 'px-3 py-2 space-y-3'}`}
         data-testid="agent-chat-messages"
       >
         {loading && (
@@ -195,7 +206,7 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
         )}
 
         {visibleMessages.map((msg, i) => (
-          <ChatBubble key={i} msg={msg} agent={agent} />
+          <ChatBubble key={i} msg={msg} agent={agent} compact={compact} />
         ))}
 
         <div ref={messagesEndRef} />
@@ -203,7 +214,7 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
 
       {/* Input area */}
       {showInput && (
-        <div className="border-t border-th-border px-3 py-2">
+        <div className={`border-t border-th-border ${compact ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
@@ -212,7 +223,7 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
               onKeyDown={handleKeyDown}
               placeholder={`Message ${agent?.role.name ?? 'agent'}…`}
               rows={1}
-              className="flex-1 resize-none rounded-md border border-th-border bg-th-bg px-3 py-1.5 text-sm text-th-text placeholder-th-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              className={`flex-1 resize-none rounded-md border border-th-border bg-th-bg px-3 py-1.5 text-th-text placeholder-th-text-muted focus:outline-none focus:ring-1 focus:ring-accent ${compact ? 'text-xs' : 'text-sm'}`}
               disabled={sending}
               data-testid="agent-chat-input"
             />
@@ -250,7 +261,7 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight }: AgentChatPanelP
 }
 
 /** Individual chat message bubble */
-function ChatBubble({ msg, agent }: { msg: AcpTextChunk; agent?: AgentInfo }) {
+function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentInfo; compact?: boolean }) {
   const sender = msg.sender ?? 'agent';
   const style = getSenderStyle(sender);
   const isUser = sender === 'user';
@@ -304,9 +315,9 @@ function ChatBubble({ msg, agent }: { msg: AcpTextChunk; agent?: AgentInfo }) {
 
       {/* Message content */}
       <div
-        className={`rounded-lg px-3 py-1.5 text-sm max-w-[90%] ${style.bg} ${
+        className={`rounded-lg max-w-[90%] ${style.bg} ${
           isUser ? 'rounded-tr-sm' : 'rounded-tl-sm'
-        }`}
+        } ${compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'}`}
       >
         <MarkdownContent text={text} />
       </div>
