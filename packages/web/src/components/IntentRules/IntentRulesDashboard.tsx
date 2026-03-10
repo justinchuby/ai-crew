@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Target, BarChart3 } from 'lucide-react';
+import { Plus, Target, BarChart3, Info, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { TrustPresetBar } from './TrustPresetBar';
 import { RuleRow } from './RuleRow';
 import { RuleEditor } from './RuleEditor';
 import { type IntentRule, type TrustPreset } from './types';
+import type { OversightLevel } from '../../stores/settingsStore';
 
-export function IntentRulesDashboard() {
+interface IntentRulesDashboardProps {
+  oversightLevel?: OversightLevel;
+}
+
+export function IntentRulesDashboard({ oversightLevel }: IntentRulesDashboardProps) {
   const [rules, setRules] = useState<IntentRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePreset, setActivePreset] = useState<TrustPreset | null>('autonomous');
@@ -106,13 +111,38 @@ export function IntentRulesDashboard() {
     return <div className="text-xs text-th-text-muted p-4">Loading intent rules...</div>;
   }
 
+  const isMinimalMode = oversightLevel === 'minimal';
+
   return (
-    <div className="space-y-3" data-testid="intent-rules-dashboard">
+    <div className="space-y-3 relative" data-testid="intent-rules-dashboard">
+      {/* Minimal mode overlay */}
+      {isMinimalMode && (
+        <div className="absolute inset-0 bg-th-bg/80 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
+          <div className="bg-surface-raised border border-yellow-500/30 rounded-lg p-4 max-w-md text-center">
+            <AlertCircle className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-th-text mb-1">Intent Rules Bypassed</p>
+            <p className="text-xs text-th-text-muted">
+              Oversight Level is set to <strong>Minimal</strong>. All agent decisions are auto-approved, and Intent Rules are not evaluated.
+            </p>
+            <p className="text-xs text-blue-400 mt-2">
+              Change Oversight Level to Standard or Detailed to enable Intent Rules.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
           <Target className="w-3.5 h-3.5" />
           Intent Rules
+          <span 
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            title="Note: Intent rules are bypassed when Oversight Level is set to Minimal"
+          >
+            <Info className="w-3 h-3" />
+            Requires Standard/Detailed Oversight
+          </span>
         </h3>
         <button
           onClick={() => setCreating(true)}

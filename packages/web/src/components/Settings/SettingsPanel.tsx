@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
-import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye, Info } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
 import { IntentRulesDashboard } from '../IntentRules';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
@@ -170,6 +170,13 @@ export function SettingsPanel({ api }: Props) {
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6" data-testid="oversight-section">
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
           <Eye className="w-3.5 h-3.5" /> Oversight Level
+          <span 
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            title="Minimal mode auto-approves all decisions, bypassing Intent Rules"
+          >
+            <Info className="w-3 h-3" />
+            Affects Intent Rules
+          </span>
         </h3>
         <div className="space-y-2">
           {OVERSIGHT_OPTIONS.map(({ level, label, description }) => (
@@ -209,7 +216,7 @@ export function SettingsPanel({ api }: Props) {
 
       {/* Intent Rules */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <IntentRulesDashboard />
+        <IntentRulesDashboard oversightLevel={oversightLevel} />
       </section>
 
       {/* Conflict Detection */}
