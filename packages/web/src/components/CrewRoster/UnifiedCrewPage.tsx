@@ -283,6 +283,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
               isSelected={selectedAgentId === agent.agentId}
               onSelect={() => onSelectAgent(agent.agentId)}
               onRemove={onRemoveAgent}
+              crewAgents={agents}
             />
           ))}
         </div>
@@ -323,14 +324,18 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
 
 // ── Agent Row ─────────────────────────────────────────────
 
-function AgentRow({ agent, isLead, isSelected, onSelect, onRemove }: {
-  agent: RosterAgent; isLead?: boolean; isSelected: boolean; onSelect: () => void; onRemove?: (agentId: string) => void;
+function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }: {
+  agent: RosterAgent; isLead?: boolean; isSelected: boolean; onSelect: () => void; onRemove?: (agentId: string) => void; crewAgents?: RosterAgent[];
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
   
-  // Only show remove button for terminated/retired agents
-  const canRemove = (agent.status === 'terminated' || agent.status === 'retired') && 
+  // Check if this is a lead with children
+  const hasChildren = isLead && crewAgents && crewAgents.some(a => a.parentId === agent.agentId && a.agentId !== agent.agentId);
+  
+  // Only show remove button for terminated/retired agents that aren't leads with children
+  const canRemove = !hasChildren &&
+                    (agent.status === 'terminated' || agent.status === 'retired') && 
                     (!agent.liveStatus || agent.liveStatus === 'terminated' || agent.liveStatus === 'failed' || agent.liveStatus === 'completed');
 
   const handleRemove = async (e: React.MouseEvent) => {
@@ -356,11 +361,21 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove }: {
     setConfirmingRemove(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
     <div className="relative">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onSelect}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-th-bg-alt/30 transition-colors
+        onKeyDown={handleKeyDown}
+        className={`w-full flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-th-bg-alt/30 transition-colors
           ${isSelected ? 'bg-th-bg-alt/40 border-l-2 border-blue-500' : ''}
           ${isLead ? 'font-medium' : ''}`}
       >
@@ -404,7 +419,12 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove }: {
             <X className="w-3 h-3" />
           </button>
         )}
-      </button>
+        {hasChildren && (
+          <span className="text-[10px] text-th-text-muted px-1.5 py-0.5 rounded bg-th-bg-alt border border-th-border shrink-0" title="Delete crew to remove lead with children">
+            Lead with children
+          </span>
+        )}
+      </div>
     </div>
   );
 }
