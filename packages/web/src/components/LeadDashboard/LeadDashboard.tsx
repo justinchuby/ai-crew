@@ -301,13 +301,18 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     }
   }, [currentProject?.agentReports?.length, reportsExpanded]);
 
-  // Poll progress for selected lead (skip for project: prefixed IDs and read-only mode)
-  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly;
+  // Poll progress for selected lead (skip for project: prefixed IDs, read-only mode, and terminated agents)
+  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly && isActive === true;
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
+    let stopped = false;
     const fetchProgress = () => {
-      fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data) => {
         if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
       }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err); });
     };
@@ -320,8 +325,13 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
+    let stopped = false;
     const fetchDecisions = () => {
-      fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data) => {
         if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
       }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err); });
     };
@@ -334,7 +344,10 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
-    fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => r.json()).then((data) => {
+    fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => {
+      if (r.status === 404) return null;
+      return r.json();
+    }).then((data) => {
       if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
     }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Groups fetch failed:', err); });
     return () => controller.abort();
@@ -344,8 +357,13 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
+    let stopped = false;
     const fetchDag = () => {
-      fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => r.json()).then((data: any) => {
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data: any) => {
         if (!controller.signal.aborted && data && data.tasks) {
           const store = useLeadStore.getState();
           store.setDagStatus(selectedLeadId, data as DagStatus);
