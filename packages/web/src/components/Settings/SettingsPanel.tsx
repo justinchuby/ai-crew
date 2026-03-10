@@ -5,7 +5,6 @@ import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
 import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
 import { IntentRulesDashboard } from '../IntentRules';
-import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
 import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
@@ -216,16 +215,6 @@ export function SettingsPanel({ api }: Props) {
       {/* Conflict Detection */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <ConflictSettingsPanel />
-      </section>
-
-      {/* Recovery Settings */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <RecoverySettingsPanel />
-      </section>
-
-      {/* Recovery Metrics */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <RecoveryMetricsCard />
       </section>
 
       {/* Notification Preferences */}

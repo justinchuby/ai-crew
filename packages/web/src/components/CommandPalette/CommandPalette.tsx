@@ -171,12 +171,6 @@ function buildSettingItems(
       keywords: ['intent', 'rules', 'approval', 'auto'],
     },
     {
-      id: 'setting-recovery',
-      label: 'Recovery Settings',
-      description: 'Self-healing crew configuration',
-      keywords: ['recovery', 'healing', 'restart'],
-    },
-    {
       id: 'setting-notifications',
       label: 'Notification Preferences',
       description: 'Configure notification channels',

@@ -89,7 +89,7 @@ describe('NotificationService', () => {
   describe('preferences', () => {
     it('returns default preferences for all events', () => {
       const prefs = service.getPreferences();
-      expect(prefs.length).toBeGreaterThanOrEqual(9);
+      expect(prefs.length).toBeGreaterThanOrEqual(8);
       expect(prefs.map(p => p.event)).toContain('decision_pending');
       expect(prefs.map(p => p.event)).toContain('agent_crashed');
     });

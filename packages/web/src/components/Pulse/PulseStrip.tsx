@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Users, Brain } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { PulseRecoveryIndicator } from '../Recovery';
 import { PulseConflictIndicator } from '../Conflicts';
 
 // ── Token pressure helpers ───────────────────────────────────────────
@@ -152,15 +151,6 @@ export function PulseStrip() {
           </div>
         </>
       )}
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
-
-      {/* Recovery Status */}
-      <PulseRecoveryIndicator />
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />

@@ -15,8 +15,7 @@ export type NotifiableEvent =
   | 'budget_exceeded'
   | 'session_completed'
   | 'task_completed'
-  | 'context_critical'
-  | 'handoff_ready';
+  | 'context_critical';
 
 export interface DesktopConfig {
   sound: boolean;
@@ -84,7 +83,7 @@ const LOG_KEY = 'notification_log';
 const ALL_EVENTS: NotifiableEvent[] = [
   'decision_pending', 'agent_crashed', 'agent_recovered',
   'budget_warning', 'budget_exceeded', 'session_completed',
-  'task_completed', 'context_critical', 'handoff_ready',
+  'task_completed', 'context_critical',
 ];
 
 const DEFAULT_PREFERENCES: NotificationPreference[] = ALL_EVENTS.map(event => ({

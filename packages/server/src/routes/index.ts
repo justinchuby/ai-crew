@@ -18,8 +18,6 @@ import { commsRoutes } from './comms.js';
 import { summaryRoutes } from './summary.js';
 import { sharedRoutes } from './shared.js';
 import { analyticsRoutes } from './analytics.js';
-import { recoveryRoutes } from './recovery.js';
-import { handoffRoutes } from './handoffs.js';
 import { notificationRoutes } from './notifications.js';
 import { nlRoutes } from './nl.js';
 import { conflictRoutes } from './conflicts.js';
@@ -50,8 +48,7 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(summaryRoutes(ctx));
   router.use(sharedRoutes(ctx));
   router.use(analyticsRoutes(ctx));
-  router.use(recoveryRoutes(ctx));
-  router.use(handoffRoutes(ctx));
+
   router.use(notificationRoutes(ctx));
   router.use(nlRoutes(ctx));
   router.use(conflictRoutes(ctx));

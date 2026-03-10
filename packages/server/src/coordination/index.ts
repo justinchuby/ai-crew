@@ -12,7 +12,6 @@ export * from './files/index.js';
 export * from './knowledge/index.js';
 export * from './playbooks/index.js';
 export * from './predictions/index.js';
-export * from './recovery/index.js';
 export * from './reporting/index.js';
 export * from './scheduling/index.js';
 export * from './sessions/index.js';
