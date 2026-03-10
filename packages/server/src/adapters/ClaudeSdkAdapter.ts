@@ -16,6 +16,7 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
+import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -335,7 +336,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
    * Emits 'permission_request' event and waits for resolvePermission().
    */
   readonly handlePermission: CanUseToolCallback = async (input, toolUseId) => {
-    if (this.autopilot) {
+    if (this.autopilot && !isDangerousTool(input.tool_name, (input.tool_input ?? {}) as Record<string, unknown>)) {
       return { result: 'allow' };
     }
 

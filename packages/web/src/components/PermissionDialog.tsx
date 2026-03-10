@@ -1,15 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, FileText, Terminal, X } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
-import { useApi } from '../hooks/useApi';
+import { useApi, apiFetch } from '../hooks/useApi';
 import type { AgentInfo, AcpPermissionRequest } from '../types';
 import { AgentIdBadge } from '../utils/markdown';
 
 const AUTO_DENY_SECONDS = 60;
-
-function getLocalStorageKey(agentRole: string) {
-  return `acp-always-allow:${agentRole}`;
-}
 
 function formatArgs(args: Record<string, any> | undefined): string {
   if (!args || typeof args !== 'object') return '{}';
@@ -51,25 +47,12 @@ export function PermissionDialog() {
     if (request) {
       setAlwaysAllow(false);
       setCountdown(AUTO_DENY_SECONDS);
-
-      // Auto-allow if previously set
-      if (agentWithPermission) {
-        const saved = localStorage.getItem(getLocalStorageKey(agentWithPermission.role.id));
-        if (saved === 'true') {
-          api.resolvePermission(agentWithPermission.id, true);
-          clearPermission(agentWithPermission.id);
-        }
-      }
     }
   }, [request?.id]);
 
   // Countdown timer
   useEffect(() => {
     if (!request || !agentWithPermission) return;
-
-    // Check if auto-allowed
-    const saved = localStorage.getItem(getLocalStorageKey(agentWithPermission.role.id));
-    if (saved === 'true') return;
 
     const interval = setInterval(() => {
       setCountdown((prev) => {
@@ -90,8 +73,9 @@ export function PermissionDialog() {
     (approved: boolean) => {
       if (!agentWithPermission || !request) return;
 
-      if (approved && alwaysAllow) {
-        localStorage.setItem(getLocalStorageKey(agentWithPermission.role.id), 'true');
+      // Persist "always allow" for this tool type on the server
+      if (approved && alwaysAllow && request.toolName) {
+        apiFetch(`/tool-auto-allow/${encodeURIComponent(request.toolName)}`, { method: 'POST' }).catch(() => {});
       }
 
       api.resolvePermission(agentWithPermission.id, approved);
@@ -100,11 +84,8 @@ export function PermissionDialog() {
     [agentWithPermission, request, alwaysAllow, api, clearPermission],
   );
 
-  // Don't render if nothing pending (or auto-allowed)
+  // Don't render if nothing pending
   if (!agentWithPermission || !request) return null;
-
-  const saved = localStorage.getItem(getLocalStorageKey(agentWithPermission.role.id));
-  if (saved === 'true') return null;
 
   const ToolIcon = getToolIcon(request.toolName);
   const summary = getToolSummary(request.toolName, request.arguments);
@@ -171,7 +152,7 @@ export function PermissionDialog() {
               onChange={(e) => setAlwaysAllow(e.target.checked)}
               className="rounded border-th-border bg-th-bg-alt text-blue-500 focus:ring-blue-500/30"
             />
-            Always allow for this agent role
+            Always allow <code className="text-xs bg-th-bg-alt px-1 rounded">{request.toolName ?? 'this tool'}</code>
           </label>
         </div>
 

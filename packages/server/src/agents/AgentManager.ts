@@ -42,6 +42,8 @@ import type { KnowledgeInjector, InjectionContext } from '../knowledge/Knowledge
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
 import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
+import type { ToolAutoAllowStore } from '../governance/ToolAutoAllowStore.js';
+import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -132,6 +134,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
   private collectiveMemory?: CollectiveMemory;
   private configStore?: import('../config/ConfigStore.js').ConfigStore;
+  private toolAutoAllowStore?: ToolAutoAllowStore;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -276,6 +279,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setCollectiveMemory(memory: CollectiveMemory): void {
     this.collectiveMemory = memory;
+  }
+
+  setToolAutoAllowStore(store: ToolAutoAllowStore): void {
+    this.toolAutoAllowStore = store;
   }
 
   setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
@@ -628,6 +635,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
 
     agent.onPermissionRequest((request) => {
+      // Server-side auto-allow: approve if tool is on auto-allow list and not dangerous
+      if (this.toolAutoAllowStore && request.toolName) {
+        const autoAllowed = this.toolAutoAllowStore.isAutoAllowed(request.toolName);
+        if (autoAllowed && !isDangerousTool(request.toolName, request.arguments ?? {})) {
+          agent.resolvePermission(true);
+          return;
+        }
+      }
       this.emit('agent:permission_request', { agentId: agent.id, request });
     });
 

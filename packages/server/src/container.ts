@@ -77,6 +77,7 @@ import { GovernancePipeline } from './governance/GovernancePipeline.js';
 import { createPermissionHook, createRateLimitHook, createCommitMessageValidationHook, createFileWriteGuardHook, createShellCommandBlocklistHook, createApprovalGateHook } from './governance/hooks/index.js';
 import { EagerScheduler } from './tasks/EagerScheduler.js';
 import { SearchEngine } from './coordination/knowledge/SearchEngine.js';
+import { ToolAutoAllowStore } from './governance/ToolAutoAllowStore.js';
 
 // ── Imports: Tier 4-5 (AgentManager + dependents) ──────────
 import { AgentManager } from './agents/AgentManager.js';
@@ -189,6 +190,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const knowledgeInjector = new KnowledgeInjector(memoryCategoryManager, hybridSearchEngine);
   const sessionKnowledgeExtractor = new SessionKnowledgeExtractor(knowledgeStore);
   const collectiveMemory = new CollectiveMemory(db);
+  const toolAutoAllowStore = new ToolAutoAllowStore(db);
 
   // ── Agent Server Transport & Client ─────────────────────
   // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
@@ -304,6 +306,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   agentManager.setSessionKnowledgeExtractor(sessionKnowledgeExtractor);
   agentManager.setCollectiveMemory(collectiveMemory);
   agentManager.setConfigStore(configStore);
+  agentManager.setToolAutoAllowStore(toolAutoAllowStore);
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
   skillsLoader.startWatching();
@@ -439,6 +442,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     agentRoster: agentRosterRepository,
     integrationRouter,
     configStore,
+    toolAutoAllowStore,
 
     // Lifecycle
     async shutdown() {

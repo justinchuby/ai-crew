@@ -14,6 +14,7 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
+import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -174,8 +175,11 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
     // Always use dynamic handler — checks this.autopilot at call time
     // so mid-session autopilot toggles take effect immediately.
+    // Dangerous tools bypass autopilot and always require explicit approval.
     const permissionHandler: CopilotPermissionHandler = (request, invocation) => {
-      if (this.autopilot) return Promise.resolve('allow' as const);
+      if (this.autopilot && !isDangerousTool(request.kind, request as Record<string, unknown>)) {
+        return Promise.resolve('allow' as const);
+      }
       return this.handlePermissionRequest(request, invocation);
     };
 

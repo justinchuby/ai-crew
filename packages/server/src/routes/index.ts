@@ -28,6 +28,7 @@ import { agentServerRoutes } from './agent-server.js';
 import { settingsRoutes } from './settings.js';
 import { integrationRoutes } from './integrations.js';
 import { tasksRoutes } from './tasks.js';
+import { toolAutoAllowRoutes } from './toolAutoAllow.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -59,4 +60,5 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(settingsRoutes(ctx));
   router.use(integrationRoutes(ctx));
   router.use(tasksRoutes(ctx));
+  router.use(toolAutoAllowRoutes(ctx));
 }
