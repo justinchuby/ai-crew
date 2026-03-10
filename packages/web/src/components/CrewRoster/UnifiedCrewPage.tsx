@@ -4,10 +4,9 @@
  * Uses CrewRoster's grouping as foundation. Adds:
  * - scope prop: 'project' (single project) or 'global' (all crews)
  * - Collapsible health strip from CrewPage
- * - Export/Import via overflow menu (dialogs ported from CrewPage)
  * - Project-scoped filtering when scope='project'
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Users,
   Search,
@@ -17,16 +16,11 @@ import {
   Cpu,
   Activity,
   Heart,
-  MoreHorizontal,
-  Download,
-  Upload,
   X,
   Server,
   Power,
   Wifi,
   WifiOff,
-  FolderDown,
-  Package,
   CheckCircle,
   Info,
   PauseCircle,
@@ -39,6 +33,7 @@ import {
   Clock,
   Settings,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { getRoleIcon } from '../../utils/getRoleIcon';
@@ -141,24 +136,6 @@ interface ServerStatus {
   trackedAgents: number;
 }
 
-interface ExportResult {
-  success: boolean;
-  bundle?: unknown;
-  bundlePath?: string;
-  manifest?: { exportedAt: string; agentCount: number; knowledgeCount: number };
-  filesWritten?: number;
-}
-
-interface ImportReport {
-  success: boolean;
-  teamId: string;
-  agents: Array<{ name: string; action: string; newAgentId: string; renamedTo?: string }>;
-  knowledge: { imported: number; skipped: number; conflicts: number };
-  training: { correctionsImported: number; feedbackImported: number };
-  warnings: string[];
-  validation: { valid: boolean; issues: Array<{ severity: string; message: string; phase?: string }> };
-}
-
 interface UnifiedCrewPageProps {
   scope?: 'project' | 'global';
 }
@@ -175,17 +152,20 @@ function formatDuration(ms: number): string {
 
 // ── Crew Group (collapsible) ──────────────────────────────
 
-function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId }: {
+function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew }: {
   leadId: string;
   agents: RosterAgent[];
   summary: CrewSummary | null;
   defaultExpanded?: boolean;
   onSelectAgent: (id: string) => void;
   selectedAgentId: string | null;
+  onDeleteCrew: (leadId: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [sessions, setSessions] = useState<SessionDetail[]>([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!expanded || sessionsLoaded || !summary?.projectId) return;
@@ -213,37 +193,84 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   const activeCount = summary?.activeAgentCount ?? agents.filter(a =>
     a.liveStatus === 'running' || a.liveStatus === 'idle'
   ).length;
+  const isActive = activeCount > 0;
   const latestActivity = summary?.lastActivity ??
     agents.reduce((latest, a) => a.updatedAt > latest ? a.updatedAt : latest, '');
   const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${lead.projectId.slice(0, 8)}` : `Crew ${leadId.slice(0, 8)}`);
 
+  const handleDeleteCrew = async () => {
+    setDeleting(true);
+    try {
+      await onDeleteCrew(leadId);
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  };
+
   return (
     <div className="border border-th-border rounded-lg overflow-hidden bg-surface-raised md:min-w-[280px]">
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-th-bg-alt/30 transition-colors"
-      >
-        <ChevronRight className={`w-4 h-4 text-th-text-muted shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-th-text text-sm">{displayName}</span>
-            {activeCount > 0 ? (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
-                {activeCount}/{agents.length} active
-              </span>
-            ) : (
-              <span className="text-[10px] text-th-text-muted">
-                {agents.length} agent{agents.length !== 1 ? 's' : ''}
-              </span>
-            )}
+      {/* Group header */}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-th-bg-alt/30 transition-colors">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
+          <ChevronRight className={`w-4 h-4 text-th-text-muted shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-th-text text-sm">{displayName}</span>
+              {activeCount > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
+                  {activeCount}/{agents.length} active
+                </span>
+              ) : (
+                <span className="text-[10px] text-th-text-muted">
+                  {agents.length} agent{agents.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
+              {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
+              {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
+              {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
-            {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
-            {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
-            {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
-          </div>
+        </button>
+        {!isActive && (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            title="Delete crew"
+            className="p-1.5 rounded text-th-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Delete confirmation */}
+      {confirmingDelete && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-t border-red-500/20">
+          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+          <span className="text-xs text-red-600 dark:text-red-400 flex-1">
+            Delete <strong>{displayName}</strong> and all {agents.length} agents? This cannot be undone.
+          </span>
+          <button
+            onClick={handleDeleteCrew}
+            disabled={deleting}
+            className="px-2.5 py-1 text-xs bg-red-500 text-white rounded font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(false)}
+            disabled={deleting}
+            className="px-2.5 py-1 text-xs text-th-text-muted rounded hover:bg-th-bg-muted transition-colors"
+          >
+            Cancel
+          </button>
         </div>
-      </button>
+      )}
 
       {expanded && (
         <div className="border-t border-th-border/50 divide-y divide-th-border/30">
@@ -613,206 +640,7 @@ function HealthStrip({ teamId }: { teamId: string }) {
   );
 }
 
-// ── Export Dialog (ported from CrewPage) ───────────────────
 
-function ExportDialog({ teamId, onClose }: { teamId: string; onClose: () => void }) {
-  const addToast = useToastStore(s => s.add);
-  const [includeKnowledge, setIncludeKnowledge] = useState(true);
-  const [includeTraining, setIncludeTraining] = useState(true);
-  const [excludeEpisodic, setExcludeEpisodic] = useState(false);
-  const [outputPath, setOutputPath] = useState('');
-  const [exporting, setExporting] = useState(false);
-  const [result, setResult] = useState<ExportResult | null>(null);
-
-  const handleExport = async (toDirectory: boolean) => {
-    setExporting(true);
-    setResult(null);
-    try {
-      const body: Record<string, unknown> = { includeKnowledge, includeTraining, excludeEpisodic };
-      if (toDirectory && outputPath.trim()) body.outputPath = outputPath.trim();
-      const data = await apiFetch<ExportResult>(`/teams/${encodeURIComponent(teamId)}/export`, { method: 'POST', body: JSON.stringify(body) });
-      setResult(data);
-      if (data.success && !toDirectory && data.bundle) {
-        const blob = new Blob([JSON.stringify(data.bundle, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${teamId}-crew-bundle.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        addToast('success', 'Crew bundle downloaded');
-      } else if (data.success && toDirectory) {
-        addToast('success', `Exported to ${data.bundlePath ?? outputPath}`);
-      }
-    } catch (err: any) {
-      addToast('error', err.message ?? 'Export failed');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-th-border">
-          <div className="flex items-center gap-2"><Download className="w-5 h-5 text-th-accent" /><h2 className="text-base font-semibold text-th-text">Export Crew</h2></div>
-          <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 flex items-start gap-2">
-            <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>Export packages your crew&apos;s agents, knowledge, and training data into a portable bundle.</span>
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-th-text cursor-pointer"><input type="checkbox" checked={includeKnowledge} onChange={e => setIncludeKnowledge(e.target.checked)} className="rounded" />Include knowledge entries</label>
-            <label className="flex items-center gap-2 text-sm text-th-text cursor-pointer"><input type="checkbox" checked={includeTraining} onChange={e => setIncludeTraining(e.target.checked)} className="rounded" />Include training data</label>
-            <label className="flex items-center gap-2 text-sm text-th-text-alt cursor-pointer"><input type="checkbox" checked={excludeEpisodic} onChange={e => setExcludeEpisodic(e.target.checked)} className="rounded" />Exclude episodic knowledge</label>
-          </div>
-          <div>
-            <label className="text-xs text-th-text-alt block mb-1">Export directory (optional)</label>
-            <input type="text" value={outputPath} onChange={e => setOutputPath(e.target.value)} placeholder="/path/to/export/directory"
-              className="w-full px-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" />
-          </div>
-          {result?.success && (
-            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />{result.bundlePath ? `Exported to ${result.bundlePath}` : 'Bundle downloaded'}
-            </div>
-          )}
-          <div className="flex gap-2 justify-end">
-            <button onClick={() => handleExport(true)} disabled={exporting || !outputPath.trim()}
-              className="px-4 py-2 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1.5 disabled:opacity-40">
-              <FolderDown className="w-4 h-4" />Export to Directory
-            </button>
-            <button onClick={() => handleExport(false)} disabled={exporting}
-              className="px-4 py-2 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5 disabled:opacity-40">
-              <Download className="w-4 h-4" />{exporting ? 'Exporting…' : 'Download Bundle'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Import Dialog (ported from CrewPage) ──────────────────
-
-function ImportDialog({ teamId, onClose, onImported }: { teamId: string; onClose: () => void; onImported: () => void }) {
-  const addToast = useToastStore(s => s.add);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [bundleJson, setBundleJson] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [agentConflict, setAgentConflict] = useState<'skip' | 'rename' | 'overwrite'>('skip');
-  const [knowledgeConflict, setKnowledgeConflict] = useState<'prefer_existing' | 'prefer_import' | 'keep_both' | 'skip'>('prefer_existing');
-  const [importing, setImporting] = useState(false);
-  const [dryRunResult, setDryRunResult] = useState<ImportReport | null>(null);
-  const [importResult, setImportResult] = useState<ImportReport | null>(null);
-
-  const parseBundle = (): unknown | null => { try { return JSON.parse(bundleJson); } catch { addToast('error', 'Invalid JSON'); return null; } };
-
-  const handleDryRun = async () => {
-    const bundle = parseBundle();
-    if (!bundle || !projectId.trim()) { addToast('error', 'Bundle and project ID required'); return; }
-    setImporting(true);
-    setDryRunResult(null);
-    try {
-      const data = await apiFetch<{ success: boolean; report: ImportReport }>('/teams/import', {
-        method: 'POST', body: JSON.stringify({ bundle, projectId: projectId.trim(), teamId, agentConflict, knowledgeConflict, dryRun: true }),
-      });
-      setDryRunResult(data.report);
-    } catch (err: any) { addToast('error', err.message ?? 'Dry run failed'); }
-    finally { setImporting(false); }
-  };
-
-  const handleImport = async () => {
-    const bundle = parseBundle();
-    if (!bundle || !projectId.trim()) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const data = await apiFetch<{ success: boolean; report: ImportReport }>('/teams/import', {
-        method: 'POST', body: JSON.stringify({ bundle, projectId: projectId.trim(), teamId, agentConflict, knowledgeConflict, dryRun: false }),
-      });
-      setImportResult(data.report);
-      if (data.success) { addToast('success', 'Crew imported'); onImported(); }
-    } catch (err: any) { addToast('error', err.message ?? 'Import failed'); }
-    finally { setImporting(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-th-bg border border-th-border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-th-border sticky top-0 bg-th-bg z-10">
-          <div className="flex items-center gap-2"><Upload className="w-5 h-5 text-th-accent" /><h2 className="text-base font-semibold text-th-text">Import Crew</h2></div>
-          <button onClick={onClose} className="text-th-text-muted hover:text-th-text p-1" aria-label="Close"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          <div>
-            <input ref={fileInputRef} type="file" accept=".json" onChange={async (e) => {
-              const file = e.target.files?.[0]; if (!file) return;
-              try { setBundleJson(await file.text()); addToast('success', `Loaded ${file.name}`); } catch { addToast('error', 'Failed to read file'); }
-            }} className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()}
-              className="w-full px-4 py-3 rounded-lg border-2 border-dashed border-th-border hover:border-th-accent/50 text-sm text-th-text-alt hover:text-th-text transition-colors flex items-center justify-center gap-2">
-              <Package className="w-5 h-5" />{bundleJson ? 'Bundle loaded ✓' : 'Choose crew bundle (.json)'}
-            </button>
-          </div>
-          <div>
-            <label className="text-xs text-th-text-alt block mb-1">Target project ID (required)</label>
-            <input type="text" value={projectId} onChange={e => setProjectId(e.target.value)} placeholder="my-project"
-              className="w-full px-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-th-text-alt block mb-1">Agent conflicts</label>
-              <select value={agentConflict} onChange={e => setAgentConflict(e.target.value as typeof agentConflict)}
-                className="w-full px-2 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text">
-                <option value="skip">Skip existing</option><option value="rename">Rename new</option><option value="overwrite">Overwrite</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-th-text-alt block mb-1">Knowledge conflicts</label>
-              <select value={knowledgeConflict} onChange={e => setKnowledgeConflict(e.target.value as typeof knowledgeConflict)}
-                className="w-full px-2 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text">
-                <option value="prefer_existing">Keep existing</option><option value="prefer_import">Prefer import</option><option value="keep_both">Keep both</option><option value="skip">Skip all</option>
-              </select>
-            </div>
-          </div>
-          {dryRunResult && (
-            <div className="p-3 rounded-lg border border-th-border bg-th-bg-alt space-y-2">
-              <h3 className="text-sm font-medium text-th-text">Import Preview</h3>
-              {dryRunResult.validation?.issues?.length > 0 && (
-                <div className="space-y-1">
-                  {dryRunResult.validation.issues.map((issue, i) => (
-                    <div key={i} className={`text-xs flex items-center gap-1 ${issue.severity === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
-                      <AlertTriangle className="w-3 h-3" />{issue.message}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="text-xs text-th-text-alt space-y-0.5">
-                <p>Agents: {dryRunResult.agents?.length ?? 0}</p>
-                <p>Knowledge: {dryRunResult.knowledge?.imported ?? 0} to import, {dryRunResult.knowledge?.skipped ?? 0} skipped</p>
-              </div>
-            </div>
-          )}
-          {importResult?.success && (
-            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />Crew imported
-            </div>
-          )}
-          <div className="flex gap-2 justify-end">
-            <button onClick={handleDryRun} disabled={importing || !bundleJson || !projectId.trim()}
-              className="px-4 py-2 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors disabled:opacity-40">Preview</button>
-            <button onClick={handleImport} disabled={importing || !bundleJson || !projectId.trim()}
-              className="px-4 py-2 text-sm rounded bg-th-accent/20 hover:bg-th-accent/30 text-th-accent border border-th-accent/30 transition-colors flex items-center gap-1.5 disabled:opacity-40">
-              <Upload className="w-4 h-4" />{importing ? 'Importing…' : 'Import'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main Component ────────────────────────────────────────
 
@@ -825,9 +653,6 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RosterStatus | 'all'>('all');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [showExport, setShowExport] = useState(false);
-  const [showImport, setShowImport] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
 
   const effectiveProjectId = useEffectiveProjectId();
   const projectId = scope === 'project' ? effectiveProjectId : null;
@@ -891,6 +716,23 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const handleDeleteCrew = useCallback(async (leadId: string) => {
+    try {
+      await apiFetch(`/crews/${leadId}`, { method: 'DELETE' });
+      addToast('success', 'Crew deleted');
+      setAgents(prev => prev.filter(a => a.agentId !== leadId && a.parentId !== leadId));
+      if (selectedAgent) {
+        const deletedAgent = agents.find(a => a.agentId === selectedAgent);
+        if (deletedAgent && (deletedAgent.agentId === leadId || deletedAgent.parentId === leadId)) {
+          setSelectedAgent(null);
+        }
+      }
+      setCrewSummaries(prev => prev.filter(s => s.leadId !== leadId));
+    } catch (err: any) {
+      addToast('error', `Failed to delete crew: ${err.message}`);
+    }
+  }, [addToast, agents, selectedAgent]);
+
   // Filter agents by search
   const filtered = agents.filter(a => {
     if (!search) return true;
@@ -947,28 +789,6 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Overflow menu for export/import */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(v => !v)}
-              className="p-1.5 rounded hover:bg-th-bg-alt text-th-text-alt transition-colors"
-              title="More actions"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-th-bg border border-th-border rounded-lg shadow-xl z-20 py-1">
-                <button onClick={() => { setShowExport(true); setShowMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-th-text-alt hover:bg-th-bg-alt transition-colors">
-                  <Download className="w-3.5 h-3.5" />Export Crew
-                </button>
-                <button onClick={() => { setShowImport(true); setShowMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-th-text-alt hover:bg-th-bg-alt transition-colors">
-                  <Upload className="w-3.5 h-3.5" />Import Crew
-                </button>
-              </div>
-            )}
-          </div>
           <button onClick={() => fetchAll()}
             className="px-3 py-1.5 text-sm rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt transition-colors flex items-center gap-1">
             <RefreshCw className="w-3.5 h-3.5" />Refresh
@@ -1035,6 +855,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
               defaultExpanded
               onSelectAgent={setSelectedAgent}
               selectedAgentId={selectedAgent}
+              onDeleteCrew={handleDeleteCrew}
             />
           ))}
         </div>
@@ -1066,10 +887,6 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       <div className="mt-3 shrink-0">
         <HealthStrip teamId="default" />
       </div>
-
-      {/* Dialogs */}
-      {showExport && <ExportDialog teamId="default" onClose={() => setShowExport(false)} />}
-      {showImport && <ImportDialog teamId="default" onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); fetchAll(); }} />}
     </div>
   );
 }
