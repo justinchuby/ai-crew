@@ -382,7 +382,32 @@ export function leadRoutes(ctx: AppContext): Router {
   router.get('/lead/:id/progress', (req, res) => {
     const leadId = req.params.id;
     const delegations = agentManager.getDelegations(leadId);
-    let children = agentManager.getAll().filter((a) => a.parentId === leadId);
+
+    interface ProgressAgent {
+      id: string;
+      role: { id: string; name: string; model?: string } | string;
+      status: string;
+      task?: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      contextWindowSize?: number;
+      contextWindowUsed?: number;
+    }
+
+    let children: ProgressAgent[] = agentManager.getAll()
+      .filter((a) => a.parentId === leadId)
+      .map((a) => ({
+        id: a.id,
+        role: a.role,
+        status: a.status,
+        task: a.task,
+        model: a.model || a.role.model,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
+        contextWindowSize: a.contextWindowSize,
+        contextWindowUsed: a.contextWindowUsed,
+      }));
 
     // DB fallback: when lead is no longer in memory (historical session),
     // query agentRoster for crew members linked via metadata.parentId
@@ -393,17 +418,25 @@ export function leadRoutes(ctx: AppContext): Router {
         return meta.parentId === leadId && a.agentId !== leadId;
       });
       if (rosterChildren.length > 0) {
-        children = rosterChildren.map((a) => ({
-          id: a.agentId,
-          role: typeof a.role === 'string' ? { id: a.role, name: a.role } : a.role,
-          status: a.status,
-          task: a.lastTaskSummary ?? undefined,
-          model: a.model,
-          inputTokens: 0,
-          outputTokens: 0,
-          contextWindowSize: undefined,
-          contextWindowUsed: undefined,
-        })) as typeof children;
+        // Pull real token data from CostTracker if available
+        const costTracker = agentManager.getCostTracker();
+        const agentCosts = costTracker?.getAgentCosts() ?? [];
+        const costMap = new Map(agentCosts.map((c) => [c.agentId, c]));
+
+        children = rosterChildren.map((a) => {
+          const cost = costMap.get(a.agentId);
+          return {
+            id: a.agentId,
+            role: typeof a.role === 'string' ? { id: a.role, name: a.role } : a.role,
+            status: a.status,
+            task: a.lastTaskSummary ?? undefined,
+            model: a.model,
+            inputTokens: cost?.totalInputTokens ?? 0,
+            outputTokens: cost?.totalOutputTokens ?? 0,
+            contextWindowSize: undefined,
+            contextWindowUsed: undefined,
+          };
+        });
       }
     }
 
@@ -413,8 +446,6 @@ export function leadRoutes(ctx: AppContext): Router {
     const total = delegations.length;
 
     const lead = agentManager.get(leadId);
-    // DB fallback for lead tokens
-    const leadRoster = !lead && ctx.agentRoster ? ctx.agentRoster.getAgent(leadId) : undefined;
 
     res.json({
       totalDelegations: total,
@@ -424,12 +455,12 @@ export function leadRoutes(ctx: AppContext): Router {
       completionPct: total > 0 ? Math.round((completed / total) * 100) : 0,
       teamSize: children.length,
       leadTokens: lead ? { input: lead.inputTokens, output: lead.outputTokens } : null,
-      teamAgents: children.map((a: any) => ({
+      teamAgents: children.map((a) => ({
         id: a.id,
         role: a.role,
         status: a.status,
         task: a.task,
-        model: a.model || a.role?.model,
+        model: a.model || (typeof a.role === 'object' ? a.role.model : undefined),
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         contextWindowSize: a.contextWindowSize,
