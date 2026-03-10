@@ -215,14 +215,7 @@ export function useWebSocket() {
         case 'agent:plan':
           updateAgent(msg.agentId, { plan: msg.plan });
           break;
-        case 'agent:permission_request':
-          updateAgent(msg.agentId, { pendingPermission: msg.request });
-          {
-            const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-            const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
-            useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
-          }
-          break;
+
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;

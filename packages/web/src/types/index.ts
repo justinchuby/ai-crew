@@ -80,15 +80,6 @@ export interface AcpPlanEntry {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
-export interface AcpPermissionRequest {
-  id: string;
-  agentId: string;
-  toolName: string;
-  arguments: Record<string, any>;
-  timestamp: string;
-  dangerous?: boolean;
-}
-
 export interface AcpUserInputRequest {
   id: string;
   agentId: string;
@@ -113,13 +104,11 @@ export interface AgentInfo {
   childIds: string[];
   createdAt: string;
   outputPreview: string;
-  autopilot: boolean;
   session?: AcpSessionInfo;
   sessionId?: string | null;
   plan?: AcpPlanEntry[];
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];
-  pendingPermission?: AcpPermissionRequest;
   pendingUserInput?: AcpUserInputRequest;
   projectName?: string;
   projectId?: string;

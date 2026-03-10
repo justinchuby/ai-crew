@@ -304,33 +304,6 @@ describe('HomeDashboard', () => {
       });
     });
 
-    it('shows permission requests when agents have pendingPermission', async () => {
-      mockAppState.agents = [
-        ...sampleAgents,
-        {
-          id: 'agent-perm',
-          role: { id: 'developer', name: 'Developer' },
-          status: 'running',
-          projectId: 'proj-1',
-          createdAt: '2026-03-08T05:00:00Z',
-          pendingPermission: {
-            id: 'perm-1',
-            agentId: 'agent-perm',
-            toolName: 'write_file',
-            arguments: { path: '/etc/config' },
-            timestamp: '2026-03-08T05:30:00Z',
-          },
-        },
-      ] as any;
-
-      renderWithRouter(<HomeDashboard />);
-      await waitFor(() => {
-        const items = screen.getAllByTestId('action-required-item');
-        // Permission request should be first (most urgent)
-        expect(items[0].textContent).toContain('write_file');
-      });
-    });
-
     it('navigates to project on action item click', async () => {
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {

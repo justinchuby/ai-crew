@@ -62,7 +62,6 @@ interface AgentProfile {
   live: {
     task: string | null;
     outputPreview: string | null;
-    autopilot: boolean;
     model: string | null;
     sessionId: string | null;
     provider: string | null;
@@ -589,7 +588,6 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Autopilot:</span> <span className="text-th-text">{profile.live?.autopilot ? 'On' : 'Off'}</span></div>
               {profile.live?.provider && (
                 <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>
               )}

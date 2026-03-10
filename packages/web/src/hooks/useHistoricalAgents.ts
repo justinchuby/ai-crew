@@ -17,7 +17,6 @@ export interface DerivedAgent {
   contextWindowSize: number;
   contextWindowUsed: number;
   outputPreview: string;
-  autopilot: boolean;
 }
 
 /**
@@ -113,7 +112,6 @@ function normalize(a: any): DerivedAgent {
     contextWindowSize: a.contextWindowSize ?? 0,
     contextWindowUsed: a.contextWindowUsed ?? 0,
     outputPreview: a.outputPreview ?? '',
-    autopilot: a.autopilot ?? false,
   };
 }
 
@@ -158,7 +156,6 @@ export function deriveAgentsFromKeyframes(kf: ReplayKeyframe[]): DerivedAgent[] 
         contextWindowSize: 0,
         contextWindowUsed: 0,
         outputPreview: '',
-        autopilot: false,
       });
     }
   }

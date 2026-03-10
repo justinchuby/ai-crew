@@ -155,7 +155,6 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
           {/* Details grid */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{agent.model}</span></div>
-            <div><span className="text-th-text-alt">Autopilot:</span> <span className="text-th-text">{agent.autopilot ? 'On' : 'Off'}</span></div>
             {agent.provider && (
               <div><span className="text-th-text-alt">CLI:</span> <span className="text-th-text capitalize">{agent.provider}{agent.backend && agent.backend !== 'acp' ? ` (${agent.backend})` : ''}</span></div>
             )}

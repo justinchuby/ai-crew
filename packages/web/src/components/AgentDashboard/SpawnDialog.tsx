@@ -10,14 +10,13 @@ interface Props {
 export function SpawnDialog({ api, onClose }: Props) {
   const roles = useAppStore((s) => s.roles);
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
-  const [autopilot, setAutopilot] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSpawn = async () => {
     if (!selectedRole) return;
     setLoading(true);
     try {
-      await api.spawnAgent(selectedRole, undefined, autopilot);
+      await api.spawnAgent(selectedRole);
       onClose();
     } catch (err) {
       console.error('Failed to spawn agent:', err);
@@ -62,17 +61,6 @@ export function SpawnDialog({ api, onClose }: Props) {
             </label>
           ))}
         </div>
-
-        <label className="flex items-center gap-2 mb-4 px-1 text-sm text-th-text-alt cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autopilot}
-            onChange={(e) => setAutopilot(e.target.checked)}
-            className="rounded border-th-border bg-th-bg-alt text-accent focus:ring-accent/30"
-          />
-          <span>Autopilot</span>
-          <span className="text-xs text-th-text-muted">— auto-approve all tool calls</span>
-        </label>
 
         <div className="flex justify-end gap-2">
           <button

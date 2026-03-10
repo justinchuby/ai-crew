@@ -116,7 +116,6 @@ const profileData = {
   live: {
     task: 'Security architecture',
     outputPreview: 'Working on JWT...',
-    autopilot: true,
     model: 'claude-sonnet-4-6',
   },
 };

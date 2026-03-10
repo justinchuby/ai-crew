@@ -109,7 +109,6 @@ const profileData = {
   live: {
     task: 'Security architecture',
     outputPreview: 'Working on JWT...',
-    autopilot: true,
     model: 'claude-sonnet-4-6',
   },
 };
@@ -303,7 +302,7 @@ describe('CrewRoster', () => {
     // Click Settings tab
     fireEvent.click(screen.getByText('Settings'));
     await waitFor(() => {
-      expect(screen.getByText('Autopilot:')).toBeInTheDocument();
+      expect(screen.getByText('Model:')).toBeInTheDocument();
     });
   });
 

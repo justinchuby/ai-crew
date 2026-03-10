@@ -249,11 +249,6 @@ export function AgentCard({ agent, api }: Props) {
             className="inline-block w-2.5 h-2.5 rounded-full"
             style={{ backgroundColor: agent.role.color }}
           />
-          {agent.autopilot && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">
-              autopilot
-            </span>
-          )}
           {(agent.status === 'running' || agent.status === 'idle') && (
             <DiffBadge agentId={agent.id} />
           )}
