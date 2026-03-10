@@ -33,10 +33,6 @@ export type BufferedEventType =
   | 'server:client_disconnected'
   | 'server:error';
 
-/** @deprecated Use BufferedEvent instead. Alias for backward compatibility. */
-export type DaemonEvent = BufferedEvent;
-/** @deprecated Use BufferedEventType instead. Alias for backward compatibility. */
-export type DaemonEventType = BufferedEventType;
 
 export interface EventBufferOptions {
   /** Maximum events per agent (default: 100) */

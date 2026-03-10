@@ -34,7 +34,7 @@ vi.mock('../utils/logger.js', () => ({
 }));
 
 // Import AFTER mocking
-import { AcpConnection } from '../acp/AcpConnection.js';
+import { AcpAdapter as AcpConnection } from '../adapters/AcpAdapter.js';
 import { logger } from '../utils/logger.js';
 
 // ── Helpers ───────────────────────────────────────────────────────

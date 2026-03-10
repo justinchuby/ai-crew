@@ -33,7 +33,6 @@ import { getCapabilityCommands } from './commands/CapabilityCommands.js';
 import { getDirectMessageCommands } from './commands/DirectMessageCommands.js';
 import { getTemplateCommands } from './commands/TemplateCommands.js';
 
-// Re-export types for backward compatibility (AgentManager, HeartbeatMonitor import from here)
 export type { Delegation, CommandContext } from './commands/types.js';
 
 // ── CommandDispatcher ────────────────────────────────────────────────

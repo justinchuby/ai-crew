@@ -307,8 +307,7 @@ async function processDroppedFilesAsAttachments(
 
 // ── File processing (legacy text insertion mode) ────────────────────────
 
-/** @deprecated Use MAX_IMAGE_SIZE instead — kept for backward compatibility */
-const LEGACY_MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const LEGACY_MAX_IMAGE_SIZE = MAX_IMAGE_SIZE;
 
 function processDroppedFiles(files: File[], onInsertText: (text: string) => void): void {
   const insertions: Promise<string>[] = files.map((file) => {

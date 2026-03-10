@@ -1,9 +1,5 @@
 // ── Shared domain types (single source of truth) ─────────────────
-// These types are defined in @flightdeck/shared and re-exported here
-// for backward compatibility. Fixes 3 drift bugs:
-//   1. Delegation.status now includes 'cancelled' | 'terminated'
-//   2. DagTask now includes projectId
-//   3. ChatGroup now includes archived
+// Re-exported from @flightdeck/shared so web code imports from one place.
 export type {
   AgentStatus,
   DagTask,

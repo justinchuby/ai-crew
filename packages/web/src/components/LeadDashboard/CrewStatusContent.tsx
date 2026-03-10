@@ -7,7 +7,8 @@ import { MentionText } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
-import { AgentReportBlock, formatTokens } from './AgentReportBlock';
+import { AgentReportBlock } from './AgentReportBlock';
+import { formatTokens } from '../../utils/format';
 
 /** Minimal agent shape accepted by CrewStatusContent — compatible with AgentInfo, LeadProgress.crewAgents, and DerivedAgent */
 export interface CrewAgent {
