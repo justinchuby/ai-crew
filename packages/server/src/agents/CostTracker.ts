@@ -1,11 +1,12 @@
 import type { Database } from '../db/database.js';
-import { taskCostRecords, utcNow } from '../db/schema.js';
+import { taskCostRecords, agentRoster, utcNow } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 
 export interface CostRecord {
   agentId: string;
   dagTaskId: string;
   leadId: string;
+  projectId?: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
@@ -17,6 +18,7 @@ export interface CostRecord {
 
 export interface AgentCostSummary {
   agentId: string;
+  agentRole?: string;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCostUsd: number;
@@ -31,6 +33,24 @@ export interface TaskCostSummary {
   totalCostUsd: number;
   agentCount: number;
   agents: Array<{ agentId: string; inputTokens: number; outputTokens: number; costUsd: number }>;
+}
+
+export interface ProjectCostSummary {
+  projectId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  sessionCount: number;
+  agentCount: number;
+}
+
+export interface SessionCostSummary {
+  leadId: string;
+  projectId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  agentCount: number;
 }
 
 /**
@@ -85,7 +105,7 @@ export class CostTracker {
     leadId: string,
     cumulativeInputTokens: number,
     cumulativeOutputTokens: number,
-    extras?: { cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number },
+    extras?: { cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; projectId?: string },
   ): void {
     const prev = this.lastSeen.get(agentId) ?? { inputTokens: 0, outputTokens: 0 };
     const deltaInput = Math.max(0, cumulativeInputTokens - prev.inputTokens);
@@ -102,6 +122,7 @@ export class CostTracker {
     const cacheRead = extras?.cacheReadTokens ?? 0;
     const cacheWrite = extras?.cacheWriteTokens ?? 0;
     const costUsd = extras?.costUsd ?? 0;
+    const projectId = extras?.projectId ?? null;
 
     // Atomic upsert: insert or add delta to existing record
     this.db.drizzle
@@ -110,6 +131,7 @@ export class CostTracker {
         agentId,
         dagTaskId,
         leadId,
+        projectId,
         inputTokens: deltaInput,
         outputTokens: deltaOutput,
         cacheReadTokens: cacheRead,
@@ -124,6 +146,7 @@ export class CostTracker {
           cacheReadTokens: sql`${taskCostRecords.cacheReadTokens} + ${cacheRead}`,
           cacheWriteTokens: sql`${taskCostRecords.cacheWriteTokens} + ${cacheWrite}`,
           costUsd: sql`${taskCostRecords.costUsd} + ${costUsd}`,
+          projectId: projectId ?? sql`${taskCostRecords.projectId}`,
           updatedAt: utcNow,
         },
       })
@@ -135,17 +158,20 @@ export class CostTracker {
     const rows = this.db.drizzle
       .select({
         agentId: taskCostRecords.agentId,
+        agentRole: agentRoster.role,
         totalInputTokens: sql<number>`sum(${taskCostRecords.inputTokens})`,
         totalOutputTokens: sql<number>`sum(${taskCostRecords.outputTokens})`,
         totalCostUsd: sql<number>`sum(${taskCostRecords.costUsd})`,
         taskCount: sql<number>`count(distinct ${taskCostRecords.dagTaskId})`,
       })
       .from(taskCostRecords)
+      .leftJoin(agentRoster, eq(taskCostRecords.agentId, agentRoster.agentId))
       .groupBy(taskCostRecords.agentId)
       .all();
 
     return rows.map(r => ({
       agentId: r.agentId,
+      agentRole: r.agentRole ?? undefined,
       totalInputTokens: r.totalInputTokens ?? 0,
       totalOutputTokens: r.totalOutputTokens ?? 0,
       totalCostUsd: r.totalCostUsd ?? 0,
@@ -213,6 +239,7 @@ export class CostTracker {
         agentId: r.agentId,
         dagTaskId: r.dagTaskId,
         leadId: r.leadId,
+        projectId: r.projectId ?? undefined,
         inputTokens: r.inputTokens ?? 0,
         outputTokens: r.outputTokens ?? 0,
         cacheReadTokens: r.cacheReadTokens ?? 0,
@@ -221,6 +248,59 @@ export class CostTracker {
         createdAt: r.createdAt!,
         updatedAt: r.updatedAt!,
       }));
+  }
+
+  /** Get cost totals per project (across all sessions and agents). */
+  getProjectCosts(): ProjectCostSummary[] {
+    const rows = this.db.drizzle
+      .select({
+        projectId: taskCostRecords.projectId,
+        totalInputTokens: sql<number>`sum(${taskCostRecords.inputTokens})`,
+        totalOutputTokens: sql<number>`sum(${taskCostRecords.outputTokens})`,
+        totalCostUsd: sql<number>`sum(${taskCostRecords.costUsd})`,
+        sessionCount: sql<number>`count(distinct ${taskCostRecords.leadId})`,
+        agentCount: sql<number>`count(distinct ${taskCostRecords.agentId})`,
+      })
+      .from(taskCostRecords)
+      .groupBy(taskCostRecords.projectId)
+      .all();
+
+    return rows
+      .filter(r => r.projectId != null)
+      .map(r => ({
+        projectId: r.projectId!,
+        totalInputTokens: r.totalInputTokens ?? 0,
+        totalOutputTokens: r.totalOutputTokens ?? 0,
+        totalCostUsd: r.totalCostUsd ?? 0,
+        sessionCount: r.sessionCount ?? 0,
+        agentCount: r.agentCount ?? 0,
+      }));
+  }
+
+  /** Get cost totals per session (leadId) within a project. */
+  getSessionCosts(projectId: string): SessionCostSummary[] {
+    const rows = this.db.drizzle
+      .select({
+        leadId: taskCostRecords.leadId,
+        projectId: taskCostRecords.projectId,
+        totalInputTokens: sql<number>`sum(${taskCostRecords.inputTokens})`,
+        totalOutputTokens: sql<number>`sum(${taskCostRecords.outputTokens})`,
+        totalCostUsd: sql<number>`sum(${taskCostRecords.costUsd})`,
+        agentCount: sql<number>`count(distinct ${taskCostRecords.agentId})`,
+      })
+      .from(taskCostRecords)
+      .where(eq(taskCostRecords.projectId, projectId))
+      .groupBy(taskCostRecords.leadId)
+      .all();
+
+    return rows.map(r => ({
+      leadId: r.leadId,
+      projectId: r.projectId ?? projectId,
+      totalInputTokens: r.totalInputTokens ?? 0,
+      totalOutputTokens: r.totalOutputTokens ?? 0,
+      totalCostUsd: r.totalCostUsd ?? 0,
+      agentCount: r.agentCount ?? 0,
+    }));
   }
 
   /** Reset last-seen state (useful for testing). */

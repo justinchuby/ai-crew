@@ -206,6 +206,7 @@ export interface ProjectCostSummary {
 
 export interface AgentCostSummary {
   agentId: string;
+  agentRole?: string;
   totalInputTokens: number;
   totalOutputTokens: number;
   taskCount: number;

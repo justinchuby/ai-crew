@@ -113,8 +113,8 @@ export function TokenUsageSection({ projectId }: Props) {
             ({projectCost?.agentCount ?? 0} agent{(projectCost?.agentCount ?? 0) !== 1 ? 's' : ''})
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 font-mono text-xs">
             <span className="text-blue-500">↓{formatTokens(totalInput)}</span>
             <span className="text-emerald-500">↑{formatTokens(totalOutput)}</span>
             <span className="font-semibold text-th-text-alt">{formatTokens(totalTokens)}</span>
@@ -165,25 +165,28 @@ function AgentBreakdown({
       <div className="space-y-1">
         {sorted.map((cost) => {
           const agent = agentMap.get(cost.agentId);
+          const roleName = agent?.role.name
+            ?? (cost.agentRole ? cost.agentRole.charAt(0).toUpperCase() + cost.agentRole.slice(1) : undefined)
+            ?? cost.agentId.slice(0, 6);
+          const roleIcon = agent?.role.icon ?? '🤖';
           const agentTotal = cost.totalInputTokens + cost.totalOutputTokens;
           const pct = total > 0 ? (agentTotal / total) * 100 : 0;
           return (
-            <div key={cost.agentId} className="flex items-center gap-2 text-xs">
-              <span className="w-4 text-center">{agent?.role.icon ?? '🤖'}</span>
-              <span className="text-th-text-alt min-w-[80px] truncate">
-                {agent?.role.name ?? cost.agentId.slice(0, 8)}
+            <div key={cost.agentId} className="flex items-center gap-1.5 text-xs">
+              <span className="w-4 text-center shrink-0">{roleIcon}</span>
+              <span className="text-th-text-alt w-16 truncate shrink-0" title={`${roleName} (${cost.agentId.slice(0, 8)})`}>
+                {roleName}
               </span>
-              {/* Usage bar */}
-              <div className="flex-1 h-1.5 bg-th-bg-alt rounded-full overflow-hidden">
+              <div className="flex-1 min-w-0 h-1.5 bg-th-bg-alt rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-500/60 rounded-full transition-all"
                   style={{ width: `${Math.max(pct, 1)}%` }}
                 />
               </div>
-              <span className="font-mono text-th-text-muted w-14 text-right">
+              <span className="font-mono text-th-text-muted w-12 text-right shrink-0 text-[11px]">
                 {formatTokens(agentTotal)}
               </span>
-              <span className="font-mono text-th-text-muted w-8 text-right text-[10px]">
+              <span className="font-mono text-th-text-muted w-7 text-right shrink-0 text-[10px]">
                 {pct.toFixed(0)}%
               </span>
             </div>
@@ -226,20 +229,20 @@ function TaskBreakdown({
             const taskTotal = cost.totalInputTokens + cost.totalOutputTokens;
             const pct = total > 0 ? (taskTotal / total) * 100 : 0;
             return (
-              <div key={`${cost.leadId}:${cost.dagTaskId}`} className="flex items-center gap-2 text-xs">
-                <span className="text-th-text-muted font-mono min-w-[120px] truncate text-[10px]">
+              <div key={`${cost.leadId}:${cost.dagTaskId}`} className="flex items-center gap-1.5 text-xs">
+                <span className="text-th-text-muted font-mono w-20 truncate shrink-0 text-[10px]" title={cost.dagTaskId}>
                   {cost.dagTaskId}
                 </span>
-                <div className="flex-1 h-1.5 bg-th-bg-alt rounded-full overflow-hidden">
+                <div className="flex-1 min-w-0 h-1.5 bg-th-bg-alt rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500/60 rounded-full transition-all"
                     style={{ width: `${Math.max(pct, 1)}%` }}
                   />
                 </div>
-                <span className="font-mono text-th-text-muted w-14 text-right">
+                <span className="font-mono text-th-text-muted w-12 text-right shrink-0 text-[11px]">
                   {formatTokens(taskTotal)}
                 </span>
-                <div className="flex gap-0.5">
+                <div className="flex gap-0.5 shrink-0">
                   {cost.agents.slice(0, 3).map((a) => {
                     const agent = agentMap.get(a.agentId);
                     return (
