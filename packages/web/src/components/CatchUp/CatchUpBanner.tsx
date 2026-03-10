@@ -188,7 +188,7 @@ export function CatchUpBanner() {
       if (totalChanges < 5) return;
 
       // AC-15.6: In Minimal mode, only show for RED-level exceptions (failures/crashes)
-      if (oversightLevel === 'minimal') {
+      if (oversightLevel === 'autonomous') {
         const hasRedExceptions = (s.tasksFailed ?? 0) > 0 || s.agentsCrashed > 0 || s.budgetWarning;
         if (!hasRedExceptions) return;
       }

@@ -344,7 +344,7 @@ function KanbanBoard({ dagStatus, projectId, onTaskUpdated, scope = 'project', p
             />
             Hide empty
           </label>
-          {onShowArchivedChange && oversightLevel !== 'minimal' && (
+          {onShowArchivedChange && oversightLevel !== 'autonomous' && (
             <label className="flex items-center gap-1.5 text-[11px] text-th-text-muted cursor-pointer" data-testid="show-archived-toggle">
               <Archive size={11} />
               <input

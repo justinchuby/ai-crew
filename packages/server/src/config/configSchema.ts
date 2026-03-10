@@ -132,7 +132,8 @@ const telegramSchema = z.object({
 
 // ── Oversight section (Trust Dial) ─────────────────────────
 const oversightSchema = z.object({
-  level: z.enum(['detailed', 'standard', 'minimal']).default('standard'),
+  level: z.enum(['supervised', 'balanced', 'autonomous']).default('balanced'),
+  customInstructions: z.string().max(500).optional(),
 });
 
 // ── Conflicts section ──────────────────────────────────────

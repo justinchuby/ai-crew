@@ -5,11 +5,11 @@ export type ThemeMode = 'dark' | 'light' | 'system';
 
 /**
  * Oversight level for the Trust Dial (AC-16.1).
- * - detailed: Yellow@1 exception, all notifications, standard density
- * - standard: Yellow@2, exceptions only (default)
- * - minimal:  Red-only@3+, compact cards, critical only
+ * - supervised: Yellow@1 exception, all notifications, standard density
+ * - balanced: Yellow@2, exceptions only (default)
+ * - autonomous:  Red-only@3+, compact cards, critical only
  */
-export type OversightLevel = 'detailed' | 'standard' | 'minimal';
+export type OversightLevel = 'supervised' | 'balanced' | 'autonomous';
 
 interface SettingsState {
   soundEnabled: boolean;
@@ -58,9 +58,9 @@ function loadThemeMode(): ThemeMode {
 function loadOversightLevel(): OversightLevel {
   try {
     const saved = localStorage.getItem(OVERSIGHT_KEY);
-    if (saved === 'detailed' || saved === 'standard' || saved === 'minimal') return saved;
+    if (saved === 'supervised' || saved === 'balanced' || saved === 'autonomous') return saved;
   } catch {}
-  return 'standard';
+  return 'balanced';
 }
 
 function loadProjectOverrides(): Record<string, OversightLevel> {
@@ -71,7 +71,7 @@ function loadProjectOverrides(): Record<string, OversightLevel> {
   return {};
 }
 
-const OVERSIGHT_CYCLE: OversightLevel[] = ['minimal', 'standard', 'detailed'];
+const OVERSIGHT_CYCLE: OversightLevel[] = ['autonomous', 'balanced', 'supervised'];
 
 function resolveTheme(mode: ThemeMode): 'dark' | 'light' {
   if (mode === 'system') {
@@ -181,8 +181,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 /**
  * Notification severity used by the toast system.
  * - critical: failures, crashes → ALWAYS shown regardless of oversight level
- * - exception: permission requests, heartbeat halted, alerts → standard + detailed
- * - info: spawned, completed, sub-spawned, context compacted → detailed only
+ * - exception: permission requests, heartbeat halted, alerts → balanced + supervised
+ * - info: spawned, completed, sub-spawned, context compacted → supervised only
  */
 export type NotificationSeverity = 'critical' | 'exception' | 'info';
 
@@ -193,9 +193,9 @@ export type NotificationSeverity = 'critical' | 'exception' | 'info';
 export function shouldNotify(severity: NotificationSeverity, level?: OversightLevel): boolean {
   const effective = level ?? useSettingsStore.getState().oversightLevel;
   if (severity === 'critical') return true;
-  if (severity === 'exception') return effective !== 'minimal';
+  if (severity === 'exception') return effective !== 'autonomous';
   // severity === 'info'
-  return effective === 'detailed';
+  return effective === 'supervised';
 }
 
 
@@ -205,7 +205,7 @@ export const ESCALATION_RULES: Record<OversightLevel, {
   redThreshold: number;
   redRequiresFailure: boolean;
 }> = {
-  detailed: { yellowThreshold: 1, redThreshold: 2, redRequiresFailure: false },
-  standard: { yellowThreshold: 2, redThreshold: 3, redRequiresFailure: false },
-  minimal:  { yellowThreshold: Infinity, redThreshold: 3, redRequiresFailure: true },
+  supervised: { yellowThreshold: 1, redThreshold: 2, redRequiresFailure: false },
+  balanced: { yellowThreshold: 2, redThreshold: 3, redRequiresFailure: false },
+  autonomous:  { yellowThreshold: Infinity, redThreshold: 3, redRequiresFailure: true },
 };

@@ -19,6 +19,14 @@ export function configRoutes(ctx: AppContext): Router {
     res.json(getConfig());
   });
 
+  // GET /config/yaml — returns the full YAML config (used by UI to load oversight settings)
+  router.get('/config/yaml', (_req, res) => {
+    if (!ctx.configStore) {
+      return res.status(503).json({ error: 'Config store not available' });
+    }
+    res.json(ctx.configStore.current);
+  });
+
   router.patch('/config', validateBody(configPatchSchema), (req, res) => {
     const sanitized: Partial<ServerConfig> = {};
     if (req.body.maxConcurrentAgents !== undefined) {
@@ -36,7 +44,10 @@ export function configRoutes(ctx: AppContext): Router {
         yamlPatch.server = { maxConcurrentAgents: updated.maxConcurrentAgents };
       }
       if (req.body.oversightLevel !== undefined) {
-        yamlPatch.oversight = { level: req.body.oversightLevel };
+        yamlPatch.oversight = { ...yamlPatch.oversight as Record<string, unknown> ?? {}, level: req.body.oversightLevel };
+      }
+      if (req.body.customInstructions !== undefined) {
+        yamlPatch.oversight = { ...yamlPatch.oversight as Record<string, unknown> ?? {}, customInstructions: req.body.customInstructions };
       }
       if (Object.keys(yamlPatch).length > 0) {
         ctx.configStore.writePartial(yamlPatch).catch(err => {

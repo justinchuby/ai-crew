@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
+import { apiFetch } from '../../hooks/useApi';
 import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
-
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
 import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
 
 const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
-  { level: 'detailed', label: 'Detailed', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
-  { level: 'standard', label: 'Standard', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
-  { level: 'minimal', label: 'Minimal', description: 'Agents work autonomously — only critical resets require your approval' },
+  { level: 'supervised', label: 'Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
+  { level: 'balanced', label: 'Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
+  { level: 'autonomous', label: 'Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
 ];
 
 interface Props {
@@ -26,12 +26,36 @@ export function SettingsPanel({ api }: Props) {
   const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore();
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [instructionsSaved, setInstructionsSaved] = useState(false);
 
   useEffect(() => {
     if (config?.maxConcurrentAgents != null) {
       setMaxAgents(config.maxConcurrentAgents);
     }
   }, [config?.maxConcurrentAgents]);
+
+  // Load custom instructions from server config
+  useEffect(() => {
+    apiFetch<{ oversight?: { customInstructions?: string } }>('/config/yaml')
+      .then((data) => {
+        if (data?.oversight?.customInstructions) {
+          setCustomInstructions(data.oversight.customInstructions);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveCustomInstructions = useCallback(async () => {
+    try {
+      await apiFetch('/config', {
+        method: 'PATCH',
+        body: JSON.stringify({ customInstructions }),
+      });
+      setInstructionsSaved(true);
+      setTimeout(() => setInstructionsSaved(false), 2000);
+    } catch { /* best effort */ }
+  }, [customInstructions]);
 
   // New role form
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -196,6 +220,30 @@ export function SettingsPanel({ api }: Props) {
               </div>
             </label>
           ))}
+        </div>
+        <div className="mt-4">
+          <label className="text-xs text-th-text-muted block mb-1.5">Custom Instructions</label>
+          <textarea
+            value={customInstructions}
+            onChange={(e) => {
+              setCustomInstructions(e.target.value.slice(0, 500));
+              setInstructionsSaved(false);
+            }}
+            onBlur={handleSaveCustomInstructions}
+            placeholder="Optional: Add custom instructions for agents, e.g. Ask me before modifying database schemas"
+            maxLength={500}
+            rows={3}
+            className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-2 text-sm text-th-text placeholder:text-th-text-muted/50 focus:outline-none focus:border-accent resize-none"
+          />
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-[10px] text-th-text-muted">{customInstructions.length}/500</span>
+            {instructionsSaved && (
+              <span className="text-[10px] text-green-400">Saved ✓</span>
+            )}
+          </div>
+          <p className="text-[10px] text-th-text-muted mt-1">
+            Affects in-app notifications only. External channels (Telegram, Slack) use separate routing preferences.
+          </p>
         </div>
       </section>
 

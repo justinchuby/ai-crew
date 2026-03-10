@@ -129,7 +129,7 @@ export function useAttentionItems(): AttentionState {
     if (!apiData) return null;
 
     const items: AttentionItem[] = apiData.items
-      .filter((item) => !(item.type === 'decision' && oversightLevel === 'minimal'))
+      .filter((item) => !(item.type === 'decision' && oversightLevel === 'autonomous'))
       .map((item, i) => {
       const projectRoute = item.task?.projectId || item.decision?.projectId || selectedLeadId;
       if (item.type === 'decision') {
@@ -176,7 +176,7 @@ export function useAttentionItems(): AttentionState {
       agentCount: agents.length,
       runningCount,
       failedTaskCount: apiData.summary.failedCount,
-      pendingDecisionCount: oversightLevel === 'minimal' ? 0 : apiData.summary.decisionCount,
+      pendingDecisionCount: oversightLevel === 'autonomous' ? 0 : apiData.summary.decisionCount,
     };
   }, [apiData, agents, projects, selectedLeadId, oversightLevel]);
 
@@ -227,7 +227,7 @@ export function useAttentionItems(): AttentionState {
 
     for (const decision of pendingDecisions) {
       // Minimal oversight: decisions are auto-approved at WS layer; skip any that slipped through
-      if (oversightLevel === 'minimal') continue;
+      if (oversightLevel === 'autonomous') continue;
       items.push({
         id: `decision-${decision.id}`,
         kind: 'decision',
@@ -253,7 +253,7 @@ export function useAttentionItems(): AttentionState {
       agentCount: agents.length,
       runningCount,
       failedTaskCount,
-      pendingDecisionCount: oversightLevel === 'minimal' ? 0 : pendingDecisions.length,
+      pendingDecisionCount: oversightLevel === 'autonomous' ? 0 : pendingDecisions.length,
     };
   }, [agents, pendingDecisions, projects, selectedLeadId, oversightLevel]);
 

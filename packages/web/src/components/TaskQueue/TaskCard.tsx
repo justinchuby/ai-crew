@@ -35,8 +35,8 @@ export interface TaskCardProps {
 
 export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdated, showProjectName, projectName }: TaskCardProps) {
   const oversightLevel = useSettingsStore((s) => s.oversightLevel);
-  const isMinimal = oversightLevel === 'minimal';
-  const isDetailed = oversightLevel === 'detailed';
+  const isMinimal = oversightLevel === 'autonomous';
+  const isDetailed = oversightLevel === 'supervised';
   const [expanded, setExpanded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showCommentDialog, setShowCommentDialog] = useState(false);

@@ -46,6 +46,13 @@ import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/Collecti
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
 
+// ── Oversight tier behavioral instructions injected into agent prompts ──
+const OVERSIGHT_TIER_INSTRUCTIONS: Record<string, string> = {
+  supervised: 'Be cautious about what you do. When you modify files, always acquire user approval until the oversight level is changed.',
+  balanced: 'Use good judgment. Ask for approval on significant changes like architecture decisions, file deletions, or system-level changes. Proceed with routine work.',
+  autonomous: 'You can detail your reasoning, but there is no need to ask for user approval.',
+};
+
 // ── Typed event map for AgentManager ────────────────────────────────
 export interface AgentManagerEvents {
   'agent:spawned': ReturnType<Agent['toJSON']>;
@@ -124,6 +131,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private skillsLoader?: SkillsLoader;
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
   private collectiveMemory?: CollectiveMemory;
+  private configStore?: import('../config/ConfigStore.js').ConfigStore;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -268,6 +276,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setCollectiveMemory(memory: CollectiveMemory): void {
     this.collectiveMemory = memory;
+  }
+
+  setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
+    this.configStore = store;
   }
 
   /** Late-inject IntegrationRouter to break circular dependency. */
@@ -423,6 +435,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           role: role.id,
           memoriesIncluded: Math.min(memories.length, 20),
         });
+      }
+    }
+
+    // Inject oversight tier behavioral instructions into agent prompt
+    if (this.configStore) {
+      const oversightConfig = this.configStore.current.oversight;
+      const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[oversightConfig.level] ?? '';
+      const customInstructions = oversightConfig.customInstructions ?? '';
+      const parts: string[] = [];
+      if (tierInstructions) parts.push(tierInstructions);
+      if (customInstructions) parts.push(`Additional user instructions: ${customInstructions}`);
+      if (parts.length > 0) {
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n<oversight_instructions>\n${parts.join('\n\n')}\n</oversight_instructions>`,
+        };
       }
     }
 

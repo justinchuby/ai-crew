@@ -360,7 +360,7 @@ export function useWebSocket() {
           if (msg.needsConfirmation && msg.id) {
             // Minimal oversight: auto-approve all decisions without user prompts
             const effectiveLevel = useSettingsStore.getState().getEffectiveLevel(msg.projectId ?? undefined);
-            if (effectiveLevel === 'minimal') {
+            if (effectiveLevel === 'autonomous') {
               apiFetch(`/decisions/${msg.id}/confirm`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
               break;
             }
