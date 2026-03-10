@@ -391,6 +391,10 @@ export class AgentServerClient extends EventEmitter {
         break;
 
       case 'pong':
+        // Pong responses can legitimately arrive after timeout — they're keepalive messages, not errors.
+        // Silently ignore orphaned pongs to reduce log noise.
+        break;
+
       case 'auth_result':
       case 'agent_list':
         // These should have been handled by pending request matching above.
