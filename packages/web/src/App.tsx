@@ -131,6 +131,7 @@ export function App() {
   const systemPaused = useAppStore((s) => s.systemPaused);
   const setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
+  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());
 
@@ -188,7 +189,7 @@ export function App() {
         }
       } else if (msg.type === 'agent:sub_spawned') {
         if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
-      } else if (msg.type === 'agent:permission_request' && soundEnabled) {
+      } else if (msg.type === 'agent:permission_request' && soundEnabled && oversightLevel === 'supervised') {
         playAttentionSound();
       } else if (msg.type === 'agent:context_compacted') {
         if (shouldNotify('info')) {
@@ -206,7 +207,7 @@ export function App() {
     };
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
-  }, [addToast, soundEnabled]);
+  }, [addToast, soundEnabled, oversightLevel]);
 
   // Detect all-agents-idle and play completion sound
   useEffect(() => {

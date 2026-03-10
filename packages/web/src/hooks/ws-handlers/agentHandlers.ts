@@ -166,7 +166,8 @@ export function handleAgentPermissionRequest(msg: any, ctx: HandlerContext): voi
   if (shouldNotify('exception')) {
     const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
     const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
-    useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+    const toolName = msg.request?.toolName ?? 'unknown tool';
+    useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests: ${toolName}`);
   }
 }
 

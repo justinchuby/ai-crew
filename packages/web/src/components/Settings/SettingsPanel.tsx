@@ -11,9 +11,9 @@ import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
 
 const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
-  { level: 'supervised', label: 'Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
-  { level: 'balanced', label: 'Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
-  { level: 'autonomous', label: 'Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
+  { level: 'supervised', label: '🔍 Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
+  { level: 'balanced', label: '⚖️ Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
+  { level: 'autonomous', label: '🚀 Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
 ];
 
 interface Props {
