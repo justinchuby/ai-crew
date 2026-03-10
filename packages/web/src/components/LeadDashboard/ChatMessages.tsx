@@ -4,6 +4,7 @@ import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { useAppStore } from '../../stores/appStore';
+import { hasUnclosedCommandBlock } from '../../utils/commandParser';
 import type { AcpTextChunk, AgentInfo } from '../../types';
 
 export interface CatchUpSummary {
@@ -118,7 +119,15 @@ export function ChatMessages({
           if (isFirstInRun && (!msg.contentType || msg.contentType === 'text')) {
             for (let j = i + 1; j < filtered.length; j++) {
               const next = filtered[j];
-              if (next.sender !== 'agent' || next.queued || (next.contentType && next.contentType !== 'text')) break;
+              if (next.sender !== 'agent' || next.queued || (next.contentType && next.contentType !== 'text')) {
+                // If the merged text so far has an unclosed ⟦⟦ command block, keep merging
+                // past non-agent messages (e.g. thinking) to rejoin split commands from history
+                if (hasUnclosedCommandBlock(mergedText) && next.sender === 'agent' && !next.queued) {
+                  mergedText += next.text;
+                  continue;
+                }
+                break;
+              }
               mergedText += next.text;
             }
           }
