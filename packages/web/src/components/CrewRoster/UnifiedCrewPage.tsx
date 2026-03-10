@@ -152,7 +152,7 @@ function formatDuration(ms: number): string {
 
 // ── Crew Group (collapsible) ──────────────────────────────
 
-function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew }: {
+function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew, onRemoveAgent }: {
   leadId: string;
   agents: RosterAgent[];
   summary: CrewSummary | null;
@@ -160,6 +160,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   onSelectAgent: (id: string) => void;
   selectedAgentId: string | null;
   onDeleteCrew: (leadId: string) => Promise<void>;
+  onRemoveAgent?: (agentId: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [sessions, setSessions] = useState<SessionDetail[]>([]);
@@ -281,6 +282,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
               isLead={agent.agentId === leadId || agent.role === 'lead'}
               isSelected={selectedAgentId === agent.agentId}
               onSelect={() => onSelectAgent(agent.agentId)}
+              onRemove={onRemoveAgent}
             />
           ))}
         </div>
@@ -321,34 +323,89 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
 
 // ── Agent Row ─────────────────────────────────────────────
 
-function AgentRow({ agent, isLead, isSelected, onSelect }: {
-  agent: RosterAgent; isLead?: boolean; isSelected: boolean; onSelect: () => void;
+function AgentRow({ agent, isLead, isSelected, onSelect, onRemove }: {
+  agent: RosterAgent; isLead?: boolean; isSelected: boolean; onSelect: () => void; onRemove?: (agentId: string) => void;
 }) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  
+  // Only show remove button for terminated/retired agents
+  const canRemove = (agent.status === 'terminated' || agent.status === 'retired') && 
+                    (!agent.liveStatus || agent.liveStatus === 'terminated' || agent.liveStatus === 'failed' || agent.liveStatus === 'completed');
+
+  const handleRemove = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onRemove) return;
+    
+    if (!confirmingRemove) {
+      setConfirmingRemove(true);
+      return;
+    }
+
+    setRemoving(true);
+    try {
+      await onRemove(agent.agentId);
+    } finally {
+      setRemoving(false);
+      setConfirmingRemove(false);
+    }
+  };
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmingRemove(false);
+  };
+
   return (
-    <button
-      onClick={onSelect}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-th-bg-alt/30 transition-colors
-        ${isSelected ? 'bg-th-bg-alt/40 border-l-2 border-blue-500' : ''}
-        ${isLead ? 'font-medium' : ''}`}
-    >
-      <span className="w-4 text-center text-xs">{isLead ? '🎖️' : getRoleIcon(agent.role)}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs capitalize">{agent.role}</span>
-          <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
-          <span className="text-[10px] text-th-text-muted">{agent.model}</span>
+    <div className="relative">
+      <button
+        onClick={onSelect}
+        className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-th-bg-alt/30 transition-colors
+          ${isSelected ? 'bg-th-bg-alt/40 border-l-2 border-blue-500' : ''}
+          ${isLead ? 'font-medium' : ''}`}
+      >
+        <span className="w-4 text-center text-xs">{isLead ? '🎖️' : getRoleIcon(agent.role)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs capitalize">{agent.role}</span>
+            <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
+            <span className="text-[10px] text-th-text-muted">{agent.model}</span>
+          </div>
+          {agent.lastTaskSummary && (
+            <div className="text-[10px] text-th-text-muted truncate">{agent.lastTaskSummary}</div>
+          )}
         </div>
-        {agent.lastTaskSummary && (
-          <div className="text-[10px] text-th-text-muted truncate">{agent.lastTaskSummary}</div>
+        <StatusBadge {...agentStatusProps(agent.status, agent.liveStatus)} />
+        {agent.provider && (
+          <span className="px-1 py-0.5 rounded text-[10px] bg-th-bg-alt text-th-text-muted border border-th-border capitalize shrink-0">
+            {agent.provider}
+          </span>
         )}
-      </div>
-      <StatusBadge {...agentStatusProps(agent.status, agent.liveStatus)} />
-      {agent.provider && (
-        <span className="px-1 py-0.5 rounded text-[10px] bg-th-bg-alt text-th-text-muted border border-th-border capitalize shrink-0">
-          {agent.provider}
-        </span>
-      )}
-    </button>
+        {canRemove && onRemove && (
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            title={confirmingRemove ? "Confirm removal" : "Remove agent from roster"}
+            className={`p-1 rounded transition-colors shrink-0 ${
+              confirmingRemove 
+                ? 'bg-red-500 text-white hover:bg-red-600' 
+                : 'text-th-text-muted hover:text-red-400 hover:bg-red-500/10'
+            } ${removing ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {removing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          </button>
+        )}
+        {confirmingRemove && canRemove && onRemove && (
+          <button
+            onClick={handleCancel}
+            title="Cancel"
+            className="p-1 rounded text-th-text-muted hover:bg-th-bg-alt transition-colors shrink-0"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </button>
+    </div>
   );
 }
 
@@ -733,6 +790,19 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
     }
   }, [addToast, agents, selectedAgent]);
 
+  const handleRemoveAgent = useCallback(async (agentId: string) => {
+    try {
+      await apiFetch(`/roster/${agentId}`, { method: 'DELETE' });
+      addToast('success', 'Agent removed from roster');
+      setAgents(prev => prev.filter(a => a.agentId !== agentId));
+      if (selectedAgent === agentId) {
+        setSelectedAgent(null);
+      }
+    } catch (err: any) {
+      addToast('error', `Failed to remove agent: ${err.message}`);
+    }
+  }, [addToast, selectedAgent]);
+
   // Filter agents by search
   const filtered = agents.filter(a => {
     if (!search) return true;
@@ -856,6 +926,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
               onSelectAgent={setSelectedAgent}
               selectedAgentId={selectedAgent}
               onDeleteCrew={handleDeleteCrew}
+              onRemoveAgent={handleRemoveAgent}
             />
           ))}
         </div>

@@ -420,5 +420,36 @@ export function teamsRoutes(ctx: AppContext): Router {
     res.json({ ok: true, deleted });
   });
 
+  // ── DELETE /roster/:agentId — Remove a single agent from roster ────
+
+  router.delete('/roster/:agentId', writeLimiter, (req, res) => {
+    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+
+    const agentId = paramStr(req.params.agentId);
+
+    if (!AGENT_ID_RE.test(agentId)) {
+      return res.status(400).json({ error: 'Invalid agentId format' });
+    }
+
+    const agent = agentRoster.getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found in roster' });
+    }
+
+    // Don't allow deleting active agents — check AgentManager
+    const liveAgent = agentManager.getAll().find(a => a.id === agentId);
+    if (liveAgent && (liveAgent.status === 'running' || liveAgent.status === 'idle' || liveAgent.status === 'creating')) {
+      return res.status(409).json({ error: 'Cannot delete an active agent. Stop the agent first.' });
+    }
+
+    const deleted = agentRoster.deleteAgent(agentId);
+    if (!deleted) {
+      return res.status(500).json({ error: 'Failed to delete agent from roster' });
+    }
+
+    logger.info({ module: 'teams', msg: 'Agent removed from roster', agentId, role: agent.role });
+    res.json({ ok: true, agentId });
+  });
+
   return router;
 }
