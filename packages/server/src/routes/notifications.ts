@@ -194,16 +194,16 @@ export function notificationRoutes(ctx: AppContext): Router {
       // 2. Convert routing matrix (event→channelTypes) to preferences (event→channelIds)
       if (routing && typeof routing === 'object') {
         const allChannels = service.getChannels();
+        const existingPrefs = service.getPreferences();
         const updates = Object.entries(routing).map(([event, channelTypes]) => {
           const types = channelTypes as string[];
           const channelIds = allChannels
             .filter(c => types.includes(c.type) && c.enabled)
             .map(c => c.id);
+          const existing = existingPrefs.find(p => p.event === event);
           return {
             event: event as NotifiableEvent,
-            tier: (['agent_crashed', 'budget_exceeded'] as string[]).includes(event)
-              ? 'interrupt' as const
-              : 'summon' as const,
+            tier: existing?.tier ?? 'summon' as const,
             channels: channelIds,
             enabled: channelIds.length > 0,
           };

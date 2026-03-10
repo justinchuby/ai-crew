@@ -142,6 +142,15 @@ export class ActiveDelegationRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
+  /** Delete all delegation records for an agent (used before agent deletion to avoid FK constraint violations) */
+  deleteByAgent(agentId: string): number {
+    const result = this.db.drizzle
+      .delete(activeDelegations)
+      .where(eq(activeDelegations.agentId, agentId))
+      .run();
+    return result.changes;
+  }
+
   private rowToRecord(row: typeof activeDelegations.$inferSelect): DelegationRecord {
     return {
       delegationId: row.delegationId,

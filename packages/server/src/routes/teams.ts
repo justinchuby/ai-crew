@@ -11,6 +11,7 @@ import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { isTerminalStatus } from '../agents/Agent.js';
+import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
 import type { AppContext } from './context.js';
 
 // ── Rate Limiters ───────────────────────────────────────────────────
@@ -28,7 +29,7 @@ function paramStr(val: string | string[] | undefined): string {
 // ── Routes ──────────────────────────────────────────────────────────
 
 export function teamsRoutes(ctx: AppContext): Router {
-  const { knowledgeStore, trainingCapture, agentRoster, agentManager, projectRegistry } = ctx;
+  const { knowledgeStore, trainingCapture, agentRoster, agentManager, projectRegistry, db } = ctx;
   const router = Router();
 
 
@@ -437,8 +438,8 @@ export function teamsRoutes(ctx: AppContext): Router {
       return res.status(404).json({ error: 'Agent not found in roster' });
     }
 
-    // Don't allow deleting active agents — check AgentManager
-    const liveAgent = agentManager.getAll().find(a => a.id === agentId);
+    // Don't allow deleting active agents — check AgentManager (O(1) lookup)
+    const liveAgent = agentManager.get(agentId);
     if (liveAgent && !isTerminalStatus(liveAgent.status)) {
       return res.status(409).json({ error: 'Cannot delete an active agent. Stop the agent first.' });
     }
@@ -460,6 +461,13 @@ export function teamsRoutes(ctx: AppContext): Router {
           error: 'Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.' 
         });
       }
+    }
+
+    // Delete delegation records first to avoid FK constraint violations
+    const activeDelegations = new ActiveDelegationRepository(db);
+    const deletedDelegations = activeDelegations.deleteByAgent(agentId);
+    if (deletedDelegations > 0) {
+      logger.info({ module: 'teams', msg: 'Deleted delegation records', agentId, count: deletedDelegations });
     }
 
     const deleted = agentRoster.deleteAgent(agentId);
