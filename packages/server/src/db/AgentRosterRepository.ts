@@ -162,25 +162,39 @@ export class AgentRosterRepository {
     return result.changes;
   }
 
-  /** Hard-delete all roster entries for a specific crew (lead + children) */
+  /** Hard-delete all roster entries for a specific crew (lead + all descendants).
+   *  Walks the parent chain recursively to catch grandchildren spawned by sub-agents. */
   deleteCrew(leadId: string): number {
-    // Delete the lead entry
-    const leadResult = this.db.drizzle
-      .delete(agentRoster)
-      .where(eq(agentRoster.agentId, leadId))
-      .run();
+    const lead = this.getAgent(leadId);
+    if (!lead) return 0;
 
-    // Delete all agents parented to this lead (metadata.parentId)
-    const all = this.getAllAgents();
-    let childCount = 0;
-    for (const agent of all) {
-      const meta = agent.metadata as Record<string, unknown> | undefined;
-      if (meta?.parentId === leadId) {
-        this.deleteAgent(agent.agentId);
-        childCount++;
+    // Scope to the lead's project (uses idx_agent_roster_project index, avoids full table scan)
+    const projectAgents = lead.projectId
+      ? this.getByProject(lead.projectId)
+      : this.getAllAgents();
+
+    // Build set of all descendant IDs via BFS on metadata.parentId
+    const toDelete = new Set<string>([leadId]);
+    let frontier = [leadId];
+    while (frontier.length > 0) {
+      const nextFrontier: string[] = [];
+      for (const agent of projectAgents) {
+        if (toDelete.has(agent.agentId)) continue;
+        const meta = agent.metadata as Record<string, unknown> | undefined;
+        if (meta?.parentId && frontier.includes(meta.parentId as string)) {
+          toDelete.add(agent.agentId);
+          nextFrontier.push(agent.agentId);
+        }
       }
+      frontier = nextFrontier;
     }
-    return leadResult.changes + childCount;
+
+    // Delete all in one pass
+    let deleted = 0;
+    for (const agentId of toDelete) {
+      if (this.deleteAgent(agentId)) deleted++;
+    }
+    return deleted;
   }
 
   retireAgent(agentId: string, reason?: string): boolean {

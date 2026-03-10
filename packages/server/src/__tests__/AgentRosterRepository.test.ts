@@ -326,4 +326,64 @@ describe('AgentRosterRepository', () => {
       expect(reconciled).toBe(0);
     });
   });
+
+  describe('deleteByProject', () => {
+    it('removes all roster entries for a project', () => {
+      repo.upsertAgent('lead-1', 'lead', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-1', 'developer', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-2', 'developer', 'claude', 'idle', undefined, 'proj-2');
+
+      const deleted = repo.deleteByProject('proj-1');
+      expect(deleted).toBe(2);
+      expect(repo.getByProject('proj-1')).toHaveLength(0);
+      // Other project untouched
+      expect(repo.getByProject('proj-2')).toHaveLength(1);
+    });
+
+    it('returns 0 when no agents match', () => {
+      expect(repo.deleteByProject('nonexistent')).toBe(0);
+    });
+  });
+
+  describe('deleteCrew', () => {
+    it('deletes lead and direct children', () => {
+      repo.upsertAgent('lead-1', 'lead', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-1', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'lead-1' });
+      repo.upsertAgent('rev-1', 'reviewer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'lead-1' });
+
+      const deleted = repo.deleteCrew('lead-1');
+      expect(deleted).toBe(3);
+      expect(repo.getByProject('proj-1')).toHaveLength(0);
+    });
+
+    it('deletes grandchildren recursively', () => {
+      repo.upsertAgent('lead-1', 'lead', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-1', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'lead-1' });
+      // Grandchild: spawned by dev-1, not directly by lead
+      repo.upsertAgent('sub-1', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'dev-1' });
+      // Great-grandchild
+      repo.upsertAgent('sub-2', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'sub-1' });
+
+      const deleted = repo.deleteCrew('lead-1');
+      expect(deleted).toBe(4);
+      expect(repo.getByProject('proj-1')).toHaveLength(0);
+    });
+
+    it('does not delete agents from other crews', () => {
+      repo.upsertAgent('lead-1', 'lead', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-1', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'lead-1' });
+      repo.upsertAgent('lead-2', 'lead', 'claude', 'idle', undefined, 'proj-1');
+      repo.upsertAgent('dev-2', 'developer', 'claude', 'idle', undefined, 'proj-1', { parentId: 'lead-2' });
+
+      const deleted = repo.deleteCrew('lead-1');
+      expect(deleted).toBe(2);
+      // Other crew untouched
+      expect(repo.getAgent('lead-2')).toBeDefined();
+      expect(repo.getAgent('dev-2')).toBeDefined();
+    });
+
+    it('returns 0 for nonexistent lead', () => {
+      expect(repo.deleteCrew('nonexistent')).toBe(0);
+    });
+  });
 });

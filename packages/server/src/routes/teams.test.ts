@@ -690,4 +690,72 @@ describe('teamsRoutes', () => {
       }
     });
   });
+
+  // ── DELETE /crews/:leadId ───────────────────────────────────────
+
+  describe('DELETE /crews/:leadId', () => {
+    it('deletes a crew and returns count', async () => {
+      const mockDeleteCrew = vi.fn().mockReturnValue(3);
+      const mockGetAgent = vi.fn().mockReturnValue({ agentId: 'lead-1', role: 'lead', status: 'terminated' });
+      const srv = createTestServer({
+        agentRoster: { deleteCrew: mockDeleteCrew, getAgent: mockGetAgent } as any,
+        agentManager: { getAll: vi.fn().mockReturnValue([]) } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/lead-1`, { method: 'DELETE' });
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.ok).toBe(true);
+        expect(data.deleted).toBe(3);
+        expect(mockDeleteCrew).toHaveBeenCalledWith('lead-1');
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('returns 404 when lead not in roster', async () => {
+      const srv = createTestServer({
+        agentRoster: { getAgent: vi.fn().mockReturnValue(null) } as any,
+        agentManager: { getAll: vi.fn().mockReturnValue([]) } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/nonexistent`, { method: 'DELETE' });
+        expect(res.status).toBe(404);
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('returns 409 when crew is still active', async () => {
+      const mockGetAgent = vi.fn().mockReturnValue({ agentId: 'lead-1', role: 'lead' });
+      const srv = createTestServer({
+        agentRoster: { getAgent: mockGetAgent } as any,
+        agentManager: { getAll: vi.fn().mockReturnValue([{ id: 'lead-1', status: 'running' }]) } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/lead-1`, { method: 'DELETE' });
+        expect(res.status).toBe(409);
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('returns 503 when roster unavailable', async () => {
+      const srv = createTestServer({ agentRoster: undefined });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/lead-1`, { method: 'DELETE' });
+        expect(res.status).toBe(503);
+      } finally {
+        await srv.stop();
+      }
+    });
+  });
 });
