@@ -69,7 +69,7 @@ Per-project overrides are set in the project creation dialog or project settings
 
 ```yaml
 oversight:
-  defaultTier: balanced  # supervised | balanced | autonomous
+  level: balanced  # supervised | balanced | autonomous
   customInstructions: |
     Always run tests before committing.
     Use conventional commits.

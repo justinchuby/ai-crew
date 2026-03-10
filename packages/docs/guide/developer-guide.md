@@ -83,8 +83,8 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 ### Oversight
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/settings/oversight` | Get oversight config |
-| PUT | `/settings/oversight` | Update oversight tier and custom instructions |
+| GET | `/config/yaml` | Get full config (includes oversight section) |
+| PATCH | `/config` | Update oversight level and custom instructions |
 
 ### Playbooks (Removed)
 
