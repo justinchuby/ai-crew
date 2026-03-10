@@ -16,7 +16,6 @@ import { diffRoutes } from './diff.js';
 import { replayRoutes } from './replay.js';
 import { commsRoutes } from './comms.js';
 import { summaryRoutes } from './summary.js';
-import { debateRoutes } from './debates.js';
 import { sharedRoutes } from './shared.js';
 import { analyticsRoutes } from './analytics.js';
 import { recoveryRoutes } from './recovery.js';
@@ -49,7 +48,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(replayRoutes(ctx));
   router.use(commsRoutes(ctx));
   router.use(summaryRoutes(ctx));
-  router.use(debateRoutes(ctx));
   router.use(sharedRoutes(ctx));
   router.use(analyticsRoutes(ctx));
   router.use(recoveryRoutes(ctx));
