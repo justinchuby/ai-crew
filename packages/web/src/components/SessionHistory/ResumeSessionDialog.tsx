@@ -35,6 +35,9 @@ function AgentCheckbox({
         <div className="flex items-center gap-1.5">
           <span className="font-medium text-th-text">{agent.role}</span>
           <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
+          {agent.provider && (
+            <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 rounded">{agent.provider}</span>
+          )}
           <span className="text-th-text-muted">({agent.model})</span>
           {agent.sessionId ? (
             <span className="text-green-500 flex items-center gap-0.5" title="Has session — can resume with context">

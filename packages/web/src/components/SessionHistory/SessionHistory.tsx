@@ -21,6 +21,7 @@ export interface SessionAgent {
   agentId: string;
   sessionId: string | null;
   lastTaskSummary?: string | null;
+  provider?: string | null;
 }
 
 export interface SessionDetail {
