@@ -127,7 +127,7 @@ export class ServerClientAdapter extends EventEmitter implements AgentAdapter {
     this.client.clearTracking(this.agentId);
     this.removeSubscriptions();
     // Emit exit so AgentManager's onExit handler fires (endSession, cleanup).
-    // AcpAdapter and CopilotSdkAdapter both do this; missing here caused
+    // AcpAdapter does this; missing here caused
     // sessions to stay 'active' after stop.
     this.emit('exit', 0);
   }
@@ -280,7 +280,7 @@ export async function startRemoteBridge(
     });
 
     // For session resume, prefer: spawn result sessionId > agent.resumeSessionId > adapter's agentId
-    // The spawn result carries the actual session ID from the remote CopilotSdkAdapter.
+    // The spawn result carries the actual session ID from the remote adapter.
     // ServerClientAdapter.start() returns agentId (synthetic), so we override it.
     agent.sessionId = result.sessionId || agent.resumeSessionId || sessionId;
     agent._notifySessionReady(agent.sessionId!);

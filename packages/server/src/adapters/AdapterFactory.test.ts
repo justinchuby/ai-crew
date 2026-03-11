@@ -1,8 +1,10 @@
 /**
  * AdapterFactory tests.
  *
- * Covers: backend resolution, adapter creation, SDK fallback,
+ * Covers: backend resolution, adapter creation,
  * start options building, and configuration handling.
+ *
+ * All providers now resolve to ACP backend (no SDK adapters active).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -22,12 +24,6 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
-// Mock Claude SDK (for ClaudeSdkAdapter's dynamic import)
-vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
-  query: vi.fn(),
-  listSessions: vi.fn(),
-}));
-
 describe('AdapterFactory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,12 +32,12 @@ describe('AdapterFactory', () => {
   // ── resolveBackend() ─────────────────────────────────────
 
   describe('resolveBackend()', () => {
-    it('returns copilot-sdk for copilot', () => {
-      expect(resolveBackend('copilot')).toBe('copilot-sdk');
+    it('returns acp for copilot', () => {
+      expect(resolveBackend('copilot')).toBe('acp');
     });
 
-    it('returns claude-sdk for claude', () => {
-      expect(resolveBackend('claude')).toBe('claude-sdk');
+    it('returns acp for claude', () => {
+      expect(resolveBackend('claude')).toBe('acp');
     });
 
     it('returns acp for gemini', () => {
@@ -73,10 +69,17 @@ describe('AdapterFactory', () => {
   // ── createAdapterForProvider() ───────────────────────────
 
   describe('createAdapterForProvider()', () => {
-    it('creates CopilotSdkAdapter for copilot (always SDK)', async () => {
+    it('creates AcpAdapter for copilot', async () => {
       const result = await createAdapterForProvider({ provider: 'copilot' });
-      expect(result.adapter.type).toBe('copilot-sdk');
-      expect(result.backend).toBe('copilot-sdk');
+      expect(result.adapter.type).toBe('acp');
+      expect(result.backend).toBe('acp');
+      expect(result.fallback).toBe(false);
+    });
+
+    it('creates AcpAdapter for claude', async () => {
+      const result = await createAdapterForProvider({ provider: 'claude' });
+      expect(result.adapter.type).toBe('acp');
+      expect(result.backend).toBe('acp');
       expect(result.fallback).toBe(false);
     });
 
@@ -101,89 +104,10 @@ describe('AdapterFactory', () => {
       expect(result.backend).toBe('acp');
     });
 
-    it('creates ClaudeSdkAdapter for claude', async () => {
-      const result = await createAdapterForProvider({ provider: 'claude' });
-      expect(result.adapter.type).toBe('claude-sdk');
-      expect(result.backend).toBe('claude-sdk');
-      expect(result.fallback).toBe(false);
-    });
-
     it('creates MockAdapter for mock provider', async () => {
       const result = await createAdapterForProvider({ provider: 'mock' });
       expect(result.adapter.type).toBe('mock');
       expect(result.backend).toBe('mock');
-    });
-
-    it('passes model to ClaudeSdkAdapter', async () => {
-      const result = await createAdapterForProvider({
-        provider: 'claude',
-        model: 'claude-opus-4',
-      });
-      expect(result.adapter.type).toBe('claude-sdk');
-      expect(result.backend).toBe('claude-sdk');
-    });
-
-    it('falls back to ACP when ClaudeSdkAdapter constructor throws', async () => {
-      // Clear module cache so doMock takes effect on re-import
-      vi.resetModules();
-
-      // Re-mock logger (cleared by resetModules)
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-
-      // Mock a broken ClaudeSdkAdapter
-      vi.doMock('./ClaudeSdkAdapter.js', () => ({
-        ClaudeSdkAdapter: class {
-          constructor() {
-            throw new Error('SDK package not installed');
-          }
-        },
-      }));
-
-      // Re-import factory to pick up the mock
-      const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
-      const result = await createWithBrokenSdk({
-        provider: 'claude',
-      });
-
-      expect(result.backend).toBe('acp');
-      expect(result.fallback).toBe(true);
-      expect(result.fallbackReason).toContain('SDK package not installed');
-      expect(result.adapter.type).toBe('acp');
-
-      // Clean up: reset modules and remove doMock so subsequent dynamic imports get real modules
-      vi.resetModules();
-      vi.unmock('./ClaudeSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
-    });
-
-    it('falls back to ACP when CopilotSdkAdapter constructor throws', async () => {
-      vi.resetModules();
-
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-
-      vi.doMock('./CopilotSdkAdapter.js', () => ({
-        CopilotSdkAdapter: class {
-          constructor() {
-            throw new Error('Copilot SDK not installed');
-          }
-        },
-      }));
-
-      const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
-      const result = await createWithBrokenSdk({ provider: 'copilot' });
-
-      expect(result.backend).toBe('acp');
-      expect(result.fallback).toBe(true);
-      expect(result.fallbackReason).toContain('Copilot SDK not installed');
-      expect(result.adapter.type).toBe('acp');
-
-      vi.resetModules();
-      vi.unmock('./CopilotSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
     });
 
     it('handles unknown provider gracefully (defaults to ACP)', async () => {
@@ -320,83 +244,40 @@ describe('AdapterFactory', () => {
       expect(opts.cliArgs).toContain('--no-color');
       expect(opts.cliArgs).toContain('--agent=lead');
     });
+
+    it('resolves claude preset with claude-agent-acp binary', () => {
+      const opts = buildStartOptions(
+        { ...baseConfig, provider: 'claude' },
+        { cwd: '/test' },
+      );
+      expect(opts.cliCommand).toBe('claude-agent-acp');
+    });
   });
 
   // ── Integration: Factory + Start Options ──────────────────
 
   describe('integration', () => {
-    it('copilot: always creates CopilotSdkAdapter (never ACP)', async () => {
-      // Fresh import needed since earlier fallback tests reset modules
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      // Restore real CopilotSdkAdapter (may have been broken-mocked by fallback test)
-      vi.doMock('./CopilotSdkAdapter.js', () => vi.importActual('./CopilotSdkAdapter.js'));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
+    it('copilot: creates AcpAdapter', async () => {
       const config: AdapterConfig = {
         provider: 'copilot',
         cliCommand: 'copilot',
         cliArgs: [],
       };
 
-      const { adapter, backend } = await freshFactory(config);
+      const { adapter, backend } = await createAdapterForProvider(config);
 
-      expect(backend).toBe('copilot-sdk');
-      expect(adapter.type).toBe('copilot-sdk');
-
-      vi.resetModules();
-      vi.unmock('./CopilotSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
-    });
-
-    it('claude SDK mode: creates SDK adapter', async () => {
-      // Reset and re-import to ensure clean module state after fallback test's doMock
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      vi.doMock('@anthropic-ai/claude-agent-sdk', () => ({
-        query: vi.fn(),
-        listSessions: vi.fn(),
-      }));
-      // Restore real ClaudeSdkAdapter (overrides the broken mock from fallback test)
-      vi.doMock('./ClaudeSdkAdapter.js', () => vi.importActual('./ClaudeSdkAdapter.js'));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
-      const config: AdapterConfig = {
-        provider: 'claude',
-        model: 'claude-opus-4',
-      };
-
-      const result = await freshFactory(config);
-      expect(result.backend).toBe('claude-sdk');
-      expect(result.adapter.type).toBe('claude-sdk');
-    });
-
-    it('claude falls back to ACP if SDK unavailable', async () => {
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      vi.doMock('./ClaudeSdkAdapter.js', () => ({
-        ClaudeSdkAdapter: class {
-          constructor() { throw new Error('SDK not installed'); }
-        },
-      }));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
-      const config: AdapterConfig = {
-        provider: 'claude',
-        cliCommand: 'claude',
-        cliArgs: [],
-      };
-
-      const { adapter, backend, fallback } = await freshFactory(config);
       expect(backend).toBe('acp');
       expect(adapter.type).toBe('acp');
-      expect(fallback).toBe(true);
+    });
+
+    it('claude: creates AcpAdapter', async () => {
+      const config: AdapterConfig = {
+        provider: 'claude',
+      };
+
+      const result = await createAdapterForProvider(config);
+      expect(result.backend).toBe('acp');
+      expect(result.adapter.type).toBe('acp');
     });
 
     it('config overrides take precedence over presets', () => {

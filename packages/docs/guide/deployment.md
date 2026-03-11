@@ -8,10 +8,9 @@ This guide covers deploying Flightdeck in production. For local development, see
 - **npm 10+** — For dependency management
 - **At least one CLI provider** — Install one of: [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli), [Claude Code](https://docs.anthropic.com/en/docs/agents/claude-code), Gemini CLI, OpenCode, Cursor, or Codex
 
-### Optional
+### Provider-Specific
 
-- **@anthropic-ai/claude-agent-sdk** — For native Claude adapter with session resume
-- **@github/copilot-sdk** — For native Copilot adapter with session resume
+- **@zed-industries/claude-agent-acp** — Required for the Claude provider. Install globally: `npm install -g @zed-industries/claude-agent-acp`
 
 ## Quick Start (Single Machine)
 

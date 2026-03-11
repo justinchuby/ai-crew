@@ -22,31 +22,6 @@ export type {
 
 export { AcpAdapter } from './AcpAdapter.js';
 export { MockAdapter } from './MockAdapter.js';
-export { ClaudeSdkAdapter } from './ClaudeSdkAdapter.js';
-export { CopilotSdkAdapter } from './CopilotSdkAdapter.js';
-export type {
-  SdkQuery,
-  SdkMessage,
-  SdkAssistantMessage,
-  SdkUserMessage,
-  SdkSystemMessage,
-  SdkResultMessage,
-  QueryOptions,
-  SdkSessionInfo,
-  CanUseToolCallback,
-} from './claude-sdk-types.js';
-export type {
-  CopilotClientStub,
-  CopilotSessionStub,
-  CopilotClientOptions,
-  CopilotSessionConfig,
-  CopilotResumeSessionConfig,
-  CopilotSessionEvent,
-  CopilotPermissionHandler,
-  CopilotPermissionRequest,
-  CopilotSessionMetadata,
-  CopilotConnectionState,
-} from './copilot-sdk-types.js';
 export {
   createAdapterForProvider,
   buildStartOptions,

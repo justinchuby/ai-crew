@@ -64,7 +64,7 @@ export interface AgentJSON {
   isSystemAgent?: boolean;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   backend?: string;
 }
 
@@ -82,7 +82,16 @@ export class Agent {
   public messages: string[] = [];
   /** Index into messages[] marking the start of the current task's output */
   public taskOutputStartIndex: number = 0;
-  public sessionId: string | null = null;
+  private _sessionId: string | null = null;
+  /** ACP session ID — set once when the session starts, immutable thereafter. */
+  get sessionId(): string | null { return this._sessionId; }
+  set sessionId(value: string | null) {
+    if (this._sessionId !== null && value !== this._sessionId) {
+      logger.warn({ module: 'agent', msg: 'Ignoring sessionId overwrite', agentId: this.id, current: this._sessionId, attempted: value });
+      return;
+    }
+    this._sessionId = value;
+  }
   public projectName?: string;
   public projectId?: string;
   /** Model override for this agent (e.g. "claude-opus-4.6"). Overrides role default. */
@@ -105,7 +114,7 @@ export class Agent {
   public isSystemAgent: boolean = false;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   public provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   public backend?: string;
   /** Organized artifact storage path (~/.flightdeck/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
   public artifactDir?: string;

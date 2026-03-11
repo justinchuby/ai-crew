@@ -23,7 +23,6 @@ import { logger } from './utils/logger.js';
 
 // Adapter implementations
 export { AcpAdapter } from './adapters/AcpAdapter.js';
-export { ClaudeSdkAdapter } from './adapters/ClaudeSdkAdapter.js';
 export { MockAdapter } from './adapters/MockAdapter.js';
 
 // Factory

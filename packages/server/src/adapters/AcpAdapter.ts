@@ -142,7 +142,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           }),
           SDK_TIMEOUT_MS, 'loadSession',
         );
-        // LoadSessionResponse has no sessionId — the session ID stays the same on successful load
         sessionId = opts.sessionId;
       } catch (err) {
         // Resume failed — do NOT fall back to a new session.

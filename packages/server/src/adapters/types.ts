@@ -141,7 +141,7 @@ export interface AgentAdapter extends EventEmitter {
 // ── Factory Types ───────────────────────────────────────────────────
 
 export interface AdapterFactoryOptions {
-  type: 'acp' | 'mock' | 'claude-sdk' | 'copilot-sdk' | 'daemon';
+  type: 'acp' | 'mock';
   model?: string;
 }
 

@@ -124,7 +124,7 @@ export interface AgentInfo {
   estimatedExhaustionMinutes?: number | null;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   backend?: string;
 }
 

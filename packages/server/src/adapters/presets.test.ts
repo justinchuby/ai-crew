@@ -37,9 +37,9 @@ describe('Provider Presets', () => {
       }
     });
 
-    it('all presets have non-empty args', () => {
+    it('all presets have args array (may be empty for some providers)', () => {
       for (const preset of Object.values(PROVIDER_PRESETS) as ProviderPreset[]) {
-        expect(preset.args.length).toBeGreaterThan(0);
+        expect(Array.isArray(preset.args)).toBe(true);
       }
     });
   });
@@ -91,11 +91,11 @@ describe('Provider Presets', () => {
     });
   });
 
-  describe('Claude Code preset', () => {
-    it('uses claude binary with --acp --stdio', () => {
+  describe('Claude preset', () => {
+    it('uses claude-agent-acp binary', () => {
       const preset = PROVIDER_PRESETS.claude;
-      expect(preset.binary).toBe('claude');
-      expect(preset.args).toEqual(['--acp', '--stdio']);
+      expect(preset.binary).toBe('claude-agent-acp');
+      expect(preset.args).toEqual([]);
       expect(preset.supportsResume).toBe(true);
       expect(preset.requiredEnvVars).toContain('ANTHROPIC_API_KEY');
       expect(preset.agentFileFormat).toBe('CLAUDE.md');
@@ -107,7 +107,7 @@ describe('Provider Presets', () => {
       const preset = getPreset('copilot');
       expect(preset).toBeDefined();
       expect(preset!.id).toBe('copilot');
-      expect(preset!.name).toBe('GitHub Copilot SDK');
+      expect(preset!.name).toBe('GitHub Copilot');
     });
 
     it('returns undefined for an unknown provider ID', () => {
@@ -175,7 +175,7 @@ describe('Provider Presets', () => {
   describe('detectInstalledProviders()', () => {
     it('returns presets for binaries found on PATH', async () => {
       const checker = async (binary: string) =>
-        binary === 'copilot' || binary === 'claude';
+        binary === 'copilot' || binary === 'claude-agent-acp';
 
       const installed = await detectInstalledProviders(checker);
       const ids = installed.map((p: ProviderPreset) => p.id);

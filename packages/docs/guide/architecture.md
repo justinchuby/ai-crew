@@ -23,7 +23,7 @@ Flightdeck uses a **three-tier architecture** that separates agent process manag
 │  CLI adapters (Copilot, Claude, Gemini, etc.)    │
 │  Process isolation, PID files, event replay       │
 └──────────────────┬───────────────────────────────┘
-                   │ SDK / ACP protocol
+                   │ ACP protocol (stdio)
                    ▼
             ┌──────────────┐
             │  CLI Binaries │
@@ -71,15 +71,14 @@ The agent server runs as a **detached child process** that manages CLI agent lif
 
 ### CLI Adapters
 
-Three adapter backends implement the `AgentAdapter` interface:
+All providers use a single adapter backend that implements the `AgentAdapter` interface:
 
 | Backend | Transport | Session Resume | Used By |
 |---------|-----------|---------------|---------|
-| **AcpAdapter** | ACP over stdio | Best-effort | All 6 providers |
-| **ClaudeSdkAdapter** | `@anthropic-ai/claude-agent-sdk` | Explicit (`query({ resume })`) | Claude |
-| **CopilotSdkAdapter** | `@github/copilot-sdk` JSON-RPC | Explicit (`client.resumeSession()`) | Copilot |
+| **AcpAdapter** | ACP over stdio | Best-effort (`loadSession()`, falls back to `newSession()`) | All providers (Copilot, Claude, Gemini, Cursor, Codex, OpenCode) |
+| **MockAdapter** | In-memory | N/A | Testing only |
 
-All SDK imports are **lazy** (`dynamic import()`) so the server starts without any SDK installed. See the [adapter-architecture-pattern](/skills) for details.
+See the [adapter-architecture-pattern](/skills) for details.
 
 ## Tier 2: Orchestration Server
 
