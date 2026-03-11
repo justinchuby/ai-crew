@@ -441,6 +441,118 @@ describe('SystemCommands validation', () => {
       expect.stringContaining('REQUEST_LIMIT_CHANGE validation error'),
     );
   });
+
+  // ── QUERY_PROVIDERS ──
+
+  it('QUERY_PROVIDERS rejects non-lead agents', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent({ role: { id: 'developer', name: 'Developer' } });
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Only the Project Lead'),
+    );
+  });
+
+  it('QUERY_PROVIDERS returns unavailable message when providerManager not set', () => {
+    const ctx = makeCtx({ providerManager: undefined });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Provider information is not available yet'),
+    );
+  });
+
+  it('QUERY_PROVIDERS lists providers ranked by preference with status', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot', 'claude', 'gemini']),
+        getProviderStatus: vi.fn((id: string) => ({
+          enabled: id !== 'gemini',
+          installed: id === 'copilot',
+        })),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('AVAILABLE PROVIDERS');
+    // copilot: enabled + installed → ✓
+    expect(response).toContain('(copilot) — ✓');
+    // claude: enabled but not installed → ⚠
+    expect(response).toContain('(claude) — ⚠ not installed');
+    // gemini: disabled → ✗
+    expect(response).toContain('(gemini) — ✗ disabled');
+    // Ranking order preserved
+    const copilotIdx = response.indexOf('1.');
+    const claudeIdx = response.indexOf('2.');
+    const geminiIdx = response.indexOf('3.');
+    expect(copilotIdx).toBeLessThan(claudeIdx);
+    expect(claudeIdx).toBeLessThan(geminiIdx);
+  });
+
+  it('QUERY_PROVIDERS includes default model and resume support', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['claude']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('Default model:');
+    expect(response).toContain('Resume support:');
+  });
+
+  it('QUERY_PROVIDERS includes project model config when available', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue('proj-123'),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+      projectRegistry: {
+        getModelConfig: vi.fn().mockReturnValue({
+          config: {
+            lead: ['claude-sonnet-4', 'gpt-5.2-codex'],
+            developer: ['claude-haiku-4.5'],
+          },
+        }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('PROJECT MODEL CONFIGURATION');
+    expect(response).toContain('lead: claude-sonnet-4, gpt-5.2-codex');
+    expect(response).toContain('developer: claude-haiku-4.5');
+  });
+
+  it('QUERY_PROVIDERS omits model config section when no project', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).not.toContain('PROJECT MODEL CONFIGURATION');
+  });
 });
 
 // ── TimerCommands validation ─────────────────────────────────────────
