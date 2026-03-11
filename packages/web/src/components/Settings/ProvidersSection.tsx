@@ -59,7 +59,7 @@ const PROVIDER_DOCS: Record<string, string> = {
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
 const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: [],
+  copilot: ['--acp', '--stdio'],
   claude: [],
   gemini: ['--experimental-acp'],
   cursor: ['acp'],
