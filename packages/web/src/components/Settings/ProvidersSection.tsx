@@ -66,7 +66,7 @@ const PROVIDER_DOCS: Record<string, string> = {
 const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
   copilot: ['--acp', '--stdio'],
   claude: [],
-  gemini: ['--experimental-acp'],
+  gemini: ['--acp'],
   cursor: ['acp'],
   codex: [],
   opencode: ['acp'],

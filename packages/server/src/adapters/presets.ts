@@ -59,7 +59,7 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
     id: 'gemini',
     name: 'Google Gemini CLI',
     binary: 'gemini',
-    args: ['--experimental-acp'],
+    args: ['--acp'],
     requiredEnvVars: ['GEMINI_API_KEY'],
     transport: 'stdio',
     supportsResume: true,

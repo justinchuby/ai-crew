@@ -54,10 +54,10 @@ describe('Provider Presets', () => {
   });
 
   describe('Gemini preset', () => {
-    it('uses gemini binary with --experimental-acp', () => {
+    it('uses gemini binary with --acp', () => {
       const preset = PROVIDER_PRESETS.gemini;
       expect(preset.binary).toBe('gemini');
-      expect(preset.args).toEqual(['--experimental-acp']);
+      expect(preset.args).toEqual(['--acp']);
       expect(preset.supportsResume).toBe(true);
       expect(preset.requiredEnvVars).toContain('GEMINI_API_KEY');
     });
