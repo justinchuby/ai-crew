@@ -37,10 +37,18 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
   {
     id: 'gemini-3-pro-preview',
     name: 'Gemini 3 Pro',
-    tier: 'standard',
+    tier: 'premium',
     contextWindow: 1000000,
     costPer1kTokens: 1.25,
     bestFor: ['large-context', 'multi-file', 'research'],
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash',
+    tier: 'standard',
+    contextWindow: 1000000,
+    costPer1kTokens: 0.6,
+    bestFor: ['large-context', 'fast-iteration', 'multi-file'],
   },
   {
     id: 'gpt-5.1-codex',

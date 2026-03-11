@@ -184,9 +184,9 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-3-pro-preview to sonnet on Claude', () => {
+    it('maps gemini-3-pro-preview to opus on Claude', () => {
       const result = resolveModel('gemini-3-pro-preview', 'claude')!;
-      expect(result.model).toBe('sonnet');
+      expect(result.model).toBe('opus');
       expect(result.translated).toBe(true);
     });
 

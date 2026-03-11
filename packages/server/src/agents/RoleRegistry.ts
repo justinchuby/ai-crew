@@ -538,7 +538,7 @@ Defer non-blocking issues for later follow-up:
 
 == MODEL SELECTION ==
 Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. Override the default by setting "model" in CREATE_AGENT.
-Available models: claude-opus-4.6, claude-sonnet-4.6, claude-sonnet-4.5, claude-haiku-4.5, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2, gpt-5.1-codex, gemini-3-pro-preview, gpt-4.1
+Available models: claude-opus-4.6, claude-sonnet-4.6, claude-sonnet-4.5, claude-haiku-4.5, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2, gpt-5.1-codex, gemini-3-pro-preview, gemini-3-flash-preview, gpt-4.1
 Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
 
 == TEAMWORK PATTERNS ==

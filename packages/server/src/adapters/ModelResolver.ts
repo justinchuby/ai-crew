@@ -103,7 +103,8 @@ const EQUIVALENCES: Record<string, Record<string, string>> = {
   'gpt-4.1': { anthropic: 'claude-sonnet-4', google: 'gemini-2.5-flash' },
 
   // Google → others
-  'gemini-3-pro-preview': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.1-codex' },
+  'gemini-3-pro-preview': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-3-flash-preview': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.1-codex' },
   'gemini-2.5-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
   'gemini-2.5-flash': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.1-codex' },
   'gemini-2.5-flash-lite': { anthropic: 'claude-haiku-4.5', openai: 'gpt-5.1-codex-mini' },
