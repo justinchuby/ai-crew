@@ -49,12 +49,12 @@ const PROVIDER_AUTH_LABELS: Record<string, string> = {
 };
 
 const PROVIDER_DOCS: Record<string, string> = {
-  copilot: 'https://docs.github.com/en/copilot',
-  claude: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-agent-sdk',
-  gemini: 'https://ai.google.dev/gemini-api/docs/api-key',
-  opencode: 'https://opencode.ai/docs/providers/',
+  copilot: 'https://github.com/features/copilot/cli',
+  claude: 'https://github.com/zed-industries/claude-agent-acp#installation',
+  gemini: 'https://geminicli.com/docs/get-started/installation/',
+  opencode: 'https://opencode.ai/docs/',
   cursor: 'https://docs.cursor.com',
-  codex: 'https://platform.openai.com/docs/api-reference',
+  codex: 'https://developers.openai.com/codex/quickstart?setup=cli',
 };
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
