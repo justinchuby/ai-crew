@@ -74,12 +74,6 @@ export interface AdapterCapabilities {
   supportsPlans: boolean;
 }
 
-export interface UserInputRequest {
-  id: string;
-  question: string;
-  timestamp: string;
-}
-
 // ── Start Options ───────────────────────────────────────────────────
 
 export interface AdapterStartOptions {
@@ -94,12 +88,8 @@ export interface AdapterStartOptions {
   sessionId?: string;
   /** Model name or tier alias (resolved by ModelResolver before use) */
   model?: string;
-  /** Maximum turns before auto-stop (SDK adapters only) */
+  /** Maximum turns before auto-stop */
   maxTurns?: number;
-  /** System prompt override (SDK adapters only) */
-  systemPrompt?: string;
-  /** Enable the ask_user tool (only for root project leads) */
-  enableUserInput?: boolean;
 }
 
 // ── Core Interface ──────────────────────────────────────────────────
@@ -119,7 +109,6 @@ export interface AdapterStartOptions {
  *   'prompting'       (active: boolean)
  *   'prompt_complete'  (reason: string)
  *   'response_start'  ()
- *   'user_input_request' (req: UserInputRequest)
  *   'exit'            (code: number)
  *   'usage'           (usage: UsageInfo)
  */
@@ -135,7 +124,6 @@ export interface AgentAdapter extends EventEmitter {
   prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;
   cancel(): Promise<void>;
   terminate(): void | Promise<void>;
-  resolveUserInput(response: string): void;
 }
 
 // ── Factory Types ───────────────────────────────────────────────────

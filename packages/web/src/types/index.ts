@@ -80,13 +80,6 @@ export interface AcpPlanEntry {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
-export interface AcpUserInputRequest {
-  id: string;
-  agentId: string;
-  question: string;
-  timestamp: string;
-}
-
 export interface AcpSessionInfo {
   sessionId: string;
   isPrompting: boolean;
@@ -109,7 +102,6 @@ export interface AgentInfo {
   plan?: AcpPlanEntry[];
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];
-  pendingUserInput?: AcpUserInputRequest;
   projectName?: string;
   projectId?: string;
   model?: string;

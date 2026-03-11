@@ -12,7 +12,6 @@ import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
-import { UserInputDialog } from './components/UserInputDialog';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play, Bug } from 'lucide-react';
@@ -407,7 +406,6 @@ export function App() {
         )}
       </div>
       <ToastContainer />
-      <UserInputDialog />
       <ApprovalSlideOver />
       <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />

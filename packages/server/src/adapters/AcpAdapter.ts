@@ -392,10 +392,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     }
   }
 
-  resolveUserInput(_response: string): void {
-    // ACP subprocess adapter does not support user input requests
-  }
-
   async cancel(): Promise<void> {
     if (this.connection && this.sessionId) {
       await this.connection.cancel({ sessionId: this.sessionId });

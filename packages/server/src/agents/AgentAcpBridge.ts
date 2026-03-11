@@ -114,9 +114,6 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agentFlag: agentFlagForRole(agent.role.id),
   });
 
-  // Only root project leads get the ask_user tool
-  startOpts.enableUserInput = agent.role.id === 'lead' && !agent.parentId;
-
   conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;
     agent._notifySessionReady(sessionId);
@@ -188,10 +185,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   conn.on('plan', (entries: PlanEntry[]) => withCtx(() => {
     agent.plan = entries;
     agent._notifyPlan(entries);
-  }));
-
-  conn.on('user_input_request', (request: any) => withCtx(() => {
-    agent._notifyUserInputRequest(request);
   }));
 
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {

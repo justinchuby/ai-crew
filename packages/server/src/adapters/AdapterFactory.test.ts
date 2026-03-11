@@ -215,13 +215,12 @@ describe('AdapterFactory', () => {
       expect(opts.cliCommand).toBe('my-binary');
     });
 
-    it('passes through maxTurns and systemPrompt', () => {
+    it('passes through maxTurns', () => {
       const opts = buildStartOptions(
         baseConfig,
-        { cwd: '/test', maxTurns: 10, systemPrompt: 'You are a helper.' },
+        { cwd: '/test', maxTurns: 10 },
       );
       expect(opts.maxTurns).toBe(10);
-      expect(opts.systemPrompt).toBe('You are a helper.');
     });
 
     it('resolves model via ModelResolver', () => {

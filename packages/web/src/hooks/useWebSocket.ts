@@ -409,13 +409,6 @@ export function useWebSocket() {
           useToastStore.getState().add('error', `Session resume failed (agent ${agentId}): ${error}`);
           break;
         }
-        case 'agent:user_input_request': {
-          updateAgent(msg.agentId, { pendingUserInput: msg.request });
-          const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-          const roleName = agent?.role?.name ?? msg.agentId?.slice(0, 8);
-          useToastStore.getState().add('info', `💬 Agent ${roleName} is asking you a question`);
-          break;
-        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);

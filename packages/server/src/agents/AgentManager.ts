@@ -64,7 +64,6 @@ export interface AgentManagerEvents {
   'agent:content': { agentId: string; content: string };
   'agent:thinking': { agentId: string; text: string };
   'agent:plan': { agentId: string; plan: PlanEntry[] };
-  'agent:user_input_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
   'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
@@ -132,7 +131,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
   private collectiveMemory?: CollectiveMemory;
   private configStore?: import('../config/ConfigStore.js').ConfigStore;
-  private userInputTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -624,29 +622,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     });
 
-    agent.onUserInputRequest((request) => {
-      // Defense-in-depth: non-root agents shouldn't have the ask_user tool
-      // (disabled at SDK level via enableUserInput), but guard here too
-      if (agent.parentId) {
-        agent.resolveUserInput('User is not available. Use your best judgement.');
-        logger.info({ module: 'agent-manager', msg: 'Auto-resolved user input (non-lead agent)', agentId: agent.id, role: agent.role.id });
-        return;
-      }
-
-      this.emit('agent:user_input_request', { agentId: agent.id, request });
-
-      // In autonomous mode, auto-respond after 2 minutes so agent isn't blocked
-      const effectiveLevel = this.getEffectiveOversightLevel(agent.projectId);
-      if (effectiveLevel === 'autonomous') {
-        const timer = setTimeout(() => {
-          this.userInputTimers.delete(agent.id);
-          agent.resolveUserInput('User is not available. Use your best judgement.');
-          logger.info({ module: 'agent-manager', msg: 'Auto-resolved user input (autonomous mode timeout)', agentId: agent.id });
-        }, 120_000);
-        this.userInputTimers.set(agent.id, timer);
-      }
-    });
-
     // When an agent's session is established, broadcast session ID
     agent.onSessionReady((sessionId) => {
       this.emit('agent:session_ready', { agentId: agent.id, sessionId });
@@ -742,7 +717,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.clearHungTimer(agent.id);
-      this.clearUserInputTimer(agent.id);
       this.dispatcher.clearBuffer(agent.id);
       logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
@@ -1192,32 +1166,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.autoTerminateTimeoutMs = ms;
   }
 
-  resolveUserInput(agentId: string, response: string): boolean {
-    const agent = this.agents.get(agentId);
-    if (!agent) return false;
-    // Cancel the autonomous-mode auto-resolve timer if active
-    const timer = this.userInputTimers.get(agentId);
-    if (timer) {
-      clearTimeout(timer);
-      this.userInputTimers.delete(agentId);
-    }
-    agent.resolveUserInput(response);
-    return true;
-  }
-
   private clearHungTimer(agentId: string): void {
     const timer = this.hungTimers.get(agentId);
     if (timer) {
       clearTimeout(timer);
       this.hungTimers.delete(agentId);
-    }
-  }
-
-  private clearUserInputTimer(agentId: string): void {
-    const timer = this.userInputTimers.get(agentId);
-    if (timer) {
-      clearTimeout(timer);
-      this.userInputTimers.delete(agentId);
     }
   }
 

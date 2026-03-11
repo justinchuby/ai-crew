@@ -127,7 +127,6 @@ export function buildStartOptions(
     sessionId: agentOpts.sessionId,
     model: resolution?.model,
     maxTurns: agentOpts.maxTurns,
-    systemPrompt: agentOpts.systemPrompt,
   };
 }
 
