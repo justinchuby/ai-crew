@@ -299,6 +299,17 @@ export function App() {
               <VersionBadge />
             </div>
             <div className="flex items-center gap-3">
+              <a
+                href={buildFeedbackUrl({ title: 'User feedback' })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
+                title="Submit Issue"
+                data-testid="top-bar-submit-issue"
+              >
+                <Bug className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Submit Issue</span>
+              </a>
               <button
                 onClick={togglePause}
                 title={systemPaused ? 'Resume system' : 'Pause system'}
@@ -322,17 +333,6 @@ export function App() {
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <StatusPopover />
-              <a
-                href={buildFeedbackUrl({ title: 'User feedback' })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
-                title="Submit Issue"
-                data-testid="top-bar-submit-issue"
-              >
-                <Bug className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Submit Issue</span>
-              </a>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
