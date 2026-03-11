@@ -529,7 +529,6 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Team:</span> <span className="text-th-text">{profile.teamId}</span></div>
               <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{profile.projectId ?? '—'}</span></div>
               <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
               <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleString()}</span></div>

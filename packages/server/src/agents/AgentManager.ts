@@ -546,11 +546,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Persist agent to roster DB for crash recovery
     if (this.agentRosterRepository) {
       try {
+        // teamId = root lead ID so all agents in a crew share the same team
+        const teamId = this.getRootLeadId(agent.id);
         this.agentRosterRepository.upsertAgent(
           agent.id, role.id, effectiveModel || 'default', 'idle',
           undefined, agent.projectId,
           parentId ? { parentId } : undefined,
-          'default',
+          teamId,
           agent.provider,
         );
       } catch (err: any) {
@@ -962,6 +964,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       return this.getProjectIdForAgent(agent.parentId);
     }
     return undefined;
+  }
+
+  /** Walk up the parent chain to find the root lead agent's ID. */
+  private getRootLeadId(agentId: string, visited = new Set<string>()): string {
+    if (visited.has(agentId)) return agentId;
+    visited.add(agentId);
+    const agent = this.agents.get(agentId);
+    if (!agent || !agent.parentId) return agentId;
+    return this.getRootLeadId(agent.parentId, visited);
   }
 
   /** Auto-spawn a Secretary agent as a child of the given lead. Returns the secretary or null. */
