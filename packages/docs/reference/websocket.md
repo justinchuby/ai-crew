@@ -38,12 +38,10 @@ All events follow the shape `{ type: string, payload: object }`.
 |-------|---------|-------------|
 | `init` | `{ agents[], locks[], paused }` | Initial state snapshot sent on WebSocket connection |
 | `system:paused` | `{ paused: boolean }` | System pause toggled on or off |
-| `agentServerStatus` | `{ status, agents?, stats? }` | Agent server health check |
 | `config:reloaded` | `{}` | Configuration file reloaded |
 | `activity` | `{ entry }` | Activity log entry recorded |
 | `attention:changed` | `{}` | Signal to refetch attention items (clients should debounce ~300ms) |
 | `alert:new` | `{ alert }` | New alert triggered |
-| `reconciliation:complete` | `{ added, removed, updated }` | Agent reconciliation finished |
 
 ### Agent Lifecycle
 

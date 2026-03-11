@@ -50,7 +50,7 @@ Sessions can be stopped in three ways:
 
 - **User stop** — Click "Stop" in the UI. All agents are terminated gracefully.
 - **Natural completion** — All tasks complete and the lead signals `COMPLETE_TASK` for the final task.
-- **Mass failure** — If too many agents fail in a short window, the `MassFailureDetector` pauses spawning and the session transitions to failed.
+- **Mass failure** — If too many agents fail in a short window, the system pauses spawning and the session transitions to failed.
 
 ## Session Persistence
 
@@ -79,9 +79,9 @@ Session persistence is provider-dependent — the CLI tool decides what to save 
 
 ### Crashed Sessions
 
-If a session crashes without proper shutdown (e.g., OOM kill, power loss, agent server crash):
+If a session crashes without proper shutdown (e.g., OOM kill, power loss, server crash):
 
-- The CLI process is orphaned and terminates when its parent dies
+- The CLI processes are orphaned and terminate when their parent dies
 - Attempting to resume a crashed session may fail if the provider didn't persist state
 - The UI shows an error message: the user should start a new session instead of resuming
 - Database records (agent roster, task DAG, decisions, knowledge) are still intact — only the provider's conversation history may be lost
@@ -232,28 +232,17 @@ Navigate to a project → click the session history icon (or use the Sessions ta
 
 ## Recovery
 
-### Orchestrator Restart
+### Server Restart
 
-When the orchestrator restarts:
+When the server restarts:
 
-1. **Stale reconciliation** — `ProjectRegistry.reconcileStaleSessions()` checks which agents are still alive via the agent server
-2. **Live agents preserved** — If the agent server is still running (detached process), agents continue working
-3. **Dead agents marked** — Agents that crashed are marked as terminated in the roster
-4. **Auto-resume** — `SessionResumeManager` attempts to resume agents via ACP `loadSession()`
-
-### Agent Server Crash
-
-If the agent server crashes:
-
-1. All running CLI processes are orphaned (they terminate when their parent dies)
-2. The orchestrator detects the disconnection via health monitoring (ping/pong timeout)
-3. On next startup, the orchestrator forks a new agent server
-4. `AgentServerRecovery` reads the roster and attempts to re-spawn agents
+1. **Stale reconciliation** — `ProjectRegistry.reconcileStaleSessions()` marks agents from previous runs as terminated
+2. **Dead agents marked** — Agents that were running are marked as terminated in the roster
+3. **Auto-resume** — `SessionResumeManager` attempts to resume agents via ACP `loadSession()`
 
 ### Network Disconnection
 
 If the WebSocket connection between the client and server drops:
 
 1. The client shows a "Connection Lost" indicator in the AttentionBar
-2. `AgentReconciliation` auto-runs on reconnect to sync the UI with server state
-3. Missed events are replayed if the server's EventBuffer still has them
+2. On reconnect, the UI refetches current state from the server to sync up
