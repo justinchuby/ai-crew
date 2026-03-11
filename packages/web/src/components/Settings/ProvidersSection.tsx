@@ -59,8 +59,8 @@ const PROVIDER_DOCS: Record<string, string> = {
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
 const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: [],  // Copilot uses in-process SDK — no CLI args needed
-  claude: [],   // Claude uses in-process SDK — no CLI args needed
+  copilot: [],
+  claude: [],
   gemini: ['--experimental-acp'],
   cursor: ['acp'],
   codex: ['--acp'],
@@ -77,24 +77,14 @@ const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
   opencode: [],
 };
 
-/** Whether the provider supports in-process SDK mode. */
-const PROVIDER_SDK_CAPABLE: Record<string, boolean> = {
-  copilot: true,
-  claude: true,
-  gemini: false,
-  cursor: false,
-  codex: false,
-  opencode: false,
-};
-
 /** Whether the provider supports session resume. */
 const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
   copilot: true,
   claude: true,
-  gemini: false,
+  gemini: true,
   cursor: true,
   codex: false,
-  opencode: false,
+  opencode: true,
 };
 
 /** Whether the provider is in preview (not production-ready). Copilot is GA. */
@@ -157,7 +147,6 @@ function ProviderCard({
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
   const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
   const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
-  const sdkCapable = PROVIDER_SDK_CAPABLE[provider.id] ?? false;
   const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
 
   return (
@@ -225,15 +214,12 @@ function ProviderCard({
         <div className="border-t border-th-border px-4 py-3 bg-th-bg-alt/30 space-y-3">
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-3 text-xs">
-            {/* Binary — only show for non-SDK providers */}
-            {!sdkCapable && (
-              <div>
-                <span className="text-th-text-muted flex items-center gap-1"><Terminal className="w-3 h-3" /> Binary:</span>
-                <code className="font-mono text-th-text-alt">
-                  {provider.binaryPath ?? provider.id}
-                </code>
-              </div>
-            )}
+            <div>
+              <span className="text-th-text-muted flex items-center gap-1"><Terminal className="w-3 h-3" /> Binary:</span>
+              <code className="font-mono text-th-text-alt">
+                {provider.binaryPath ?? provider.id}
+              </code>
+            </div>
             <div>
               <span className="text-th-text-muted">Status:</span>{' '}
               <span className={provider.installed ? 'text-green-400' : 'text-th-text-muted'}>
@@ -241,8 +227,7 @@ function ProviderCard({
                 {provider.version && ` (${provider.version})`}
               </span>
             </div>
-            {/* Default Args — only show for non-SDK providers that have args */}
-            {!sdkCapable && defaultArgs.length > 0 && (
+            {defaultArgs.length > 0 && (
               <div>
                 <span className="text-th-text-muted flex items-center gap-1"><Settings2 className="w-3 h-3" /> Default Args:</span>
                 <code className="font-mono text-th-text-alt">
@@ -254,9 +239,9 @@ function ProviderCard({
               <span className="text-th-text-muted">Features:</span>{' '}
               <span className="text-th-text-alt">
                 {[
-                  sdkCapable && 'In-process SDK',
+                  'ACP',
                   supportsResume && 'Resume',
-                ].filter(Boolean).join(', ') || 'CLI mode'}
+                ].filter(Boolean).join(', ')}
               </span>
             </div>
           </div>

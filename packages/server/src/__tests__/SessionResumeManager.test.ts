@@ -388,12 +388,12 @@ describe('SessionResumeManager', () => {
       expect(manager.providerSupportsResume).toBe(true);
     });
 
-    it('reports supportsResume=false for gemini', () => {
+    it('reports supportsResume=true for gemini', () => {
       const geminiManager = new SessionResumeManager(
         mockAgentManager as any, rosterRepo, delegationRepo,
         mockRoleRegistry as any, { ...testConfig, provider: 'gemini' } as ServerConfig,
       );
-      expect(geminiManager.providerSupportsResume).toBe(false);
+      expect(geminiManager.providerSupportsResume).toBe(true);
       geminiManager.dispose();
     });
 

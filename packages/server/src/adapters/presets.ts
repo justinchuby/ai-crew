@@ -62,7 +62,7 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
     args: ['--experimental-acp'],
     requiredEnvVars: ['GEMINI_API_KEY'],
     transport: 'stdio',
-    supportsResume: false,
+    supportsResume: true,
     modelFlag: '--model',
     defaultModel: 'gemini-2.5-pro',
     agentFileFormat: '.gemini/agents/*.md',
@@ -74,7 +74,7 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
     binary: 'opencode',
     args: ['acp'],
     transport: 'stdio',
-    supportsResume: false,
+    supportsResume: true,
   },
 
   cursor: {
