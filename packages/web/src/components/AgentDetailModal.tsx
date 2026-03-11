@@ -75,7 +75,7 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
               )}
               {agent.sessionId && (
                 <button
-                  className="bg-th-bg-muted/50 px-1.5 rounded hover:bg-th-bg-muted transition-colors text-[10px] truncate max-w-[260px]"
+                  className="bg-th-bg-muted/50 px-1.5 rounded hover:bg-th-bg-muted transition-colors text-[10px]"
                   title={`Click to copy session ID: ${agent.sessionId}`}
                   onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
                 >
