@@ -497,4 +497,40 @@ describe('NotificationBatcher', () => {
     vi.advanceTimersByTime(NotificationBatcher.BATCH_WINDOW_MS + 100);
     expect(adapter.sentMessages).toHaveLength(1);
   });
+
+  it('clears existing batch timer when critical event triggers immediate flush', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    // Queue a non-critical event — starts a batch timer
+    bridge.queueEvent(createEvent({ category: 'agent_spawned', title: 'Spawned' }));
+    expect(adapter.sentMessages).toHaveLength(0);
+
+    // Queue a critical event — should flush immediately AND clear the timer
+    bridge.queueEvent(createEvent({ category: 'agent_crashed', title: 'Crashed' }));
+    expect(adapter.sentMessages).toHaveLength(1);
+
+    // Advance past the original batch window — should NOT produce a duplicate flush
+    vi.advanceTimersByTime(NotificationBatcher.BATCH_WINDOW_MS + 100);
+    expect(adapter.sentMessages).toHaveLength(1); // still 1, no orphaned flush
+  });
+
+  it('truncates outbound messages exceeding Telegram max length', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    // Create an event with a very long body that exceeds 4096 chars
+    const longBody = 'x'.repeat(5000);
+    bridge.queueEvent(createEvent({
+      category: 'agent_crashed',
+      title: 'Crash',
+      body: longBody,
+    }));
+
+    expect(adapter.sentMessages).toHaveLength(1);
+    expect(adapter.sentMessages[0].text.length).toBeLessThanOrEqual(NotificationBatcher.MAX_MESSAGE_LENGTH);
+    expect(adapter.sentMessages[0].text).toContain('… (truncated)');
+  });
 });

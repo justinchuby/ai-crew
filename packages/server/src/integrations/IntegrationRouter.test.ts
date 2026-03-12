@@ -631,6 +631,23 @@ describe('IntegrationRouter', () => {
       // Session TTL should have been refreshed to ~8h from now (much more than 1 second)
       expect(session.expiresAt).toBeGreaterThan(shortExpiry);
     });
+
+    it('truncates messages exceeding Telegram max length', async () => {
+      configStore = createMockConfigStore(true);
+      agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+      await agent.start();
+
+      agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+
+      const longMessage = 'x'.repeat(5000);
+      const result = agent.sendToProject('project-1', longMessage);
+      expect(result).toBe(true);
+
+      const adapter = agent.getAdapter('telegram')!;
+      const sentText = (adapter.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0].text;
+      expect(sentText.length).toBeLessThanOrEqual(4096);
+      expect(sentText).toContain('… (truncated)');
+    });
   });
 
   // ── Session TTL ──────────────────────────────────────────
