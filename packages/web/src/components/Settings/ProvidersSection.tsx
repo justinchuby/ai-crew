@@ -53,13 +53,21 @@ const PROVIDER_AUTH_LABELS: Record<string, string> = {
   codex: 'Authenticated via OpenAI',
 };
 
-const PROVIDER_DOCS: Record<string, string> = {
-  copilot: 'https://github.com/features/copilot/cli',
-  claude: 'https://github.com/zed-industries/claude-agent-acp#installation',
-  gemini: 'https://geminicli.com/docs/get-started/installation/',
-  opencode: 'https://opencode.ai/docs/',
-  cursor: 'https://docs.cursor.com',
-  codex: 'https://github.com/zed-industries/codex-acp#installation',
+interface ProviderLink {
+  label: string;
+  url: string;
+}
+
+const PROVIDER_LINKS: Record<string, ProviderLink[]> = {
+  copilot: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
+  claude: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
+  gemini: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
+  opencode: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
+  cursor: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],
+  codex: [
+    { label: 'ACP adapter', url: 'https://github.com/zed-industries/codex-acp' },
+    { label: 'CLI quickstart', url: 'https://developers.openai.com/codex/quickstart/?setup=cli' },
+  ],
 };
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
@@ -98,7 +106,7 @@ const PROVIDER_PREVIEW: Record<string, boolean> = {
   claude: true,
   gemini: true,
   cursor: true,
-  codex: true,
+  codex: false,
   opencode: true,
 };
 
@@ -155,7 +163,7 @@ function ProviderCard({
   }, [provider.id]);
 
   const icon = PROVIDER_ICONS[provider.id] ?? '🔌';
-  const docsUrl = PROVIDER_DOCS[provider.id];
+  const links = PROVIDER_LINKS[provider.id] ?? [];
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
   const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
   const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
@@ -296,20 +304,27 @@ function ProviderCard({
             </div>
           )}
 
-          {/* Setup instructions if not installed */}
-          {!provider.installed && docsUrl && (
+          {/* Setup links and documentation */}
+          {links.length > 0 && (
             <div className="bg-th-bg-alt border border-th-border rounded-md p-3 text-xs">
-              <p className="text-th-text-muted mb-1.5">
-                Install the CLI to use this provider:
-              </p>
-              <a
-                href={docsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-accent hover:text-accent-muted transition-colors"
-              >
-                <ExternalLink size={10} /> Installation docs
-              </a>
+              {!provider.installed && (
+                <p className="text-th-text-muted mb-1.5">
+                  Install the CLI to use this provider:
+                </p>
+              )}
+              <div className="flex flex-col gap-1" data-testid={`provider-links-${provider.id}`}>
+                {links.map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-accent hover:text-accent-muted transition-colors"
+                  >
+                    <ExternalLink size={10} /> {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

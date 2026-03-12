@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Check, RotateCcw, Save, Loader2 } from 'lucide-react';
+import { Check, RotateCcw, Save, Loader2, X } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 
 /** Role ID → allowed model IDs */
@@ -33,7 +33,6 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.2-codex': 'GPT-5.2 Codex',
   'gpt-5.2': 'GPT-5.2',
   'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
-  'gpt-5.1-codex': 'GPT-5.1 Codex',
   'gpt-5.1': 'GPT-5.1',
   'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
   'gpt-5-mini': 'GPT-5 Mini',
@@ -182,6 +181,12 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
     setSaved(false);
   }, [defaults, onChange]);
 
+  const discardChanges = useCallback(() => {
+    setConfig(savedConfig);
+    onChange?.(savedConfig);
+    setSaved(false);
+  }, [savedConfig, onChange]);
+
   const saveConfig = useCallback(async () => {
     if (!projectId) return;
     setSaving(true);
@@ -215,66 +220,81 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
 
   return (
     <div className={`${compact ? 'text-[11px]' : 'text-xs'} space-y-2`}>
-      {/* Header with actions */}
-      {projectId && (
-        <div className="flex items-center justify-between px-1">
-          <span className="text-th-text-muted font-medium">Model Allowlist</span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={resetToDefaults}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 text-th-text-muted hover:text-th-text-alt rounded transition-colors"
-              title="Reset to defaults"
-            >
-              <RotateCcw className="w-3 h-3" />
-            </button>
-            {(isDirty || saving || saved) && (
+      {/* Sticky header: title, actions, and provider tabs */}
+      <div className="sticky top-0 z-10 bg-th-bg pb-1" data-testid="allowlist-sticky-header">
+        {/* Header with actions */}
+        {projectId && (
+          <div className="flex items-center justify-between px-1 pb-1">
+            <span className="text-th-text-muted font-medium">Model Allowlist</span>
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={saveConfig}
-                disabled={saving}
-                className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors ${
-                  saved
-                    ? 'bg-green-600/20 text-green-400'
-                    : 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-600 dark:text-yellow-400'
+                onClick={resetToDefaults}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-th-text-muted hover:text-th-text-alt rounded transition-colors"
+                title="Reset to defaults"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+              {(isDirty || saving || saved) && (
+                <>
+                  <button
+                    onClick={discardChanges}
+                    disabled={saving}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors bg-th-bg-hover hover:bg-th-bg-alt text-th-text-muted hover:text-th-text-alt"
+                    data-testid="discard-changes"
+                  >
+                    <X className="w-3 h-3" />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveConfig}
+                    disabled={saving}
+                    className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors ${
+                      saved
+                        ? 'bg-green-600/20 text-green-400'
+                        : 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-600 dark:text-yellow-400'
+                    }`}
+                    data-testid="save-config"
+                  >
+                    {saving ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : saved ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
+                    {saved ? 'Saved' : 'Save'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && <div className="px-1 text-red-400 text-[10px]">{error}</div>}
+
+        {/* Provider tabs */}
+        <div className="flex gap-1 px-1 border-b border-th-border pb-1 overflow-x-auto"
+             style={{ scrollbarWidth: 'thin' }}>
+          {PROVIDER_TABS.map((tab) => {
+            const tabModels = allModels.filter(tab.models);
+            if (tabModels.length === 0) return null;
+            const isActive = providerTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setProviderTab(tab.id)}
+                className={`px-2 py-0.5 rounded-t text-[10px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  isActive
+                    ? `${tab.color} bg-th-bg-alt`
+                    : 'text-th-text-muted border-transparent hover:text-th-text-alt'
                 }`}
               >
-                {saving ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : saved ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <Save className="w-3 h-3" />
-                )}
-                {saved ? 'Saved' : 'Save'}
+                {tab.label}
+                <span className="ml-1 opacity-60">({tabModels.length})</span>
               </button>
-            )}
-          </div>
+            );
+          })}
         </div>
-      )}
-
-      {error && <div className="px-1 text-red-400 text-[10px]">{error}</div>}
-
-      {/* Provider tabs */}
-      <div className="flex gap-1 px-1 border-b border-th-border pb-1 overflow-x-auto"
-           style={{ scrollbarWidth: 'thin' }}>
-        {PROVIDER_TABS.map((tab) => {
-          const tabModels = allModels.filter(tab.models);
-          if (tabModels.length === 0) return null;
-          const isActive = providerTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setProviderTab(tab.id)}
-              className={`px-2 py-0.5 rounded-t text-[10px] font-medium border-b-2 transition-colors whitespace-nowrap ${
-                isActive
-                  ? `${tab.color} bg-th-bg-alt`
-                  : 'text-th-text-muted border-transparent hover:text-th-text-alt'
-              }`}
-            >
-              {tab.label}
-              <span className="ml-1 opacity-60">({tabModels.length})</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* Role → Model grid for selected provider tab */}
