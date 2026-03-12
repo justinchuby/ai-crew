@@ -135,11 +135,13 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
   // Fetch profile data when teamId is available
   useEffect(() => {
     if (!teamId) return;
+    let cancelled = false;
     setProfileLoading(true);
     apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
-      .then(setProfile)
-      .catch(() => setProfile(null))
-      .finally(() => setProfileLoading(false));
+      .then((data) => { if (!cancelled) setProfile(data); })
+      .catch(() => { if (!cancelled) setProfile(null); })
+      .finally(() => { if (!cancelled) setProfileLoading(false); });
+    return () => { cancelled = true; };
   }, [agentId, teamId]);
 
   if (!agent && !profile) {
@@ -209,7 +211,10 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
       `| **Session ID** | \`${sessionId ?? 'N/A'}\` |`, '',
     ];
     if (task) bodyParts.push('## Task', '', task, '');
-    if (exitError) bodyParts.push('## Error Output', '', '```', exitError, '```', '');
+    if (exitError) {
+      const truncated = exitError.length > 1000 ? exitError.slice(0, 1000) + '\n… (truncated)' : exitError;
+      bodyParts.push('## Error Output', '', '```', truncated, '```', '');
+    }
     bodyParts.push('## Environment', '', `- **Timestamp**: ${new Date().toISOString()}`, `- **Agent Status**: ${status}`);
     const body = bodyParts.join('\n');
     const params = new URLSearchParams({ title, body, labels: 'bug,agent-failure' });
