@@ -151,32 +151,17 @@ describe('AdapterFactory', () => {
       expect(opts.cliArgs).toContain('--agent=developer');
     });
 
-    it('skips --agent flag for gemini provider (unsupported)', () => {
-      const opts = buildStartOptions(
-        { ...baseConfig, provider: 'gemini' },
-        { cwd: '/test', agentFlag: 'flightdeck-developer' },
-      );
-      const agentArgs = opts.cliArgs!.filter((a: string) => a.startsWith('--agent='));
-      expect(agentArgs).toHaveLength(0);
-    });
-
-    it('skips --agent flag for claude provider (unsupported)', () => {
-      const opts = buildStartOptions(
-        { ...baseConfig, provider: 'claude' },
-        { cwd: '/test', agentFlag: 'flightdeck-developer' },
-      );
-      const agentArgs = opts.cliArgs!.filter((a: string) => a.startsWith('--agent='));
-      expect(agentArgs).toHaveLength(0);
-    });
-
-    it('skips --agent flag for codex provider (unsupported)', () => {
-      const opts = buildStartOptions(
-        { ...baseConfig, provider: 'codex' },
-        { cwd: '/test', agentFlag: 'flightdeck-developer' },
-      );
-      const agentArgs = opts.cliArgs!.filter((a: string) => a.startsWith('--agent='));
-      expect(agentArgs).toHaveLength(0);
-    });
+    it.each(['gemini', 'claude', 'codex', 'opencode', 'cursor'] as const)(
+      'skips --agent flag for %s provider (unsupported)',
+      (provider) => {
+        const opts = buildStartOptions(
+          { ...baseConfig, provider },
+          { cwd: '/test', agentFlag: 'flightdeck-developer' },
+        );
+        const agentArgs = (opts.cliArgs ?? []).filter((a: string) => a.startsWith('--agent='));
+        expect(agentArgs).toHaveLength(0);
+      },
+    );
 
     it('includes --model flag when model provided', () => {
       const opts = buildStartOptions(
