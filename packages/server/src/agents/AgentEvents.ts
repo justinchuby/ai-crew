@@ -124,10 +124,12 @@ export class AgentEventEmitter {
     this.toolCallListeners.length = 0;
     this.planListeners.length = 0;
     this.sessionReadyListeners.length = 0;
+    this.sessionResumeFailedListeners.length = 0;
     this.contextCompactedListeners.length = 0;
     this.thinkingListeners.length = 0;
     this.usageListeners.length = 0;
     this.responseStartListeners.length = 0;
+    this.modelFallbackListeners.length = 0;
     if (this._idleDebounceTimer) {
       clearTimeout(this._idleDebounceTimer);
       this._idleDebounceTimer = null;
