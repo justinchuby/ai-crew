@@ -118,6 +118,6 @@ describe('AgentHeatmap', () => {
     render(<AgentHeatmap agents={[agent]} buckets={buckets} />);
 
     const heatmap = screen.getByTestId('agent-heatmap');
-    expect(heatmap.textContent).toContain('Agent norol');
+    expect(heatmap.textContent).toContain('Agent no-role-');
   });
 });
