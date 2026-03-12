@@ -2,7 +2,7 @@ import { Bot, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { AgentInfo, Delegation } from '../../types';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
-import { getProviderColors } from '../../utils/providerColors';
+import { ProviderBadge } from '../ProviderBadge';
 
 interface Props {
   agents: AgentInfo[];
@@ -64,10 +64,7 @@ export function CrewStatus({ agents, delegations }: Props) {
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs font-mono ${colorClass}`}>{agent.status}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    {agent.provider && (() => {
-                      const pc = getProviderColors(agent.provider);
-                      return <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${pc.bg} ${pc.text}`}>{agent.provider}</span>;
-                    })()}
+                    <ProviderBadge provider={agent.provider} />
                     {(agent.model) && (
                       <span className="text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded" title={agent.model}>
                         {shortModel(agent.model)}
