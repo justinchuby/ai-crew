@@ -75,18 +75,33 @@ describe('appStore — agent lifecycle', () => {
     expect(updated.status).toBe('terminated');
   });
 
-  it('agent:exit should not overwrite terminated status with failed', () => {
+  it('updateAgent does not clear provider when exit data overwrites status', () => {
+    const agent = makeAgent({ id: 'a1', provider: 'copilot', status: 'running' });
+    useAppStore.getState().addAgent(agent);
+
+    // Simulate agent:exit overwriting status — provider must survive the merge
+    useAppStore.getState().updateAgent('a1', {
+      status: 'failed',
+      exitError: 'signal',
+      exitCode: -1,
+    });
+
+    const result = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+    expect(result.status).toBe('failed');
+    expect(result.provider).toBe('copilot');
+    expect(result.exitCode).toBe(-1);
+  });
+
+  it('terminated status survives when no subsequent update changes it', () => {
     const agent = makeAgent({ id: 'a1', provider: 'copilot', status: 'terminated' });
     useAppStore.getState().addAgent(agent);
 
-    // Simulate the guard: check status before overwriting
-    const existing = useAppStore.getState().agents.find((a) => a.id === 'a1');
-    if (existing?.status !== 'terminated') {
-      useAppStore.getState().updateAgent('a1', { status: 'failed', exitError: 'signal' });
-    }
+    // A partial update that doesn't include status should not change it
+    useAppStore.getState().updateAgent('a1', { exitError: 'killed' });
 
     const result = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
     expect(result.status).toBe('terminated');
     expect(result.provider).toBe('copilot');
+    expect(result.exitError).toBe('killed');
   });
 });

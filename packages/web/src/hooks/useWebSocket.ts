@@ -87,7 +87,7 @@ export function useWebSocket() {
           updateAgent(msg.agentId, {
             status: msg.code === 0 ? 'completed' : 'failed',
             exitError: msg.error,
-            exitCode: msg.code ?? undefined,
+            exitCode: msg.code ?? null,
           });
           break;
         }
