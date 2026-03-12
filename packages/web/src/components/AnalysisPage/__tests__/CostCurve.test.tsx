@@ -15,19 +15,12 @@ vi.mock('@visx/group', () => ({
     <g data-testid="visx-group" {...props}>{children as React.ReactNode}</g>
   ),
 }));
-vi.mock('@visx/shape', () => ({
-  AreaClosed: (props: Record<string, unknown>) => (
-    <path data-testid="area-closed" data-fill={props.fill as string} data-fill-opacity={String(props.fillOpacity)} />
-  ),
-  LinePath: (props: Record<string, unknown>) => (
-    <line data-testid="line-path" data-stroke={props.stroke as string} data-stroke-width={String(props.strokeWidth)} />
-  ),
-}));
 vi.mock('@visx/scale', () => ({
   scaleTime: () => {
     const fn = () => 0;
     fn.domain = () => fn;
     fn.range = () => fn;
+    fn.invert = () => new Date(0);
     return fn;
   },
   scaleLinear: () => {
@@ -41,6 +34,37 @@ vi.mock('@visx/scale', () => ({
 vi.mock('@visx/axis', () => ({
   AxisBottom: () => <g data-testid="axis-bottom" />,
   AxisLeft: () => <g data-testid="axis-left" />,
+}));
+vi.mock('@visx/shape', async (importOriginal) => {
+  const orig = await importOriginal<Record<string, unknown>>();
+  return {
+    ...orig,
+    AreaClosed: (props: Record<string, unknown>) => (
+      <path data-testid="area-closed" data-fill={props.fill as string} data-fill-opacity={String(props.fillOpacity)} />
+    ),
+    LinePath: (props: Record<string, unknown>) => (
+      <line data-testid="line-path" data-stroke={props.stroke as string} data-stroke-width={String(props.strokeWidth)} />
+    ),
+    Line: () => <line data-testid="crosshair-line" />,
+  };
+});
+vi.mock('@visx/tooltip', () => ({
+  useTooltip: () => ({
+    showTooltip: () => {},
+    hideTooltip: () => {},
+    tooltipData: null,
+    tooltipLeft: 0,
+    tooltipTop: 0,
+    tooltipOpen: false,
+  }),
+  TooltipWithBounds: () => null,
+  defaultStyles: {},
+}));
+vi.mock('@visx/event', () => ({
+  localPoint: () => ({ x: 0, y: 0 }),
+}));
+vi.mock('d3-array', () => ({
+  bisector: () => ({ left: () => 0 }),
 }));
 
 describe('CostCurve', () => {
