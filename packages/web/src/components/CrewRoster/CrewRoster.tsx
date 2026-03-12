@@ -808,7 +808,7 @@ export function CrewRoster() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full min-h-0 p-6">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -860,7 +860,7 @@ export function CrewRoster() {
       {/* Content: Grouped List + Profile */}
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-y-auto mt-4">
         {/* Crew Groups — stable width at desktop/tablet, full-width responsive on mobile */}
-        <div className={`space-y-3 w-full max-w-full md:min-w-[320px] lg:min-w-[400px] ${selectedAgent ? 'md:w-1/2' : 'w-full'}`}>
+        <div className={`space-y-3 min-w-0 ${selectedAgent ? 'flex-1' : 'w-full'}`}>
           {crewGroups.length === 0 ? (
             <div className="text-center py-8 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
               <Cpu className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -884,7 +884,7 @@ export function CrewRoster() {
 
         {/* Profile Panel */}
         {selectedAgent && (
-          <div className="w-full max-w-full md:w-1/2 md:min-w-[320px] lg:min-w-[400px]">
+          <div className="w-full max-w-full md:w-[400px] lg:w-[480px] shrink-0">
             <ProfilePanel
               agentId={selectedAgent}
               teamId={selectedAgentTeamId}

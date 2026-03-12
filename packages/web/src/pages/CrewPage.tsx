@@ -476,7 +476,7 @@ export function CrewPage() {
   const statusCounts = health?.statusCounts ?? {};
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Header with team identity and actions */}
       <div className="bg-surface-raised rounded-lg border border-th-border p-5">
         <div className="flex items-start justify-between mb-4">

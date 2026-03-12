@@ -883,7 +883,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full min-h-0 p-6">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -928,7 +928,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       {/* Content: Grouped List + Profile */}
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 mt-4">
-        <div className={`space-y-3 w-full max-w-full md:min-w-[320px] lg:min-w-[400px] overflow-y-auto ${selectedAgent ? 'md:w-[60%]' : 'w-full'}`}>
+        <div className={`space-y-3 min-w-0 overflow-y-auto ${selectedAgent ? 'flex-1' : 'w-full'}`}>
           {/* Empty: no agents at all */}
           {agents.length === 0 && !loading && (
             <div className="text-center py-12 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
@@ -981,7 +981,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
               fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
               md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
               ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
-              ${selectedAgent ? 'md:w-[40%] md:min-w-[360px] md:max-w-[480px]' : 'md:w-0 md:hidden'}
+              ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
               md:self-start md:sticky md:top-0 md:max-h-full
             `}
           >
