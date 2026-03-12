@@ -120,6 +120,8 @@ export interface AgentInfo {
   backend?: string;
   /** Error message if agent failed to start or crashed */
   exitError?: string;
+  /** Process exit code (non-zero indicates failure) */
+  exitCode?: number | null;
 }
 
 export interface ServerConfig {

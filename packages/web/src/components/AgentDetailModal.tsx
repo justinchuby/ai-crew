@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Zap, Square, Send } from 'lucide-react';
+import { Zap, Square, Send, AlertTriangle, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { apiFetch } from '../hooks/useApi';
 import { useToastStore } from './Toast';
@@ -48,6 +48,45 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
 
   const totalTokens = (agent.inputTokens ?? 0) + (agent.outputTokens ?? 0)
     + (agent.cacheReadTokens ?? 0) + (agent.cacheWriteTokens ?? 0);
+
+  const isAgentFailed = agent.status === 'failed' || agent.status === 'terminated';
+
+  const openGitHubIssue = () => {
+    const title = `Agent failure: ${agent.role.name} ${agent.provider ?? 'unknown'} ${agent.model} - exit code ${agent.exitCode ?? 'unknown'}`;
+
+    const bodyParts = [
+      '## Agent Failure Report',
+      '',
+      '| Field | Value |',
+      '|-------|-------|',
+      `| **Agent ID** | \`${agent.id}\` |`,
+      `| **Role** | ${agent.role.name} |`,
+      `| **Provider** | ${agent.provider ?? 'N/A'} |`,
+      `| **Model** | ${agent.model} |`,
+      `| **Exit Code** | ${agent.exitCode ?? 'N/A'} |`,
+      `| **Session ID** | \`${agent.sessionId ?? 'N/A'}\` |`,
+      '',
+    ];
+
+    if (agent.task) {
+      bodyParts.push('## Task', '', agent.task, '');
+    }
+
+    if (agent.exitError) {
+      bodyParts.push('## Error Output', '', '```', agent.exitError, '```', '');
+    }
+
+    bodyParts.push(
+      '## Environment',
+      '',
+      `- **Timestamp**: ${new Date().toISOString()}`,
+      `- **Agent Status**: ${agent.status}`,
+    );
+
+    const body = bodyParts.join('\n');
+    const params = new URLSearchParams({ title, body, labels: 'bug,agent-failure' });
+    window.open(`https://github.com/justinchuby/flightdeck/issues/new?${params.toString()}`, '_blank');
+  };
 
   return (
     <div
@@ -117,6 +156,42 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Agent Failed Banner */}
+          {isAgentFailed && (agent.exitError || agent.exitCode !== undefined) && (
+            <div className="mx-4 mt-3 rounded-lg border border-red-500/40 bg-red-500/10 overflow-hidden">
+              <div className="flex items-start gap-3 px-4 py-3">
+                <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-semibold text-red-400">Agent Failed</h4>
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono text-red-300/80">
+                    {agent.exitCode != null && (
+                      <span>Exit code: <span className="text-red-400 font-semibold">{agent.exitCode}</span></span>
+                    )}
+                    {agent.provider && (
+                      <span>Provider: <span className="text-red-400">{agent.provider}</span></span>
+                    )}
+                    {agent.model && (
+                      <span>Model: <span className="text-red-400">{agent.model}</span></span>
+                    )}
+                  </div>
+                  {agent.exitError && (
+                    <pre className="mt-2 text-xs font-mono text-red-400/90 whitespace-pre-wrap break-words bg-red-900/20 rounded p-2 max-h-40 overflow-y-auto">
+                      {agent.exitError}
+                    </pre>
+                  )}
+                </div>
+              </div>
+              <div className="px-4 pb-3 flex justify-end">
+                <button
+                  onClick={openGitHubIssue}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-red-600/30 text-red-300 hover:bg-red-600/50 hover:text-red-200 transition-colors border border-red-500/30"
+                >
+                  <ExternalLink size={12} />
+                  Submit GitHub Issue
+                </button>
+              </div>
+            </div>
+          )}
           {/* Current Task */}
           {agent.task && (
             <div className="px-5 py-3 border-b border-th-border">
@@ -177,8 +252,8 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
             </div>
           )}
 
-          {/* Exit Error */}
-          {agent.exitError && (
+          {/* Exit Error (shown inline when banner is not visible, e.g. creating status with error) */}
+          {agent.exitError && !isAgentFailed && (
             <div className="px-5 py-3 border-b border-th-border">
               <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Exit Error</h4>
               <div className="text-xs font-mono text-red-400 whitespace-pre-wrap bg-red-900/20 border border-red-800/40 rounded p-2">
