@@ -76,7 +76,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro, costTracker } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -88,11 +88,13 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     // Enrich with storage info and per-status agent counts
     const allAgents = agentManager.getAll();
+    const projectCosts = costTracker ? new Map(costTracker.getProjectCosts().map((c) => [c.projectId, c])) : new Map();
     const enriched = projects.map((p) => {
       const projectAgents = allAgents.filter((a) => a.projectId === p.id);
       const runningCount = projectAgents.filter((a) => a.status === 'running').length;
       const idleCount = projectAgents.filter((a) => a.status === 'idle').length;
       const failedCount = projectAgents.filter((a) => a.status === 'failed').length;
+      const costs = projectCosts.get(p.id);
       return {
         ...p,
         activeAgentCount: runningCount + idleCount,
@@ -100,6 +102,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         idleAgentCount: idleCount,
         failedAgentCount: failedCount,
         storageMode: storageManager?.getStorageMode(p.id) ?? 'user',
+        tokenUsage: costs ? { inputTokens: costs.totalInputTokens, outputTokens: costs.totalOutputTokens, costUsd: costs.totalCostUsd } : undefined,
       };
     });
     res.json(enriched);
@@ -932,10 +935,12 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   // List all known models and default config
   router.get('/models', (_req, res) => {
+    const { providerManager } = ctx;
     res.json({
       models: KNOWN_MODEL_IDS,
       defaults: DEFAULT_MODEL_CONFIG,
       modelsByProvider: getModelsByProvider(),
+      activeProvider: providerManager?.getActiveProviderId() ?? 'copilot',
     });
   });
 

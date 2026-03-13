@@ -27,7 +27,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
   const [showModelConfig, setShowModelConfig] = useState(false);
   const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const [error, setError] = useState('');
-  const { models: availableModels } = useModels();
+  const { filteredModels: availableModels } = useModels();
 
   // Fetch available roles on mount
   useEffect(() => {
