@@ -1,3 +1,8 @@
+---
+name: project-status-live-computation
+description: "When rendering UI that depends on whether a project is \"active\" or \"stopped\" — buttons, badges, conditional sections. The `project.status` DB field is stale after server restarts."
+---
+
 # Project Status: Use Agent Counts, Not the DB Field
 
 ## When to use

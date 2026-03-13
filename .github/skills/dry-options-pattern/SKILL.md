@@ -1,3 +1,8 @@
+---
+name: dry-options-pattern
+description: "**Description:** Use when consolidating multiple similar formatting functions into one. Applies to any case where 2-3 functions share 80%+ logic but differ in output format or filtering."
+---
+
 # DRY Options Pattern for Formatter Functions
 
 **Description:** Use when consolidating multiple similar formatting functions into one. Applies to any case where 2-3 functions share 80%+ logic but differ in output format or filtering.

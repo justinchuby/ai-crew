@@ -1,3 +1,8 @@
+---
+name: token-attribution-system
+description: "**When to use:** When working on token usage tracking, cost attribution, or the CostBreakdown UI panel. Also useful when debugging why token data is missing."
+---
+
 # Token Attribution System: CostTracker and task_cost_records
 
 **When to use:** When working on token usage tracking, cost attribution, or the CostBreakdown UI panel. Also useful when debugging why token data is missing.

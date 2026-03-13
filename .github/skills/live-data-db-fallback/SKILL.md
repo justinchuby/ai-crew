@@ -1,3 +1,8 @@
+---
+name: live-data-db-fallback
+description: "**When to use:** When building UI that displays session metrics (tokens, costs, agent stats) and needs to work for both active and inactive/historical sessions."
+---
+
 # Analysis Page: Live Data vs Persisted DB Fallback
 
 **When to use:** When building UI that displays session metrics (tokens, costs, agent stats) and needs to work for both active and inactive/historical sessions.

@@ -1,3 +1,8 @@
+---
+name: activity-ledger-patterns
+description: "When fetching activity data for UI display, or debugging why activity-based features show empty/stale data."
+---
+
 # Activity Ledger Query Patterns
 
 **When to use**: When fetching activity data for UI display, or debugging why activity-based features show empty/stale data.

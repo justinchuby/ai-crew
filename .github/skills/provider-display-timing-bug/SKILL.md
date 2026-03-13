@@ -1,3 +1,8 @@
+---
+name: provider-display-timing-bug
+description: "**Description:** Use when debugging agents showing wrong or missing provider in the UI, or when modifying agent spawn/roster logic."
+---
+
 # Provider Display Timing Bug: Roster Written Before ACP Sets Provider
 
 **Description:** Use when debugging agents showing wrong or missing provider in the UI, or when modifying agent spawn/roster logic.

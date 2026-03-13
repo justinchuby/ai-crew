@@ -1,3 +1,8 @@
+---
+name: model-selector-filtering
+description: "**When to use:** When adding or modifying model selector dropdowns, or when working with the provider system and model availability."
+---
+
 # Model Selector: Provider-Filtered Model Lists
 
 **When to use:** When adding or modifying model selector dropdowns, or when working with the provider system and model availability.

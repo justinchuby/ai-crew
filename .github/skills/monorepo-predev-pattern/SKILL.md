@@ -1,3 +1,8 @@
+---
+name: monorepo-predev-pattern
+description: "**Description:** Use when fixing \"module not found\" errors for `@flightdeck/shared` during development, or when setting up dev scripts in npm workspace monorepos."
+---
+
 # Monorepo predev Script Pattern for Shared Packages
 
 **Description:** Use when fixing "module not found" errors for `@flightdeck/shared` during development, or when setting up dev scripts in npm workspace monorepos.

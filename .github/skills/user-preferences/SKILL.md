@@ -1,8 +1,6 @@
 ---
 name: user-preferences
-description: >
-  Documented user preferences from feedback. Follow these when building new features.
-  Covers cost/token display, UI conventions, and design preferences.
+description: "Documented user preferences from feedback. Follow these when building new features. Covers cost/token display, UI conventions, and design preferences."
 ---
 
 # User Preferences for Flightdeck

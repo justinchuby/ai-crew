@@ -1,3 +1,8 @@
+---
+name: secretary-realtime-notifications
+description: "When adding a new command or event that changes the task DAG and the secretary should know about it immediately (not wait for the 3-minute ContextRefresher poll)."
+---
+
 # Secretary Agent: Real-Time Notifications via notifySecretary()
 
 ## When to use

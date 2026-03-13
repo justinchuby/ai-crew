@@ -1,3 +1,8 @@
+---
+name: provider-config-dual-system
+description: "When debugging provider selection, fallback behavior, or config persistence issues. Also when adding new provider-related settings."
+---
+
 # Provider Config Dual-System and Bridging
 
 **When to use**: When debugging provider selection, fallback behavior, or config persistence issues. Also when adding new provider-related settings.

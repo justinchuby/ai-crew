@@ -1,3 +1,8 @@
+---
+name: activity-feed-server-filtering
+description: "When fetching from the `/coordination/activity` API and you only need specific action types (e.g., `progress_update`, `task_completed`, `delegated`)."
+---
+
 # Activity Feed: Always Use Server-Side Type Filtering
 
 ## When to use

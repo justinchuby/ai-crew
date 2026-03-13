@@ -1,3 +1,8 @@
+---
+name: agent-spawn-provider-inheritance
+description: "When debugging why an agent has the wrong provider/model, or when modifying agent creation or delegation flows."
+---
+
 # Agent Spawn and Provider Inheritance
 
 **When to use**: When debugging why an agent has the wrong provider/model, or when modifying agent creation or delegation flows.

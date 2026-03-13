@@ -1,3 +1,8 @@
+---
+name: tsbuildinfo-cache-gotcha
+description: "**Description:** Use when debugging missing TypeScript build output in composite/incremental projects, especially after cleaning dist/ directories."
+---
+
 # TypeScript .tsbuildinfo Cache Skips Emission When dist/ Is Deleted
 
 **Description:** Use when debugging missing TypeScript build output in composite/incremental projects, especially after cleaning dist/ directories.

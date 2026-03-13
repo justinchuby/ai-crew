@@ -1,8 +1,6 @@
 ---
 name: architecture-decisions
-description: >
-  Architecture decisions and patterns from Flightdeck development (Phases 2–4).
-  Covers feature architecture, state management, component patterns, and API design.
+description: "Architecture decisions and patterns from Flightdeck development (Phases 2–4). Covers feature architecture, state management, component patterns, and API design."
 ---
 
 # Architecture Decisions & Patterns
