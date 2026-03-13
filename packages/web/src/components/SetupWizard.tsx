@@ -8,19 +8,37 @@ import {
   X,
   ExternalLink,
   Sparkles,
+  Loader2,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
 import { getProvider } from '@flightdeck/shared';
 
 // ── Types ───────────────────────────────────────────────────────────
 
-interface ProviderStatus {
+/** Lightweight config returned instantly (no CLI detection). */
+interface ProviderConfig {
   id: string;
   name: string;
+  enabled: boolean;
+}
+
+/** Full status from async CLI detection. */
+interface ProviderStatusData {
+  id: string;
   installed: boolean;
   authenticated: boolean | null;
-  enabled: boolean;
   binaryPath: string | null;
+}
+
+/** Combined view. */
+interface ProviderView {
+  id: string;
+  name: string;
+  enabled: boolean;
+  installed: boolean | null;  // null = still detecting
+  authenticated: boolean | null;
 }
 
 type Step = 'welcome' | 'providers' | 'done';
@@ -31,15 +49,40 @@ const STORAGE_KEY = 'flightdeck-setup-completed';
 
 export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>('welcome');
-  const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [providers, setProviders] = useState<ProviderView[]>([]);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Phase 1: instant config (id, name, enabled)
   useEffect(() => {
-    apiFetch<ProviderStatus[]>('/settings/providers')
-      .then(setProviders)
+    apiFetch<ProviderConfig[]>('/settings/providers')
+      .then((configs) => {
+        setProviders(configs.map((c) => ({
+          id: c.id, name: c.name, enabled: c.enabled,
+          installed: null, authenticated: null,
+        })));
+      })
       .catch(() => { /* initial fetch — will retry */ })
-      .finally(() => setLoading(false));
+      .finally(() => setConfigLoading(false));
   }, []);
+
+  // Phase 2: async CLI detection (installed, authenticated)
+  useEffect(() => {
+    if (configLoading) return;
+    apiFetch<ProviderStatusData[]>('/settings/providers/status')
+      .then((statuses) => {
+        const statusMap = new Map(statuses.map((s) => [s.id, s]));
+        setProviders((prev) =>
+          prev.map((p) => {
+            const s = statusMap.get(p.id);
+            return s ? { ...p, installed: s.installed, authenticated: s.authenticated } : p;
+          }),
+        );
+      })
+      .catch(() => { /* status detection failed — badges stay as loading */ })
+      .finally(() => setStatusLoading(false));
+  }, [configLoading]);
 
   const handleDismiss = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'true');
@@ -51,7 +94,22 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     onComplete();
   }, [onComplete]);
 
-  const installedCount = providers.filter((p) => p.installed).length;
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
+    setTogglingId(id);
+    // Optimistic update
+    setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, enabled } : p)));
+    try {
+      await apiFetch(`/settings/providers/${id}`, { method: 'PUT', body: JSON.stringify({ enabled }), headers: { 'Content-Type': 'application/json' } });
+    } catch {
+      // Revert on failure
+      setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: !enabled } : p)));
+    } finally {
+      setTogglingId(null);
+    }
+  }, []);
+
+  const installedCount = providers.filter((p) => p.installed === true).length;
+  const enabledCount = providers.filter((p) => p.enabled).length;
 
   return (
     <div
@@ -92,50 +150,94 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
           {step === 'providers' && (
             <div className="space-y-3" data-testid="step-providers">
               <p className="text-sm text-th-text-muted mb-4">
-                {installedCount > 0
-                  ? `${installedCount} of ${providers.length} providers detected.`
-                  : 'No providers detected. Install at least one to start.'}
+                {statusLoading
+                  ? 'Detecting providers…'
+                  : installedCount > 0
+                    ? `${installedCount} of ${providers.length} providers detected. Toggle to enable or disable.`
+                    : 'No providers detected. Install at least one to start.'}
               </p>
-              {loading ? (
+              {configLoading ? (
                 <div className="flex justify-center py-8">
                   <div className="w-5 h-5 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {providers.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-lg border border-th-border bg-th-bg-alt"
-                      data-testid={`provider-${p.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{getProvider(p.id)?.icon ?? '🔧'}</span>
-                        <span className="text-sm font-medium text-th-text">{p.name}</span>
-                        {(getProvider(p.id)?.isPreview ?? true) && (
-                          <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
-                            Preview
-                          </span>
+                <div className="space-y-2 max-h-[360px] overflow-y-auto">
+                  {providers.map((p) => {
+                    const def = getProvider(p.id);
+                    const links = def?.setupLinks ?? [];
+                    return (
+                      <div
+                        key={p.id}
+                        className={`rounded-lg border bg-th-bg-alt transition-opacity ${
+                          p.enabled ? 'border-th-border' : 'border-th-border/50 opacity-60'
+                        }`}
+                        data-testid={`provider-${p.id}`}
+                      >
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-lg flex-shrink-0">{def?.icon ?? '🔧'}</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-th-text">{p.name}</span>
+                                {(def?.isPreview ?? true) && (
+                                  <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                                    Preview
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Install status badge */}
+                            {p.installed === null ? (
+                              <Loader2 className="w-3.5 h-3.5 text-th-text-muted animate-spin" />
+                            ) : p.installed ? (
+                              <span className="flex items-center gap-1 text-xs text-green-400">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Installed
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs text-th-text-muted">
+                                <XCircle className="w-3.5 h-3.5" />
+                                Not found
+                              </span>
+                            )}
+                            {/* Enable/disable toggle */}
+                            <button
+                              onClick={() => handleToggle(p.id, !p.enabled)}
+                              disabled={togglingId === p.id}
+                              className="text-th-text-muted hover:text-th-text transition-colors disabled:opacity-50"
+                              aria-label={p.enabled ? `Disable ${p.name}` : `Enable ${p.name}`}
+                              data-testid={`toggle-${p.id}`}
+                            >
+                              {p.enabled ? (
+                                <ToggleRight className="w-6 h-6 text-accent" />
+                              ) : (
+                                <ToggleLeft className="w-6 h-6" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        {/* Setup links (always visible for providers needing CLI + adapter) */}
+                        {links.length > 0 && (
+                          <div className="flex items-center gap-3 px-4 pb-2.5 -mt-1">
+                            {links.map((link) => (
+                              <a
+                                key={link.url}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-[11px] text-accent hover:underline"
+                              >
+                                {link.label}
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      {p.installed ? (
-                        <span className="flex items-center gap-1 text-xs text-green-400">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          Installed
-                        </span>
-                      ) : (
-                        <a
-                          href={getProvider(p.id)?.docsUrl ?? '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-accent hover:underline"
-                          data-testid={`install-${p.id}`}
-                        >
-                          Install
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -146,8 +248,8 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto" />
               <h3 className="text-lg font-semibold text-th-text">You're ready!</h3>
               <p className="text-sm text-th-text-muted leading-relaxed">
-                {installedCount > 0
-                  ? `${installedCount} provider${installedCount > 1 ? 's' : ''} detected. Create your first project to start working with AI agents.`
+                {enabledCount > 0
+                  ? `${enabledCount} provider${enabledCount > 1 ? 's' : ''} enabled. Create your first project to start working with AI agents.`
                   : 'You can set up providers later in Settings. Create a project to explore the interface.'}
               </p>
             </div>

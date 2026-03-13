@@ -80,7 +80,10 @@ interface ProviderLink {
 
 const PROVIDER_LINKS: Record<string, ProviderLink[]> = {
   copilot: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
-  claude: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
+  claude: [
+    { label: 'ACP adapter', url: 'https://github.com/zed-industries/claude-agent-acp' },
+    { label: 'Claude Code CLI', url: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview' },
+  ],
   gemini: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
   opencode: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
   cursor: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],

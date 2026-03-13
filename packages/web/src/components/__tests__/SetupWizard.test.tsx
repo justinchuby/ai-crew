@@ -25,16 +25,35 @@ vi.mock('../../hooks/useApi', () => ({
 
 // ── Test Data ───────────────────────────────────────────────────────
 
-const MOCK_PROVIDERS = [
-  { id: 'copilot', name: 'GitHub Copilot SDK', installed: true, authenticated: true, enabled: true, binaryPath: '/usr/bin/gh' },
-  { id: 'claude', name: 'Claude Code', installed: true, authenticated: true, enabled: true, binaryPath: '/usr/bin/claude' },
-  { id: 'gemini', name: 'Google Gemini CLI', installed: false, authenticated: null, enabled: true, binaryPath: null },
-  { id: 'opencode', name: 'OpenCode', installed: false, authenticated: null, enabled: true, binaryPath: null },
-  { id: 'cursor', name: 'Cursor', installed: false, authenticated: null, enabled: true, binaryPath: null },
-  { id: 'codex', name: 'Codex', installed: false, authenticated: null, enabled: true, binaryPath: null },
+/** Phase 1: config (instant) */
+const MOCK_CONFIGS = [
+  { id: 'copilot', name: 'GitHub Copilot SDK', enabled: true },
+  { id: 'claude', name: 'Claude Code', enabled: true },
+  { id: 'gemini', name: 'Google Gemini CLI', enabled: true },
+  { id: 'opencode', name: 'OpenCode', enabled: true },
+  { id: 'cursor', name: 'Cursor', enabled: true },
+  { id: 'codex', name: 'Codex', enabled: true },
 ];
 
-const ALL_NOT_INSTALLED = MOCK_PROVIDERS.map((p) => ({ ...p, installed: false, binaryPath: null }));
+/** Phase 2: status (async CLI detection) */
+const MOCK_STATUSES = [
+  { id: 'copilot', installed: true, authenticated: true, binaryPath: '/usr/bin/copilot' },
+  { id: 'claude', installed: true, authenticated: true, binaryPath: '/usr/bin/claude-agent-acp' },
+  { id: 'gemini', installed: false, authenticated: null, binaryPath: null },
+  { id: 'opencode', installed: false, authenticated: null, binaryPath: null },
+  { id: 'cursor', installed: false, authenticated: null, binaryPath: null },
+  { id: 'codex', installed: false, authenticated: null, binaryPath: null },
+];
+
+const ALL_NOT_INSTALLED_STATUSES = MOCK_STATUSES.map((s) => ({ ...s, installed: false, binaryPath: null }));
+
+function mockTwoPhase(configs = MOCK_CONFIGS, statuses = MOCK_STATUSES) {
+  mockApiFetch.mockImplementation((url: string) => {
+    if (url === '/settings/providers') return Promise.resolve(configs);
+    if (url === '/settings/providers/status') return Promise.resolve(statuses);
+    return Promise.resolve(undefined);
+  });
+}
 
 // ── Tests ───────────────────────────────────────────────────────────
 
@@ -48,7 +67,7 @@ describe('SetupWizard', () => {
   });
 
   it('renders welcome step initially', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
@@ -56,8 +75,8 @@ describe('SetupWizard', () => {
     expect(screen.getByText(/welcome to flightdeck/i)).toBeInTheDocument();
   });
 
-  it('navigates to providers step on next', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+  it('navigates to providers step and shows installed count after detection', async () => {
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -66,11 +85,14 @@ describe('SetupWizard', () => {
       expect(screen.getByTestId('step-providers')).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/2 of 6 providers detected/i)).toBeInTheDocument();
+    // After status loads, should show installed count
+    await waitFor(() => {
+      expect(screen.getByText(/2 of 6 providers detected/i)).toBeInTheDocument();
+    });
   });
 
   it('shows installed status for configured providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -79,13 +101,15 @@ describe('SetupWizard', () => {
       expect(screen.getByTestId('provider-copilot')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('provider-copilot')).toHaveTextContent('Installed');
-    expect(screen.getByTestId('provider-claude')).toHaveTextContent('Installed');
-    expect(screen.getByTestId('install-gemini')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('provider-copilot')).toHaveTextContent('Installed');
+      expect(screen.getByTestId('provider-claude')).toHaveTextContent('Installed');
+      expect(screen.getByTestId('provider-gemini')).toHaveTextContent('Not found');
+    });
   });
 
   it('shows no providers message when none detected', async () => {
-    mockApiFetch.mockResolvedValue(ALL_NOT_INSTALLED);
+    mockTwoPhase(MOCK_CONFIGS, ALL_NOT_INSTALLED_STATUSES);
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -96,7 +120,7 @@ describe('SetupWizard', () => {
   });
 
   it('navigates through all three steps', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     // Step 1: Welcome
@@ -115,7 +139,7 @@ describe('SetupWizard', () => {
   });
 
   it('back button navigates to previous step', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -128,7 +152,7 @@ describe('SetupWizard', () => {
   });
 
   it('dismiss sets localStorage and calls onComplete', () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-dismiss'));
@@ -137,7 +161,7 @@ describe('SetupWizard', () => {
   });
 
   it('skip sets localStorage and calls onComplete', () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-skip'));
@@ -146,7 +170,7 @@ describe('SetupWizard', () => {
   });
 
   it('finish on done step sets localStorage and calls onComplete', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     // Navigate to done
@@ -159,16 +183,38 @@ describe('SetupWizard', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('install link has external href for uninstalled providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+  it('shows setup links for providers with multiple links', async () => {
+    mockTwoPhase();
     render(<SetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByTestId('wizard-next'));
-    await waitFor(() => screen.getByTestId('install-gemini'));
+    await waitFor(() => screen.getByTestId('provider-claude'));
 
-    const link = screen.getByTestId('install-gemini');
-    expect(link).toHaveAttribute('href', 'https://github.com/google-gemini/gemini-cli');
-    expect(link).toHaveAttribute('target', '_blank');
+    // Claude should show ACP adapter link
+    const claudeCard = screen.getByTestId('provider-claude');
+    expect(claudeCard).toHaveTextContent('ACP adapter');
+    expect(claudeCard).toHaveTextContent('Claude Code CLI');
+  });
+
+  it('enable/disable toggle calls API and updates UI', async () => {
+    mockTwoPhase();
+    render(<SetupWizard onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByTestId('wizard-next'));
+    await waitFor(() => screen.getByTestId('toggle-copilot'));
+
+    // Toggle copilot off
+    fireEvent.click(screen.getByTestId('toggle-copilot'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/providers/copilot',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ enabled: false }),
+        }),
+      );
+    });
   });
 
   it('handles API error gracefully', async () => {

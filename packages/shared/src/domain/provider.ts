@@ -196,7 +196,10 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     authLabel: 'Authenticated via Anthropic API key',
     color: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-l-amber-500', tab: 'text-orange-400 border-orange-400' },
     docsUrl: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview',
-    setupLinks: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
+    setupLinks: [
+      { label: 'ACP adapter', url: 'https://github.com/zed-industries/claude-agent-acp' },
+      { label: 'Claude Code CLI', url: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview' },
+    ],
     isPreview: false,
   },
 
