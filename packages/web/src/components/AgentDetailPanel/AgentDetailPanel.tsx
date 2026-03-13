@@ -47,8 +47,8 @@ import { shortAgentId } from '../../utils/agentLabel';
 
 export interface AgentDetailPanelProps {
   agentId: string;
-  /** If present, fetches richer profile data from the teams API */
-  teamId?: string;
+  /** If present, fetches richer profile data from the crews API */
+  crewId?: string;
   /** 'inline' renders as a side panel; 'modal' renders as a centered overlay */
   mode: 'inline' | 'modal';
   onClose: () => void;
@@ -56,14 +56,14 @@ export interface AgentDetailPanelProps {
 
 type DetailTab = 'details' | 'chat' | 'settings';
 
-/** Profile data returned from /teams/:teamId/agents/:agentId/profile */
+/** Profile data returned from /crews/:crewId/agents/:agentId/profile */
 interface AgentProfile {
   agentId: string;
   role: string;
   model: string;
   status: string;
   liveStatus: string | null;
-  teamId: string;
+  crewId: string;
   projectId: string | null;
   lastTaskSummary: string | null;
   createdAt: string;
@@ -90,7 +90,7 @@ const TABS: TabItem[] = [
 
 // ── Main exported component ──────────────────────────────────
 
-export function AgentDetailPanel({ agentId, teamId, mode, onClose }: AgentDetailPanelProps) {
+export function AgentDetailPanel({ agentId, crewId, mode, onClose }: AgentDetailPanelProps) {
   const agentExists = useAppStore((s) => s.agents.some((a) => a.id === agentId));
 
   // Close modal on Escape key
@@ -103,8 +103,8 @@ export function AgentDetailPanel({ agentId, teamId, mode, onClose }: AgentDetail
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [mode, onClose]);
 
-  // If no agent in store and no teamId to fetch profile from, render nothing
-  if (!agentExists && !teamId) return null;
+  // If no agent in store and no crewId to fetch profile from, render nothing
+  if (!agentExists && !crewId) return null;
 
   if (mode === 'modal') {
     return (
@@ -113,7 +113,7 @@ export function AgentDetailPanel({ agentId, teamId, mode, onClose }: AgentDetail
         onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
         <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-          <AgentDetailPanelContent agentId={agentId} teamId={teamId} mode={mode} onClose={onClose} />
+          <AgentDetailPanelContent agentId={agentId} crewId={crewId} mode={mode} onClose={onClose} />
         </div>
       </div>
     );
@@ -121,14 +121,14 @@ export function AgentDetailPanel({ agentId, teamId, mode, onClose }: AgentDetail
 
   return (
     <div className="bg-th-bg-alt rounded-lg border border-th-border w-full h-full flex flex-col">
-      <AgentDetailPanelContent agentId={agentId} teamId={teamId} mode={mode} onClose={onClose} />
+      <AgentDetailPanelContent agentId={agentId} crewId={crewId} mode={mode} onClose={onClose} />
     </div>
   );
 }
 
 // ── Inner content (shared between modal and inline) ──────────
 
-function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetailPanelProps) {
+function AgentDetailPanelContent({ agentId, crewId, mode, onClose }: AgentDetailPanelProps) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const addToast = useToastStore((s) => s.add);
 
@@ -145,17 +145,17 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
   const [confirmStop, setConfirmStop] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Fetch profile data when teamId is available
+  // Fetch profile data when crewId is available
   useEffect(() => {
-    if (!teamId) return;
+    if (!crewId) return;
     let cancelled = false;
     setProfileLoading(true);
-    apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
+    apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`)
       .then((data) => { if (!cancelled) setProfile(data); })
       .catch(() => { if (!cancelled) setProfile(null); })
       .finally(() => { if (!cancelled) setProfileLoading(false); });
     return () => { cancelled = true; };
-  }, [agentId, teamId]);
+  }, [agentId, crewId]);
 
   if (!agent && !profile) {
     if (profileLoading) {
@@ -196,8 +196,8 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
       if (action === 'stop') {
         addToast('success', 'Agent terminated');
         setConfirmStop(false);
-        if (teamId) {
-          const data = await apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`);
+        if (crewId) {
+          const data = await apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`);
           setProfile(data);
         }
       } else if (action === 'interrupt') {
@@ -426,7 +426,7 @@ function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, e
         </div>
       )}
 
-      {/* Profile metadata (when teamId provides richer data) */}
+      {/* Profile metadata (when crewId provides richer data) */}
       {profile && (
         <div className="px-5 py-3 border-b border-th-border">
           <div className="grid grid-cols-2 gap-3 text-sm">

@@ -1,7 +1,7 @@
 /**
- * Teams route tests.
+ * Crew route tests.
  *
- * Covers: list teams, team details, agent profiles, health,
+ * Covers: list crews, crew details, agent profiles, health,
  * clone, crews summary, error handling, and missing dependencies.
  */
 import { describe, it, expect, vi, afterAll } from 'vitest';
@@ -15,7 +15,7 @@ vi.mock('../middleware/rateLimit.js', () => ({
   rateLimit: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-import { teamsRoutes } from './teams.js';
+import { crewRoutes } from './teams.js';
 import type { AppContext } from './context.js';
 
 // ── Mock Data ───────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ function createTestServer(ctxOverrides: Partial<AppContext> = {}): {
   const ctx = minimalCtx(ctxOverrides);
   const app = express();
   app.use(express.json());
-  app.use(teamsRoutes(ctx));
+  app.use(crewRoutes(ctx));
 
   let server: Server;
   return {
@@ -94,21 +94,21 @@ function createTestServer(ctxOverrides: Partial<AppContext> = {}): {
 
 // ── Tests ───────────────────────────────────────────────────────────
 
-describe('teamsRoutes', () => {
-  // ── GET /teams ──────────────────────────────────────────────────
+describe('crewRoutes', () => {
+  // ── GET /crews ──────────────────────────────────────────────────
 
-  describe('GET /teams', () => {
-    it('returns grouped teams with agent counts', async () => {
+  describe('GET /crews', () => {
+    it('returns grouped crews with agent counts', async () => {
       const srv = createTestServer();
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams`);
+        const res = await fetch(`${base}/crews`);
         const body = await res.json();
 
         expect(res.status).toBe(200);
-        expect(body.teams).toHaveLength(2);
+        expect(body.crews).toHaveLength(2);
 
-        const team1 = body.teams.find((t: any) => t.teamId === 'team-1');
+        const team1 = body.crews.find((t: any) => t.crewId === 'team-1');
         expect(team1.agentCount).toBe(2);
         expect(team1.roles).toContain('architect');
         expect(team1.roles).toContain('developer');
@@ -121,7 +121,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({ agentRoster: undefined });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams`);
+        const res = await fetch(`${base}/crews`);
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();
@@ -129,18 +129,18 @@ describe('teamsRoutes', () => {
     });
   });
 
-  // ── GET /teams/:teamId ──────────────────────────────────────────
+  // ── GET /crews/:crewId ──────────────────────────────────────────
 
-  describe('GET /teams/:teamId', () => {
-    it('returns team details with agents and knowledge count', async () => {
+  describe('GET /crews/:crewId', () => {
+    it('returns crew details with agents and knowledge count', async () => {
       const srv = createTestServer();
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1`);
+        const res = await fetch(`${base}/crews/team-1`);
         const body = await res.json();
 
         expect(res.status).toBe(200);
-        expect(body.teamId).toBe('team-1');
+        expect(body.crewId).toBe('team-1');
         expect(body.agentCount).toBe(2);
         expect(body.agents).toHaveLength(2);
         expect(body.knowledgeCount).toBe(10);
@@ -150,11 +150,11 @@ describe('teamsRoutes', () => {
       }
     });
 
-    it('returns 404 for unknown team', async () => {
+    it('returns 404 for unknown crew', async () => {
       const srv = createTestServer();
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/nonexistent`);
+        const res = await fetch(`${base}/crews/nonexistent`);
         expect(res.status).toBe(404);
       } finally {
         await srv.stop();
@@ -165,7 +165,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({ agentRoster: undefined });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1`);
+        const res = await fetch(`${base}/crews/team-1`);
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();
@@ -173,9 +173,9 @@ describe('teamsRoutes', () => {
     });
   });
 
-  // ── GET /teams/:teamId/health ───────────────────────────────────
+  // ── GET /crews/:crewId/health ───────────────────────────────────
 
-  describe('GET /teams/:teamId/health', () => {
+  describe('GET /crews/:crewId/health', () => {
     it('returns health with status counts and agents', async () => {
       const srv = createTestServer({
         agentRoster: {
@@ -185,10 +185,10 @@ describe('teamsRoutes', () => {
       });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/health`);
+        const res = await fetch(`${base}/crews/team-1/health`);
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.teamId).toBe('team-1');
+        expect(body.crewId).toBe('team-1');
         expect(body.totalAgents).toBe(3);
         expect(body.statusCounts).toEqual({ idle: 1, busy: 2, terminated: 0 });
         expect(body.agents).toHaveLength(3);
@@ -198,7 +198,7 @@ describe('teamsRoutes', () => {
       }
     });
 
-    it('returns 404 for empty team', async () => {
+    it('returns 404 for empty crew', async () => {
       const srv = createTestServer({
         agentRoster: {
           getAllAgents: vi.fn().mockReturnValue([]),
@@ -207,7 +207,7 @@ describe('teamsRoutes', () => {
       });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/nonexistent/health`);
+        const res = await fetch(`${base}/crews/nonexistent/health`);
         expect(res.status).toBe(404);
       } finally {
         await srv.stop();
@@ -218,7 +218,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({ agentRoster: undefined });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/health`);
+        const res = await fetch(`${base}/crews/team-1/health`);
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();
@@ -226,9 +226,9 @@ describe('teamsRoutes', () => {
     });
   });
 
-  // ── POST /teams/:teamId/agents/:agentId/clone ──────────────────
+  // ── POST /crews/:crewId/agents/:agentId/clone ──────────────────
 
-  describe('POST /teams/:teamId/agents/:agentId/clone', () => {
+  describe('POST /crews/:crewId/agents/:agentId/clone', () => {
     it('clones an agent', async () => {
       const mockClone = { agentId: 'a1-clone-xxx', role: 'architect', model: 'gpt-4', status: 'idle', teamId: 'team-1' };
       const srv = createTestServer({
@@ -240,7 +240,7 @@ describe('teamsRoutes', () => {
       });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents/a1/clone`, {
+        const res = await fetch(`${base}/crews/team-1/agents/a1/clone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -263,7 +263,7 @@ describe('teamsRoutes', () => {
       });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents/unknown/clone`, {
+        const res = await fetch(`${base}/crews/team-1/agents/unknown/clone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -278,7 +278,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({ agentRoster: undefined });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents/a1/clone`, {
+        const res = await fetch(`${base}/crews/team-1/agents/a1/clone`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -424,9 +424,9 @@ describe('teamsRoutes', () => {
     });
   });
 
-  // ── GET /teams/:teamId/agents — provider fallback ─────────────────
+  // ── GET /crews/:crewId/agents — provider fallback ─────────────────
 
-  describe('GET /teams/:teamId/agents', () => {
+  describe('GET /crews/:crewId/agents', () => {
     it('returns provider from roster when live agent is gone (terminated)', async () => {
       const rosterAgents = [
         {
@@ -458,7 +458,7 @@ describe('teamsRoutes', () => {
 
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents`);
+        const res = await fetch(`${base}/crews/team-1/agents`);
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveLength(1);
@@ -513,7 +513,7 @@ describe('teamsRoutes', () => {
 
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents`);
+        const res = await fetch(`${base}/crews/team-1/agents`);
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveLength(1);
@@ -527,7 +527,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({ agentRoster: undefined });
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents`);
+        const res = await fetch(`${base}/crews/team-1/agents`);
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();
@@ -596,7 +596,7 @@ describe('teamsRoutes', () => {
       }
     });
 
-    it('GET /teams/:teamId/agents excludes stale agents from previous sessions', async () => {
+    it('GET /crews/:crewId/agents excludes stale agents from previous sessions', async () => {
       const srv = createTestServer({
         agentRoster: {
           getAllAgents: vi.fn().mockReturnValue(allRoster.filter(a => a.teamId === 'team-1')),
@@ -606,7 +606,7 @@ describe('teamsRoutes', () => {
 
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams/team-1/agents`);
+        const res = await fetch(`${base}/crews/team-1/agents`);
         expect(res.status).toBe(200);
         const body = await res.json();
         // 3 current-session agents, stale-1 excluded
@@ -619,7 +619,7 @@ describe('teamsRoutes', () => {
       }
     });
 
-    it('GET /teams returns empty teams list when no agents are live', async () => {
+    it('GET /crews returns empty crews list when no agents are live', async () => {
       const srv = createTestServer({
         agentRoster: { getAllAgents: vi.fn().mockReturnValue(allRoster) } as any,
         agentManager: { getAll: vi.fn().mockReturnValue([]) } as any,
@@ -627,10 +627,10 @@ describe('teamsRoutes', () => {
 
       const base = await srv.start();
       try {
-        const res = await fetch(`${base}/teams`);
+        const res = await fetch(`${base}/crews`);
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.teams).toHaveLength(0);
+        expect(body.crews).toHaveLength(0);
       } finally {
         await srv.stop();
       }

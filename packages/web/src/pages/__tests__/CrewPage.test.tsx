@@ -34,9 +34,9 @@ function renderPage() {
 
 // ── Fixtures ──────────────────────────────────────────────
 
-const teamsData = {
-  teams: [
-    { teamId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
+const crewsData = {
+  crews: [
+    { crewId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
   ],
 };
 
@@ -80,7 +80,7 @@ const rosterAgents = [
 ];
 
 const healthData = {
-  teamId: 'default',
+  crewId: 'default',
   totalAgents: 3,
   statusCounts: { running: 1, idle: 1, terminated: 1 },
   massFailurePaused: false,
@@ -97,7 +97,7 @@ const profileData = {
   model: 'claude-sonnet-4-6',
   status: 'running',
   liveStatus: 'running',
-  teamId: 'default',
+  crewId: 'default',
   projectId: 'proj-1',
   lastTaskSummary: 'Designing auth module',
   createdAt: '2026-03-01T10:00:00Z',
@@ -110,8 +110,8 @@ const profileData = {
   },
 };
 
-const teamDetailData = {
-  teamId: 'default',
+const crewDetailData = {
+  crewId: 'default',
   agentCount: 3,
   agents: [
     { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'running' },
@@ -122,18 +122,18 @@ const teamDetailData = {
 };
 
 function setupMocks(overrides: Partial<{
-  teams: any;
+  crews: any;
   agents: any;
   health: any;
   profile: any;
-  teamDetail: any;
+  crewDetail: any;
 }> = {}) {
   mockApiFetch.mockImplementation((path: string, opts?: any) => {
-    if (path === '/teams') return Promise.resolve(overrides.teams ?? teamsData);
+    if (path === '/crews') return Promise.resolve(overrides.crews ?? crewsData);
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/health')) return Promise.resolve(overrides.health ?? healthData);
-    // Match /teams/:teamId (but not /teams/:teamId/agents or /teams/:teamId/health)
-    if (/^\/teams\/[^/]+$/.test(path)) return Promise.resolve(overrides.teamDetail ?? teamDetailData);
+    // Match /crews/:crewId (but not /crews/:crewId/agents or /crews/:crewId/health)
+    if (/^\/crews\/[^/]+$/.test(path)) return Promise.resolve(overrides.crewDetail ?? crewDetailData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
     return Promise.resolve({});
   });
@@ -159,7 +159,7 @@ describe('CrewPage', () => {
 
   it('shows error state on API failure', async () => {
     mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path === '/crews') return Promise.resolve(crewsData);
       if (path.includes('/agents')) return Promise.reject(new Error('Network error'));
       return Promise.reject(new Error('fail'));
     });

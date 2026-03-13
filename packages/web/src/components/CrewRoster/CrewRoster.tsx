@@ -79,8 +79,8 @@ interface AgentProfile {
   } | null;
 }
 
-interface TeamInfo {
-  teamId: string;
+interface CrewInfo {
+  crewId: string;
   agentCount: number;
   roles: string[];
 }
@@ -368,7 +368,7 @@ function AgentRow({ agent, isLead, isSelected, onSelect }: {
 
 // ── Agent Profile Panel ───────────────────────────────────
 
-function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: string; onClose: () => void }) {
+function ProfilePanel({ agentId, crewId, onClose }: { agentId: string; crewId: string; onClose: () => void }) {
   const addToast = useToastStore(s => s.add);
   const { models: availableModels } = useModels();
   const [profile, setProfile] = useState<AgentProfile | null>(null);
@@ -381,11 +381,11 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
 
   useEffect(() => {
     setLoading(true);
-    apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
+    apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`)
       .then(data => setProfile(data))
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
-  }, [agentId, teamId]);
+  }, [agentId, crewId]);
 
   const isAlive = profile?.liveStatus === 'running' || profile?.liveStatus === 'creating' || profile?.liveStatus === 'idle';
 
@@ -427,7 +427,7 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
       addToast('success', 'Agent terminated');
       setConfirmStop(false);
       // Refresh profile to reflect new status
-      const data = await apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`);
+      const data = await apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`);
       setProfile(data);
     } catch (err: any) {
       addToast('error', `Failed to stop agent: ${err.message}`);
@@ -684,18 +684,18 @@ export function CrewRoster() {
   const [statusFilter, setStatusFilter] = useState<RosterStatus | 'all'>('all');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  // Resolve teamId for the profile panel
-  const selectedAgentTeamId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
+  // Resolve crewId for the profile panel
+  const selectedAgentCrewId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
 
   const fetchAll = useCallback(async () => {
     try {
       setError(null);
       setLoading(true);
 
-      // Fetch crew summaries + all team agents in parallel
-      const [summaryResult, teamsResult] = await Promise.allSettled([
+      // Fetch crew summaries + all crew agents in parallel
+      const [summaryResult, crewsResult] = await Promise.allSettled([
         apiFetch<CrewSummary[]>('/crews/summary'),
-        apiFetch<{ teams: TeamInfo[] }>('/teams'),
+        apiFetch<{ crews: CrewInfo[] }>('/crews'),
       ]);
 
       // Crew summaries (for project names, session counts)
@@ -703,11 +703,11 @@ export function CrewRoster() {
         ? summaryResult.value : [];
       setCrewSummaries(summaries);
 
-      // Fetch agents from all teams (gives full data with teamId for profile lookups)
-      const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
+      // Fetch agents from all crews (gives full data with crewId for profile lookups)
+      const crewList = crewsResult.status === 'fulfilled' ? (crewsResult.value.crews ?? []) : [];
       const statusQ = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
       const agentResults = await Promise.allSettled(
-        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${statusQ}`))
+        crewList.map(t => apiFetch<RosterAgent[]>(`/crews/${t.crewId}/agents${statusQ}`))
       );
 
       const allAgents: RosterAgent[] = [];
@@ -889,7 +889,7 @@ export function CrewRoster() {
           <div className="w-full max-w-full md:w-[400px] lg:w-[480px] shrink-0">
             <ProfilePanel
               agentId={selectedAgent}
-              teamId={selectedAgentTeamId}
+              crewId={selectedAgentCrewId}
               onClose={() => setSelectedAgent(null)}
             />
           </div>

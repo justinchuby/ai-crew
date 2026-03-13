@@ -60,8 +60,8 @@ interface RosterAgent {
   outputPreview: string | null;
 }
 
-interface TeamInfo {
-  teamId: string;
+interface CrewInfo {
+  crewId: string;
   agentCount: number;
   roles: string[];
 }
@@ -419,7 +419,7 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
-function HealthStrip({ teamId: _teamId }: { teamId: string }) {
+function HealthStrip({ crewId: _crewId }: { crewId: string }) {
   const [expanded, setExpanded] = useState(false);
   const liveAgents = useAppStore(s => s.agents);
 
@@ -493,7 +493,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const contextProjectId = useOptionalProjectId();
   const projectId = scope === 'project' ? contextProjectId : null;
 
-  const selectedAgentTeamId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
+  const selectedAgentCrewId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
 
   const fetchAll = useCallback(async () => {
     try {
@@ -502,18 +502,18 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       // Pass projectId to server so it queries roster directly (includes history)
       const pq = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-      const [summaryResult, teamsResult] = await Promise.allSettled([
+      const [summaryResult, crewsResult] = await Promise.allSettled([
         apiFetch<CrewSummary[]>(`/crews/summary${pq}`),
-        apiFetch<{ teams: TeamInfo[] }>(`/teams${pq}`),
+        apiFetch<{ crews: CrewInfo[] }>(`/crews${pq}`),
       ]);
 
       const summaries = summaryResult.status === 'fulfilled' && Array.isArray(summaryResult.value)
         ? summaryResult.value : [];
       setCrewSummaries(summaries);
 
-      const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
+      const crewList = crewsResult.status === 'fulfilled' ? (crewsResult.value.crews ?? []) : [];
       const agentResults = await Promise.allSettled(
-        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${pq}`))
+        crewList.map(t => apiFetch<RosterAgent[]>(`/crews/${t.crewId}/agents${pq}`))
       );
 
       const allAgents: RosterAgent[] = [];
@@ -733,7 +733,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         >
           {selectedAgent && (
             <div className="h-full md:max-h-screen overflow-hidden">
-              <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
+              <AgentDetailPanel agentId={selectedAgent} crewId={selectedAgentCrewId} mode="inline" onClose={() => setSelectedAgent(null)} />
             </div>
           )}
         </div>
@@ -741,7 +741,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       {/* Health Strip (collapsed at bottom) */}
       <div className="mt-3 shrink-0">
-        <HealthStrip teamId="default" />
+        <HealthStrip crewId="default" />
       </div>
     </div>
   );

@@ -21,7 +21,7 @@ import { notificationRoutes } from './notifications.js';
 import { nlRoutes } from './nl.js';
 import { dataRoutes } from './data.js';
 import { knowledgeRoutes } from './knowledge.js';
-import { teamsRoutes } from './teams.js';
+import { crewRoutes } from './teams.js';
 import { settingsRoutes } from './settings.js';
 import { integrationRoutes } from './integrations.js';
 import { tasksRoutes } from './tasks.js';
@@ -49,7 +49,7 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(nlRoutes(ctx));
   router.use(dataRoutes(ctx));
   router.use(knowledgeRoutes(ctx));
-  router.use(teamsRoutes(ctx));
+  router.use(crewRoutes(ctx));
   router.use(settingsRoutes(ctx));
   router.use(integrationRoutes(ctx));
   router.use(tasksRoutes(ctx));

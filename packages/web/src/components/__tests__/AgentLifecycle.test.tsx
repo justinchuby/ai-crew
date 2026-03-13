@@ -24,7 +24,7 @@ const MOCK_AGENT: AgentHealthInfo = {
 
 const defaultProps = {
   agentId: 'agent-001-full-id',
-  teamId: 'team-1',
+  crewId: 'crew-1',
   agent: MOCK_AGENT,
   onClose: vi.fn(),
   onActionComplete: vi.fn(),
@@ -78,7 +78,7 @@ describe('AgentLifecycle', () => {
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
-        '/teams/team-1/agents/agent-001-full-id/clone',
+        '/crews/crew-1/agents/agent-001-full-id/clone',
         expect.objectContaining({ method: 'POST' }),
       );
     });
