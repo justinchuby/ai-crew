@@ -397,9 +397,9 @@ describe('ProviderManager', () => {
     });
   });
 
-  // ── resolveAvailableProvider ─────────────────────────────
+  // ── resolveAndPersistProvider ─────────────────────────────
 
-  describe('resolveAvailableProvider', () => {
+  describe('resolveAndPersistProvider', () => {
     it('returns configured provider when it is installed and enabled', () => {
       // Set active provider to 'claude' via DB
       const mgr = createManager();
@@ -411,7 +411,7 @@ describe('ProviderManager', () => {
         throw new Error('not found');
       });
 
-      const result = mgr.resolveAvailableProvider();
+      const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
     });
 
@@ -429,7 +429,7 @@ describe('ProviderManager', () => {
       // Set ranking so claude comes first after copilot
       mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
-      const result = mgr.resolveAvailableProvider();
+      const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
     });
 
@@ -449,7 +449,7 @@ describe('ProviderManager', () => {
       mgr.setProviderEnabled('claude', true);
       mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
-      const result = mgr.resolveAvailableProvider();
+      const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
     });
 
@@ -460,7 +460,7 @@ describe('ProviderManager', () => {
       // Mock: no binary is installed
       exec.mockImplementation(() => { throw new Error('not found'); });
 
-      const result = mgr.resolveAvailableProvider();
+      const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('copilot');
     });
 
@@ -475,7 +475,7 @@ describe('ProviderManager', () => {
         throw new Error('not found');
       });
 
-      mgr.resolveAvailableProvider();
+      mgr.resolveAndPersistProvider();
       // The active provider should now be 'claude' in the DB
       expect(mgr.getActiveProviderId()).toBe('claude');
     });

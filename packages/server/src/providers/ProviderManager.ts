@@ -392,7 +392,7 @@ export class ProviderManager {
    * Call this during startup after the ProviderManager is created to ensure
    * the active provider is actually usable.
    */
-  resolveAvailableProvider(): ProviderId {
+  resolveAndPersistProvider(): ProviderId {
     const configured = this.getActiveProviderId();
 
     // Check if the configured provider is installed and enabled

@@ -120,6 +120,19 @@ export interface ServiceContainer extends AppContext {
   };
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Map YAML provider config to the flat ServerConfig fields. */
+function toProviderConfig(cfg: { id: string; binaryOverride?: string; argsOverride?: string[]; envOverride?: Record<string, string>; cloudProvider?: ServerConfig['cloudProvider'] }) {
+  return {
+    provider: cfg.id,
+    providerBinaryOverride: cfg.binaryOverride,
+    providerArgsOverride: cfg.argsOverride,
+    providerEnvOverride: cfg.envOverride,
+    cloudProvider: cfg.cloudProvider,
+  };
+}
+
 // ── Factory ────────────────────────────────────────────────
 
 export async function createContainer(opts: ContainerConfig): Promise<ServiceContainer> {
@@ -151,13 +164,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
 
   // Bridge YAML provider config → ServerConfig so all services see the configured provider
   const yamlProvider = configStore.current.provider;
-  updateConfig({
-    provider: yamlProvider.id,
-    providerBinaryOverride: yamlProvider.binaryOverride,
-    providerArgsOverride: yamlProvider.argsOverride,
-    providerEnvOverride: yamlProvider.envOverride,
-    cloudProvider: yamlProvider.cloudProvider,
-  });
+  updateConfig(toProviderConfig(yamlProvider));
   // Re-read config so all services see restored values
   const effectiveConfig = getConfig();
 
@@ -256,7 +263,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // Resolve the best available provider at startup — if the configured provider
   // (from YAML or default 'copilot') isn't installed, fall back to the first
   // available one from the provider ranking.
-  const resolvedProvider = providerManager.resolveAvailableProvider();
+  const resolvedProvider = providerManager.resolveAndPersistProvider();
   updateConfig({ provider: resolvedProvider });
 
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
@@ -531,16 +538,10 @@ function wireEvents(c: ServiceContainer): void {
   });
 
   configStore.on('config:provider:changed', ({ config: providerCfg }: any) => {
-    updateConfig({
-      provider: providerCfg.id,
-      providerBinaryOverride: providerCfg.binaryOverride,
-      providerArgsOverride: providerCfg.argsOverride,
-      providerEnvOverride: providerCfg.envOverride,
-      cloudProvider: providerCfg.cloudProvider,
-    });
+    updateConfig(toProviderConfig(providerCfg));
     // Re-resolve in case the new provider isn't installed
     if (c.providerManager) {
-      const resolved = c.providerManager.resolveAvailableProvider();
+      const resolved = c.providerManager.resolveAndPersistProvider();
       updateConfig({ provider: resolved });
     }
   });
