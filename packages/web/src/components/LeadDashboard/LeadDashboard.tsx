@@ -7,7 +7,7 @@ import type { AgentReport, ProgressSnapshot, ActivityEvent, AgentComm } from '..
 import type { AcpTextChunk, DagStatus, Decision, ChatGroup, GroupMessage, Delegation, LeadProgress } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
-import { AgentReportBlock } from './AgentReportBlock';
+import { parseAgentReport } from './AgentReportBlock';
 import { BannerDecisionActions } from './DecisionPanel';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { useAttachments } from '../../hooks/useAttachments';
@@ -709,19 +709,19 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
                   <div ref={reportsScrollRef} className="max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
                     {agentReports.slice(-20).map((r) => {
                       const time = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const parsed = parseAgentReport(r.content);
+                      const summary = parsed.isReport
+                        ? [parsed.header, parsed.task].filter(Boolean).join(' — ')
+                        : r.content.split('\n')[0];
                       return (
                         <div
                           key={r.id}
-                          className="flex items-start gap-2 px-2 py-1.5 rounded bg-amber-500/[0.06] border border-amber-400/20 border-l-2 border-l-amber-500/30 cursor-pointer hover:bg-amber-500/[0.10] transition-colors"
+                          className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/[0.06] border border-amber-400/20 border-l-2 border-l-amber-500/30 cursor-pointer hover:bg-amber-500/[0.10] transition-colors"
                           onClick={() => setExpandedReport(r)}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">{r.fromRole}</span>
-                              <span className="text-[10px] text-th-text-muted ml-auto">{time}</span>
-                            </div>
-                            <AgentReportBlock content={r.content} compact />
-                          </div>
+                          <span className="text-[10px] font-mono text-th-text-muted shrink-0">{time}</span>
+                          <span className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400 shrink-0">{r.fromRole}</span>
+                          <span className="text-xs font-mono text-th-text-alt truncate min-w-0">{summary}</span>
                         </div>
                       );
                     })}
