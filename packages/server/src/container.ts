@@ -264,7 +264,19 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // (from YAML or default 'copilot') isn't installed, fall back to the first
   // available one from the provider ranking.
   const resolvedProvider = providerManager.resolveAndPersistProvider();
-  updateConfig({ provider: resolvedProvider });
+  if (resolvedProvider !== configStore.current.provider.id) {
+    // Falling back to a different provider — clear YAML overrides so the
+    // original provider's binary/args/env/cloud settings don't bleed through.
+    updateConfig({
+      provider: resolvedProvider,
+      providerBinaryOverride: undefined,
+      providerArgsOverride: undefined,
+      providerEnvOverride: undefined,
+      cloudProvider: undefined,
+    });
+  } else {
+    updateConfig({ provider: resolvedProvider });
+  }
 
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
@@ -542,7 +554,18 @@ function wireEvents(c: ServiceContainer): void {
     // Re-resolve in case the new provider isn't installed
     if (c.providerManager) {
       const resolved = c.providerManager.resolveAndPersistProvider();
-      updateConfig({ provider: resolved });
+      if (resolved !== providerCfg.id) {
+        // Falling back — clear overrides from the unreachable provider
+        updateConfig({
+          provider: resolved,
+          providerBinaryOverride: undefined,
+          providerArgsOverride: undefined,
+          providerEnvOverride: undefined,
+          cloudProvider: undefined,
+        });
+      } else {
+        updateConfig({ provider: resolved });
+      }
     }
   });
 
