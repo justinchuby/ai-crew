@@ -60,13 +60,19 @@ export function teamsRoutes(ctx: AppContext): Router {
 
   // ── GET /teams ──────────────────────────────────────────────────
 
-  router.get('/teams', readLimiter, (_req, res) => {
+  router.get('/teams', readLimiter, (req, res) => {
     if (!agentRoster) {
       return res.status(503).json({ error: 'Agent roster not available' });
     }
 
     try {
-      const allAgents = filterToActiveSession(agentRoster.getAllAgents(), agentManager.getAll());
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+
+      // Project-scoped: query roster directly (includes terminated agents for history).
+      // Global: filter to agents with an active session in agentManager.
+      const allAgents = projectId
+        ? agentRoster.getByProject(projectId)
+        : filterToActiveSession(agentRoster.getAllAgents(), agentManager.getAll());
 
       // Group agents by teamId to build team list
       const teamMap = new Map<string, { teamId: string; agentCount: number; roles: Set<string> }>();
@@ -155,13 +161,14 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     try {
       const allLive = agentManager.getAll();
-      const agents = filterToActiveSession(
-        agentRoster.getAllAgents(
-          statusFilter as 'idle' | 'running' | 'terminated' | 'failed' | undefined,
-          teamId,
-        ),
-        allLive,
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+
+      // Project-scoped: query roster directly; Global: filter to active sessions
+      const dbAgents = agentRoster.getAllAgents(
+        statusFilter as 'idle' | 'running' | 'terminated' | 'failed' | undefined,
+        teamId,
       );
+      const agents = projectId ? dbAgents : filterToActiveSession(dbAgents, allLive);
 
       // Enrich with live status from AgentManager
       const enriched = agents.map(a => {
@@ -327,12 +334,17 @@ export function teamsRoutes(ctx: AppContext): Router {
 
   // ── GET /crews/summary — Crew groups with stats ──────────────────
 
-  router.get('/crews/summary', readLimiter, (_req, res) => {
+  router.get('/crews/summary', readLimiter, (req, res) => {
     if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
 
     try {
       const liveAgents = agentManager.getAll();
-      const allAgents = filterToActiveSession(agentRoster.getAllAgents(), liveAgents);
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+
+      // Project-scoped: query roster directly; Global: filter to active sessions
+      const allAgents = projectId
+        ? agentRoster.getByProject(projectId)
+        : filterToActiveSession(agentRoster.getAllAgents(), liveAgents);
 
       // Group agents by their lead (parentId from metadata, or self if role is lead)
       const crewMap = new Map<string, typeof allAgents>();

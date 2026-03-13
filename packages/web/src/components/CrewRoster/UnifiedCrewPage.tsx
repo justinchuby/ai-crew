@@ -500,9 +500,11 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       setError(null);
       setLoading(true);
 
+      // Pass projectId to server so it queries roster directly (includes history)
+      const pq = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
       const [summaryResult, teamsResult] = await Promise.allSettled([
-        apiFetch<CrewSummary[]>('/crews/summary'),
-        apiFetch<{ teams: TeamInfo[] }>('/teams'),
+        apiFetch<CrewSummary[]>(`/crews/summary${pq}`),
+        apiFetch<{ teams: TeamInfo[] }>(`/teams${pq}`),
       ]);
 
       const summaries = summaryResult.status === 'fulfilled' && Array.isArray(summaryResult.value)
@@ -511,7 +513,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
       const agentResults = await Promise.allSettled(
-        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents`))
+        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${pq}`))
       );
 
       const allAgents: RosterAgent[] = [];
@@ -529,21 +531,14 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         throw new Error(firstFail?.reason?.message ?? 'Failed to fetch agents');
       }
 
-      // Filter to project scope if needed
-      if (projectId) {
-        const projectLeadIds = new Set(summaries.filter(s => s.projectId === projectId).map(s => s.leadId));
-        const filtered = allAgents.filter(a => {
-          if (a.projectId === projectId) return true;
-          if (projectLeadIds.has(a.agentId)) return true;
-          if (a.parentId && projectLeadIds.has(a.parentId)) return true;
-          return false;
-        });
-        setAgents(filtered);
-      } else {
+      if (!projectId) {
         // Global scope: only show active agents
         const activeStatuses = new Set(['running', 'idle', 'creating']);
         const active = allAgents.filter(a => a.liveStatus && activeStatuses.has(a.liveStatus));
         setAgents(active);
+      } else {
+        // Project scope: server already filtered by projectId
+        setAgents(allAgents);
       }
     } catch (err: any) {
       setError(err.message ?? 'Failed to fetch crew roster');
