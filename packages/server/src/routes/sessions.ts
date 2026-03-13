@@ -55,14 +55,8 @@ export function sessionsRoutes(ctx: AppContext): Router {
 
       projectRegistry.reactivateSession(session.id, task, roleId);
 
-      // Send briefing once the agent's session is connected
-      const briefing = projectRegistry.buildBriefing(project.id);
-      if (briefing && briefing.sessions.length > 1) {
-        const briefingText = projectRegistry.formatBriefing(briefing);
-        agent.onSessionReady(() => {
-          agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nYou are resuming a previous session. Continue from where you left off.`);
-        });
-      }
+      // Resume mode: no messages — agent picks up context from restored ACP session.
+      // The silence invariant ensures all agents start idle after resume.
 
       logger.info('session', `Resumed session ${idParam} for project "${project.name}" (${agent.id.slice(0, 8)})`);
       res.status(201).json(agent.toJSON());
