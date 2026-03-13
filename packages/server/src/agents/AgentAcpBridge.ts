@@ -195,12 +195,17 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent.sessionId = sessionId;
     agent._notifySessionReady(sessionId);
     if (initialPrompt) {
+      // Fresh agent — clear resume flag (it's false anyway) and start prompting.
+      agent._isResuming = false;
       return conn.prompt(initialPrompt);
     }
     // Resumed agents have no initial prompt — they're waiting for input.
     // Transition to idle so the UI shows the correct state.
     agent.status = 'idle';
     agent._notifyStatusChange(agent.status);
+    // Clear AFTER session-ready and idle notifications have fired synchronously,
+    // so all resume-suppression guards see _isResuming === true.
+    agent._isResuming = false;
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
     logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
@@ -335,8 +340,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   conn.on('prompting', (active: boolean) => withCtx(() => {
     if (agent._isTerminated) return;
     if (active) {
-      // Resume initialization is complete — agent is now doing real work.
-      agent._isResuming = false;
+      // Note: _isResuming is NOT cleared here — it's cleared in the
+      // conn.start().then() handler after session-ready and initial idle
+      // notifications have fired.  Clearing here would race with conn.start()
+      // resolution and let suppressed resume notifications leak through.
       if (agent.status !== 'running') {
         agent.status = 'running';
         agent._notifyStatusChange(agent.status);

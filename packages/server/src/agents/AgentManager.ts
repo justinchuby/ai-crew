@@ -687,7 +687,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.parentId) {
         this.agentMemory.store(agent.parentId, agent.id, 'sessionId', sessionId);
         // Suppress notification during resume — the lead already knows about this agent.
-        if (!agent._isResuming) {
+        // Use resumeSessionId (immutable) rather than _isResuming (can be cleared
+        // early if the provider emits 'prompting' before conn.start() resolves).
+        if (!agent.resumeSessionId) {
           const parent = this.agents.get(agent.parentId);
           if (parent && (parent.status === 'running' || parent.status === 'idle')) {
             const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
@@ -760,6 +762,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           }
         }
 
+        // Suppress the first idle notification for resumed agents — their prior
+        // work was already reported.
         if (status === 'idle' && agent.parentId && !agent._isResuming) {
           this.dispatcher.notifyParentOfIdle(agent);
         }
