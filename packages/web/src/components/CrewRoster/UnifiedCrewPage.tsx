@@ -27,7 +27,7 @@ import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
 import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
-import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import { useAppStore } from '../../stores/appStore';
 import { AgentDetailPanel } from '../AgentDetailPanel';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -478,8 +478,8 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(scope === 'project' ? 'active' : 'all');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  const effectiveProjectId = useEffectiveProjectId();
-  const projectId = scope === 'project' ? effectiveProjectId : null;
+  const contextProjectId = useOptionalProjectId();
+  const projectId = scope === 'project' ? contextProjectId : null;
 
   const selectedAgentTeamId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
 
