@@ -355,4 +355,39 @@ describe('groupTimeline', () => {
     expect(result[1].kind).toBe('message'); // user message
     expect(result[2].kind).toBe('message'); // standalone agent
   });
+
+  it('tool messages during agent turn go to systemEvents (not merged as agent text)', () => {
+    const items: TimelineItem[] = [
+      msg('agent text 1', 'agent', 1000, 0),
+      msg('✓ Read file', 'tool', 1500, 1),
+      msg('agent text 2', 'agent', 2000, 2),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('agent-group');
+    if (result[0].kind === 'agent-group') {
+      expect(result[0].messages).toHaveLength(2);
+      expect(result[0].messages[0].msg.text).toBe('agent text 1');
+      expect(result[0].messages[1].msg.text).toBe('agent text 2');
+      // Tool message should be in systemEvents, not merged into agent text
+      expect(result[0].systemEvents).toHaveLength(1);
+      if (result[0].systemEvents[0].kind === 'message') {
+        expect(result[0].systemEvents[0].msg.sender).toBe('tool');
+      }
+    }
+  });
+
+  it('standalone tool messages (outside agent turn) pass through', () => {
+    const items: TimelineItem[] = [
+      msg('✓ Read file', 'tool', 500, 0),
+      msg('agent text', 'agent', 1000, 1),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe('message');
+    if (result[0].kind === 'message') {
+      expect(result[0].msg.sender).toBe('tool');
+    }
+    expect(result[1].kind).toBe('message');
+  });
 });

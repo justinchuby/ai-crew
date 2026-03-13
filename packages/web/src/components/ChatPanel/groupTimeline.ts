@@ -28,6 +28,7 @@ export type GroupedTimelineItem = AgentGroup | TimelineItem;
  * - 'thinking' messages during an agent turn → include in the group's messages
  * - 'system' messages during an agent turn → add to group's systemEvents
  *   (except '---' separators which flush the group)
+ * - 'tool' messages during an agent turn → add to group's systemEvents
  * - Activity events during an agent turn → add to group's systemEvents
  * - 'user' messages → always flush current group, render standalone
  * - Rich content (contentType !== 'text') → flush current group, render standalone
@@ -98,6 +99,16 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
       }
       // Skip outgoing DM notifications (redundant with command blocks)
       if (text.startsWith('📤')) continue;
+      if (currentGroup) {
+        currentGroup.systemEvents.push(item);
+      } else {
+        result.push(item);
+      }
+      continue;
+    }
+
+    // Tool call messages — treat like system events (don't merge into agent text)
+    if (sender === 'tool') {
       if (currentGroup) {
         currentGroup.systemEvents.push(item);
       } else {

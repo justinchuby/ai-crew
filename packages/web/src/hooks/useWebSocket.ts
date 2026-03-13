@@ -212,6 +212,9 @@ export function useWebSocket() {
               text: `${statusIcon} ${title}`,
               sender: 'tool',
               timestamp: Date.now(),
+              toolCallId: tc.toolCallId,
+              toolStatus: tc.status,
+              toolKind: tc.kind,
             });
             updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
           } else {

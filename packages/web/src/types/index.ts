@@ -64,6 +64,12 @@ export interface AcpTextChunk {
   uri?: string;
   /** Image attachments sent with a user message */
   attachments?: Array<{ name: string; mimeType: string; thumbnailDataUrl?: string }>;
+  /** Tool call ID for sender='tool' messages, links to AcpToolCall */
+  toolCallId?: string;
+  /** Tool call status for sender='tool' messages */
+  toolStatus?: AcpToolCall['status'];
+  /** Tool call kind (e.g. 'bash', 'file_edit') for sender='tool' messages */
+  toolKind?: string;
 }
 
 export interface AcpToolCall {
