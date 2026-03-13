@@ -330,34 +330,42 @@ function ProjectCard({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
-            {project.status === 'active' && (
-              <Link
-                to={`/projects/${project.id}/session`}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium no-underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Play className="w-3 h-3" />
-                Go to Session
-              </Link>
-            )}
-            {project.status !== 'archived' && project.status !== 'active' && (
-              <button
-                onClick={() => onResume(project.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium"
-              >
-                <Play className="w-3 h-3" />
-                Resume
-              </button>
-            )}
-            {project.status === 'active' && (
-              <button
-                onClick={() => onArchive(project.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-th-text-muted rounded-md hover:bg-th-bg-muted transition-colors"
-              >
-                <Archive className="w-3 h-3" />
-                Archive
-              </button>
-            )}
+            {(() => {
+              const effectiveStatus = projectStatusProps(project);
+              const isLive = effectiveStatus.variant === 'success' || effectiveStatus.variant === 'warning';
+              return (
+                <>
+                  {isLive && (
+                    <Link
+                      to={`/projects/${project.id}/session`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium no-underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Play className="w-3 h-3" />
+                      Go to Session
+                    </Link>
+                  )}
+                  {project.status !== 'archived' && !isLive && (
+                    <button
+                      onClick={() => onResume(project.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium"
+                    >
+                      <Play className="w-3 h-3" />
+                      Resume
+                    </button>
+                  )}
+                  {isLive && (
+                    <button
+                      onClick={() => onArchive(project.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-th-text-muted rounded-md hover:bg-th-bg-muted transition-colors"
+                    >
+                      <Archive className="w-3 h-3" />
+                      Archive
+                    </button>
+                  )}
+                </>
+              );
+            })()}
             {(project.runningAgentCount ?? 0) > 0 && (
               <button
                 onClick={() => onStop(project.id)}
