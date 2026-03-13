@@ -26,7 +26,7 @@ beforeAll(async () => {
     taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
     timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
     maxConcurrent: 10,
-    markHumanInterrupt: vi.fn(),
+    markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
   } as any;
   new CommandDispatcher(mockCtx);
 });
@@ -132,7 +132,7 @@ describe('CommandHelp', () => {
         chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
         taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
         timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
-        maxConcurrent: 10, markHumanInterrupt: vi.fn(),
+        maxConcurrent: 10, markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
       } as any;
       new CommandDispatcher(mockCtx);
     });
@@ -236,7 +236,7 @@ describe('CommandDispatcher error handling', () => {
       chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
       taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
       maxConcurrent: 10,
-      markHumanInterrupt: vi.fn(),
+      markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     } as any;
 
     const dispatcher = new CommandDispatcher(mockCtx);
@@ -284,7 +284,7 @@ describe('CommandDispatcher error handling', () => {
       chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
       taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
       maxConcurrent: 10,
-      markHumanInterrupt: vi.fn(),
+      markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     } as any;
 
     const dispatcher = new CommandDispatcher(mockCtx);

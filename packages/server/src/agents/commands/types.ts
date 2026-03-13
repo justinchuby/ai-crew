@@ -53,8 +53,8 @@ export interface CommandContext {
   taskDecomposer?: TaskDecomposer;
   maxConcurrent: number;
   markHumanInterrupt(agentId: string): void;
-  resumeHeartbeat?(agentId: string): void;
-  sendCommandReminderTo?(agent: Agent): void;
+  haltHeartbeat(agentId: string): void;
+  resumeHeartbeat(agentId: string): void;
   governancePipeline?: GovernancePipeline;
   activeDelegationRepository?: ActiveDelegationRepository;
   agentRosterRepository?: AgentRosterRepository;

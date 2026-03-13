@@ -97,7 +97,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       getAgentCapabilities: vi.fn().mockReturnValue([]),
     },
     maxConcurrent: 10,
-    markHumanInterrupt: vi.fn(),
+    markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     delegations: new Map(),
     reportedCompletions: new Set(),
     pendingSystemActions: new Map(),

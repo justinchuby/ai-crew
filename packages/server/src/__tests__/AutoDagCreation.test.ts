@@ -86,7 +86,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
     reportedCompletions: new Set(),
     pendingSystemActions: new Map(),
     maxConcurrent: 50,
-    markHumanInterrupt: vi.fn(),
+    markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     ...overrides,
   } as any;
 }

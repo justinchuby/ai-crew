@@ -795,7 +795,7 @@ describe('HeartbeatMonitor', () => {
       ctx.getAllAgents.mockReturnValue([agent]);
 
       // Halt heartbeat for this agent
-      monitor.trackHumanInterrupt('dev-1');
+      monitor.haltHeartbeat('dev-1');
 
       triggerCheck();
       expect(agent.queueMessage).not.toHaveBeenCalled();
@@ -810,7 +810,7 @@ describe('HeartbeatMonitor', () => {
       ctx.getAllAgents.mockReturnValue([agent]);
 
       // Halt then resume
-      monitor.trackHumanInterrupt('dev-1');
+      monitor.haltHeartbeat('dev-1');
       monitor.resumeHeartbeat('dev-1');
 
       triggerCheck();
@@ -827,7 +827,7 @@ describe('HeartbeatMonitor', () => {
       ctx.getAllAgents.mockReturnValue([agent]);
 
       // Halt heartbeat, then trackActive (agent becomes active again)
-      monitor.trackHumanInterrupt('dev-1');
+      monitor.haltHeartbeat('dev-1');
       monitor.trackActive('dev-1');
 
       triggerCheck();
@@ -836,15 +836,32 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('trackRemoved clears halted state', () => {
-      monitor.trackHumanInterrupt('dev-1');
+      monitor.haltHeartbeat('dev-1');
       expect(monitor.isHalted('dev-1')).toBe(true);
 
       monitor.trackRemoved('dev-1');
       expect(monitor.isHalted('dev-1')).toBe(false);
     });
-  });
 
-  // ── On-demand command reminders (sendCommandReminderTo) ────────────
+    it('UI humanInterrupt auto-clears on trackActive (transient)', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      // UI message triggers humanInterrupt (transient)
+      monitor.trackHumanInterrupt('dev-1');
+      // Agent becomes active again — should auto-clear
+      monitor.trackActive('dev-1');
+
+      triggerCheck();
+      // Should receive reminders — humanInterrupt was cleared
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      expect(agent.queueMessage).toHaveBeenCalledWith(expect.stringContaining('Command Reference Reminder'));
+    });
+  });
 
   describe('sendCommandReminderTo', () => {
     it('sends a command reminder to a specific agent', () => {
@@ -900,7 +917,7 @@ describe('HeartbeatMonitor', () => {
         status: 'running',
       });
 
-      monitor.trackHumanInterrupt('dev-1');
+      monitor.haltHeartbeat('dev-1');
       monitor.sendCommandReminderTo(agent);
 
       expect(agent.queueMessage).not.toHaveBeenCalled();

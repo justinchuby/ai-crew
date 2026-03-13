@@ -76,12 +76,13 @@ export class HeartbeatMonitor {
     this.leadIdleSince.set(agentId, Date.now());
   }
 
-  /** Called when a lead agent becomes active — reset idle tracking */
+  /** Called when a lead agent becomes active — reset idle tracking and UI interrupt */
   trackActive(agentId: string): void {
     this.leadIdleSince.delete(agentId);
     this.leadNudgeCount.set(agentId, 0);
-    // NOTE: humanInterrupted is NOT cleared here — HALT_HEARTBEAT stays
-    // active until explicitly resumed via resumeHeartbeat().
+    this.humanInterrupted.delete(agentId);
+    // NOTE: haltedAgents is NOT cleared here — HALT_HEARTBEAT is an explicit
+    // opt-out that persists until resumeHeartbeat().
   }
 
   /** Called when a lead agent exits or is terminated — clean up all tracking */
@@ -93,15 +94,25 @@ export class HeartbeatMonitor {
     this.haltedAgents.delete(agentId);
   }
 
-  /** Called when HALT_HEARTBEAT is issued — suppress ALL heartbeat activity until resumeHeartbeat() */
+  /**
+   * Called when a human sends a message via the UI — temporarily suppress lead nudges.
+   * Cleared automatically by trackActive() when the lead starts working again.
+   * Does NOT affect command reminders or haltedAgents.
+   */
   trackHumanInterrupt(agentId: string): void {
     this.humanInterrupted.add(agentId);
+  }
+
+  /**
+   * Called when HALT_HEARTBEAT command is issued — persistently suppress ALL
+   * heartbeat activity (nudges + command reminders) until resumeHeartbeat().
+   */
+  haltHeartbeat(agentId: string): void {
     this.haltedAgents.add(agentId);
   }
 
   /** Explicitly resume heartbeat for an agent that previously issued HALT_HEARTBEAT */
   resumeHeartbeat(agentId: string): void {
-    this.humanInterrupted.delete(agentId);
     this.haltedAgents.delete(agentId);
   }
 

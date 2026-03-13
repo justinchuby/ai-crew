@@ -130,7 +130,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       clearAgent: vi.fn(),
     } as any,
     maxConcurrent: 10,
-    markHumanInterrupt: vi.fn(),
+    markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     ...overrides,
   };
 }

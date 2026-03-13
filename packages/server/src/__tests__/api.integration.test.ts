@@ -122,7 +122,7 @@ const mockAgentManager = {
   getChatGroupRegistry: vi.fn().mockReturnValue(mockChatGroupRegistry),
   getDelegations: vi.fn().mockReturnValue([]),
   getTaskDAG: vi.fn().mockReturnValue(mockTaskDAG),
-  markHumanInterrupt: vi.fn(),
+  markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
   persistHumanMessage: vi.fn(),
   consumePendingSystemAction: vi.fn().mockReturnValue(undefined),
   autoSpawnSecretary: vi.fn().mockReturnValue(null),

@@ -119,14 +119,14 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
 }
 
 function handleHaltHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
-  ctx.markHumanInterrupt(agent.id);
+  ctx.haltHeartbeat(agent.id);
   logger.info('agent', `Heartbeat halted by ${agent.role.name} (${agent.id.slice(0, 8)})`);
   ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'heartbeat_halted', `Heartbeat halted by ${agent.role.name}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
   agent.sendMessage('[System] Heartbeat paused (nudges + command reminders). Use RESUME_HEARTBEAT to re-enable.');
 }
 
 function handleResumeHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
-  ctx.resumeHeartbeat?.(agent.id);
+  ctx.resumeHeartbeat(agent.id);
   logger.info('agent', `Heartbeat resumed by ${agent.role.name} (${agent.id.slice(0, 8)})`);
   ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'status_change', `Heartbeat resumed by ${agent.role.name}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
   agent.sendMessage('[System] Heartbeat resumed. Nudges and command reminders are active again.');

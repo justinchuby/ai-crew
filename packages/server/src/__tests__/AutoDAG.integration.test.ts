@@ -111,7 +111,7 @@ function makeContext(taskDAG: TaskDAG, overrides: Partial<CommandContext> = {}):
       clearAgent: vi.fn(),
     } as any,
     maxConcurrent: 10,
-    markHumanInterrupt: vi.fn(),
+    markHumanInterrupt: vi.fn(), haltHeartbeat: vi.fn(), resumeHeartbeat: vi.fn(),
     ...overrides,
   };
 }
