@@ -1,7 +1,7 @@
 import type { Agent } from './Agent.js';
 import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
-import { buildCommandReminder } from './commands/CommandHelp.js';
+import { buildCommandHelp } from './commands/CommandHelp.js';
 import { logger } from '../utils/logger.js';
 
 export interface DagSummary {
@@ -26,10 +26,6 @@ export interface HeartbeatContext {
 
 /** How often (ms) to send command reminders — default 2 hours */
 const COMMAND_REMINDER_INTERVAL_MS = 2 * 60 * 60 * 1000;
-
-export function buildCommandReminderMessage(role?: string): string {
-  return buildCommandReminder(role);
-}
 
 export class HeartbeatMonitor {
   private leadIdleSince: Map<string, number> = new Map();
@@ -121,7 +117,7 @@ export class HeartbeatMonitor {
   sendCommandReminderTo(agent: Agent): void {
     if (isTerminalStatus(agent.status)) return;
 
-    const message = buildCommandReminderMessage(agent.role.id);
+    const message = buildCommandHelp({ format: 'compact', role: agent.role.id });
     agent.queueMessage(message);
     this.lastCommandReminder.set(agent.id, Date.now());
 
@@ -275,7 +271,7 @@ export class HeartbeatMonitor {
       if (elapsed < COMMAND_REMINDER_INTERVAL_MS) continue;
 
       // Send the reminder via queueMessage (waits for idle, non-interrupting)
-      const message = buildCommandReminderMessage(agent.role.id);
+      const message = buildCommandHelp({ format: 'compact', role: agent.role.id });
       agent.queueMessage(message);
       this.lastCommandReminder.set(agent.id, now);
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HeartbeatMonitor, buildCommandReminderMessage } from '../agents/HeartbeatMonitor.js';
+import { HeartbeatMonitor } from '../agents/HeartbeatMonitor.js';
 import type { HeartbeatContext, DagSummary } from '../agents/HeartbeatMonitor.js';
+import { buildCommandHelp } from '../agents/commands/CommandHelp.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Delegation } from '../agents/CommandDispatcher.js';
 import { setRegisteredPatterns } from '../agents/commands/CommandHelp.js';
@@ -980,9 +981,9 @@ describe('HeartbeatMonitor', () => {
     });
   });
 
-  // ── buildCommandReminderMessage ─────────────────────────────────────
+  // ── buildCommandHelp (compact format) ───────────────────────────────
 
-  describe('buildCommandReminderMessage', () => {
+  describe('buildCommandHelp compact', () => {
     const TEST_PATTERNS: CommandEntry[] = [
       { regex: /COMMIT/, name: 'COMMIT', handler: vi.fn(), help: { description: 'Commit your locked files', example: 'COMMIT {"message": "..."}', category: 'Coordination' } },
       { regex: /LOCK_FILE/, name: 'LOCK_FILE', handler: vi.fn(), help: { description: 'Lock a file before editing', example: 'LOCK_FILE {"filePath": "..."}', category: 'Coordination' } },
@@ -1007,7 +1008,7 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('includes key commands auto-generated from registry', () => {
-      const msg = buildCommandReminderMessage();
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('COMMIT');
       expect(msg).toContain('LOCK_FILE');
       expect(msg).toContain('UNLOCK_FILE');
@@ -1021,12 +1022,12 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('includes usage hint about text response', () => {
-      const msg = buildCommandReminderMessage();
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('directly in your text response');
     });
 
     it('groups commands by category', () => {
-      const msg = buildCommandReminderMessage();
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('== Communication ==');
       expect(msg).toContain('== Coordination ==');
       expect(msg).toContain('== Task DAG ==');
@@ -1034,12 +1035,12 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('formats entries as NAME example — description', () => {
-      const msg = buildCommandReminderMessage();
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('COMMIT COMMIT {"message": "..."} — Commit your locked files');
     });
 
     it('excludes lead-only commands for non-lead roles', () => {
-      const msg = buildCommandReminderMessage('developer');
+      const msg = buildCommandHelp({ format: 'compact', role: 'developer' });
       expect(msg).toContain('COMMIT');
       expect(msg).toContain('COMPLETE_TASK');
       expect(msg).not.toContain('DECLARE_TASKS');
@@ -1047,7 +1048,7 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('includes lead-only commands for lead role', () => {
-      const msg = buildCommandReminderMessage('lead');
+      const msg = buildCommandHelp({ format: 'compact', role: 'lead' });
       expect(msg).toContain('DECLARE_TASKS');
       expect(msg).toContain('SPAWN_AGENT');
     });
