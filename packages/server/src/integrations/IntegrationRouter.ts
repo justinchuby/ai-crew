@@ -100,17 +100,9 @@ export class IntegrationRouter {
 
   /** Initialize and start all configured adapters. */
   async start(): Promise<void> {
-    const config = this.configStore.current;
-    const telegramConfig = config.telegram;
-
-    if (telegramConfig?.enabled && telegramConfig.botToken) {
-      const tgConfig = {
-        ...telegramConfig,
-        // Prefer env var over config file for the bot token
-        botToken: process.env.TELEGRAM_BOT_TOKEN || telegramConfig.botToken,
-      };
-      await this.startTelegram(tgConfig);
-    }
+    // Telegram requires manual enablement each server start via
+    // PATCH /api/integrations/telegram { enabled: true } or the UI toggle.
+    // It will NOT auto-start even if config says enabled: true.
 
     // Start session cleanup timer
     this.sessionCleanupTimer = setInterval(() => this.cleanExpiredSessions(), 60_000);

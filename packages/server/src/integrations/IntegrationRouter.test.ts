@@ -81,6 +81,15 @@ function createMockConfigStore(telegramEnabled = false): any {
   };
 }
 
+/** Enable Telegram via config change (simulates PATCH /api/integrations/telegram). */
+async function enableTelegram(store: ReturnType<typeof createMockConfigStore>): Promise<void> {
+  store.current.telegram.enabled = true;
+  store.current.telegram.botToken = 'test-token-123';
+  store.emit('config:reloaded');
+  // startTelegram is async inside the event handler — let it resolve
+  await new Promise((r) => setTimeout(r, 10));
+}
+
 describe('IntegrationRouter', () => {
   let agent: IntegrationRouter;
   let agentManager: ReturnType<typeof createMockAgentManager>;
@@ -116,17 +125,18 @@ describe('IntegrationRouter', () => {
     expect(agent.getAdapter('telegram')).toBeUndefined();
   });
 
-  it('starts Telegram adapter when enabled', async () => {
-    configStore = createMockConfigStore(true);
+  it('starts Telegram adapter when enabled via config change', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    expect(agent.getAdapter('telegram')).toBeUndefined(); // not auto-started
+    await enableTelegram(configStore);
     expect(agent.getAdapter('telegram')).toBeDefined();
   });
 
   it('stops cleanly', async () => {
-    configStore = createMockConfigStore(true);
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     await agent.stop();
     expect(agent.getAdapter('telegram')).toBeUndefined();
@@ -190,9 +200,9 @@ describe('IntegrationRouter', () => {
   // ── Command Handlers ──────────────────────────────────────
 
   it('registers /status, /projects, /agents commands', async () => {
-    configStore = createMockConfigStore(true);
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     expect(adapter.registerCommand).toHaveBeenCalledWith('status', expect.any(Function));
@@ -201,7 +211,6 @@ describe('IntegrationRouter', () => {
   });
 
   it('/status returns formatted status', async () => {
-    configStore = createMockConfigStore(true);
     agentManager._addAgent({
       id: 'agent-1',
       role: { id: 'developer' },
@@ -211,6 +220,7 @@ describe('IntegrationRouter', () => {
 
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     const statusHandler = adapter._commandHandlers.get('status');
@@ -222,9 +232,9 @@ describe('IntegrationRouter', () => {
   });
 
   it('/projects returns project list', async () => {
-    configStore = createMockConfigStore(true);
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     const projectsHandler = adapter._commandHandlers.get('projects');
@@ -235,7 +245,6 @@ describe('IntegrationRouter', () => {
   });
 
   it('/agents returns agent list', async () => {
-    configStore = createMockConfigStore(true);
     agentManager._addAgent({
       id: 'abc12345',
       role: 'developer',
@@ -245,6 +254,7 @@ describe('IntegrationRouter', () => {
 
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     const agentsHandler = adapter._commandHandlers.get('agents');
@@ -254,9 +264,9 @@ describe('IntegrationRouter', () => {
   });
 
   it('/projects handles missing registry gracefully', async () => {
-    configStore = createMockConfigStore(true);
     agent = new IntegrationRouter(agentManager, undefined, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     const projectsHandler = adapter._commandHandlers.get('projects');
@@ -313,9 +323,9 @@ describe('IntegrationRouter', () => {
   // ── Regression: C1 — bind command was unreachable ─────
 
   it('processes bind command even without an active session', async () => {
-    configStore = createMockConfigStore(true);
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     expect(adapter.onMessage).toHaveBeenCalled();
@@ -343,7 +353,6 @@ describe('IntegrationRouter', () => {
   // ── Regression: M6 — role renders as [object Object] ──
 
   it('/agents renders role.id not [object Object]', async () => {
-    configStore = createMockConfigStore(true);
     agentManager._addAgent({
       id: 'abc12345',
       role: { id: 'developer', name: 'Developer' }, // Role object, not string
@@ -353,6 +362,7 @@ describe('IntegrationRouter', () => {
 
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
     const agentsHandler = adapter._commandHandlers.get('agents');
@@ -364,7 +374,6 @@ describe('IntegrationRouter', () => {
   // ── Regression: M3 — input sanitization ───────────────
 
   it('sanitizes control characters in inbound messages', async () => {
-    configStore = createMockConfigStore(true);
     agentManager._addAgent({
       id: 'lead-1',
       role: { id: 'lead' },
@@ -375,6 +384,7 @@ describe('IntegrationRouter', () => {
 
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     // Bind a session first
     agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
@@ -406,7 +416,6 @@ describe('IntegrationRouter', () => {
   // ── Regression: C-1 — displayName prompt injection ────
 
   it('sanitizes displayName to prevent prompt injection', async () => {
-    configStore = createMockConfigStore(true);
     agentManager._addAgent({
       id: 'lead-1',
       role: { id: 'lead' },
@@ -417,6 +426,7 @@ describe('IntegrationRouter', () => {
 
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     // Bind a session
     agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
@@ -452,9 +462,9 @@ describe('IntegrationRouter', () => {
 
   describe('challenge-response session binding', () => {
     beforeEach(async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
     });
 
     it('createChallenge sends verification code to chat', async () => {
@@ -566,9 +576,9 @@ describe('IntegrationRouter', () => {
 
   describe('sendToProject', () => {
     it('sends a message to the chat bound to the project', async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
       agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
 
@@ -584,18 +594,18 @@ describe('IntegrationRouter', () => {
     });
 
     it('returns false when no session is bound to the project', async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
       const result = agent.sendToProject('project-1', 'Hello');
       expect(result).toBe(false);
     });
 
     it('returns false for expired sessions', async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
       const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
       session.expiresAt = Date.now() - 1000; // Force expire
@@ -616,9 +626,9 @@ describe('IntegrationRouter', () => {
     });
 
     it('refreshes session TTL on access', async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
       const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
 
@@ -633,9 +643,9 @@ describe('IntegrationRouter', () => {
     });
 
     it('truncates messages exceeding Telegram max length', async () => {
-      configStore = createMockConfigStore(true);
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
       agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
 
@@ -655,6 +665,7 @@ describe('IntegrationRouter', () => {
   it('session TTL is 8 hours', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
     const before = Date.now();
     const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
