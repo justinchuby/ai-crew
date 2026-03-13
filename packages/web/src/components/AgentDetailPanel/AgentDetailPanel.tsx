@@ -25,15 +25,19 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useLeadStore } from '../../stores/leadStore';
+import type { AgentComm, ActivityEvent } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { agentStatusText } from '../../utils/statusColors';
 import { formatTokens } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { getRoleIcon } from '../../utils/getRoleIcon';
+import { MentionText } from '../../utils/markdown';
 import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
 import { AgentChatPanel } from '../AgentChatPanel';
+import { AgentReportBlock } from '../LeadDashboard/AgentReportBlock';
 import { getProviderColors } from '../../utils/providerColors';
 import { useModels, deriveModelName } from '../../hooks/useModels';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -126,6 +130,13 @@ export function AgentDetailPanel({ agentId, teamId, mode, onClose }: AgentDetail
 function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetailPanelProps) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const addToast = useToastStore((s) => s.add);
+
+  // Pull communications and activity from leadStore for the current project
+  const leadId = useLeadStore((s) => s.selectedLeadId);
+  const comms = useLeadStore((s) => leadId ? s.projects[leadId]?.comms : undefined);
+  const activity = useLeadStore((s) => leadId ? s.projects[leadId]?.activity : undefined);
+  const agentComms = (comms ?? []).filter((c) => c.fromId === agentId || c.toId === agentId);
+  const agentActivity = (activity ?? []).filter((e) => e.agentId === agentId);
 
   const [activeTab, setActiveTab] = useState<DetailTab>('details');
   const [profile, setProfile] = useState<AgentProfile | null>(null);
@@ -329,6 +340,7 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
         {activeTab === 'details' && (
           <DetailsTab
             agent={agent ?? null}
+            agentId={agentId}
             profile={profile}
             provider={provider}
             model={model}
@@ -339,6 +351,8 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
             isAgentFailed={isAgentFailed}
             totalTokens={totalTokens}
             openGitHubIssue={openGitHubIssue}
+            agentComms={agentComms}
+            agentActivity={agentActivity}
           />
         )}
         {activeTab === 'chat' && (
@@ -365,6 +379,7 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
 
 interface DetailsTabProps {
   agent: { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number; contextWindowSize?: number; contextWindowUsed?: number } | null;
+  agentId: string;
   profile: AgentProfile | null;
   provider: string | null;
   model: string;
@@ -375,10 +390,13 @@ interface DetailsTabProps {
   isAgentFailed: boolean;
   totalTokens: number;
   openGitHubIssue: () => void;
+  agentComms: AgentComm[];
+  agentActivity: ActivityEvent[];
 }
 
-function DetailsTab({ agent, profile, task, outputPreview, exitError, exitCode, provider, model, isAgentFailed, totalTokens, openGitHubIssue }: DetailsTabProps) {
-  const hasContent = task || totalTokens > 0 || outputPreview || exitError || profile;
+function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, exitCode, provider, model, isAgentFailed, totalTokens, openGitHubIssue, agentComms, agentActivity }: DetailsTabProps) {
+  const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
+  const hasContent = task || totalTokens > 0 || outputPreview || exitError || profile || agentComms.length > 0 || agentActivity.length > 0;
 
   return (
     <div className="space-y-0">
@@ -517,10 +535,103 @@ function DetailsTab({ agent, profile, task, outputPreview, exitError, exitCode, 
         </div>
       )}
 
+      {/* Communications */}
+      {agentComms.length > 0 && (
+        <div className="px-5 py-3 border-b border-th-border">
+          <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
+            Communications ({agentComms.length})
+          </h4>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {agentComms.slice(-20).map((c) => {
+              const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const isSender = c.fromId === agentId;
+              return (
+                <div
+                  key={c.id}
+                  className="text-xs font-mono cursor-pointer hover:bg-th-bg-muted/40 rounded px-1 py-0.5 transition-colors"
+                  onClick={() => setSelectedComm(c)}
+                >
+                  <div className="flex items-center gap-1">
+                    <span className={isSender ? 'text-cyan-400' : 'text-green-400'}>{isSender ? c.fromRole : c.toRole}</span>
+                    <span className="text-th-text-muted">{isSender ? '→' : '←'}</span>
+                    <span className={isSender ? 'text-green-400' : 'text-cyan-400'}>{isSender ? c.toRole : c.fromRole}</span>
+                    <span className="text-th-text-muted ml-auto">{time}</span>
+                  </div>
+                  <p className="text-th-text-alt mt-0.5 break-words whitespace-pre-wrap">
+                    <MentionText text={c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Activity */}
+      {agentActivity.length > 0 && (
+        <div className="px-5 py-3 border-b border-th-border">
+          <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
+            Activity ({agentActivity.length})
+          </h4>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {agentActivity.slice(-15).map((evt) => {
+              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-th-text-muted">{time}</span>
+                  <span className="text-th-text-alt truncate" title={evt.summary}>{evt.summary}</span>
+                  {evt.status && (
+                    <span className={`ml-auto shrink-0 text-[10px] ${
+                      evt.status === 'completed' ? 'text-purple-400' :
+                      evt.status === 'in_progress' ? 'text-blue-400' : 'text-th-text-muted'
+                    }`}>{evt.status}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {!hasContent && (
         <div className="px-5 py-8 text-center text-th-text-muted text-xs font-mono">
           No activity yet for this agent
+        </div>
+      )}
+
+      {/* Comm detail popup */}
+      {selectedComm && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
+        >
+          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
+              <div className="flex items-center gap-2 text-sm">
+                <MessageSquare className="w-4 h-4 text-blue-400" />
+                <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
+                <span className="text-th-text-muted">→</span>
+                <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-th-text-muted">
+                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                </span>
+                <button type="button" aria-label="Close communication detail" onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
+                ? <AgentReportBlock content={selectedComm.content} />
+                : (
+                  <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
+                    <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
+                  </pre>
+                )
+              }
+            </div>
+          </div>
         </div>
       )}
     </div>
