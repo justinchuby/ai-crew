@@ -28,7 +28,7 @@ import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
 import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
-import { useAppStore } from '../../stores/appStore';
+
 import { AgentDetailPanel } from '../AgentDetailPanel';
 import { shortAgentId } from '../../utils/agentLabel';
 
@@ -38,7 +38,7 @@ type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
 type StatusFilter = RosterStatus | 'all' | 'active';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 
-interface RosterAgent {
+export interface RosterAgent {
   agentId: string;
   role: string;
   model: string;
@@ -419,18 +419,16 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
-function HealthStrip({ crewId: _crewId }: { crewId: string }) {
+export function HealthStrip({ agents }: { agents: RosterAgent[] }) {
   const [expanded, setExpanded] = useState(false);
-  const liveAgents = useAppStore(s => s.agents);
 
-  // Derive counts from live agent data (same source as StatusPopover)
   const statusCounts = useMemo(() => {
-    const running = liveAgents.filter(a => a.status === 'running' || a.status === 'creating').length;
-    const idle = liveAgents.filter(a => a.status === 'idle').length;
-    const completed = liveAgents.filter(a => a.status === 'completed' || a.status === 'terminated').length;
-    const failed = liveAgents.filter(a => a.status === 'failed').length;
-    return { running, idle, completed, failed, total: liveAgents.length };
-  }, [liveAgents]);
+    const running = agents.filter(a => a.liveStatus === 'running' || a.liveStatus === 'creating').length;
+    const idle = agents.filter(a => a.liveStatus === 'idle').length;
+    const completed = agents.filter(a => a.liveStatus === 'completed' || a.liveStatus === 'terminated').length;
+    const failed = agents.filter(a => a.liveStatus === 'failed').length;
+    return { running, idle, completed, failed, total: agents.length };
+  }, [agents]);
 
   return (
     <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
@@ -732,7 +730,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           `}
         >
           {selectedAgent && (
-            <div className="h-full md:max-h-screen overflow-hidden">
+            <div className="h-full md:max-h-screen overflow-y-auto">
               <AgentDetailPanel agentId={selectedAgent} crewId={selectedAgentCrewId} mode="inline" onClose={() => setSelectedAgent(null)} />
             </div>
           )}
@@ -741,7 +739,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       {/* Health Strip (collapsed at bottom) */}
       <div className="mt-3 shrink-0">
-        <HealthStrip crewId="default" />
+        <HealthStrip agents={agents} />
       </div>
     </div>
   );
