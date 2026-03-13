@@ -74,8 +74,8 @@ interface CachedDetection {
 // Auth commands derived from the central ProviderRegistry
 const AUTH_COMMANDS: Partial<Record<ProviderId, string>> = Object.fromEntries(
   PROVIDER_IDS
-    .filter((id) => PROVIDER_REGISTRY[id].authCommand)
-    .map((id) => [id, PROVIDER_REGISTRY[id].authCommand!]),
+    .filter((id: ProviderId) => PROVIDER_REGISTRY[id].authCommand)
+    .map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].authCommand!]),
 ) as Partial<Record<ProviderId, string>>;
 
 // ── Constants ────────────────────────────────────────────────────
