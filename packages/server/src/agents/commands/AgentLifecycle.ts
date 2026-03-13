@@ -98,8 +98,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       ? (req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`)
       : undefined;
     const spawnOptions: { projectName?: string; projectId?: string; provider?: string } | undefined =
-      (subLeadName || agent.projectId || req.provider || agent.provider)
-        ? { projectName: subLeadName, projectId: agent.projectId, provider: req.provider || agent.provider }
+      (subLeadName || agent.projectId || req.provider)
+        ? { projectName: subLeadName, projectId: agent.projectId, provider: req.provider }
         : undefined;
     const child = ctx.spawnAgent(role, req.task, agent.id, req.model, agent.cwd, spawnOptions);
     if (role.id === 'lead') {
