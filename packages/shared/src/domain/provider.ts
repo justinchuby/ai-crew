@@ -184,15 +184,13 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     agentFileFormat: 'CLAUDE.md',
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic'],
-    tierModels: { fast: 'haiku', standard: 'sonnet', premium: 'opus' },
-    // Claude CLI requires short model names (opus/sonnet/haiku) instead of full IDs.
+    tierModels: { fast: 'haiku', standard: 'default', premium: 'opus' },
+    // Maps our model IDs to Claude CLI's ACP availableModels names.
+    // These 3 IDs come from the CLI's newSession response: 'default', 'opus', 'haiku'.
     // Other providers accept full model names directly, so they don't need aliases.
     modelAliases: {
       'claude-opus-4.6': 'opus',
-      'claude-opus-4.5': 'opus',
-      'claude-sonnet-4.6': 'sonnet',
-      'claude-sonnet-4.5': 'sonnet',
-      'claude-sonnet-4': 'sonnet',
+      'claude-sonnet-4.6': 'default',
       'claude-haiku-4.5': 'haiku',
     },
     authLabel: 'Authenticated via Anthropic API key',

@@ -126,6 +126,10 @@ export function resolveModel(
   if (isTierAlias(modelSpec)) {
     const resolved = TIER_MAP[modelSpec as ModelTier]?.[provider];
     if (resolved) {
+      // Apply Claude aliases to tier-resolved models
+      if (provider === 'claude' && resolved in CLAUDE_ALIASES) {
+        return { model: CLAUDE_ALIASES[resolved], translated: true, original, reason: `tier '${modelSpec}' → ${CLAUDE_ALIASES[resolved]}` };
+      }
       return { model: resolved, translated: true, original, reason: `tier '${modelSpec}' → ${resolved}` };
     }
     // Tier alias recognized but no mapping for this provider — warn and continue to fallback
@@ -194,8 +198,12 @@ export function resolveModel(
   }
 
   // Step 4: Fallback to standard tier
-  const fallback = TIER_MAP.standard?.[provider];
+  let fallback = TIER_MAP.standard?.[provider];
   if (fallback) {
+    // Apply Claude aliases to the fallback model
+    if (provider === 'claude' && fallback in CLAUDE_ALIASES) {
+      fallback = CLAUDE_ALIASES[fallback];
+    }
     logger.warn({
       module: 'model-resolver',
       msg: `Model '${modelSpec}' has no mapping for ${provider}, falling back to standard tier: ${fallback}`,
