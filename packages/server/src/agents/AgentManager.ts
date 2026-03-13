@@ -726,6 +726,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const effectiveLeadId = agent.parentId || agentId;
         tracker.recordUsage(agentId, effectiveTaskId, effectiveLeadId, inputTokens, outputTokens, {
           cacheReadTokens, cacheWriteTokens, costUsd,
+          projectId: agent.projectId,
         });
         this.emit('agent:usage', { agentId, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize });
       });

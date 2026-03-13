@@ -67,7 +67,28 @@ export class CostTracker {
 
   constructor(db: Database) {
     this.db = db;
+    this.backfillProjectIds();
     this.initializeFromDb();
+  }
+
+  /**
+   * One-time backfill: derive project_id from agent_roster for any
+   * cost records that were inserted without it.
+   */
+  private backfillProjectIds(): void {
+    try {
+      this.db.drizzle.run(sql`
+        UPDATE ${taskCostRecords}
+        SET project_id = (
+          SELECT ${agentRoster.projectId}
+          FROM ${agentRoster}
+          WHERE ${agentRoster.agentId} = ${taskCostRecords.agentId}
+        )
+        WHERE ${taskCostRecords.projectId} IS NULL
+      `);
+    } catch {
+      // Non-critical — backfill can be retried on next startup
+    }
   }
 
   /**
