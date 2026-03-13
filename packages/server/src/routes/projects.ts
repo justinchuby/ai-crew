@@ -701,7 +701,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({ ...briefing, formatted: projectRegistry.formatBriefing(briefing) });
   });
 
-  // Resume a project — starts a new lead session with project context + message history
+  // Resume a project — finds the latest session and resumes it (same sessionId + leadId)
   router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(String(req.params.id));
