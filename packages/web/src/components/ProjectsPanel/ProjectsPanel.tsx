@@ -31,6 +31,13 @@ import { sessionStatusDot } from '../../utils/statusColors';
 import { SessionViewer, type ViewableSession } from '../SessionHistory';
 import { shortAgentId } from '../../utils/agentLabel';
 
+/** Format a token count for display (e.g., 1234 → "1.2K", 1234567 → "1.2M") */
+function formatTokenCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
+
 /** Extended project type with storage and agent count info from the enriched API */
 interface EnrichedProject {
   id: string;
@@ -56,6 +63,7 @@ interface EnrichedProject {
   }>;
   activeLeadId?: string;
   taskProgress?: { done: number; total: number };
+  tokenUsage?: { inputTokens: number; outputTokens: number; costUsd: number };
 }
 
 function StorageBadge({ mode }: { mode: 'user' | 'local' }) {
@@ -267,6 +275,17 @@ function ProjectCard({
               <span className="text-th-text-muted">Updated</span>
               <div className="text-th-text-alt">{formatRelativeTime(project.updatedAt)}</div>
             </div>
+            {project.tokenUsage && (project.tokenUsage.inputTokens > 0 || project.tokenUsage.outputTokens > 0) && (
+              <div>
+                <span className="text-th-text-muted">Token Usage</span>
+                <div className="text-th-text-alt text-xs">
+                  {formatTokenCount(project.tokenUsage.inputTokens)} in / {formatTokenCount(project.tokenUsage.outputTokens)} out
+                  {project.tokenUsage.costUsd > 0 && (
+                    <span className="text-th-text-muted ml-1">(${project.tokenUsage.costUsd.toFixed(2)})</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sessions summary */}
@@ -311,7 +330,17 @@ function ProjectCard({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
-            {project.status !== 'archived' && (
+            {project.status === 'active' && (
+              <Link
+                to={`/projects/${project.id}/session`}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium no-underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Play className="w-3 h-3" />
+                Go to Session
+              </Link>
+            )}
+            {project.status !== 'archived' && project.status !== 'active' && (
               <button
                 onClick={() => onResume(project.id)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium"
