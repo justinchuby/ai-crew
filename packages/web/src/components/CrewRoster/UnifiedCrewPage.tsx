@@ -35,6 +35,7 @@ import { shortAgentId } from '../../utils/agentLabel';
 // ── Types (shared with CrewRoster) ─────────────────────────
 
 type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
+type StatusFilter = RosterStatus | 'all' | 'active';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 
 interface RosterAgent {
@@ -474,7 +475,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RosterStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(scope === 'project' ? 'active' : 'all');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
   const effectiveProjectId = useEffectiveProjectId();
@@ -497,7 +498,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       setCrewSummaries(summaries);
 
       const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
-      const statusQ = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+      const statusQ = statusFilter !== 'all' && statusFilter !== 'active' ? `?status=${statusFilter}` : '';
       const agentResults = await Promise.allSettled(
         teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${statusQ}`))
       );
@@ -526,7 +527,11 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           if (a.parentId && projectLeadIds.has(a.parentId)) return true;
           return false;
         });
-        setAgents(filtered);
+        // 'active' filter: exclude terminated/failed agents for a cleaner default view
+        const activeFiltered = statusFilter === 'active'
+          ? filtered.filter(a => a.status !== 'terminated' && a.status !== 'failed')
+          : filtered;
+        setAgents(activeFiltered);
       } else {
         // Global scope: only show active agents
         const activeStatuses = new Set(['running', 'idle', 'creating']);
@@ -655,7 +660,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         </div>
         {scope === 'project' && (
           <div className="flex gap-1">
-            {(['all', 'idle', 'running', 'terminated', 'failed'] as const).map(s => (
+            {(['active', 'all', 'idle', 'running', 'terminated', 'failed'] as const).map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-3 py-1.5 text-xs rounded capitalize transition-colors ${
                   statusFilter === s
