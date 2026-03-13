@@ -16,8 +16,8 @@ export interface FlowPoint {
 
 interface CumulativeFlowProps {
   data: FlowPoint[];
-  width?: number;
-  height?: number;
+  width: number;
+  height: number;
 }
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };

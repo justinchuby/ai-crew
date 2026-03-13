@@ -15,8 +15,8 @@ export interface CostPoint {
 
 interface CostCurveProps {
   data: CostPoint[];
-  width?: number;
-  height?: number;
+  width: number;
+  height: number;
 }
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };
