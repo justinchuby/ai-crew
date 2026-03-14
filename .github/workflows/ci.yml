@@ -63,8 +63,11 @@ jobs:
           wait $SERVER_PID 2>/dev/null || true
           echo 'Smoke test passed — server started successfully'
 
-      - name: Unit tests with coverage
+      - name: Server unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
+
+      - name: Web unit tests
+        run: npm run test --workspace=packages/web
 
       - name: CLI smoke test
         run: |

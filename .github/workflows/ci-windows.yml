@@ -34,8 +34,12 @@ jobs:
         run: npx --workspace=packages/web tsc --noEmit
         shell: bash
 
-      - name: Unit tests
+      - name: Server unit tests
         run: npm run test:coverage --workspace=packages/server
+        shell: bash
+
+      - name: Web unit tests
+        run: npm run test --workspace=packages/web
         shell: bash
 
       - name: Upload coverage to Codecov
