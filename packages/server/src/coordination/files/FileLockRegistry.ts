@@ -83,7 +83,7 @@ export class FileLockRegistry extends EventEmitter {
     agentRole: string,
     filePath: string,
     reason = '',
-    ttlSeconds = 300,
+    ttlSeconds = 600,
     projectId = '',
   ): { ok: boolean; holder?: string } {
     this.validatePath(filePath);
