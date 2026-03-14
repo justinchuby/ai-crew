@@ -8,6 +8,18 @@ import { tmpdir } from 'node:os';
 import { projectsRoutes } from './projects.js';
 import type { AppContext } from './context.js';
 
+const mockStateDir = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs');
+  const { join } = require('node:path');
+  const { tmpdir } = require('node:os');
+  return mkdtempSync(join(tmpdir(), 'fd-test-state-'));
+});
+
+vi.mock('../config.js', async () => {
+  const actual = await vi.importActual<typeof import('../config.js')>('../config.js');
+  return { ...actual, FLIGHTDECK_STATE_DIR: mockStateDir };
+});
+
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -494,5 +506,80 @@ describe('GET /projects/:id/files — rejects symlinks resolving outside project
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toBe('Path outside project directory');
+  });
+});
+
+// ── Artifact contents endpoint ─────────────────────────────────────
+
+describe('GET /projects/:id/artifact-contents', () => {
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+
+  beforeAll(async () => {
+    // Create artifact file structure under mockStateDir
+    const sessionsDir = join(mockStateDir, 'artifacts', 'test-proj', 'sessions');
+    const agentDir = join(sessionsDir, 'lead-abc123', 'architect-def456');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'report.md'), '# Artifact Report\nTest content');
+
+    const mockRegistry = {
+      get: vi.fn().mockReturnValue({
+        id: 'test-proj',
+        name: 'Test Project',
+        cwd: '/tmp/fake',
+        status: 'active',
+      }),
+    } as any;
+
+    const srv = createTestServer({ projectRegistry: mockRegistry });
+    baseUrl = await srv.start();
+    stop = srv.stop;
+  });
+
+  afterAll(async () => {
+    await stop?.();
+  });
+
+  it('serves artifact file content', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=lead-abc123/architect-def456/report.md`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.content).toContain('# Artifact Report');
+    expect(body.ext).toBe('md');
+    expect(body.size).toBeGreaterThan(0);
+  });
+
+  it('returns 404 for non-existent artifact', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=lead-abc123/architect-def456/missing.md`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects path traversal attempts', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=../../../etc/passwd`,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid path');
+  });
+
+  it('rejects missing path parameter', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents`,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 for unknown project', async () => {
+    const mockRegistry = { get: vi.fn().mockReturnValue(undefined) } as any;
+    const srv = createTestServer({ projectRegistry: mockRegistry });
+    const url = await srv.start();
+    const res = await fetch(`${url}/projects/unknown/artifact-contents?path=foo/bar.md`);
+    expect(res.status).toBe(404);
+    await srv.stop();
   });
 });

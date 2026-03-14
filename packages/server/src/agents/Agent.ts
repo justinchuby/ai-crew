@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { createHash } from 'crypto';
 import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent } from '../adapters/types.js';
 import type { Role } from './RoleRegistry.js';
-import type { ServerConfig } from '../config.js';
+import { FLIGHTDECK_STATE_DIR, type ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
@@ -305,7 +305,7 @@ ${crewSection}
 ${budgetSection}
 
 == SHARED WORKSPACE ==
-Your artifact directory: ${this.artifactDir || `.flightdeck/artifacts/${this.projectId || '_unscoped'}/sessions/${this.parentId || this.id}/${this.role.id}-${this.id.slice(0, 8)}/`}
+Your artifact directory: ${this.artifactDir || `${FLIGHTDECK_STATE_DIR}/artifacts/${this.projectId || '_unscoped'}/sessions/${this.parentId || this.id}/${this.role.id}-${this.id.slice(0, 8)}/`}
 Write reports, designs, and analysis files here. All crew members can read this directory.
 Convention: Write files directly to your artifact directory shown above.
 All team members have access to all artifact directories under the same session.
