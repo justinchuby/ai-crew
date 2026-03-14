@@ -631,13 +631,20 @@ export function projectsRoutes(ctx: AppContext): Router {
     const titleError = validateProjectTitle(projectName);
     if (titleError) return res.status(400).json({ error: `Could not derive project name: ${titleError}. Provide an explicit name.` });
 
-    // Gather metadata about what's in .flightdeck/
-    const hasShared = existsSync(join(flightdeckDir, 'shared'));
+    // Gather metadata about existing artifacts
+    const organizedArtifactDir = join(FLIGHTDECK_STATE_DIR, 'artifacts');
     const hasScreenshots = existsSync(join(flightdeckDir, 'screenshots'));
-    let sharedAgentCount = 0;
-    if (hasShared) {
+    let artifactSessionCount = 0;
+    if (existsSync(organizedArtifactDir)) {
       try {
-        sharedAgentCount = readdirSync(join(flightdeckDir, 'shared')).length;
+        // Count session dirs across all projects (informational only)
+        const projectDirs = readdirSync(organizedArtifactDir, { withFileTypes: true }).filter(e => e.isDirectory());
+        for (const pd of projectDirs) {
+          const sessionsDir = join(organizedArtifactDir, pd.name, 'sessions');
+          if (existsSync(sessionsDir)) {
+            artifactSessionCount += readdirSync(sessionsDir, { withFileTypes: true }).filter(e => e.isDirectory()).length;
+          }
+        }
       } catch { /* ignore */ }
     }
 
@@ -648,16 +655,14 @@ export function projectsRoutes(ctx: AppContext): Router {
       projectId: project.id,
       name: projectName,
       cwd: normalizedCwd,
-      hasShared,
-      sharedAgentCount,
+      artifactSessionCount,
     });
 
     res.status(201).json({
       ...project,
       imported: {
-        hasShared,
         hasScreenshots,
-        sharedAgentCount,
+        artifactSessionCount,
       },
     });
   });
@@ -1047,8 +1052,8 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   /**
    * GET /projects/:id/artifacts
-   * Returns markdown files from organized storage ($FLIGHTDECK_STATE_DIR/artifacts/) and
-   * legacy .flightdeck/shared/, grouped by agent directory and session.
+   * Returns markdown files from organized storage ($FLIGHTDECK_STATE_DIR/artifacts/),
+   * grouped by agent directory and session.
    */
   router.get('/projects/:id/artifacts', (req, res) => {
     if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
@@ -1101,25 +1106,42 @@ export function projectsRoutes(ctx: AppContext): Router {
       } catch { /* ignore read errors */ }
     }
 
-    // Fallback: read from legacy in-repo path
-    const sharedDir = project.cwd ? join(project.cwd, '.flightdeck', 'shared') : null;
-    if (sharedDir) {
-      const result = resolveAndValidate(project.cwd!, '.flightdeck/shared');
-      if (result) {
-        try {
-          const seenDirs = new Set(groups.map(g => g.agentDir));
-          const agentDirs = readdirSync(result.resolved, { withFileTypes: true })
-            .filter(e => e.isDirectory() && !seenDirs.has(e.name));
-          for (const dir of agentDirs) {
-            const group = readAgentDir(join(result.resolved, dir.name), dir.name, realpathSync(project.cwd!));
-            if (group) groups.push(group);
-          }
-        } catch { /* ignore */ }
-      }
+    groups.sort((a, b) => a.role.localeCompare(b.role));
+    res.json({ groups, artifactBasePath: organizedDir });
+  });
+
+  /**
+   * GET /projects/:id/artifact-contents?path=<sessionId>/<role>-<shortId>/file.md
+   * Returns file content from organized artifact storage.
+   * Separate from file-contents because artifacts live outside project.cwd.
+   */
+  router.get('/projects/:id/artifact-contents', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!filePath || filePath.includes('\0') || filePath.includes('..')) {
+      return res.status(400).json({ error: 'Invalid path' });
     }
 
-    groups.sort((a, b) => a.role.localeCompare(b.role));
-    res.json({ groups, sharedPath: sharedDir || '' });
+    const organizedDir = join(FLIGHTDECK_STATE_DIR, 'artifacts', req.params.id, 'sessions');
+    const resolved = join(organizedDir, filePath);
+    // Security: ensure resolved path stays within organizedDir
+    if (!normalize(resolved).startsWith(normalize(organizedDir) + sep)) {
+      return res.status(403).json({ error: 'Path outside artifact directory' });
+    }
+
+    try {
+      const stat = statSync(resolved);
+      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
+      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large' });
+      const content = readFileSync(resolved, 'utf-8');
+      res.json({ path: filePath, content, size: stat.size, ext: extname(filePath).slice(1) });
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+      res.status(400).json({ error: 'Cannot read file' });
+    }
   });
 
   return router;

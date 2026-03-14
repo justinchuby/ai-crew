@@ -30,7 +30,7 @@ function renderPanel() {
 // ── Fixtures ──────────────────────────────────────────────────────
 
 const artifactGroups = {
-  sharedPath: '/home/user/project/.flightdeck/shared',
+  artifactBasePath: '/home/user/.flightdeck/artifacts/test-project/sessions',
   groups: [
     {
       agentDir: 'architect-3973583e',
@@ -40,14 +40,14 @@ const artifactGroups = {
       files: [
         {
           name: 'codebase-audit-report.md',
-          path: '.flightdeck/shared/architect-3973583e/codebase-audit-report.md',
+          path: 'abc12345-6789-0abc-def0-123456789abc/architect-3973583e/codebase-audit-report.md',
           ext: 'md',
           title: 'Codebase Audit Report',
           modifiedAt: '2026-03-07T14:00:00Z',
         },
         {
           name: 'remaining-work.md',
-          path: '.flightdeck/shared/architect-3973583e/remaining-work.md',
+          path: 'abc12345-6789-0abc-def0-123456789abc/architect-3973583e/remaining-work.md',
           ext: 'md',
           title: 'Remaining Work Items',
           modifiedAt: '2026-03-06T10:00:00Z',
@@ -62,7 +62,7 @@ const artifactGroups = {
       files: [
         {
           name: 'navigation-redesign-spec.md',
-          path: '.flightdeck/shared/designer-8baab941/navigation-redesign-spec.md',
+          path: 'def67890-1234-5678-9abc-def012345678/designer-8baab941/navigation-redesign-spec.md',
           ext: 'md',
           title: 'Navigation Redesign Specification',
           modifiedAt: '2026-03-08T12:00:00Z',
@@ -124,9 +124,9 @@ describe('ArtifactsPanel', () => {
   it('loads and renders markdown preview on file click', async () => {
     mockApiFetch.mockImplementation((url: string) => {
       if (url.includes('/artifacts')) return Promise.resolve(artifactGroups);
-      if (url.includes('/file-contents')) {
+      if (url.includes('/artifact-contents')) {
         return Promise.resolve({
-          path: '.flightdeck/shared/architect-3973583e/codebase-audit-report.md',
+          path: 'abc12345-6789-0abc-def0-123456789abc/architect-3973583e/codebase-audit-report.md',
           content: '# Codebase Audit\n\nFindings here.',
           size: 34,
           ext: 'md',
@@ -150,7 +150,7 @@ describe('ArtifactsPanel', () => {
   it('shows error when file load fails', async () => {
     mockApiFetch.mockImplementation((url: string) => {
       if (url.includes('/artifacts')) return Promise.resolve(artifactGroups);
-      if (url.includes('/file-contents')) return Promise.reject(new Error('File not found'));
+      if (url.includes('/artifact-contents')) return Promise.reject(new Error('File not found'));
       return Promise.reject(new Error('Unknown'));
     });
 
@@ -216,7 +216,7 @@ describe('ArtifactsPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('artifacts-path-bar')).toBeInTheDocument();
     });
-    expect(screen.getByText('/home/user/project/.flightdeck/shared')).toBeInTheDocument();
+    expect(screen.getByText('/home/user/.flightdeck/artifacts/test-project/sessions')).toBeInTheDocument();
     expect(screen.getByLabelText('Copy artifacts path')).toBeInTheDocument();
   });
 

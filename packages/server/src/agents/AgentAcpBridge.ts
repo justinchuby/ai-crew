@@ -2,7 +2,7 @@
  * ACP connection management for Agent — extracted from Agent.ts to reduce file size.
  * Handles startAgent(), wireAcpEvents(), and ensureSharedWorkspace().
  */
-import { mkdirSync, existsSync, renameSync, symlinkSync, writeFileSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { createAdapterForProvider, buildStartOptions } from '../adapters/AdapterFactory.js';
 import { createRoleFileWriter, listRoleFileWriterProviders } from '../adapters/RoleFileWriter.js';
@@ -17,43 +17,11 @@ import type { Agent } from './Agent.js';
 /** Set of provider IDs that have a RoleFileWriter. Cached at module load. */
 const ROLE_FILE_PROVIDERS = new Set(listRoleFileWriterProviders());
 
-/** Ensure the shared workspace directory exists for inter-agent artifact sharing. */
+/** Ensure the organized artifact directory exists for inter-agent artifact sharing. */
 export function ensureSharedWorkspace(agent: Agent): void {
-  const baseDir = agent.cwd || process.cwd();
-  const newBase = join(baseDir, '.flightdeck');
-  const legacyBase = join(baseDir, '.ai-crew');
-
-  // Backward-compat: migrate .ai-crew/ → .flightdeck/ if legacy exists.
-  if (!existsSync(newBase) && existsSync(legacyBase)) {
-    try {
-      renameSync(legacyBase, newBase);
-      logger.info({ module: 'agent', msg: 'Migrated workspace: .ai-crew/ → .flightdeck/' });
-    } catch {
-      logger.debug({ module: 'agent', msg: 'Could not migrate .ai-crew/ dir, creating fresh .flightdeck/' });
-    }
-  }
-
-  const sharedDir = join(newBase, 'shared');
-  if (!existsSync(sharedDir)) {
-    try { mkdirSync(sharedDir, { recursive: true }); } catch (err) { logger.debug({ module: 'agent', msg: 'Shared dir already exists or cannot be created' }); }
-  }
-
-  // Create organized artifact directory and symlink from shared workspace
+  // Create organized artifact directory
   if (agent.artifactDir) {
-    try {
-      mkdirSync(agent.artifactDir, { recursive: true });
-    } catch { /* already exists */ }
-
-    const shortId = agent.id.slice(0, 8);
-    const linkPath = join(sharedDir, `${agent.role.id}-${shortId}`);
-    if (!existsSync(linkPath)) {
-      try {
-        symlinkSync(agent.artifactDir, linkPath, 'dir');
-      } catch {
-        // Fallback: if symlink fails (Windows, permissions), create local dir
-        try { mkdirSync(linkPath, { recursive: true }); } catch { /* ignore */ }
-      }
-    }
+    try { mkdirSync(agent.artifactDir, { recursive: true }); } catch { /* already exists */ }
 
     // Write session metadata (once per session directory)
     const sessionDir = dirname(agent.artifactDir);

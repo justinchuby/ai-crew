@@ -43,14 +43,13 @@ vi.mock('child_process', () => {
   return { exec: execFn, execFile: execFileFn };
 });
 
-// Mock fs.existsSync / rmSync / symlinkSync — default: nothing exists
+// Mock fs.existsSync / rmSync — default: nothing exists
 const existsSyncMock = vi.hoisted(() => vi.fn((_path: string) => false));
 const rmSyncMock = vi.hoisted(() => vi.fn());
-const symlinkSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
-  return { ...actual, existsSync: existsSyncMock, rmSync: rmSyncMock, symlinkSync: symlinkSyncMock };
+  return { ...actual, existsSync: existsSyncMock, rmSync: rmSyncMock };
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -79,7 +78,6 @@ describe('WorktreeManager', () => {
     execCalls = [];
     existsSyncMock.mockReturnValue(false);
     rmSyncMock.mockReset();
-    symlinkSyncMock.mockReset();
     setDefaultExec();
     mgr = new WorktreeManager(REPO);
   });
@@ -105,21 +103,6 @@ describe('WorktreeManager', () => {
     expect(info!.branch).toBe(`agent-wt-${SHORT}`);
     expect(info!.agentId).toBe(AGENT_ID);
     expect(mgr.count).toBe(1);
-  });
-
-  it('symlinks .flightdeck when shared dir exists', async () => {
-    existsSyncMock
-      .mockReturnValueOnce(false)  // worktreePath doesn't exist
-      .mockReturnValueOnce(true)   // sharedDir exists
-      .mockReturnValueOnce(false); // targetShared doesn't exist
-
-    await mgr.create(AGENT_ID);
-
-    expect(symlinkSyncMock).toHaveBeenCalledWith(
-      expect.stringContaining('.flightdeck'),
-      expect.stringContaining('.flightdeck'),
-      'junction',
-    );
   });
 
   it('emits worktree:created event', async () => {

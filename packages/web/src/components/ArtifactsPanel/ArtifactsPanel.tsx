@@ -65,7 +65,7 @@ interface FileData {
 export function ArtifactsPanel() {
   const projectId = useProjectId();
   const [groups, setGroups] = useState<ArtifactGroup[]>([]);
-  const [sharedPath, setSharedPath] = useState<string | null>(null);
+  const [artifactBasePath, setArtifactBasePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -81,11 +81,11 @@ export function ArtifactsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<{ groups: ArtifactGroup[]; sharedPath?: string }>(
+      const data = await apiFetch<{ groups: ArtifactGroup[]; artifactBasePath?: string }>(
         `/projects/${projectId}/artifacts`,
       );
       setGroups(data.groups);
-      if (data.sharedPath) setSharedPath(data.sharedPath);
+      if (data.artifactBasePath) setArtifactBasePath(data.artifactBasePath);
     } catch (err: any) {
       setError(err.message || 'Failed to load artifacts');
     } finally {
@@ -102,7 +102,7 @@ export function ArtifactsPanel() {
     setFileError(null);
     try {
       const data = await apiFetch<FileData>(
-        `/projects/${projectId}/file-contents?path=${encodeURIComponent(path)}`,
+        `/projects/${projectId}/artifact-contents?path=${encodeURIComponent(path)}`,
       );
       setFileData(data);
       setSelectedPath(path);
@@ -126,13 +126,13 @@ export function ArtifactsPanel() {
   useEffect(() => { setCopied(false); }, [selectedPath]);
 
   const copyPath = useCallback(async () => {
-    if (!sharedPath) return;
+    if (!artifactBasePath) return;
     try {
-      await navigator.clipboard.writeText(sharedPath);
+      await navigator.clipboard.writeText(artifactBasePath);
       setPathCopied(true);
       setTimeout(() => setPathCopied(false), 2000);
     } catch { /* clipboard unavailable */ }
-  }, [sharedPath]);
+  }, [artifactBasePath]);
 
   // Derive session-grouped view from flat agent groups
   const sessionGroups = useMemo(() => {
@@ -205,11 +205,11 @@ export function ArtifactsPanel() {
         </div>
 
         {/* Path info bar */}
-        {sharedPath && (
+        {artifactBasePath && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-th-border bg-th-bg-alt/30" data-testid="artifacts-path-bar">
             <span className="text-[10px] text-th-text-muted">📁</span>
-            <span className="text-[10px] font-mono text-th-text-muted truncate flex-1" title={sharedPath}>
-              {sharedPath}
+            <span className="text-[10px] font-mono text-th-text-muted truncate flex-1" title={artifactBasePath}>
+              {artifactBasePath}
             </span>
             <button
               onClick={copyPath}
