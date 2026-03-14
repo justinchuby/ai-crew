@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import type { FlightdeckConnection, ServerMessage } from './connection';
+import type { FlightdeckConnection, ServerMessage } from '../connection';
 
 /**
  * Manages the Flightdeck Dashboard webview panel.
