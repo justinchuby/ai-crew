@@ -28,6 +28,7 @@ export function tasksRoutes(ctx: AppContext): Router {
     const taskDAG = agentManager.getTaskDAG();
     const scope = (req.query.scope as string) || 'global';
     const projectId = req.query.projectId as string | undefined;
+    const leadId = req.query.leadId as string | undefined;
     const statusFilter = req.query.status as string | undefined;
     const roleFilter = req.query.role as string | undefined;
     const agentFilter = req.query.assignedAgentId as string | undefined;
@@ -38,14 +39,20 @@ export function tasksRoutes(ctx: AppContext): Router {
     let tasks: DagTask[];
 
     if (scope === 'project') {
+      // Project scope: ALL tasks for the project across all sessions.
       if (!projectId) {
         return res.status(400).json({ error: 'projectId is required when scope=project' });
       }
       tasks = taskDAG.getTasksByProject(projectId, { includeArchived });
+    } else if (leadId) {
+      // Global scope with leadId: session-scoped view for a specific lead.
+      // Used by lead agents to query only their own tasks.
+      const allTasks = taskDAG.getAll({ includeArchived });
+      tasks = allTasks.filter(t => t.leadId === leadId);
     } else {
-      // Global scope: filter to tasks belonging to the current session.
-      // dagTasks has no sessionId column, so we match tasks whose leadId
-      // corresponds to an agent that is currently live in the AgentManager.
+      // Global scope without leadId (UI kanban): restrict to tasks whose
+      // lead is currently live in the AgentManager to avoid leaking tasks
+      // from old/unrelated sessions.
       const allTasks = taskDAG.getAll({ includeArchived });
       const liveAgentIds = new Set(agentManager.getAll().map(a => a.id));
       tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
