@@ -227,6 +227,18 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       status: 'active',
       createdAt: new Date().toISOString(),
     };
+
+    // Complete any existing active delegation to this agent to prevent orphans
+    for (const [, existing] of ctx.delegations) {
+      if (existing.toAgentId === child.id && existing.status === 'active') {
+        existing.status = 'completed';
+        existing.completedAt = new Date().toISOString();
+        if (ctx.activeDelegationRepository) {
+          try { ctx.activeDelegationRepository.complete(existing.id); } catch { /* non-critical */ }
+        }
+      }
+    }
+
     ctx.delegations.set(delegation.id, delegation);
 
     child.task = req.task;

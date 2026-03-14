@@ -766,12 +766,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         // idle transition properly re-notifies the parent.
         if (status === 'running') {
           this.dispatcher.clearCompletionTracking(agent.id);
-          // Cancel any pending idle task nudge
-          const nudgeTimer = this.idleNudgeTimers.get(agent.id);
-          if (nudgeTimer) {
-            clearTimeout(nudgeTimer);
-            this.idleNudgeTimers.delete(agent.id);
-          }
+          this.clearIdleNudgeTimer(agent.id);
         }
 
         // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
@@ -780,14 +775,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           if (!this.idleNudgeTimers.has(agent.id)) {
             const timer = setTimeout(() => {
               this.idleNudgeTimers.delete(agent.id);
-              if (agent.status !== 'idle') return;
+              if (agent.status !== 'idle' || isTerminalStatus(agent.status)) return;
+              if (!this.agents.has(agent.id)) return; // agent was removed
               const leadId = agent.parentId;
               if (!leadId) return;
               const dagTask = this.taskDAG.getTaskByAgent(leadId, agent.id);
               if (dagTask && dagTask.dagStatus === 'running') {
                 agent.sendMessage(
                   `[System] You have an uncompleted task: "${dagTask.title || dagTask.id}". ` +
-                  `Please mark it done with COMPLETE_TASK or report what is blocking you.`
+                  `Please mark it done with COMPLETE_TASK, report PROGRESS, or explain what is blocking you.`
                 );
               }
             }, 30_000);
@@ -807,6 +803,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.dispatcher.clearBuffer(agent.id);
+      this.clearIdleNudgeTimer(agent.id);
       logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
@@ -956,6 +953,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.dispatcher.clearBuffer(id);
+    this.clearIdleNudgeTimer(id);
 
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
@@ -1210,6 +1208,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
     this.heartbeat.stop();
+    // Clear all idle nudge timers to prevent firing on disposed agents
+    for (const [id, timer] of this.idleNudgeTimers) {
+      clearTimeout(timer);
+    }
+    this.idleNudgeTimers.clear();
     const active = [...this.agents.values()]
       .filter(agent => !isTerminalStatus(agent.status));
     logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
@@ -1331,6 +1334,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   }
 
   /** Flush buffered agent text to the conversation store */
+  private clearIdleNudgeTimer(agentId: string): void {
+    const timer = this.idleNudgeTimers.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleNudgeTimers.delete(agentId);
+    }
+  }
+
   private flushAgentMessage(agentId: string): void {
     const timer = this.flushTimers.get(agentId);
     if (timer) { clearTimeout(timer); this.flushTimers.delete(agentId); }

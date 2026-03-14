@@ -1,22 +1,22 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
-import { agentRoster } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
 
 /**
  * Global task routes — cross-project task queries and the attention items
  * endpoint used by the KanbanBoard, AttentionBar, and HomeDashboard.
  */
 export function tasksRoutes(ctx: AppContext): Router {
-  const { agentManager, decisionLog, db } = ctx;
+  const { agentManager, decisionLog, agentRoster: rosterRepo } = ctx;
   const router = Router();
 
   // ── Global task query ─────────────────────────────────────────────
   /**
    * GET /tasks
-   *   ?scope=global|project
+   *   ?scope=global|project|lead
    *   &projectId=<id>        (required when scope=project)
+   *   &leadId=<id>           (required when scope=lead — session-scoped)
+   *   &sessionId=<id>        (fallback for scope=global after server restart)
    *   &status=running,failed  (comma-separated filter)
    *   &role=developer          (filter by role)
    *   &assignedAgentId=<id>   (filter by assigned agent)
@@ -64,14 +64,9 @@ export function tasksRoutes(ctx: AppContext): Router {
       if (liveAgents.length > 0) {
         const liveAgentIds = new Set(liveAgents.map(a => a.id));
         tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
-      } else if (sessionId && db) {
+      } else if (sessionId && rosterRepo) {
         // Filter by session ID when no live agents are available (e.g., after server restart)
-        const rosterRows = db.drizzle
-          .select({ agentId: agentRoster.agentId })
-          .from(agentRoster)
-          .where(eq(agentRoster.sessionId, sessionId))
-          .all();
-        const sessionAgentIds = new Set(rosterRows.map(r => r.agentId));
+        const sessionAgentIds = new Set(rosterRepo.getBySession(sessionId).map(r => r.agentId));
         tasks = allTasks.filter(t => t.leadId && sessionAgentIds.has(t.leadId));
       } else {
         tasks = [];
