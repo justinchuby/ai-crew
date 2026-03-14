@@ -28,7 +28,7 @@ export type GroupedTimelineItem = AgentGroup | TimelineItem;
  * - 'thinking' messages during an agent turn → include in the group's messages
  * - 'system' messages during an agent turn → add to group's systemEvents
  *   (except '---' separators which flush the group)
- * - 'tool' messages during an agent turn → add to group's systemEvents
+ * - 'tool' messages → flush current group, render standalone (chronological interleaving)
  * - Activity events during an agent turn → add to group's systemEvents
  * - 'user' messages → always flush current group, render standalone
  * - Rich content (contentType !== 'text') → flush current group, render standalone
@@ -107,13 +107,10 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
       continue;
     }
 
-    // Tool call messages — treat like system events (don't merge into agent text)
+    // Tool call messages — flush current group and render inline for chronological interleaving
     if (sender === 'tool') {
-      if (currentGroup) {
-        currentGroup.systemEvents.push(item);
-      } else {
-        result.push(item);
-      }
+      flush();
+      result.push(item);
       continue;
     }
 

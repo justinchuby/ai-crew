@@ -356,25 +356,47 @@ describe('groupTimeline', () => {
     expect(result[2].kind).toBe('message'); // standalone agent
   });
 
-  it('tool messages during agent turn go to systemEvents (not merged as agent text)', () => {
+  it('tool messages flush agent group and render standalone for interleaving', () => {
     const items: TimelineItem[] = [
       msg('agent text 1', 'agent', 1000, 0),
       msg('✓ Read file', 'tool', 1500, 1),
       msg('agent text 2', 'agent', 2000, 2),
     ];
     const result = groupTimeline(items);
-    expect(result).toHaveLength(1);
-    expect(result[0].kind).toBe('agent-group');
-    if (result[0].kind === 'agent-group') {
-      expect(result[0].messages).toHaveLength(2);
-      expect(result[0].messages[0].msg.text).toBe('agent text 1');
-      expect(result[0].messages[1].msg.text).toBe('agent text 2');
-      // Tool message should be in systemEvents, not merged into agent text
-      expect(result[0].systemEvents).toHaveLength(1);
-      if (result[0].systemEvents[0].kind === 'message') {
-        expect(result[0].systemEvents[0].msg.sender).toBe('tool');
-      }
+    // Tool message breaks the agent group: text1 → tool → text2
+    expect(result).toHaveLength(3);
+    expect(result[0].kind).toBe('message');
+    if (result[0].kind === 'message') {
+      expect(result[0].msg.text).toBe('agent text 1');
     }
+    expect(result[1].kind).toBe('message');
+    if (result[1].kind === 'message') {
+      expect(result[1].msg.sender).toBe('tool');
+    }
+    expect(result[2].kind).toBe('message');
+    if (result[2].kind === 'message') {
+      expect(result[2].msg.text).toBe('agent text 2');
+    }
+  });
+
+  it('multiple tool calls interleave with agent text chronologically', () => {
+    const items: TimelineItem[] = [
+      msg('analyzing...', 'agent', 1000, 0),
+      msg('✓ Read file', 'tool', 1500, 1),
+      msg('making changes...', 'agent', 2000, 2),
+      msg('✓ Edit file', 'tool', 2500, 3),
+      msg('done!', 'agent', 3000, 4),
+    ];
+    const result = groupTimeline(items);
+    // Should be: text → tool → text → tool → text (5 items)
+    expect(result).toHaveLength(5);
+    expect(result[0].kind).toBe('message');
+    expect(result[1].kind).toBe('message');
+    if (result[1].kind === 'message') expect(result[1].msg.sender).toBe('tool');
+    expect(result[2].kind).toBe('message');
+    expect(result[3].kind).toBe('message');
+    if (result[3].kind === 'message') expect(result[3].msg.sender).toBe('tool');
+    expect(result[4].kind).toBe('message');
   });
 
   it('standalone tool messages (outside agent turn) pass through', () => {
