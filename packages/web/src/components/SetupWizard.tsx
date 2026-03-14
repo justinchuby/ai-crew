@@ -186,7 +186,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                                 )}
                               </div>
                               {p.id === 'copilot' && (
-                                <div className="text-[10px] text-amber-400/80">Requires Copilot ≥ 1.0.4</div>
+                                <div className="text-[10px] text-th-text-muted">Requires Copilot ≥ 1.0.4</div>
                               )}
                             </div>
                           </div>
