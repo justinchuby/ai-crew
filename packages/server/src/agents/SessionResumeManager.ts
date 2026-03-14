@@ -214,6 +214,85 @@ export class SessionResumeManager {
     return { agent, task };
   }
 
+  // ── Child agent batch resume ────────────────────────────────────────
+
+  /**
+   * Resume child agents from a previous session in batched parallel spawns.
+   *
+   * Reads the agent roster for the project, filters to children of the given
+   * lead, optionally filtered to specific agent IDs, then spawns them in
+   * batches of 3 with small delays to avoid rate limits.
+   *
+   * Returns the number of agents queued for respawn and whether a secretary
+   * was among them.
+   */
+  resumeChildAgents(opts: {
+    leadAgent: Agent;
+    project: { id: string; name: string; cwd?: string | null };
+    resumeAll?: boolean;
+    agentIds?: string[];
+  }): { respawnedCount: number; secretaryResumed: boolean } {
+    const { leadAgent, project, resumeAll, agentIds } = opts;
+
+    if (!resumeAll && !agentIds) {
+      return { respawnedCount: 0, secretaryResumed: false };
+    }
+
+    const allRosterAgents = this.agentRosterRepo.getByProject(project.id);
+    const previousAgents = allRosterAgents.filter((a) => {
+      const meta = a.metadata as Record<string, unknown> | undefined;
+      return meta?.parentId === leadAgent.id && a.role !== 'lead';
+    });
+
+    const toResume = Array.isArray(agentIds)
+      ? previousAgents.filter((a) => agentIds.includes(a.agentId))
+      : previousAgents;
+
+    if (toResume.length === 0) {
+      return { respawnedCount: 0, secretaryResumed: false };
+    }
+
+    const BATCH_SIZE = 3;
+    const BATCH_DELAY = 1000;
+    const INITIAL_DELAY = 2000;
+
+    const spawnTeam = async () => {
+      await new Promise((r) => setTimeout(r, INITIAL_DELAY));
+      for (let b = 0; b < toResume.length; b += BATCH_SIZE) {
+        const batch = toResume.slice(b, b + BATCH_SIZE);
+        await Promise.allSettled(batch.map((prev) => {
+          const prevRole = this.roleRegistry.get(prev.role);
+          if (!prevRole) return Promise.resolve();
+          try {
+            this.agentManager.spawn(
+              prevRole,
+              prev.lastTaskSummary || undefined,
+              leadAgent.id,
+              prev.model,
+              project.cwd ?? undefined,
+              prev.sessionId || undefined,
+              prev.agentId,
+              { projectId: project.id, projectName: project.name },
+            );
+            logger.info({ module: 'resume', msg: 'Respawned child agent', role: prev.role, model: prev.model, parentId: leadAgent.id });
+          } catch (err: unknown) {
+            logger.warn({ module: 'resume', msg: 'Failed to respawn child agent', role: prev.role, err: (err as Error).message });
+          }
+          return Promise.resolve();
+        }));
+        if (b + BATCH_SIZE < toResume.length) {
+          await new Promise((r) => setTimeout(r, BATCH_DELAY));
+        }
+      }
+    };
+    spawnTeam().catch((err) => logger.warn({ module: 'resume', msg: 'Batch spawn error', err: String(err) }));
+
+    return {
+      respawnedCount: toResume.length,
+      secretaryResumed: toResume.some((a) => a.role === 'secretary'),
+    };
+  }
+
   // ── Recovery queries ──────────────────────────────────────────────
 
   /** Get all in-flight delegations (for recovery awareness). */

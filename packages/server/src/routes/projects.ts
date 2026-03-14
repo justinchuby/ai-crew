@@ -789,65 +789,17 @@ export function projectsRoutes(ctx: AppContext): Router {
       logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
 
       // Team respawn: bring back agents from last session (unless freshStart).
-      // Since agent.id === lastSession.leadId (invariant), use agent.id to find children.
       let respawnedCount = 0;
       let secretaryResumed = false;
-      if (!freshStart && agentRoster && lastSession && (resumeAll || agentIds)) {
-        const allRosterAgents = agentRoster.getByProject(project.id);
-        const previousAgents = allRosterAgents.filter((a) => {
-          const meta = a.metadata as Record<string, unknown> | undefined;
-          return (
-            meta?.parentId === agent.id &&
-            a.role !== 'lead'
-          );
+      if (!freshStart && lastSession && (resumeAll || agentIds) && sessionResumeManager) {
+        const result = sessionResumeManager.resumeChildAgents({
+          leadAgent: agent,
+          project,
+          resumeAll,
+          agentIds,
         });
-
-        // Filter to selected agents if specific IDs provided
-        const toResume = Array.isArray(agentIds)
-          ? previousAgents.filter((a) => agentIds.includes(a.agentId))
-          : previousAgents;
-
-        // Spawn team agents in parallel batches (batch size 3, 1s between batches)
-        const BATCH_SIZE = 3;
-        const BATCH_DELAY = 1000;
-        const INITIAL_DELAY = 2000; // let lead settle before spawning team
-
-        const spawnTeam = async () => {
-          await new Promise((r) => setTimeout(r, INITIAL_DELAY));
-          for (let b = 0; b < toResume.length; b += BATCH_SIZE) {
-            const batch = toResume.slice(b, b + BATCH_SIZE);
-            await Promise.allSettled(batch.map((prev) => {
-              const prevRole = roleRegistry.get(prev.role);
-              if (!prevRole) return Promise.resolve();
-              try {
-                agentManager.spawn(
-                  prevRole,
-                  prev.lastTaskSummary || undefined,
-                  agent.id,
-                  prev.model,
-                  project.cwd ?? undefined,
-                  prev.sessionId || undefined,
-                  prev.agentId,
-                  { projectId: project.id, projectName: project.name },
-                );
-                logger.info({ module: 'project', msg: 'Respawned agent', role: prev.role, model: prev.model, parentId: agent.id });
-              } catch (err: any) {
-                logger.warn({ module: 'project', msg: 'Failed to respawn agent', role: prev.role, err: err.message });
-              }
-              return Promise.resolve();
-            }));
-            // Small delay between batches to avoid rate limits
-            if (b + BATCH_SIZE < toResume.length) {
-              await new Promise((r) => setTimeout(r, BATCH_DELAY));
-            }
-          }
-        };
-        spawnTeam().catch((err) => logger.warn({ module: 'project', msg: 'Batch spawn error', err: String(err) }));
-        respawnedCount = toResume.length;
-        secretaryResumed = toResume.some((a) => a.role === 'secretary');
-
-        // During resume, agents pick up context from restored ACP session — no messages needed.
-        // The crew roster is discoverable via QUERY_CREW.
+        respawnedCount = result.respawnedCount;
+        secretaryResumed = result.secretaryResumed;
       }
 
       // Auto-spawn Secretary for DAG tracking.
