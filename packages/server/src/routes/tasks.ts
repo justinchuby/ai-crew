@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
+import { agentRoster } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 
 /**
  * Global task routes — cross-project task queries and the attention items
  * endpoint used by the KanbanBoard, AttentionBar, and HomeDashboard.
  */
 export function tasksRoutes(ctx: AppContext): Router {
-  const { agentManager, decisionLog } = ctx;
+  const { agentManager, decisionLog, db } = ctx;
   const router = Router();
 
   // ── Global task query ─────────────────────────────────────────────
@@ -29,6 +31,7 @@ export function tasksRoutes(ctx: AppContext): Router {
     const scope = (req.query.scope as string) || 'global';
     const projectId = req.query.projectId as string | undefined;
     const leadId = req.query.leadId as string | undefined;
+    const sessionId = req.query.sessionId as string | undefined;
     const statusFilter = req.query.status as string | undefined;
     const roleFilter = req.query.role as string | undefined;
     const agentFilter = req.query.assignedAgentId as string | undefined;
@@ -52,17 +55,26 @@ export function tasksRoutes(ctx: AppContext): Router {
       const allTasks = taskDAG.getAll({ includeArchived });
       tasks = allTasks.filter(t => t.leadId === leadId);
     } else {
-      // Global scope (default): when agents are live, restrict to tasks
-      // whose lead is in-memory to avoid leaking old session tasks.
-      // After a server restart (no live agents yet), return all tasks
-      // so the UI isn't empty while agents are reconnecting.
+      // Global scope (default): filter to current session's tasks.
+      // When live agents exist, use their IDs directly. After a server
+      // restart (no live agents yet), fall back to sessionId from the
+      // request — look up lead agent IDs from the roster DB.
       const allTasks = taskDAG.getAll({ includeArchived });
       const liveAgents = agentManager.getAll();
       if (liveAgents.length > 0) {
         const liveAgentIds = new Set(liveAgents.map(a => a.id));
         tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
+      } else if (sessionId && db) {
+        // Filter by session ID when no live agents are available (e.g., after server restart)
+        const rosterRows = db.drizzle
+          .select({ agentId: agentRoster.agentId })
+          .from(agentRoster)
+          .where(eq(agentRoster.sessionId, sessionId))
+          .all();
+        const sessionAgentIds = new Set(rosterRows.map(r => r.agentId));
+        tasks = allTasks.filter(t => t.leadId && sessionAgentIds.has(t.leadId));
       } else {
-        tasks = allTasks;
+        tasks = [];
       }
     }
 
