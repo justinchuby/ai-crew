@@ -210,15 +210,17 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('content', (content: any) => withCtx(() => {
+    if (agent._isResuming) return;
     agent._notifyContent(content);
   }));
 
   conn.on('thinking', (text: string) => withCtx(() => {
+    if (agent._isResuming) return;
     agent._notifyThinking(text);
   }));
 
   conn.on('tool_call', (info: ToolCallInfo) => withCtx(() => {
-    if (agent._isTerminated) return;
+    if (agent._isTerminated || agent._isResuming) return;
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
     if (idx >= 0) {
       agent.toolCalls[idx] = info;
@@ -232,6 +234,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => withCtx(() => {
+    if (agent._isResuming) return;
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === update.toolCallId);
     if (idx >= 0) {
       agent.toolCalls[idx] = { ...agent.toolCalls[idx], ...update };
