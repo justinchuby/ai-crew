@@ -33,10 +33,12 @@ export function agentsRoutes(ctx: AppContext): Router {
   router.get('/agents', (req, res) => {
     const projectId = req.query.projectId as string | undefined;
     const sessionId = req.query.sessionId as string | undefined;
+    // AgentManager holds only live (in-memory) agents — this inherently
+    // scopes results to the current server process, not historical DB records.
     let agents = projectId
       ? agentManager.getByProject(projectId)
       : agentManager.getAll();
-    // Filter to a specific session when requested
+    // Further narrow to a specific session when requested
     if (sessionId) {
       agents = agents.filter(a => a.sessionId === sessionId);
     }

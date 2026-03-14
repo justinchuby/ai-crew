@@ -125,6 +125,8 @@ export class AgentRosterRepository {
   }
 
   /** Get agents matching both a project and session. */
+  /** Get agents for a project within a specific session.
+   *  Intended for future session-scoped views; keep even if currently unused. */
   getByProjectAndSession(projectId: string, sessionId: string): AgentRecord[] {
     const rows = this.db.drizzle
       .select()
