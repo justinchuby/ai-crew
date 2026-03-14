@@ -23,6 +23,7 @@
   ],
   "files": [
     "bin/",
+    "packages/shared/package.json",
     "packages/shared/dist/",
     "packages/server/dist/",
     "!packages/server/dist/__tests__/",
@@ -74,5 +75,8 @@
     "eslint": "^10.0.2",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3"
-  }
+  },
+  "bundledDependencies": [
+    "@flightdeck/shared"
+  ]
 }
