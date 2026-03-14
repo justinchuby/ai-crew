@@ -16,6 +16,7 @@ export class ServerManager {
   private _process: ChildProcess | null = null;
   private _outputChannel: vscode.OutputChannel;
   private _running = false;
+  private _stopping = false;
 
   private readonly _onDidChangeState = new vscode.EventEmitter<boolean>();
   readonly onDidChangeState = this._onDidChangeState.event;
@@ -59,8 +60,6 @@ export class ServerManager {
         cwd,
         env: { ...process.env, NODE_ENV: 'production' },
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
-        detached: false,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -82,12 +81,14 @@ export class ServerManager {
         `Server exited (code=${code ?? 'null'}, signal=${signal ?? 'none'})`,
       );
       this._process = null;
+      this._stopping = false;
       this._setRunning(false);
     });
 
     this._process.on('error', (err) => {
       this._outputChannel.appendLine(`Server error: ${err.message}`);
       this._process = null;
+      this._stopping = false;
       this._setRunning(false);
     });
 
