@@ -272,7 +272,7 @@ export class FlightdeckConnection {
 
     // Fetch server version and check API compatibility
     try {
-      this._serverVersion = await this.fetch<ServerVersionInfo>('/version');
+      this._serverVersion = await this.fetchRaw<ServerVersionInfo>('/version');
       this.log.appendLine(`Server version: ${this._serverVersion.version}, API version: ${this._serverVersion.apiVersion}`);
 
       if (this._serverVersion.apiVersion !== EXPECTED_API_VERSION) {
@@ -311,11 +311,12 @@ export class FlightdeckConnection {
   }
 
   /**
-   * Make a GET request to the server REST API.
-   * @param path - API path relative to server URL (e.g. `/health`, `/api/projects`)
+   * Make a GET request to the server using a raw path (no /api prefix).
+   * Use fetchJson() or postJson() for API-prefixed requests.
+   * @param path - Path relative to server URL (e.g. `/health`, `/version`)
    * @returns Parsed JSON response body
    */
-  async fetch<T>(path: string): Promise<T> {
+  async fetchRaw<T>(path: string): Promise<T> {
     const baseUrl = this._serverUrl || 'http://localhost:3001';
     const url = new URL(path, baseUrl);
     const lib = url.protocol === 'https:' ? https : http;
@@ -356,7 +357,7 @@ export class FlightdeckConnection {
   async fetchJson<T>(path: string): Promise<T | null> {
     if (!this.connected) return null;
     try {
-      return await this.fetch<T>(`/api${path}`);
+      return await this.fetchRaw<T>(`/api${path}`);
     } catch {
       return null;
     }
@@ -493,7 +494,9 @@ export class FlightdeckConnection {
       this.reconnectTimer = null;
       if (!this.shouldReconnect) return;
 
-      // Re-discover in case the server restarted on a different port
+      // Re-discover in case the server restarted on a different port.
+      // Note: discoverServer() includes port scanning which may take a few
+      // seconds, so the RECONNECT_INTERVAL is a minimum delay, not exact.
       const discovered = await this.discoverServer();
 
       // Guard: disconnect() may have been called during async discovery

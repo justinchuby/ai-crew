@@ -449,7 +449,7 @@ describe('FlightdeckConnection', () => {
     it('GET /health returns parsed JSON', async () => {
       const conn = createConnection();
       (conn as unknown as Record<string, unknown>)._serverUrl = `http://localhost:${port}`;
-      const data = await conn.fetch<{ status: string }>('/health');
+      const data = await conn.fetchRaw<{ status: string }>('/health');
       expect(data).toEqual({ status: 'ok' });
       conn.dispose();
     });
@@ -457,7 +457,7 @@ describe('FlightdeckConnection', () => {
     it('GET /api/projects returns parsed JSON', async () => {
       const conn = createConnection();
       (conn as unknown as Record<string, unknown>)._serverUrl = `http://localhost:${port}`;
-      const data = await conn.fetch<Array<{ id: string }>>('/api/projects');
+      const data = await conn.fetchRaw<Array<{ id: string }>>('/api/projects');
       expect(data).toEqual([{ id: '1', name: 'Test' }]);
       conn.dispose();
     });
@@ -465,7 +465,7 @@ describe('FlightdeckConnection', () => {
     it('rejects on 404', async () => {
       const conn = createConnection();
       (conn as unknown as Record<string, unknown>)._serverUrl = `http://localhost:${port}`;
-      await expect(conn.fetch('/nonexistent')).rejects.toThrow('HTTP 404');
+      await expect(conn.fetchRaw('/nonexistent')).rejects.toThrow('HTTP 404');
       conn.dispose();
     });
   });
