@@ -232,7 +232,7 @@ describe('ProvidersSection', () => {
     expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
   });
 
-  it('shows preview badge for Claude but not Copilot or Codex', async () => {
+  it('shows preview badge for Cursor but not Copilot, Claude, or Codex', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
@@ -241,9 +241,11 @@ describe('ProvidersSection', () => {
     const copilotCard = screen.getByTestId('provider-card-copilot');
     const claudeCard = screen.getByTestId('provider-card-claude');
     const codexCard = screen.getByTestId('provider-card-codex');
+    const cursorCard = screen.getByTestId('provider-card-cursor');
     expect(copilotCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
-    expect(claudeCard.querySelector('[data-testid="preview-badge"]')).not.toBeNull();
+    expect(claudeCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
     expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
+    expect(cursorCard.querySelector('[data-testid="preview-badge"]')).not.toBeNull();
   });
 
   it('shows two setup links for Codex when expanded', async () => {
