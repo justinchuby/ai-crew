@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-03-14
+
+### Fixed
+
+- **`@flightdeck/shared` module resolution on Linux** — Added `packages/shared/package.json` to the npm tarball `files` array and declared `@flightdeck/shared` in `bundledDependencies`. Without this, Node.js could not resolve the bare specifier `@flightdeck/shared` when installed via `npm install -g` or `npx`, because the package.json (with its `exports` field) was missing from the published package.
+
 ## [0.4.1] - 2026-03-14
 
 ### Fixed
