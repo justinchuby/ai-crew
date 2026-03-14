@@ -31,8 +31,6 @@ coverage/
 
 # Runtime / workspace
 .flightdeck
-# Temporary directory for AI Crew
-.ai-crew
 .worktrees/
 
 # Logs

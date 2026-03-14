@@ -31,14 +31,13 @@ export interface ServerConfig {
 
 /**
  * Resolve database path. Checks env var, then auto-migrates from legacy
- * CWD locations (./flightdeck.db, ./ai-crew.db) to ~/.flightdeck/.
+ * CWD location (./flightdeck.db) to ~/.flightdeck/.
  */
 function resolveDbPath(explicit: string | undefined): string {
   if (explicit) return explicit;
 
   const defaultPath = join(FLIGHTDECK_STATE_DIR, 'flightdeck.db');
   const cwdPath = './flightdeck.db';
-  const legacyPath = './ai-crew.db';
 
   // Ensure state directory exists
   mkdirSync(FLIGHTDECK_STATE_DIR, { recursive: true });
@@ -52,17 +51,6 @@ function resolveDbPath(explicit: string | undefined): string {
       }
       logger.info({ module: 'config', msg: 'Database migrated to ~/.flightdeck/', from: cwdPath });
     } catch { /* keep CWD path if rename fails */ }
-  }
-
-  // Auto-migrate from legacy ai-crew.db → ~/.flightdeck/flightdeck.db
-  if (!existsSync(defaultPath) && existsSync(legacyPath)) {
-    try {
-      renameSync(legacyPath, defaultPath);
-      for (const suffix of ['-shm', '-wal']) {
-        if (existsSync(legacyPath + suffix)) renameSync(legacyPath + suffix, defaultPath + suffix);
-      }
-      logger.info({ module: 'config', msg: 'Database migrated from legacy path', from: legacyPath });
-    } catch { /* use default path anyway */ }
   }
 
   return defaultPath;

@@ -5,10 +5,6 @@ import { App } from './App';
 import './index.css';
 import { getAuthToken } from './hooks/useApi';
 import { useSettingsStore } from './stores/settingsStore';
-import { migrateLocalStorage } from './utils/migrateLocalStorage';
-
-// Migrate localStorage keys from ai-crew → flightdeck before anything reads them
-migrateLocalStorage();
 
 // Apply theme before render to avoid flash
 useSettingsStore.getState().initThemeListener();
