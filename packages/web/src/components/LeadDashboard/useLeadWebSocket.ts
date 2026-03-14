@@ -314,7 +314,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
   const preview = (msg.content ?? '').slice(0, 2000);
   const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
   const senderId = shortAgentId(msg.from ?? '');
-  if (msg.from === 'system') {
+  if (msg.from === 'system' && msg.to === leadId) {
     store.addMessage(leadId, { type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system', timestamp: Date.now() });
   } else if (isBroadcast) {
     // Broadcasts tracked in comms panel — don't duplicate in chat
