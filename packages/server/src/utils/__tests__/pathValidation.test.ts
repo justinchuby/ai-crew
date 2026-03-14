@@ -73,7 +73,7 @@ describe('validatePathWithinDir', () => {
   });
 
   it('throws with descriptive message including file path', () => {
-    expect(() => validatePathWithinDir(BASE, '../../etc/passwd')).toThrow("escapes '/tmp/project'");
+    expect(() => validatePathWithinDir(BASE, '../../etc/passwd')).toThrow(`escapes '${resolve(BASE)}'`);
   });
 
   it('throws on null byte in path', () => {
@@ -89,11 +89,13 @@ describe('validatePathWithinDir', () => {
   });
 
   it('handles Windows-style backslashes in path', () => {
-    // On Unix, backslash is a valid filename char, but resolve normalizes it
-    // The key behavior: no escape should be possible regardless of separator
-    expect(() => validatePathWithinDir(BASE, '..\\..\\etc\\passwd')).not.toThrow();
-    // The above doesn't escape on Unix because \\ is treated as literal chars in filename
-    // On Windows, resolve() would normalize backslashes and catch the traversal
+    if (process.platform === 'win32') {
+      // On Windows, backslashes are path separators so this IS a traversal
+      expect(() => validatePathWithinDir(BASE, '..\\..\\etc\\passwd')).toThrow('Path traversal detected');
+    } else {
+      // On Unix, backslash is a valid filename char — no escape
+      expect(() => validatePathWithinDir(BASE, '..\\..\\etc\\passwd')).not.toThrow();
+    }
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import YAML from 'yaml';
 import { StorageManager, atomicWriteFile } from '../StorageManager.js';
@@ -194,7 +194,7 @@ describe('path traversal protection', () => {
 describe('validatePathWithinDir', () => {
   it('allows paths within parent directory', () => {
     const result = validatePathWithinDir('/projects/my-proj', 'knowledge/core/rules.md');
-    expect(result).toBe('/projects/my-proj/knowledge/core/rules.md');
+    expect(result).toBe(resolve('/projects/my-proj', 'knowledge/core/rules.md'));
   });
 
   it('rejects paths that escape via ../', () => {
@@ -207,6 +207,6 @@ describe('validatePathWithinDir', () => {
 
   it('allows deeply nested valid paths', () => {
     const result = validatePathWithinDir('/root', 'a/b/c/d.txt');
-    expect(result).toBe('/root/a/b/c/d.txt');
+    expect(result).toBe(resolve('/root', 'a/b/c/d.txt'));
   });
 });

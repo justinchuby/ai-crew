@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { SkillsLoader, parseFrontmatter } from '../SkillsLoader.js';
@@ -175,7 +175,7 @@ describe('SkillsLoader', () => {
       const loader = new SkillsLoader(tempDir);
       const result = loader.loadAll();
 
-      expect(result.skills[0].path).toMatch(/^\//);
+      expect(isAbsolute(result.skills[0].path)).toBe(true);
       expect(result.skills[0].path).toContain('SKILL.md');
     });
   });
