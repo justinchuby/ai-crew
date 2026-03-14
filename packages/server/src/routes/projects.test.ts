@@ -258,6 +258,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
   const mockGetSessions = vi.fn().mockReturnValue([]);
   const mockGetAllAgents = vi.fn().mockReturnValue([]);
   const mockGetMessageHistory = vi.fn().mockReturnValue([]);
+  const mockResumeLeadSession = vi.fn();
 
   // Mock spawn returns an agent with the requested ID (8th arg) to honor the invariant
   const makeFakeAgent = (id: string) => ({
@@ -273,6 +274,11 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
       (_role: any, _task: any, _parentId: any, _model: any, _cwd: any, _resumeSession: any, id?: string) =>
         makeFakeAgent(id ?? 'new-lead-1'),
     );
+    mockResumeLeadSession.mockImplementation((opts: any) => {
+      const agent = makeFakeAgent(opts.session.leadId);
+      mockSpawn(null, opts.task, null, opts.model, null, opts.session.sessionId, opts.session.leadId);
+      return { agent, task: opts.task };
+    });
     mockGet.mockReturnValue({ id: 'proj-1', name: 'Test', cwd: '/tmp/test' });
 
     const srv = createTestServer({
@@ -299,6 +305,49 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
       agentRoster: {
         getAllAgents: mockGetAllAgents,
         getByProject: mockGetAllAgents,
+      } as any,
+      sessionResumeManager: {
+        resumeLeadSession: mockResumeLeadSession,
+        resumeChildAgents: vi.fn().mockImplementation((opts: any) => {
+          const allAgents = mockGetAllAgents();
+          const previous = allAgents.filter((a: any) => {
+            const meta = a.metadata as Record<string, unknown> | undefined;
+            return meta?.parentId === opts.leadAgent.id && a.role !== 'lead';
+          });
+          const toResume = Array.isArray(opts.agentIds)
+            ? previous.filter((a: any) => opts.agentIds.includes(a.agentId))
+            : previous;
+          // Spawn in batches asynchronously (mirrors real implementation)
+          const BATCH_SIZE = 3;
+          const INITIAL_DELAY = 2000;
+          const BATCH_DELAY = 1000;
+          const spawnTeam = async () => {
+            await new Promise((r) => setTimeout(r, INITIAL_DELAY));
+            for (let b = 0; b < toResume.length; b += BATCH_SIZE) {
+              const batch = toResume.slice(b, b + BATCH_SIZE);
+              for (const prev of batch) {
+                mockSpawn(
+                  { id: prev.role, name: prev.role, instructions: '' },
+                  prev.lastTaskSummary || undefined,
+                  opts.leadAgent.id,
+                  prev.model,
+                  opts.project.cwd ?? undefined,
+                  prev.sessionId || undefined,
+                  prev.agentId,
+                  { projectId: opts.project.id, projectName: opts.project.name },
+                );
+              }
+              if (b + BATCH_SIZE < toResume.length) {
+                await new Promise((r) => setTimeout(r, BATCH_DELAY));
+              }
+            }
+          };
+          spawnTeam().catch(() => {});
+          return {
+            respawnedCount: toResume.length,
+            secretaryResumed: toResume.some((a: any) => a.role === 'secretary'),
+          };
+        }),
       } as any,
     });
     baseUrl = await srv.start();
