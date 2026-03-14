@@ -35,5 +35,15 @@ jobs:
         shell: bash
 
       - name: Unit tests
-        run: npm test --workspace=packages/server
+        run: npm run test:coverage --workspace=packages/server
         shell: bash
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: packages/server/coverage/lcov.info
+          flags: server-windows
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
