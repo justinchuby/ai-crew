@@ -1,26 +1,57 @@
 import * as vscode from 'vscode';
+import { FlightdeckConnection } from './connection';
+import { AgentsTreeProvider } from './providers/AgentsTreeProvider';
+import { TasksTreeProvider } from './providers/TasksTreeProvider';
+import { FileLocksTreeProvider } from './providers/FileLocksTreeProvider';
 
 let outputChannel: vscode.OutputChannel;
+let connection: FlightdeckConnection;
 
 export function activate(context: vscode.ExtensionContext): void {
   outputChannel = vscode.window.createOutputChannel('Flightdeck');
   outputChannel.appendLine('Flightdeck extension activated');
 
+  // Create connection manager
+  connection = new FlightdeckConnection();
+  context.subscriptions.push({ dispose: () => connection.dispose() });
+
+  // Create tree view providers
+  const agentsProvider = new AgentsTreeProvider(connection);
+  const tasksProvider = new TasksTreeProvider(connection);
+  const locksProvider = new FileLocksTreeProvider(connection);
+
+  // Register tree views
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('flightdeck-agents', agentsProvider),
+    vscode.window.registerTreeDataProvider('flightdeck-tasks', tasksProvider),
+    vscode.window.registerTreeDataProvider('flightdeck-locks', locksProvider),
+  );
+
+  // Refresh all views when connection state changes
+  connection.onDidChangeConnection((connected) => {
+    outputChannel.appendLine(`Connection state: ${connected ? 'connected' : 'disconnected'}`);
+    agentsProvider.refresh();
+    tasksProvider.refresh();
+    locksProvider.refresh();
+  });
+
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('flightdeck.connect', () => {
-      const serverUrl = vscode.workspace.getConfiguration('flightdeck').get<string>('serverUrl', 'http://localhost:3001');
-      outputChannel.appendLine(`Connecting to ${serverUrl}...`);
-      vscode.window.showInformationMessage(`Flightdeck: Connecting to ${serverUrl}...`);
-      // TODO: Implement WebSocket connection
-      vscode.commands.executeCommand('setContext', 'flightdeck.connected', true);
+    vscode.commands.registerCommand('flightdeck.connect', async () => {
+      outputChannel.appendLine(`Connecting to ${connection.serverUrl}...`);
+      vscode.window.showInformationMessage(`Flightdeck: Connecting to ${connection.serverUrl}...`);
+      await connection.connect();
+      if (connection.connected) {
+        vscode.window.showInformationMessage('Flightdeck: Connected');
+      } else {
+        vscode.window.showWarningMessage('Flightdeck: Failed to connect');
+      }
     }),
 
     vscode.commands.registerCommand('flightdeck.disconnect', () => {
-      outputChannel.appendLine('Disconnecting...');
+      connection.disconnect();
+      outputChannel.appendLine('Disconnected');
       vscode.window.showInformationMessage('Flightdeck: Disconnected');
-      vscode.commands.executeCommand('setContext', 'flightdeck.connected', false);
-      // TODO: Close WebSocket connection
     }),
 
     vscode.commands.registerCommand('flightdeck.openDashboard', () => {
@@ -30,13 +61,11 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand('flightdeck.refreshAgents', () => {
-      outputChannel.appendLine('Refreshing agents...');
-      // TODO: Refresh agent tree view data
+      agentsProvider.refresh();
     }),
 
     vscode.commands.registerCommand('flightdeck.refreshTasks', () => {
-      outputChannel.appendLine('Refreshing tasks...');
-      // TODO: Refresh task tree view data
+      tasksProvider.refresh();
     }),
 
     vscode.commands.registerCommand('flightdeck.sendMessage', async (item?: { agentId?: string }) => {
@@ -46,7 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
       if (message) {
         outputChannel.appendLine(`Sending message to ${item?.agentId ?? 'lead'}: ${message}`);
-        vscode.window.showInformationMessage(`Flightdeck: Message sent`);
+        vscode.window.showInformationMessage('Flightdeck: Message sent');
         // TODO: Send via API
       }
     }),
@@ -89,5 +118,5 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   outputChannel?.appendLine('Flightdeck extension deactivated');
-  // TODO: Close WebSocket connection, cleanup resources
+  connection?.dispose();
 }
