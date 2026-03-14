@@ -66,6 +66,43 @@ jobs:
       - name: Unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
 
+      - name: CLI smoke test
+        run: |
+          # Build the server so dist/ exists
+          npm run build --workspace=packages/server
+
+          # Start server in background — stdout/stderr flow to CI logs
+          node packages/server/dist/index.js &
+          SERVER_PID=$!
+
+          # Wait for server to be ready (up to 10s)
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ Server responded to /health after ~$((i / 2))s"
+              break
+            fi
+            # Check if server process died
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server process died (PID $SERVER_PID)"
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          # Final health check
+          HEALTH=$(curl -sf http://localhost:3001/health || true)
+          if [ -z "$HEALTH" ]; then
+            echo "❌ Server never responded to /health"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "Health response: $HEALTH"
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true
+          echo "✅ CLI smoke test passed"
+
       - name: Upload coverage to Codecov
         if: always()
         uses: codecov/codecov-action@v5
