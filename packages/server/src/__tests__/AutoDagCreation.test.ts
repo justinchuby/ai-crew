@@ -682,7 +682,10 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
 
     cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build something"} ⟧⟧');
 
-    expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();
+    // No dependency analysis request — delegation notification is OK
+    expect(secretaryAgent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('Dependency analysis needed')
+    );
   });
 
   it('does not send to terminated Secretary', () => {
@@ -718,8 +721,10 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
 
     cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build feature", "dependsOn": ["setup-task"]} ⟧⟧');
 
-    // Has explicit dep — Secretary not needed
-    expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();
+    // Has explicit dep — no dependency analysis needed (delegation notification is OK)
+    expect(secretaryAgent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('Dependency analysis needed')
+    );
   });
 });
 

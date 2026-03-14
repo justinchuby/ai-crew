@@ -9,13 +9,13 @@
 
 ## 1. What the Project Does
 
-**Flightdeck** is a multi-agent orchestration platform for [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli). It runs as a local Node.js server with a real-time web dashboard, enabling users to manage teams of specialized AI agents that work on software engineering tasks in parallel.
+**Flightdeck** is a multi-agent orchestration platform for [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli). It runs as a local Node.js server with a real-time web dashboard, enabling users to manage crews of specialized AI agents that work on software engineering tasks in parallel.
 
 ### Core Value Proposition
 Instead of one AI doing everything sequentially, Flightdeck spins up **multiple specialized agents simultaneously** — a developer writes code, a reviewer checks it, an architect designs the system, a secretary tracks progress — all coordinated through a Project Lead agent that decomposes tasks into a DAG and delegates work.
 
 ### Key Capabilities
-- **Team orchestration**: 13 specialized roles (Lead, Developer, Architect, Reviewer, etc.) with distinct system prompts and default models
+- **Crew orchestration**: 13 specialized roles (Lead, Developer, Architect, Reviewer, etc.) with distinct system prompts and default models
 - **Task DAG**: Declarative task scheduling with dependencies; auto-links agents via delegation
 - **Real-time web UI**: Dashboard with agent fleet overview, timeline, canvas graph, mission control, analytics, and chat
 - **Structured communication**: Direct messages, broadcasts, group chats, @mentions between agents

@@ -4,7 +4,7 @@
  * Left sidebar: file tree browser for the project's CWD.
  * Right pane: file content preview (markdown rendered, code syntax highlighted).
  *
- * Useful for browsing design specs, skills, shared files in .flightdeck/shared/.
+ * Useful for browsing design specs, skills, and project files.
  */
 import { useState, useCallback, useEffect } from 'react';
 import {

@@ -25,7 +25,7 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   low: 'bg-gray-500/20 text-th-text-muted',
 };
 
-const TC_STATUS: Record<AcpToolCall['status'], string> = {
+const _TC_STATUS: Record<AcpToolCall['status'], string> = {
   pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
   in_progress: 'bg-blue-500/20 text-blue-400',
   completed: 'bg-purple-500/20 text-purple-400',
@@ -51,12 +51,12 @@ function renderContentItem(c: any): string {
 }
 
 /** Safely render tool call content — handles string, array, or object */
-function stringifyContent(content: any): string {
+function _stringifyContent(content: any): string {
   if (typeof content === 'string') {
     if (content.startsWith('{') || content.startsWith('[')) {
       try {
         const parsed = JSON.parse(content);
-        return stringifyContent(parsed);
+        return _stringifyContent(parsed);
       } catch { /* not JSON, use as-is */ }
     }
     return content.slice(0, 500);
@@ -120,7 +120,10 @@ export function AcpOutput({ agentId }: Props) {
       timeline.push({ kind: 'message', msg, index: i });
     }
   });
+  // Filter out tool_call activity events — those are already represented by
+  // sender='tool' messages injected from the WebSocket tool_call handler
   agentActivity.forEach((evt) => {
+    if (evt.type === 'tool_call') return;
     timeline.push({ kind: 'activity', evt });
   });
   // Sort by timestamp
@@ -502,6 +505,10 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
     );
   }
 
+  if (sender === 'tool') {
+    return <ToolCallBadge msg={msg} />;
+  }
+
   if (msg.contentType && msg.contentType !== 'text') {
     const mentionAttr = hasUserMention(typeof msg.text === 'string' ? msg.text : '') ? { 'data-user-prompt': item.index } : {};
     return (
@@ -554,6 +561,31 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
   );
 });
 
+/** Styled tool call badge — renders with proper icon, status color, and tool kind */
+function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
+  const status = msg.toolStatus ?? 'in_progress';
+  const kind = msg.toolKind ?? '';
+  const title = typeof msg.text === 'string' ? msg.text : String(msg.text);
+  const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+  const statusColors: Record<string, string> = {
+    pending: 'text-yellow-500',
+    in_progress: 'text-blue-400',
+    completed: 'text-emerald-500',
+    cancelled: 'text-gray-400',
+  };
+  const color = statusColors[status] || 'text-th-text-muted';
+
+  return (
+    <div className="flex items-center gap-1.5 py-0.5 px-1">
+      <Wrench size={11} className={`shrink-0 ${color}`} />
+      <span className={`text-[10px] font-mono ${color}`}>{title}</span>
+      {kind && <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{kind}</span>}
+      {ts && <span className="text-[10px] text-th-text-muted ml-auto shrink-0">{ts}</span>}
+    </div>
+  );
+}
+
 /** Collapsed-by-default incoming DM with click to expand */
 function CollapsibleIncomingMessage({ text, timestamp }: { text: string; timestamp: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -586,7 +618,16 @@ function CollapsibleIncomingMessage({ text, timestamp }: { text: string; timesta
 }
 
 /** Collapsed-by-default section showing system events that occurred during an agent turn */
-function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; msg: { text: string; sender?: string; timestamp?: number }; index: number } | { kind: 'activity'; evt: ActivityEvent }> }) {
+function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; msg: AcpTextChunk; index: number } | { kind: 'activity'; evt: ActivityEvent }> }) {
+  // Count tool calls separately for a better label
+  const toolCount = events.filter((e) => e.kind === 'message' && e.msg.sender === 'tool').length;
+  const otherCount = events.length - toolCount;
+  const label = toolCount > 0 && otherCount === 0
+    ? `${toolCount} tool use${toolCount !== 1 ? 's' : ''}`
+    : toolCount > 0
+      ? `${toolCount} tool use${toolCount !== 1 ? 's' : ''}, ${otherCount} event${otherCount !== 1 ? 's' : ''}`
+      : `${events.length} system event${events.length !== 1 ? 's' : ''}`;
+
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="mt-1">
@@ -595,7 +636,7 @@ function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; 
         className="flex items-center gap-1 text-[10px] text-th-text-muted hover:text-th-text-alt transition-colors"
       >
         {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        {events.length} system event{events.length !== 1 ? 's' : ''}
+        {label}
       </button>
       {expanded && (
         <div className="ml-4 mt-0.5 space-y-0.5">
@@ -614,6 +655,10 @@ function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; 
               );
             }
             const msg = item.msg;
+            // Tool messages get proper badge rendering
+            if (msg.sender === 'tool') {
+              return <ToolCallBadge key={`sysevt-${i}`} msg={msg} />;
+            }
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
             const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
             return (

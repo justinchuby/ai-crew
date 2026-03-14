@@ -73,6 +73,7 @@ export class ContextRefresher {
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
+      if (agent._isResuming) continue; // Skip agents still resuming
 
       const projectId = this.agentManager.getProjectIdForAgent(agent.id);
       const peers = this.buildPeerList(projectId);
@@ -300,9 +301,11 @@ export class ContextRefresher {
     this.periodicHandle = setTimeout(() => {
       this.periodicHandle = null;
       if (!this.running) return;
-      if (this.hasActiveSubLeads()) {
-        this.refreshStatusReceivers();
-      }
+      try {
+        if (this.hasActiveSubLeads()) {
+          this.refreshStatusReceivers();
+        }
+      } catch { /* best-effort periodic refresh */ }
       this.schedulePeriodicRefresh();
     }, this.currentIntervalMs);
   }

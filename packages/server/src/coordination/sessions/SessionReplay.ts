@@ -56,7 +56,7 @@ const KEYFRAME_TYPES: Record<string, Keyframe['type']> = {
   commit: 'commit',
 };
 
-// ── Minimal interface for team resolution ─────────────────────────
+// ── Minimal interface for crew resolution ─────────────────────────
 // Only the subset of AgentManager that SessionReplay needs.
 
 export interface ReplayAgentSource {
@@ -96,37 +96,37 @@ export class SessionReplay {
   /**
    * Resolve activities scoped to a lead's session.
    *
-   * Uses the same team-resolution pattern as `buildTimelineData` in
+   * Uses the same crew-resolution pattern as `buildTimelineData` in
    * `packages/server/src/routes/coordination.ts`:
    *  1. Try projectId-based SQL filter (works for historical sessions).
-   *  2. If empty, resolve the team via AgentManager and filter in-memory.
-   *  3. If no team can be resolved, return [] — never unscoped data.
+   *  2. If empty, resolve the crew via AgentManager and filter in-memory.
+   *  3. If no crew can be resolved, return [] — never unscoped data.
    */
   resolveActivities(leadId: string, timestamp: string, limit: number): ActivityEntry[] {
     // Tier 1: projectId-based SQL filter (historical sessions with real project UUIDs)
     const byProject = this.activityLedger.getUntil(timestamp, leadId, limit);
     if (byProject.length > 0) return byProject;
 
-    // Tier 2: Resolve team membership from live agent roster
+    // Tier 2: Resolve crew membership from live agent roster
     if (this.agentSource) {
-      const teamIds = new Set<string>([leadId]);
+      const crewIds = new Set<string>([leadId]);
       for (const agent of this.agentSource.getAll()) {
         if (agent.parentId === leadId || agent.id === leadId) {
-          teamIds.add(agent.id);
+          crewIds.add(agent.id);
         }
       }
 
       const allActivities = this.activityLedger.getUntil(timestamp, undefined, limit);
 
-      // If we found live team members, filter to their events
-      if (teamIds.size > 1) {
+      // If we found live crew members, filter to their events
+      if (crewIds.size > 1) {
         return allActivities.filter(
-          a => teamIds.has(a.agentId) || a.projectId === leadId,
+          a => crewIds.has(a.agentId) || a.projectId === leadId,
         );
       }
 
       // Tier 3 — Historical replay without live agents: the lead was active
-      // in this session but has since disconnected. Discover the team from
+      // in this session but has since disconnected. Discover the crew from
       // projectId references and delegation chains in the event log.
       // First check if leadId appears as a projectId on any events
       const projectEvents = allActivities.filter(a => a.projectId === leadId);

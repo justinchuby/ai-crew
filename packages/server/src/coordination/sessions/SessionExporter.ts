@@ -58,16 +58,16 @@ export class SessionExporter {
     mkdirSync(join(sessionDir, 'agents'), { recursive: true });
     mkdirSync(join(sessionDir, 'groups'), { recursive: true });
 
-    // Collect team agents (lead + direct children)
+    // Collect crew agents (lead + direct children)
     const allAgents = this.agentManager.getAll();
-    const teamAgents = allAgents.filter(
+    const crewAgents = allAgents.filter(
       a => a.id === leadId || a.parentId === leadId,
     );
 
-    // Collect all events for team
-    const teamIds = new Set(teamAgents.map(a => a.id));
+    // Collect all events for crew
+    const crewIds = new Set(crewAgents.map(a => a.id));
     const allEvents = this.activityLedger.getRecent(100_000);
-    const teamEvents = allEvents.filter(e => teamIds.has(e.agentId));
+    const crewEvents = allEvents.filter(e => crewIds.has(e.agentId));
 
     // Collect decisions
     const decisions = this.decisionLog.getByLeadId(leadId);
@@ -85,11 +85,11 @@ export class SessionExporter {
 
     // 1. summary.md
     const summaryPath = join(sessionDir, 'summary.md');
-    writeFileSync(summaryPath, this.buildSummaryMd(leadId, teamAgents, teamEvents, decisions, dagTasks, commits));
+    writeFileSync(summaryPath, this.buildSummaryMd(leadId, crewAgents, crewEvents, decisions, dagTasks, commits));
     files.push('summary.md');
 
     // 2. Per-agent conversation logs
-    for (const agent of teamAgents) {
+    for (const agent of crewAgents) {
       const filename = `${agent.id.slice(0, 8)}-${agent.role?.name ?? 'unknown'}.md`;
       const filepath = join(sessionDir, 'agents', filename);
       writeFileSync(filepath, this.buildAgentMd(agent));
@@ -98,7 +98,7 @@ export class SessionExporter {
 
     // 3. timeline.json
     const timelinePath = join(sessionDir, 'timeline.json');
-    const sortedEvents = [...teamEvents].sort(
+    const sortedEvents = [...crewEvents].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
     writeFileSync(timelinePath, JSON.stringify(sortedEvents, null, 2));
@@ -132,7 +132,7 @@ export class SessionExporter {
     }
 
     // 8. metadata.json
-    const timestamps = teamEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
+    const timestamps = crewEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
     const startTime = timestamps.length > 0 ? new Date(safeMin(timestamps)).toISOString() : new Date().toISOString();
 
     const metadata: ExportMetadata = {
@@ -142,9 +142,9 @@ export class SessionExporter {
       durationMs: timestamps.length > 1
         ? safeMax(timestamps) - safeMin(timestamps)
         : 0,
-      agentCount: teamAgents.length,
+      agentCount: crewAgents.length,
       commitCount: commits.length,
-      eventCount: teamEvents.length,
+      eventCount: crewEvents.length,
       decisionCount: decisions.length,
       groupCount: groups.length,
       dagTaskCount: dagTasks.length,
@@ -153,13 +153,13 @@ export class SessionExporter {
     writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
     files.push('metadata.json');
 
-    logger.info('export', `Session exported: ${sessionDir} (${files.length} files, ${teamAgents.length} agents, ${teamEvents.length} events)`);
+    logger.info('export', `Session exported: ${sessionDir} (${files.length} files, ${crewAgents.length} agents, ${crewEvents.length} events)`);
 
     return {
       outputDir: sessionDir,
       files,
-      agentCount: teamAgents.length,
-      eventCount: teamEvents.length,
+      agentCount: crewAgents.length,
+      eventCount: crewEvents.length,
     };
   }
 

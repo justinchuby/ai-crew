@@ -59,7 +59,7 @@ export type {
   SharedEntry,
   ShareResult,
   SharedQueryOptions,
-  TeamInsight,
+  CrewInsight,
   ContributorStats,
   SharedMemoryListener,
 } from './SharedMemory.js';

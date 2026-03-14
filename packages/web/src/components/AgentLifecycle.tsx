@@ -14,7 +14,7 @@ import { shortAgentId } from '../utils/agentLabel';
 
 interface Props {
   agentId: string;
-  teamId: string;
+  crewId: string;
   agent?: AgentHealthInfo;
   onClose: () => void;
   onActionComplete: () => void;
@@ -31,7 +31,7 @@ interface ConfirmState {
 
 // ── Component ───────────────────────────────────────────────────────
 
-export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComplete }: Props) {
+export function AgentLifecycle({ agentId, crewId, agent, onClose, onActionComplete }: Props) {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -41,12 +41,12 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
     setResult(null);
 
     try {
-      const encodedTeam = encodeURIComponent(teamId);
+      const encodedCrew = encodeURIComponent(crewId);
       const encodedAgent = encodeURIComponent(agentId);
 
       switch (action) {
         case 'clone': {
-          const data = await apiFetch(`/teams/${encodedTeam}/agents/${encodedAgent}/clone`, {
+          const data = await apiFetch(`/crews/${encodedCrew}/agents/${encodedAgent}/clone`, {
             method: 'POST',
           });
           setResult({ ok: true, message: `Agent cloned: ${data.clone?.agentId ? shortAgentId(data.clone.agentId) : 'new agent'}` });
@@ -66,7 +66,7 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
       setLoading(false);
       setConfirm(null);
     }
-  }, [agentId, teamId, onActionComplete]);
+  }, [agentId, crewId, onActionComplete]);
 
   const requestAction = useCallback((action: ActionType) => {
     const configs: Record<ActionType, ConfirmState> = {

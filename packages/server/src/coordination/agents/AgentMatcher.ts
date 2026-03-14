@@ -34,12 +34,12 @@ export class AgentMatcher {
    */
   match(leadId: string, query: MatchQuery): MatchScore[] {
     const allAgents = this.agentManager.getAll();
-    const teamAgents = allAgents.filter(a => {
+    const crewAgents = allAgents.filter(a => {
       const agentLeadId = a.parentId || a.id;
       return agentLeadId === leadId && !isTerminalStatus(a.status);
     });
 
-    const scores: MatchScore[] = teamAgents.map(agent => {
+    const scores: MatchScore[] = crewAgents.map(agent => {
       let score = 0;
       const reasons: string[] = [];
 

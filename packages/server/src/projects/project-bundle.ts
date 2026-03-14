@@ -12,7 +12,7 @@
  *   training         — corrections and feedback
  */
 import { createHash } from 'node:crypto';
-import type { KnowledgeCategory, KnowledgeExport, CorrectionExport, FeedbackExport } from '../teams/bundle-format.js';
+import type { KnowledgeCategory, KnowledgeExport, CorrectionExport, FeedbackExport } from '../crew/bundle-format.js';
 
 export { type KnowledgeCategory, type KnowledgeExport, type CorrectionExport, type FeedbackExport };
 

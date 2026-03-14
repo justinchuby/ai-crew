@@ -51,7 +51,7 @@ describe('ProjectRegistry', () => {
     });
 
     it('filters by status', () => {
-      const p1 = registry.create('Active');
+      const _p1 = registry.create('Active');
       const p2 = registry.create('Archived');
       registry.update(p2.id, { status: 'archived' });
 
@@ -152,70 +152,6 @@ describe('ProjectRegistry', () => {
     });
   });
 
-  describe('getResumableSessions', () => {
-    it('returns empty when no sessions exist', () => {
-      expect(registry.getResumableSessions()).toEqual([]);
-    });
-
-    it('excludes active sessions', () => {
-      const project = registry.create('Active Test');
-      registry.startSession(project.id, 'lead-r1', 'Some task');
-      registry.setSessionId('lead-r1', 'copilot-session-1');
-      // Session is still active → not resumable
-      expect(registry.getResumableSessions()).toEqual([]);
-    });
-
-    it('excludes sessions without a Copilot sessionId', () => {
-      const project = registry.create('No SessionId');
-      registry.startSession(project.id, 'lead-r2', 'Some task');
-      registry.endSession('lead-r2', 'completed');
-      // Session ended but has no sessionId → not resumable
-      expect(registry.getResumableSessions()).toEqual([]);
-    });
-
-    it('returns completed sessions with sessionId', () => {
-      const project = registry.create('Resumable Test');
-      registry.startSession(project.id, 'lead-r3', 'Build feature X');
-      registry.setSessionId('lead-r3', 'copilot-session-abc');
-      registry.endSession('lead-r3', 'completed');
-
-      const resumable = registry.getResumableSessions();
-      expect(resumable).toHaveLength(1);
-      expect(resumable[0].sessionId).toBe('copilot-session-abc');
-      expect(resumable[0].task).toBe('Build feature X');
-      expect(resumable[0].status).toBe('completed');
-      expect(resumable[0].projectName).toBe('Resumable Test');
-    });
-
-    it('returns crashed sessions with sessionId', () => {
-      const project = registry.create('Crashed Test');
-      registry.startSession(project.id, 'lead-r4', 'Risky task');
-      registry.setSessionId('lead-r4', 'copilot-session-def');
-      registry.endSession('lead-r4', 'crashed');
-
-      const resumable = registry.getResumableSessions();
-      expect(resumable).toHaveLength(1);
-      expect(resumable[0].status).toBe('crashed');
-    });
-
-    it('orders by most recent first', () => {
-      const project = registry.create('Order Test');
-      registry.startSession(project.id, 'lead-r5', 'First');
-      registry.setSessionId('lead-r5', 'session-1');
-      registry.endSession('lead-r5', 'completed');
-
-      registry.startSession(project.id, 'lead-r6', 'Second');
-      registry.setSessionId('lead-r6', 'session-2');
-      registry.endSession('lead-r6', 'completed');
-
-      const resumable = registry.getResumableSessions();
-      expect(resumable).toHaveLength(2);
-      const ids = resumable.map((s) => s.sessionId);
-      expect(ids).toContain('session-1');
-      expect(ids).toContain('session-2');
-    });
-  });
-
   describe('getSessionById', () => {
     it('returns a session by row ID', () => {
       const project = registry.create('Row ID Test');
@@ -266,7 +202,7 @@ describe('ProjectRegistry', () => {
       registry.endSession('lead-1', 'completed');
 
       const sessions = registry.getSessions(project.id);
-      const oldStart = sessions[0].startedAt;
+      const _oldStart = sessions[0].startedAt;
       expect(sessions[0].endedAt).not.toBeNull();
 
       registry.claimSessionForResume(sessions[0].id);

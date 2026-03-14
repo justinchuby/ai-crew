@@ -1,4 +1,5 @@
-import { Send, Clock, ChevronUp, ChevronDown, X, Loader2, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { Send, Clock, ChevronUp, ChevronDown, X, Loader2, Zap, Megaphone } from 'lucide-react';
 import type { AcpTextChunk } from '../../types';
 import type { Attachment } from '../../hooks/useAttachments';
 import { AttachmentBar } from '../AttachmentBar';
@@ -12,7 +13,7 @@ interface InputComposerProps {
   messages: AcpTextChunk[];
   attachments: Attachment[];
   onRemoveAttachment: (id: string) => void;
-  onSendMessage: (mode: 'queue' | 'interrupt') => void;
+  onSendMessage: (mode: 'queue' | 'interrupt', opts: { broadcast: boolean }) => void;
   onRemoveQueuedMessage: (index: number) => void;
   onReorderQueuedMessage: (from: number, to: number) => void;
 }
@@ -29,6 +30,8 @@ export function InputComposer({
   onRemoveQueuedMessage,
   onReorderQueuedMessage,
 }: InputComposerProps) {
+  const [broadcast, setBroadcast] = useState(false);
+
   return (
     <>
       {messages.some((m) => m.queued) && (
@@ -67,8 +70,11 @@ export function InputComposer({
       )}
 
       <div className="border-t border-th-border p-3">
+        {broadcast && (
+          <div className="text-xs text-accent mb-1 px-1">Broadcasting to all agents</div>
+        )}
         <AttachmentBar attachments={attachments} onRemove={onRemoveAttachment} />
-        <div className="flex gap-2 items-end relative rounded transition-all">
+        <div className="flex gap-2 items-end relative rounded-lg transition-all">
           <textarea
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
@@ -76,11 +82,11 @@ export function InputComposer({
               if (e.nativeEvent.isComposing) return;
               if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
-                onSendMessage('queue');
+                onSendMessage('queue', { broadcast });
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 if (input.trim()) {
-                  onSendMessage('interrupt');
+                  onSendMessage('interrupt', { broadcast });
                 } else if (selectedLeadId) {
                   apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
                 }
@@ -94,19 +100,41 @@ export function InputComposer({
               el.style.height = 'auto';
               el.style.height = Math.min(el.scrollHeight, 150) + 'px';
             }}
-            className="flex-1 bg-th-bg-alt border border-th-border rounded px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
+            className={`flex-1 bg-th-bg-alt border rounded-lg px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-accent disabled:opacity-50 resize-none overflow-y-auto ${broadcast ? 'border-accent' : 'border-th-border'}`}
             style={{ maxHeight: 150 }}
           />
-          <div className="flex flex-col gap-1 shrink-0">
-            <button type="button" onClick={() => onSendMessage('queue')} disabled={!isActive || !input.trim()} title="Send (queued) — Enter" className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1">
-              <Send className="w-3.5 h-3.5" />
-              Queue
-            </button>
-            <button type="button" onClick={() => { if (input.trim()) { onSendMessage('interrupt'); } else if (selectedLeadId) { apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' }); } }} disabled={!isActive} title="Interrupt agent (Ctrl+Enter)" className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5" />
-              Interrupt
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setBroadcast(!broadcast)}
+            className={`p-2 rounded-lg transition-colors ${broadcast ? 'text-accent bg-accent/10' : 'text-th-text-muted hover:text-th-text'}`}
+            title="Broadcast to all agents"
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (input.trim()) {
+                onSendMessage('interrupt', { broadcast });
+              } else if (selectedLeadId) {
+                apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
+              }
+            }}
+            disabled={!isActive}
+            title="Interrupt agent (Ctrl+Enter)"
+            className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Zap className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSendMessage('queue', { broadcast })}
+            disabled={!isActive || !input.trim()}
+            title="Queue message (Enter)"
+            className="p-2 bg-accent text-black rounded-lg hover:bg-accent-muted transition-colors disabled:opacity-50"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </>

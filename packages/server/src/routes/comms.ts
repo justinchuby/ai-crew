@@ -44,8 +44,8 @@ export function commsRoutes(ctx: AppContext): Router {
   const { agentManager, activityLedger } = ctx;
   const router = Router();
 
-  /** Resolve team agent IDs for a lead */
-  function getTeamIds(leadId: string): Set<string> {
+  /** Resolve crew agent IDs for a lead */
+  function getCrewIds(leadId: string): Set<string> {
     const ids = new Set<string>();
     ids.add(leadId);
     for (const agent of agentManager.getAll()) {
@@ -56,15 +56,15 @@ export function commsRoutes(ctx: AppContext): Router {
     return ids;
   }
 
-  /** Filter activity entries to comm events for a team */
+  /** Filter activity entries to comm events for a crew */
   function getCommEvents(leadId: string, since?: string, types?: string[]): ActivityEntry[] {
-    const teamIds = getTeamIds(leadId);
+    const crewIds = getCrewIds(leadId);
     const events = since
       ? activityLedger.getSince(since)
       : activityLedger.getRecent(10_000);
 
     return events.filter(e => {
-      if (!teamIds.has(e.agentId)) return false;
+      if (!crewIds.has(e.agentId)) return false;
       if (!COMM_ACTION_TYPES.includes(e.actionType)) return false;
       if (types && types.length > 0) {
         const commType = ACTION_TO_COMM_TYPE[e.actionType];
@@ -85,11 +85,11 @@ export function commsRoutes(ctx: AppContext): Router {
 
       const events = getCommEvents(leadId, since, types);
 
-      // Build nodes from team agents
-      const teamIds = getTeamIds(leadId);
+      // Build nodes from crew agents
+      const crewIds = getCrewIds(leadId);
       const nodes: FlowNode[] = [];
       for (const agent of agentManager.getAll()) {
-        if (teamIds.has(agent.id)) {
+        if (crewIds.has(agent.id)) {
           nodes.push({
             id: agent.id,
             role: agent.role?.name ?? agent.role?.id ?? 'unknown',

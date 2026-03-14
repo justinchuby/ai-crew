@@ -255,28 +255,48 @@ export function leadRoutes(ctx: AppContext): Router {
   router.get('/costs/by-agent', (req, res) => {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
-    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
-    res.json(tracker.getAgentCosts(projectId));
+    try {
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+      res.json(tracker.getAgentCosts(projectId));
+    } catch (err) {
+      logger.error({ module: 'costs', msg: 'Failed to get agent costs', err: (err as Error).message });
+      res.status(500).json({ error: 'Failed to retrieve agent cost data' });
+    }
   });
 
   router.get('/costs/by-task', (req, res) => {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
-    const leadId = typeof req.query.leadId === 'string' ? req.query.leadId : undefined;
-    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
-    res.json(tracker.getTaskCosts(leadId, projectId));
+    try {
+      const leadId = typeof req.query.leadId === 'string' ? req.query.leadId : undefined;
+      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+      res.json(tracker.getTaskCosts(leadId, projectId));
+    } catch (err) {
+      logger.error({ module: 'costs', msg: 'Failed to get task costs', err: (err as Error).message });
+      res.status(500).json({ error: 'Failed to retrieve task cost data' });
+    }
   });
 
   router.get('/costs/agent/:agentId', (req, res) => {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
-    res.json(tracker.getAgentTaskCosts(req.params.agentId));
+    try {
+      res.json(tracker.getAgentTaskCosts(req.params.agentId));
+    } catch (err) {
+      logger.error({ module: 'costs', msg: 'Failed to get agent task costs', agentId: req.params.agentId, err: (err as Error).message });
+      res.status(500).json({ error: 'Failed to retrieve agent task cost data' });
+    }
   });
 
   router.get('/costs/by-project', (_req, res) => {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
-    res.json(tracker.getProjectCosts());
+    try {
+      res.json(tracker.getProjectCosts());
+    } catch (err) {
+      logger.error({ module: 'costs', msg: 'Failed to get project costs', err: (err as Error).message });
+      res.status(500).json({ error: 'Failed to retrieve project cost data' });
+    }
   });
 
   router.get('/costs/by-session', (req, res) => {
@@ -284,7 +304,12 @@ export function leadRoutes(ctx: AppContext): Router {
     if (!tracker) return res.json([]);
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
     if (!projectId) return res.status(400).json({ error: 'projectId query parameter is required' });
-    res.json(tracker.getSessionCosts(projectId));
+    try {
+      res.json(tracker.getSessionCosts(projectId));
+    } catch (err) {
+      logger.error({ module: 'costs', msg: 'Failed to get session costs', projectId, err: (err as Error).message });
+      res.status(500).json({ error: 'Failed to retrieve session cost data' });
+    }
   });
 
   // --- Timers ---

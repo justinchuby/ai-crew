@@ -127,7 +127,7 @@ describe('AgentDetailPanel', () => {
     expect(overlay).not.toBeInTheDocument();
   });
 
-  it('returns null when agent not found and no teamId', () => {
+  it('returns null when agent not found and no crewId', () => {
     mockAgents = [];
     const { container } = render(
       <AgentDetailPanel agentId="nonexistent" mode="modal" onClose={onClose} />,
@@ -327,9 +327,9 @@ describe('AgentDetailPanel', () => {
     expect(screen.getByText('No activity yet for this agent')).toBeInTheDocument();
   });
 
-  // ── Profile data (teamId present) ─────────────────────────
+  // ── Profile data (crewId present) ─────────────────────────
 
-  it('fetches profile when teamId is provided', async () => {
+  it('fetches profile when crewId is provided', async () => {
     mockAgents = [makeAgent()];
     mockApiFetch.mockResolvedValueOnce({
       agentId: mockAgents[0].id,
@@ -337,7 +337,7 @@ describe('AgentDetailPanel', () => {
       model: 'claude-sonnet-4',
       status: 'running',
       liveStatus: 'running',
-      teamId: 'team-1',
+      crewId: 'crew-1',
       projectId: 'proj-abc',
       lastTaskSummary: null,
       createdAt: '2026-01-01T00:00:00Z',
@@ -348,11 +348,11 @@ describe('AgentDetailPanel', () => {
 
     await act(async () => {
       render(
-        <AgentDetailPanel agentId={mockAgents[0].id} teamId="team-1" mode="inline" onClose={onClose} />,
+        <AgentDetailPanel agentId={mockAgents[0].id} crewId="crew-1" mode="inline" onClose={onClose} />,
       );
     });
 
-    expect(mockApiFetch).toHaveBeenCalledWith('/teams/team-1/agents/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/profile');
+    expect(mockApiFetch).toHaveBeenCalledWith('/crews/crew-1/agents/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/profile');
     // Profile data should be rendered
     expect(screen.getByText('proj-abc')).toBeInTheDocument();
     expect(screen.getByText('5 entries')).toBeInTheDocument();

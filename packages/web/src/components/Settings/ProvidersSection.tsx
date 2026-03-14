@@ -6,15 +6,16 @@
  * 2. Status (installed, authenticated, version) loads progressively — badges fill in
  *
  * Includes per-provider configuration: binary override, default model,
- * required environment variables, and default CLI arguments.
+ * authentication guidance, and default CLI arguments.
  * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Key, Settings2, GripVertical } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { getProvider } from '@flightdeck/shared';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
@@ -54,81 +55,7 @@ interface TestResult {
 }
 
 // ── Provider display metadata ───────────────────────────────────────
-
-const PROVIDER_ICONS: Record<string, string> = {
-  copilot: '🐙',
-  claude: '🟠',
-  gemini: '💎',
-  opencode: '🔓',
-  cursor: '↗️',
-  codex: '🤖',
-};
-
-const PROVIDER_AUTH_LABELS: Record<string, string> = {
-  copilot: 'Authenticated via GitHub',
-  claude: 'Authenticated via Anthropic API key',
-  gemini: 'Authenticated via Google',
-  opencode: 'Manages own keys',
-  cursor: 'Authenticated via Cursor',
-  codex: 'Authenticated via OpenAI',
-};
-
-interface ProviderLink {
-  label: string;
-  url: string;
-}
-
-const PROVIDER_LINKS: Record<string, ProviderLink[]> = {
-  copilot: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
-  claude: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
-  gemini: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
-  opencode: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
-  cursor: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],
-  codex: [
-    { label: 'ACP adapter', url: 'https://github.com/zed-industries/codex-acp' },
-    { label: 'CLI quickstart', url: 'https://developers.openai.com/codex/quickstart/?setup=cli' },
-  ],
-};
-
-/** Default CLI arguments per provider (mirrors server presets.ts). */
-const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: ['--acp', '--stdio'],
-  claude: [],
-  gemini: ['--acp'],
-  cursor: ['acp'],
-  codex: [],
-  opencode: ['acp'],
-};
-
-/** Required environment variables per provider. */
-const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
-  copilot: [],
-  claude: ['ANTHROPIC_API_KEY'],
-  gemini: ['GEMINI_API_KEY'],
-  cursor: ['CURSOR_API_KEY'],
-  codex: ['OPENAI_API_KEY'],
-  opencode: [],
-};
-
-/** Whether the provider supports session resume. */
-const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
-  copilot: true,
-  claude: true,
-  gemini: true,
-  cursor: true,
-  codex: false,
-  opencode: true,
-};
-
-/** Whether the provider is in preview (not production-ready). Copilot is GA. */
-const PROVIDER_PREVIEW: Record<string, boolean> = {
-  copilot: false,
-  claude: true,
-  gemini: true,
-  cursor: true,
-  codex: false,
-  opencode: true,
-};
+// All metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
 
 /** Small pill badge for preview providers. */
 function PreviewBadge() {
@@ -196,12 +123,13 @@ function ProviderCard({
     }
   }, [provider.id]);
 
-  const icon = PROVIDER_ICONS[provider.id] ?? '🔌';
-  const links = PROVIDER_LINKS[provider.id] ?? [];
-  const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
-  const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
-  const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
-  const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
+  const providerDef = getProvider(provider.id);
+  const icon = providerDef?.icon ?? '🔌';
+  const links = providerDef?.setupLinks ?? [];
+  const authLabel = providerDef?.authLabel ?? 'Provider-managed auth';
+  const defaultArgs = providerDef?.args ?? [];
+  const loginLabel = providerDef?.loginInstructions ?? 'Log in via the provider CLI';
+  const supportsResume = providerDef?.supportsResume ?? false;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -245,7 +173,7 @@ function ProviderCard({
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-th-text-muted w-4 text-center">{rank}</span>
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
-            {PROVIDER_PREVIEW[provider.id] && <PreviewBadge />}
+            {providerDef?.isPreview && <PreviewBadge />}
             {statusLoading ? <StatusBadgeSkeleton /> : <StatusBadge {...providerStatusProps(provider)} />}
           </div>
           <div className="text-xs text-th-text-muted">
@@ -318,25 +246,11 @@ function ProviderCard({
             </div>
           </div>
 
-          {/* Required Environment Variables */}
-          {requiredEnv.length > 0 && (
-            <div className="bg-th-bg-alt border border-th-border rounded-md p-2.5 text-xs">
-              <span className="text-th-text-muted flex items-center gap-1 mb-1.5">
-                <Key className="w-3 h-3" /> Required Environment Variables
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {requiredEnv.map((envVar) => (
-                  <code
-                    key={envVar}
-                    className="px-2 py-0.5 bg-th-bg rounded-md text-th-text-alt font-mono"
-                  >
-                    {envVar}
-                  </code>
-                ))}
-              </div>
-              <p className="text-th-text-muted mt-1.5">
-                Set these in your shell environment or <code className="text-th-text-muted">flightdeck.config.yaml</code> under <code className="text-th-text-muted">provider.envOverride</code>.
-              </p>
+          {/* Authentication info */}
+          {provider.authenticated === false && (
+            <div className="bg-th-bg-alt border border-th-border rounded-md p-2.5 text-xs flex items-center gap-2">
+              <LogIn className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="text-th-text-alt">{loginLabel}</span>
             </div>
           )}
 

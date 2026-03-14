@@ -1,12 +1,24 @@
-import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { projectsRoutes } from './projects.js';
 import type { AppContext } from './context.js';
+
+const mockStateDir = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs');
+  const { join } = require('node:path');
+  const { tmpdir } = require('node:os');
+  return mkdtempSync(join(tmpdir(), 'fd-test-state-'));
+});
+
+vi.mock('../config.js', async () => {
+  const actual = await vi.importActual<typeof import('../config.js')>('../config.js');
+  return { ...actual, FLIGHTDECK_STATE_DIR: mockStateDir };
+});
 
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -272,6 +284,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
         formatBriefing: vi.fn(),
         startSession: mockStartSession,
         reactivateSession: vi.fn(),
+        claimSessionForResume: vi.fn().mockReturnValue(true),
         getSessions: mockGetSessions,
       } as any,
       agentManager: {
@@ -311,7 +324,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     vi.useFakeTimers();
     mockSpawn.mockClear();
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-dev1', lastTaskSummary: 'build UI', metadata: { parentId: 'old-lead' } },
@@ -355,7 +368,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     vi.useFakeTimers();
     mockSpawn.mockClear();
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-d1', metadata: { parentId: 'old-lead' } },
@@ -378,13 +391,13 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     vi.useRealTimers();
   });
 
-  it('sends system message to lead about excluded agents when using selective resume', async () => {
+  it('does not send system messages to lead during selective resume', async () => {
     vi.useFakeTimers();
     mockSpawn.mockClear();
     const fakeAgent = makeFakeAgent('old-lead');
     mockSpawn.mockReturnValue(fakeAgent);
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-d1', metadata: { parentId: 'old-lead' } },
@@ -401,18 +414,15 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     const body = await res.json();
     expect(body.respawning).toBe(1);
 
-    // Advance past the team message delay (2.5s)
+    // Advance past any potential message delays
     await vi.advanceTimersByTimeAsync(3000);
 
-    // Lead should receive a system message about excluded agents
+    // During resume, NO system messages should be sent — agents pick up context from ACP session
     const sendMessageCalls = fakeAgent.sendMessage.mock.calls;
     const exclusionMsg = sendMessageCalls.find(
       (call: string[]) => call[0].includes('Resume Agent Selection')
     );
-    expect(exclusionMsg).toBeDefined();
-    expect(exclusionMsg![0]).toContain('Excluded by user: code-reviewer, architect');
-    expect(exclusionMsg![0]).toContain('Resumed: developer');
-    expect(exclusionMsg![0]).toContain('Do NOT re-create');
+    expect(exclusionMsg).toBeUndefined();
 
     vi.useRealTimers();
   });
@@ -496,5 +506,190 @@ describe('GET /projects/:id/files — rejects symlinks resolving outside project
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toBe('Path outside project directory');
+  });
+});
+
+// ── Artifact contents endpoint ─────────────────────────────────────
+
+describe('GET /projects/:id/artifact-contents', () => {
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+
+  beforeAll(async () => {
+    // Create artifact file structure under mockStateDir
+    const sessionsDir = join(mockStateDir, 'artifacts', 'test-proj', 'sessions');
+    const agentDir = join(sessionsDir, 'lead-abc123', 'architect-def456');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'report.md'), '# Artifact Report\nTest content');
+
+    const mockRegistry = {
+      get: vi.fn().mockReturnValue({
+        id: 'test-proj',
+        name: 'Test Project',
+        cwd: '/tmp/fake',
+        status: 'active',
+      }),
+    } as any;
+
+    const srv = createTestServer({ projectRegistry: mockRegistry });
+    baseUrl = await srv.start();
+    stop = srv.stop;
+  });
+
+  afterAll(async () => {
+    await stop?.();
+  });
+
+  it('serves artifact file content', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=lead-abc123/architect-def456/report.md`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.content).toContain('# Artifact Report');
+    expect(body.ext).toBe('md');
+    expect(body.size).toBeGreaterThan(0);
+  });
+
+  it('returns 404 for non-existent artifact', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=lead-abc123/architect-def456/missing.md`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects path traversal attempts', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents?path=../../../etc/passwd`,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid path');
+  });
+
+  it('rejects missing path parameter', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/artifact-contents`,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 for unknown project', async () => {
+    const mockRegistry = { get: vi.fn().mockReturnValue(undefined) } as any;
+    const srv = createTestServer({ projectRegistry: mockRegistry });
+    const url = await srv.start();
+    const res = await fetch(`${url}/projects/unknown/artifact-contents?path=foo/bar.md`);
+    expect(res.status).toBe(404);
+    await srv.stop();
+  });
+});
+
+// ── Session artifact endpoint ──────────────────────────────────────
+
+describe('GET /projects/:id/session-artifact', () => {
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+  let copilotSessionDir: string;
+
+  beforeAll(async () => {
+    // Create a fake Copilot session dir structure
+    const sessionId = 'test-session-uuid-1234';
+    copilotSessionDir = join(homedir(), '.copilot', 'session-state', sessionId);
+    mkdirSync(copilotSessionDir, { recursive: true });
+    writeFileSync(join(copilotSessionDir, 'plan.md'), '# My Plan\nStep 1: do things');
+    mkdirSync(join(copilotSessionDir, 'checkpoints'), { recursive: true });
+    writeFileSync(join(copilotSessionDir, 'checkpoints', '001-setup.md'), '# Setup Complete');
+    // Sensitive file that should NOT be served
+    writeFileSync(join(copilotSessionDir, 'events.jsonl'), '{"type":"message"}');
+    writeFileSync(join(copilotSessionDir, 'workspace.yaml'), 'id: test');
+
+    const mockRegistry = {
+      get: vi.fn().mockReturnValue({ id: 'test-proj', name: 'Test', cwd: '/tmp/fake', status: 'active' }),
+    } as any;
+
+    const mockRoster = {
+      getAgent: vi.fn().mockImplementation((id: string) => {
+        if (id === 'agent-abc12345') {
+          return { agentId: 'agent-abc12345', sessionId, projectId: 'test-proj', role: 'architect' };
+        }
+        if (id === 'agent-other-proj') {
+          return { agentId: 'agent-other-proj', sessionId, projectId: 'other-proj', role: 'developer' };
+        }
+        return undefined;
+      }),
+      getByProject: vi.fn().mockReturnValue([]),
+    } as any;
+
+    const srv = createTestServer({ projectRegistry: mockRegistry, agentRoster: mockRoster });
+    baseUrl = await srv.start();
+    stop = srv.stop;
+  });
+
+  afterAll(async () => {
+    await stop?.();
+    rmSync(copilotSessionDir, { recursive: true, force: true });
+  });
+
+  it('serves plan.md from Copilot session', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-abc12345&path=plan.md`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.content).toContain('# My Plan');
+    expect(body.ext).toBe('md');
+  });
+
+  it('serves checkpoint files', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-abc12345&path=checkpoints/001-setup.md`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.content).toContain('# Setup Complete');
+  });
+
+  it('blocks access to events.jsonl (not in allowlist)', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-abc12345&path=events.jsonl`,
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe('File not accessible');
+  });
+
+  it('blocks access to workspace.yaml (not in allowlist)', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-abc12345&path=workspace.yaml`,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('blocks cross-project access', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-other-proj&path=plan.md`,
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe('Agent not in this project');
+  });
+
+  it('rejects path traversal', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=agent-abc12345&path=../../../etc/passwd`,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for missing parameters', async () => {
+    const res = await fetch(`${baseUrl}/projects/test-proj/session-artifact`);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 for unknown agent', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/session-artifact?agentId=nonexistent&path=plan.md`,
+    );
+    expect(res.status).toBe(404);
   });
 });

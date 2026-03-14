@@ -26,9 +26,9 @@ import { sessionStatusDot } from '../../utils/statusColors';
 import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
-import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
+import { StatusBadge, agentStatusProps } from '../ui/StatusBadge';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
-import { useAppStore } from '../../stores/appStore';
+
 import { AgentDetailPanel } from '../AgentDetailPanel';
 import { shortAgentId } from '../../utils/agentLabel';
 
@@ -38,7 +38,7 @@ type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
 type StatusFilter = RosterStatus | 'all' | 'active';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 
-interface RosterAgent {
+export interface RosterAgent {
   agentId: string;
   role: string;
   model: string;
@@ -60,8 +60,8 @@ interface RosterAgent {
   outputPreview: string | null;
 }
 
-interface TeamInfo {
-  teamId: string;
+interface CrewInfo {
+  crewId: string;
   agentCount: number;
   roles: string[];
 }
@@ -104,10 +104,11 @@ function formatDuration(ms: number): string {
 
 // ── Crew Group (collapsible) ──────────────────────────────
 
-function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew, onRemoveAgent }: {
+function CrewGroup({ leadId, agents, summary, statusFilter, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew, onRemoveAgent }: {
   leadId: string;
   agents: RosterAgent[];
   summary: CrewSummary | null;
+  statusFilter?: StatusFilter;
   defaultExpanded?: boolean;
   onSelectAgent: (id: string) => void;
   selectedAgentId: string | null;
@@ -141,6 +142,13 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
     if (aIsLead !== bIsLead) return aIsLead - bIsLead;
     return a.role.localeCompare(b.role);
   });
+
+  // Apply status filter to agent rows (crew header always shows)
+  const visibleAgents = statusFilter === 'active'
+    ? sorted.filter(a => a.status !== 'terminated' && a.status !== 'failed')
+    : statusFilter && statusFilter !== 'all'
+      ? sorted.filter(a => a.status === statusFilter)
+      : sorted;
 
   const lead = sorted.find(a => a.agentId === leadId || a.role === 'lead');
   const activeCount = summary?.activeAgentCount ?? agents.filter(a =>
@@ -226,7 +234,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
 
       {expanded && (
         <div className="border-t border-th-border/50 divide-y divide-th-border/30">
-          {sorted.map(agent => (
+          {visibleAgents.length > 0 ? visibleAgents.map(agent => (
             <AgentRow
               key={agent.agentId}
               agent={agent}
@@ -236,7 +244,11 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
               onRemove={onRemoveAgent}
               crewAgents={agents}
             />
-          ))}
+          )) : (
+            <div className="px-4 py-3 text-xs text-th-text-muted text-center">
+              {agents.length} agent{agents.length !== 1 ? 's' : ''} hidden by filter
+            </div>
+          )}
         </div>
       )}
 
@@ -407,18 +419,16 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
-function HealthStrip({ teamId: _teamId }: { teamId: string }) {
+export function HealthStrip({ agents }: { agents: RosterAgent[] }) {
   const [expanded, setExpanded] = useState(false);
-  const liveAgents = useAppStore(s => s.agents);
 
-  // Derive counts from live agent data (same source as StatusPopover)
   const statusCounts = useMemo(() => {
-    const running = liveAgents.filter(a => a.status === 'running' || a.status === 'creating').length;
-    const idle = liveAgents.filter(a => a.status === 'idle').length;
-    const completed = liveAgents.filter(a => a.status === 'completed' || a.status === 'terminated').length;
-    const failed = liveAgents.filter(a => a.status === 'failed').length;
-    return { running, idle, completed, failed, total: liveAgents.length };
-  }, [liveAgents]);
+    const running = agents.filter(a => a.liveStatus === 'running' || a.liveStatus === 'creating').length;
+    const idle = agents.filter(a => a.liveStatus === 'idle').length;
+    const completed = agents.filter(a => a.liveStatus === 'completed' || a.liveStatus === 'terminated').length;
+    const failed = agents.filter(a => a.liveStatus === 'failed').length;
+    return { running, idle, completed, failed, total: agents.length };
+  }, [agents]);
 
   return (
     <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
@@ -481,26 +491,27 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const contextProjectId = useOptionalProjectId();
   const projectId = scope === 'project' ? contextProjectId : null;
 
-  const selectedAgentTeamId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
+  const selectedAgentCrewId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
 
   const fetchAll = useCallback(async () => {
     try {
       setError(null);
       setLoading(true);
 
-      const [summaryResult, teamsResult] = await Promise.allSettled([
-        apiFetch<CrewSummary[]>('/crews/summary'),
-        apiFetch<{ teams: TeamInfo[] }>('/teams'),
+      // Pass projectId to server so it queries roster directly (includes history)
+      const pq = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      const [summaryResult, crewsResult] = await Promise.allSettled([
+        apiFetch<CrewSummary[]>(`/crews/summary${pq}`),
+        apiFetch<{ crews: CrewInfo[] }>(`/crews${pq}`),
       ]);
 
       const summaries = summaryResult.status === 'fulfilled' && Array.isArray(summaryResult.value)
         ? summaryResult.value : [];
       setCrewSummaries(summaries);
 
-      const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
-      const statusQ = statusFilter !== 'all' && statusFilter !== 'active' ? `?status=${statusFilter}` : '';
+      const crewList = crewsResult.status === 'fulfilled' ? (crewsResult.value.crews ?? []) : [];
       const agentResults = await Promise.allSettled(
-        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${statusQ}`))
+        crewList.map(t => apiFetch<RosterAgent[]>(`/crews/${t.crewId}/agents${pq}`))
       );
 
       const allAgents: RosterAgent[] = [];
@@ -518,32 +529,21 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         throw new Error(firstFail?.reason?.message ?? 'Failed to fetch agents');
       }
 
-      // Filter to project scope if needed
-      if (projectId) {
-        const projectLeadIds = new Set(summaries.filter(s => s.projectId === projectId).map(s => s.leadId));
-        const filtered = allAgents.filter(a => {
-          if (a.projectId === projectId) return true;
-          if (projectLeadIds.has(a.agentId)) return true;
-          if (a.parentId && projectLeadIds.has(a.parentId)) return true;
-          return false;
-        });
-        // 'active' filter: exclude terminated/failed agents for a cleaner default view
-        const activeFiltered = statusFilter === 'active'
-          ? filtered.filter(a => a.status !== 'terminated' && a.status !== 'failed')
-          : filtered;
-        setAgents(activeFiltered);
-      } else {
+      if (!projectId) {
         // Global scope: only show active agents
         const activeStatuses = new Set(['running', 'idle', 'creating']);
         const active = allAgents.filter(a => a.liveStatus && activeStatuses.has(a.liveStatus));
         setAgents(active);
+      } else {
+        // Project scope: server already filtered by projectId
+        setAgents(allAgents);
       }
     } catch (err: any) {
       setError(err.message ?? 'Failed to fetch crew roster');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, projectId]);
+  }, [projectId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -709,6 +709,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
               leadId={leadId}
               agents={groupAgents}
               summary={summaryMap.get(leadId) ?? null}
+              statusFilter={statusFilter}
               defaultExpanded
               onSelectAgent={setSelectedAgent}
               selectedAgentId={selectedAgent}
@@ -725,12 +726,12 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
             md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
             ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
             ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
-            md:self-start md:sticky md:top-0 md:max-h-full
+            md:self-start md:sticky md:top-0 md:max-h-screen
           `}
         >
           {selectedAgent && (
-            <div className="h-full overflow-y-auto">
-              <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
+            <div className="h-full md:max-h-screen overflow-y-auto">
+              <AgentDetailPanel agentId={selectedAgent} crewId={selectedAgentCrewId} mode="inline" onClose={() => setSelectedAgent(null)} />
             </div>
           )}
         </div>
@@ -738,7 +739,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
       {/* Health Strip (collapsed at bottom) */}
       <div className="mt-3 shrink-0">
-        <HealthStrip teamId="default" />
+        <HealthStrip agents={agents} />
       </div>
     </div>
   );

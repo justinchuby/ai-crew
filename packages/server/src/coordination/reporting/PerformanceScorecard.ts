@@ -66,7 +66,7 @@ export class PerformanceTracker {
   }
 
   /** Generate scorecards for all agents under a lead */
-  getTeamScorecards(leadId: string): AgentScorecard[] {
+  getCrewScorecards(leadId: string): AgentScorecard[] {
     const agents = this.agentManager.getAll().filter((a) => {
       const aLeadId = a.parentId || a.id;
       return aLeadId === leadId && !isTerminalStatus(a.status);
@@ -76,7 +76,7 @@ export class PerformanceTracker {
 
   /** Get leaderboard sorted by overall score */
   getLeaderboard(leadId: string): AgentScorecard[] {
-    return this.getTeamScorecards(leadId).sort((a, b) => b.overallScore - a.overallScore);
+    return this.getCrewScorecards(leadId).sort((a, b) => b.overallScore - a.overallScore);
   }
 
   private computeStats(events: ActivityEntry[], agent: any) {

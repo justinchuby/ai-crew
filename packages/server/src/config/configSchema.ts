@@ -7,7 +7,7 @@ import { PROVIDER_IDS } from '@flightdeck/shared';
 // ── Section schemas ────────────────────────────────────────
 
 const serverSchema = z.object({
-  maxConcurrentAgents: z.number().int().min(1).max(200).default(50),
+  maxConcurrentAgents: z.number().int().min(1).max(1000).default(50),
 });
 
 const heartbeatSchema = z.object({

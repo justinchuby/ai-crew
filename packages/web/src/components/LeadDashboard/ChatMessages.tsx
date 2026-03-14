@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { MentionText } from '../../utils/markdown';
-import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
+import { CollapsibleReasoningBlock, CollapsibleSystemBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { useAppStore } from '../../stores/appStore';
 import { hasUnclosedCommandBlock } from '../../utils/commandParser';
@@ -79,6 +79,11 @@ export function ChatMessages({
             if (sysText.startsWith('💬')) return null;
             if (sysText.startsWith('📢')) return null;
             if (sysText.startsWith('🗣️')) return null;
+
+            if (sysText.length > 200) {
+              return <CollapsibleSystemBlock key={i} text={msg.text} timestamp={ts} />;
+            }
+
             return (
               <div key={i} className="flex justify-center py-1">
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-th-bg-alt/60 border border-th-border/50 text-xs font-mono text-th-text-muted">

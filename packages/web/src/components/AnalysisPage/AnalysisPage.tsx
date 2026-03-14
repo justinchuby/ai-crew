@@ -76,65 +76,69 @@ export function AnalysisPage() {
 
       const currentAgents = agents.length > 0 ? agents : resolvedAgents;
       if (mountedRef.current) {
+        const fPoints: FlowPoint[] = [];
+        const cPoints: CostPoint[] = [];
+
         if (kf.length > 0) {
           setSessionStart(kf[0].timestamp);
-          const fPoints: FlowPoint[] = [];
-          const cPoints: CostPoint[] = [];
+        }
 
-          // Prefer live agent token counts; fall back to persisted DB totals for inactive sessions
-          let totalInput = currentAgents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
-          let totalOutput = currentAgents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
+        // Prefer live agent token counts; fall back to persisted DB totals for inactive sessions
+        let totalInput = currentAgents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
+        let totalOutput = currentAgents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
 
-          if (totalInput + totalOutput === 0) {
-            try {
-              const costsByAgent = await apiFetch<Array<{ totalInputTokens: number; totalOutputTokens: number }>>(
-                `/costs/by-agent?projectId=${effectiveId}`,
-              );
-              if (Array.isArray(costsByAgent)) {
-                totalInput = costsByAgent.reduce((s, c) => s + (c.totalInputTokens ?? 0), 0);
-                totalOutput = costsByAgent.reduce((s, c) => s + (c.totalOutputTokens ?? 0), 0);
-              }
-            } catch { /* costs API not available — stay at zero */ }
-          }
-
-          const realTokens = totalInput + totalOutput;
-
-          // Build task flow from DAG task timestamps instead of keyframe events.
-          // Each task has createdAt, startedAt?, completedAt? — these give us the real timeline.
-          const TERMINAL_STATES = new Set(['done', 'skipped', 'failed']);
-          if (dagTasks.length > 0) {
-            type TaskEvent = { time: number; kind: 'created' | 'started' | 'finished' };
-            const events: TaskEvent[] = [];
-            for (const task of dagTasks) {
-              if (task.createdAt) events.push({ time: new Date(task.createdAt).getTime(), kind: 'created' });
-              if (task.startedAt) events.push({ time: new Date(task.startedAt).getTime(), kind: 'started' });
-              if (task.completedAt && TERMINAL_STATES.has(task.dagStatus)) {
-                events.push({ time: new Date(task.completedAt).getTime(), kind: 'finished' });
-              }
+        if (totalInput + totalOutput === 0) {
+          try {
+            const costsByAgent = await apiFetch<Array<{ totalInputTokens: number; totalOutputTokens: number }>>(
+              `/costs/by-agent?projectId=${effectiveId}`,
+            );
+            if (Array.isArray(costsByAgent)) {
+              totalInput = costsByAgent.reduce((s, c) => s + (c.totalInputTokens ?? 0), 0);
+              totalOutput = costsByAgent.reduce((s, c) => s + (c.totalOutputTokens ?? 0), 0);
             }
-            events.sort((a, b) => a.time - b.time);
+          } catch { /* costs API not available — stay at zero */ }
+        }
 
-            let created = 0, active = 0, done = 0;
-            for (const ev of events) {
-              if (ev.kind === 'created') created++;
-              else if (ev.kind === 'started') active++;
-              else if (ev.kind === 'finished') { done++; active = Math.max(0, active - 1); }
-              created = Math.max(created, done);
-              fPoints.push({ time: ev.time, created, inProgress: active, completed: done });
-            }
-          } else {
-            // Fallback: no DAG tasks yet — derive from keyframes for backwards compat
-            let completed = 0, inProgress = 0, taskTotal = 0;
-            for (const frame of kf) {
-              const t = new Date(frame.timestamp).getTime();
-              if (frame.type === 'delegation' || frame.type === 'task') { taskTotal++; inProgress++; }
-              if (frame.type === 'milestone') { completed++; inProgress = Math.max(0, inProgress - 1); }
-              taskTotal = Math.max(taskTotal, completed);
-              fPoints.push({ time: t, created: taskTotal, inProgress, completed });
+        const realTokens = totalInput + totalOutput;
+
+        // Build task flow from DAG task timestamps instead of keyframe events.
+        // Each task has createdAt, startedAt?, completedAt? — these give us the real timeline.
+        const TERMINAL_STATES = new Set(['done', 'skipped', 'failed']);
+        if (dagTasks.length > 0) {
+          type TaskEvent = { time: number; kind: 'created' | 'started' | 'finished' };
+          const events: TaskEvent[] = [];
+          for (const task of dagTasks) {
+            if (task.createdAt) events.push({ time: new Date(task.createdAt).getTime(), kind: 'created' });
+            if (task.startedAt) events.push({ time: new Date(task.startedAt).getTime(), kind: 'started' });
+            if (task.completedAt && TERMINAL_STATES.has(task.dagStatus)) {
+              events.push({ time: new Date(task.completedAt).getTime(), kind: 'finished' });
             }
           }
+          events.sort((a, b) => a.time - b.time);
 
-          // Cost curve still uses keyframes for timeline distribution
+          let created = 0, active = 0, done = 0;
+          for (const ev of events) {
+            if (ev.kind === 'created') created++;
+            else if (ev.kind === 'started') active++;
+            else if (ev.kind === 'finished') { done++; active = Math.max(0, active - 1); }
+            created = Math.max(created, done);
+            fPoints.push({ time: ev.time, created, inProgress: active, completed: done });
+          }
+        } else if (kf.length > 0) {
+          // Fallback: no DAG tasks yet — derive from keyframes for backwards compat
+          let completed = 0, inProgress = 0, taskTotal = 0;
+          for (const frame of kf) {
+            const t = new Date(frame.timestamp).getTime();
+            if (frame.type === 'delegation' || frame.type === 'task') { taskTotal++; inProgress++; }
+            if (frame.type === 'milestone') { completed++; inProgress = Math.max(0, inProgress - 1); }
+            taskTotal = Math.max(taskTotal, completed);
+            fPoints.push({ time: t, created: taskTotal, inProgress, completed });
+          }
+        }
+
+        // Cost curve: distribute tokens across keyframes when available,
+        // otherwise create a simple start→now line so the chart isn't empty.
+        if (kf.length > 0) {
           for (let i = 0; i < kf.length; i++) {
             const t = new Date(kf[i].timestamp).getTime();
             const progress = (i + 1) / kf.length;
@@ -145,14 +149,22 @@ export function AnalysisPage() {
               cumulativeOutput: totalOutput * progress,
             });
           }
+        } else if (realTokens > 0) {
+          // No keyframes but tokens exist — show a simple line from start to now
+          const now = Date.now();
+          const start = dagTasks.length > 0
+            ? Math.min(...dagTasks.map(t => new Date(t.createdAt).getTime()).filter(Boolean))
+            : now - 60_000; // fallback: 1 minute ago
+          cPoints.push(
+            { time: start, cumulativeCost: 0, cumulativeInput: 0, cumulativeOutput: 0 },
+            { time: now, cumulativeCost: realTokens, cumulativeInput: totalInput, cumulativeOutput: totalOutput },
+          );
+        }
 
-          setFlowData(fPoints);
-          setCostData(cPoints);
-          setTotalTokens(realTokens);
-        } else {
-          setFlowData([]);
-          setCostData([]);
-          setTotalTokens(0);
+        setFlowData(fPoints);
+        setCostData(cPoints);
+        setTotalTokens(realTokens);
+        if (kf.length === 0 && dagTasks.length === 0 && realTokens === 0) {
           setSessionStart(undefined);
         }
       }

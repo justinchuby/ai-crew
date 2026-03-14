@@ -123,29 +123,29 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
     events = events.filter(e => e.id !== 0);
 
-    // Resolve team membership for leadId filtering
-    const teamAgentIds = new Set<string>();
+    // Resolve crew membership for leadId filtering
+    const crewAgentIds = new Set<string>();
     if (leadId) {
-      teamAgentIds.add(leadId);
+      crewAgentIds.add(leadId);
       for (const agent of agentManager.getAll()) {
         if (agent.parentId === leadId || agent.id === leadId) {
-          teamAgentIds.add(agent.id);
+          crewAgentIds.add(agent.id);
         }
       }
 
       // Historical fallback: when no live agents match, treat leadId as projectId
-      // and discover team members from the events themselves
-      const hasLiveTeam = teamAgentIds.size > 1 || events.some(ev => ev.agentId === leadId);
-      if (!hasLiveTeam) {
+      // and discover crew members from the events themselves
+      const hasLiveCrew = crewAgentIds.size > 1 || events.some(ev => ev.agentId === leadId);
+      if (!hasLiveCrew) {
         const projectEvents = events.filter(ev => ev.projectId === leadId);
         if (projectEvents.length > 0) {
           events = projectEvents;
-          for (const ev of projectEvents) teamAgentIds.add(ev.agentId);
+          for (const ev of projectEvents) crewAgentIds.add(ev.agentId);
         }
       }
 
-      if (teamAgentIds.size > 1) {
-        events = events.filter(ev => teamAgentIds.has(ev.agentId) || ev.projectId === leadId);
+      if (crewAgentIds.size > 1) {
+        events = events.filter(ev => crewAgentIds.has(ev.agentId) || ev.projectId === leadId);
       }
     }
 
@@ -276,7 +276,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
       ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id }
       : leadId ? { projectId: leadId, leadId } : undefined;
 
-    const result = { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+    const result = { agents, communications, locks, timeRange, project, crewAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
     _timelineCache = { key: cacheKey, data: result, ts: Date.now() };
     return result;
   }
@@ -285,7 +285,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
     const since = req.query.since as string | undefined;
     const leadId = req.query.leadId as string | undefined;
     const result = buildTimelineData(leadId, since);
-    const { teamAgentIds: _ignored, ...payload } = result;
+    const { crewAgentIds: _ignored, ...payload } = result;
     res.json(payload);
   });
 
@@ -332,7 +332,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
         if (!isNaN(ts)) {
           const reconnectTimestamp = new Date(ts).toISOString();
           const missedData = buildTimelineData(leadId, reconnectTimestamp);
-          const { teamAgentIds: _ignored, ...payload } = missedData;
+          const { crewAgentIds: _ignored, ...payload } = missedData;
           writeSSE('reconnect', payload);
         }
       }
@@ -340,20 +340,20 @@ export function coordinationRoutes(ctx: AppContext): Router {
 
     // Send initial full timeline snapshot
     const initialData = buildTimelineData(leadId);
-    const { teamAgentIds, ...initialPayload } = initialData;
+    const { crewAgentIds, ...initialPayload } = initialData;
     writeSSE('init', initialPayload);
 
     // Stream incremental activity events
     const onActivity = (entry: any) => {
       // Filter synthetic id:0 events
       if (entry.id === 0 && !entry.agentId) return;
-      // Only send events for this lead's team
-      if (teamAgentIds.size > 0 && !teamAgentIds.has(entry.agentId)) {
+      // Only send events for this lead's crew
+      if (crewAgentIds.size > 0 && !crewAgentIds.has(entry.agentId)) {
         // Check if this is a new agent spawned under the lead
         const agent = agentManager.get(entry.agentId);
         if (!agent || (agent.parentId !== leadId && agent.id !== leadId)) return;
-        // New team member — add to tracked set
-        teamAgentIds.add(entry.agentId);
+        // New crew member — add to tracked set
+        crewAgentIds.add(entry.agentId);
       }
       writeSSE('activity', { entry });
 
@@ -365,17 +365,17 @@ export function coordinationRoutes(ctx: AppContext): Router {
     };
 
     const onLockAcquired = (data: any) => {
-      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      if (crewAgentIds.size > 0 && !crewAgentIds.has(data.agentId)) return;
       writeSSE('lock', { type: 'acquired', ...data });
     };
 
     const onLockReleased = (data: any) => {
-      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      if (crewAgentIds.size > 0 && !crewAgentIds.has(data.agentId)) return;
       writeSSE('lock', { type: 'released', ...data });
     };
 
     const onLockExpired = (data: any) => {
-      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      if (crewAgentIds.size > 0 && !crewAgentIds.has(data.agentId)) return;
       writeSSE('lock', { type: 'expired', ...data });
     };
 
@@ -387,18 +387,27 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Keepalive every 30s to prevent proxy/load-balancer timeouts
     const keepaliveTimer = setInterval(() => {
       if (!res.writableEnded) {
-        res.write(': keepalive\n\n');
+        try {
+          res.write(': keepalive\n\n');
+        } catch {
+          clearInterval(keepaliveTimer);
+        }
       }
     }, 30_000);
 
-    // Cleanup on client disconnect
-    req.on('close', () => {
+    const cleanup = () => {
       activityLedger.off('activity', onActivity);
       lockRegistry.off('lock:acquired', onLockAcquired);
       lockRegistry.off('lock:released', onLockReleased);
       lockRegistry.off('lock:expired', onLockExpired);
       clearInterval(keepaliveTimer);
-    });
+    };
+
+    // Handle broken connections — cleanup before 'close' fires
+    res.on('error', cleanup);
+
+    // Cleanup on client disconnect
+    req.on('close', cleanup);
   });
 
   return router;

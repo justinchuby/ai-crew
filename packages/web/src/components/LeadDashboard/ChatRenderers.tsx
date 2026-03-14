@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Lightbulb, FolderOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Lightbulb, FolderOpen, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { InlineMarkdownWithMentions } from '../../utils/markdown';
 import { splitCommandBlocks } from '../../utils/commandParser';
@@ -74,6 +74,35 @@ export function CollapsibleReasoningBlock({ text, timestamp }: { text: string; t
           {expanded && (
             <div className="mt-1 ml-5 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap max-h-60 overflow-y-auto">
               {text}
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{timestamp}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Collapsed-by-default system message block for long system messages — click to expand */
+export function CollapsibleSystemBlock({ text, timestamp }: { text: string; timestamp: string }) {
+  if (!text?.trim()) return null;
+  const [expanded, setExpanded] = useState(false);
+  const firstLine = text.replace(/^\[System\]\s*/, '').split('\n')[0].slice(0, 60);
+  return (
+    <div className="py-0.5">
+      <div
+        className="flex items-start gap-2 cursor-pointer group"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 text-xs text-th-text-muted">
+            {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+            <RefreshCw className="w-3 h-3 shrink-0" />
+            <span className="truncate">{firstLine}{!expanded && '…'}</span>
+          </div>
+          {expanded && (
+            <div className="mt-1 ml-5 font-mono text-xs text-th-text-muted whitespace-pre-wrap max-h-60 overflow-y-auto">
+              <InlineMarkdown text={text} />
             </div>
           )}
         </div>

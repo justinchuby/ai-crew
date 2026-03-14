@@ -1,10 +1,10 @@
 import { Agent, isTerminalStatus } from './Agent.js';
 import { generateProjectId } from '../utils/projectId.js';
 import { join } from 'path';
-import { homedir } from 'os';
+
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
-import type { ServerConfig } from '../config.js';
+import { FLIGHTDECK_STATE_DIR, type ServerConfig } from '../config.js';
 import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
@@ -31,7 +31,6 @@ import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
 import { runWithAgentContext } from '../middleware/requestContext.js';
 import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
 import type { SessionData, SessionMessage } from '../knowledge/types.js';
@@ -163,7 +162,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
-    const self = this;
+    const _self = this;
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
@@ -563,7 +562,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const artifactProjectId = agent.projectId || '_unscoped';
     const leadId = agent.role.id === 'lead' ? agent.id : (agent.parentId || 'unknown');
     agent.artifactDir = join(
-      homedir(), '.flightdeck', 'artifacts', artifactProjectId,
+      FLIGHTDECK_STATE_DIR, 'artifacts', artifactProjectId,
       'sessions', leadId, `${agent.role.id}-${agent.id.slice(0, 8)}`,
     );
 
@@ -687,7 +686,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.parentId) {
         this.agentMemory.store(agent.parentId, agent.id, 'sessionId', sessionId);
         // Suppress notification during resume — the lead already knows about this agent.
-        if (!agent._isResuming) {
+        // Use resumeSessionId (immutable) rather than _isResuming (can be cleared
+        // early if the provider emits 'prompting' before conn.start() resolves).
+        if (!agent.resumeSessionId) {
           const parent = this.agents.get(agent.parentId);
           if (parent && (parent.status === 'running' || parent.status === 'idle')) {
             const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
@@ -753,13 +754,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         }
 
         if (agent.role.id === 'lead') {
-          if (status === 'idle') {
+          if (status === 'idle' && !agent._isResuming) {
             this.heartbeat.trackIdle(agent.id);
           } else if (status === 'running') {
             this.heartbeat.trackActive(agent.id);
           }
         }
 
+        // Suppress the first idle notification for resumed agents — their prior
+        // work was already reported.
         if (status === 'idle' && agent.parentId && !agent._isResuming) {
           this.dispatcher.notifyParentOfIdle(agent);
         }
@@ -879,7 +882,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.emit('agent:spawned', agent.toJSON());
       this.updateLeadBudgets();
       // Auto-add to groups with matching role criteria (B4: group auto-add)
-      if (parentId) {
+      // Skip during resume — agents pick up context from restored ACP session.
+      if (parentId && !agent._isResuming) {
         this.autoAddToRoleGroups(agent);
       }
     };

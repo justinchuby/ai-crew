@@ -272,6 +272,9 @@ export function TelegramSettings() {
         <div className="flex items-center gap-3">
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
             <MessageCircle className="w-3.5 h-3.5" /> Telegram Integration
+            <span className="inline-flex items-center text-[10px] font-medium text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full normal-case tracking-normal">
+              In Development
+            </span>
           </h3>
           <span
             className={`text-xs font-medium flex items-center gap-1 ${connectionStatus.className}`}

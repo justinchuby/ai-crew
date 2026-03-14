@@ -24,7 +24,7 @@ All 6 agents in the retrospective independently identified the same root causes.
 
 ## Pattern 1: Auto-Create Groups When 3+ Agents Share a Feature
 
-**Rule:** When the lead delegates the same feature area to 3+ agents, automatically create a `{feature}-team` group.
+**Rule:** When the lead delegates the same feature area to 3+ agents, automatically create a `{feature}-crew` group.
 
 "Same feature area" means: agents whose file locks overlap, agents working on the same GitHub issue or sub-issues, or agents whose task descriptions share the same component name.
 

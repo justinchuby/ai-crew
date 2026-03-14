@@ -21,6 +21,7 @@ export function TokenUsageSection({ projectId }: Props) {
   const [agentCosts, setAgentCosts] = useState<AgentCostSummary[]>([]);
   const [taskCosts, setTaskCosts] = useState<TaskCostSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [expanded, setExpanded] = useState(false);
   const agents = useAppStore((s) => s.agents);
 
@@ -49,13 +50,23 @@ export function TokenUsageSection({ projectId }: Props) {
           fetch('/api/costs/by-task', { signal: controller.signal }),
         ]);
         if (controller.signal.aborted) return;
+
+        // Propagate server errors so SectionErrorBoundary can show Report Issue UI
+        if (!projRes.ok || !agentRes.ok || !taskRes.ok) {
+          const failedEndpoint = !projRes.ok ? 'by-project' : !agentRes.ok ? 'by-agent' : 'by-task';
+          const status = !projRes.ok ? projRes.status : !agentRes.ok ? agentRes.status : taskRes.status;
+          throw new Error(`Token usage API error: ${failedEndpoint} returned ${status}`);
+        }
+
         const allProjects: ProjectCostSummary[] = await projRes.json();
         setProjectCost(allProjects.find(c => c.projectId === projectId) ?? null);
         setAgentCosts(await agentRes.json());
         setTaskCosts(await taskRes.json());
+        setError(null);
       } catch (err) {
         if (!controller.signal.aborted) {
           console.warn('[TokenUsage] Failed to fetch costs:', err);
+          setError(err as Error);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -80,6 +91,11 @@ export function TokenUsageSection({ projectId }: Props) {
   const totalInput = projectCost?.totalInputTokens ?? 0;
   const totalOutput = projectCost?.totalOutputTokens ?? 0;
   const totalTokens = totalInput + totalOutput;
+
+  // Throw to SectionErrorBoundary so it shows Retry + Report Issue UI
+  if (error && !loading) {
+    throw error;
+  }
 
   if (loading) {
     return (

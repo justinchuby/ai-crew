@@ -11,7 +11,7 @@
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
-import { existsSync, rmSync, symlinkSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger.js';
 
@@ -74,13 +74,6 @@ export class WorktreeManager extends EventEmitter {
         `git worktree add "${worktreePath}" -b "${branch}" HEAD`,
         { cwd: this.repoRoot, timeout: 10_000 },
       );
-
-      // Symlink shared workspace so agents can communicate via .flightdeck/
-      const sharedDir = path.join(this.repoRoot, '.flightdeck');
-      const targetShared = path.join(worktreePath, '.flightdeck');
-      if (existsSync(sharedDir) && !existsSync(targetShared)) {
-        symlinkSync(sharedDir, targetShared, 'junction');
-      }
 
       const info: WorktreeInfo = { agentId, branch, path: worktreePath, createdAt: Date.now() };
       this.worktrees.set(agentId, info);

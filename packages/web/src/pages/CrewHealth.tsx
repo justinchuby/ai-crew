@@ -9,7 +9,6 @@ import {
   Users,
   Clock,
   PauseCircle,
-  XCircle,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -18,7 +17,7 @@ import { shortAgentId } from '../utils/agentLabel';
 // ── Types ───────────────────────────────────────────────────────────
 
 export interface CrewHealthData {
-  teamId: string;
+  crewId: string;
   totalAgents: number;
   statusCounts: Record<string, number>;
   massFailurePaused: boolean;
@@ -36,7 +35,7 @@ export interface AgentHealthInfo {
 }
 
 interface Props {
-  teamId?: string;
+  crewId?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -70,7 +69,7 @@ function statusLabel(status: string): string {
 
 // ── Component ───────────────────────────────────────────────────────
 
-export function CrewHealth({ teamId = 'default' }: Props) {
+export function CrewHealth({ crewId = 'default' }: Props) {
   const [health, setHealth] = useState<CrewHealthData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,14 +78,14 @@ export function CrewHealth({ teamId = 'default' }: Props) {
   const fetchHealth = useCallback(async () => {
     try {
       setError(null);
-      const data = await apiFetch<CrewHealthData>(`/teams/${encodeURIComponent(teamId)}/health`);
+      const data = await apiFetch<CrewHealthData>(`/crews/${encodeURIComponent(crewId)}/health`);
       setHealth(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load crew health');
     } finally {
       setLoading(false);
     }
-  }, [teamId]);
+  }, [crewId]);
 
   useEffect(() => {
     fetchHealth();
@@ -118,14 +117,14 @@ export function CrewHealth({ teamId = 'default' }: Props) {
   }
 
   if (error) {
-    // Friendly empty state for team-not-found or no data
-    if (error.includes('404') || error.includes('not found') || error.toLowerCase().includes('no team')) {
+    // Friendly empty state for crew-not-found or no data
+    if (error.includes('404') || error.includes('not found') || error.toLowerCase().includes('no crew')) {
       return (
         <div className="p-6" data-testid="crew-health-empty">
           <EmptyState
             icon={<Users className="w-10 h-10 text-th-text-muted/40" />}
             title="No crew found"
-            description={`Team "${teamId}" doesn't exist yet. Create a crew to see health data.`}
+            description={`Crew "${crewId}" doesn't exist yet. Create a crew to see health data.`}
           />
         </div>
       );
@@ -148,7 +147,7 @@ export function CrewHealth({ teamId = 'default' }: Props) {
   return (
     <div className="p-6 space-y-6 overflow-auto" data-testid="crew-health-dashboard">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-th-text">Crew Health — {teamId}</h1>
+        <h1 className="text-lg font-semibold text-th-text">Crew Health — {crewId}</h1>
         <button
           onClick={fetchHealth}
           className="text-xs text-th-text-muted hover:text-th-text px-2 py-1 rounded border border-th-border"
@@ -258,7 +257,7 @@ export function CrewHealth({ teamId = 'default' }: Props) {
       {selectedAgent && (
         <AgentLifecycle
           agentId={selectedAgent}
-          teamId={teamId}
+          crewId={crewId}
           agent={agents.find((a) => a.agentId === selectedAgent)}
           onClose={() => setSelectedAgent(null)}
           onActionComplete={fetchHealth}

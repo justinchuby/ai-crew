@@ -1,4 +1,4 @@
-import { eq, desc, and, isNotNull, ne, sql, inArray } from 'drizzle-orm';
+import { eq, desc, and, ne, sql, inArray } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { projects, projectSessions, dagTasks, decisions, agentMemory } from '../db/schema.js';
 import { generateProjectId } from '../utils/projectId.js';
@@ -128,7 +128,7 @@ export class ProjectRegistry {
     const allLeadIds = sessions.map(s => s.leadId);
 
     // Task summary across all sessions for this project
-    let taskSummary = { total: 0, done: 0, failed: 0, pending: 0 };
+    const taskSummary = { total: 0, done: 0, failed: 0, pending: 0 };
     const taskRows = this.db.drizzle
       .select({
         dagStatus: dagTasks.dagStatus,
@@ -202,7 +202,7 @@ export class ProjectRegistry {
     }
 
     if (briefing.memories.length > 0) {
-      lines.push('', '## Team Knowledge');
+      lines.push('', '## Crew Knowledge');
       for (const m of briefing.memories) {
         lines.push(`- **${m.key}**: ${m.value}`);
       }
@@ -211,61 +211,12 @@ export class ProjectRegistry {
     return lines.filter(l => l !== undefined).join('\n');
   }
 
-  /** Get sessions that can be resumed (have a Copilot sessionId and are no longer active) */
-  getResumableSessions(): (ProjectSession & { projectName: string })[] {
-    const rows = this.db.drizzle
-      .select({
-        id: projectSessions.id,
-        projectId: projectSessions.projectId,
-        leadId: projectSessions.leadId,
-        sessionId: projectSessions.sessionId,
-        role: projectSessions.role,
-        task: projectSessions.task,
-        status: projectSessions.status,
-        startedAt: projectSessions.startedAt,
-        endedAt: projectSessions.endedAt,
-        projectName: projects.name,
-      })
-      .from(projectSessions)
-      .innerJoin(projects, eq(projectSessions.projectId, projects.id))
-      .where(
-        and(
-          isNotNull(projectSessions.sessionId),
-          ne(projectSessions.status, 'active'),
-        ),
-      )
-      .orderBy(desc(projectSessions.startedAt))
-      .all();
-
-    return rows.map((r) => ({
-      id: r.id,
-      projectId: r.projectId,
-      leadId: r.leadId,
-      sessionId: r.sessionId,
-      role: r.role ?? 'lead',
-      task: r.task,
-      status: r.status ?? 'completed',
-      startedAt: r.startedAt ?? new Date().toISOString(),
-      endedAt: r.endedAt,
-      projectName: r.projectName,
-    }));
-  }
-
   /** Get a single session by its row ID */
   getSessionById(sessionRowId: number): ProjectSession | undefined {
     return this.db.drizzle
       .select()
       .from(projectSessions)
       .where(eq(projectSessions.id, sessionRowId))
-      .get() as ProjectSession | undefined;
-  }
-
-  /** Get a single session by its Copilot session ID */
-  getSessionByCopilotId(copilotSessionId: string): ProjectSession | undefined {
-    return this.db.drizzle
-      .select()
-      .from(projectSessions)
-      .where(eq(projectSessions.sessionId, copilotSessionId))
       .get() as ProjectSession | undefined;
   }
 

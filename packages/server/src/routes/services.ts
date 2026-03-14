@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { join } from 'node:path';
-import { SearchEngine, type SearchQuery } from '../coordination/knowledge/SearchEngine.js';
+import { type SearchQuery } from '../coordination/knowledge/SearchEngine.js';
 import { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import { ParallelAnalyzer } from '../tasks/ParallelAnalyzer.js';
 import { getRecentCommits } from './context.js';
@@ -196,7 +196,7 @@ export function servicesRoutes(ctx: AppContext): Router {
     if (!performanceTracker) { res.json([]); return; }
     const leadId = req.query.leadId as string;
     if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
-    res.json(performanceTracker.getTeamScorecards(leadId));
+    res.json(performanceTracker.getCrewScorecards(leadId));
   });
 
   router.get('/coordination/scorecards/:agentId', (req, res) => {
@@ -392,12 +392,12 @@ export function servicesRoutes(ctx: AppContext): Router {
       : allAgents.find(a => a.role?.id === 'lead');
 
     // Collect agents for the session (lead + its children, or all agents)
-    const teamAgents = lead
+    const crewAgents = lead
       ? allAgents.filter(a => a.id === lead.id || a.parentId === lead.id)
       : allAgents;
 
     // Determine session time bounds from agent creation times
-    const createdAts = teamAgents.map(a => new Date(a.createdAt ?? Date.now()).getTime()).filter(t => !isNaN(t));
+    const createdAts = crewAgents.map(a => new Date(a.createdAt ?? Date.now()).getTime()).filter(t => !isNaN(t));
     const sessionStart = createdAts.length > 0 ? Math.min(...createdAts) : Date.now() - 3_600_000;
     const sessionEnd = Date.now();
 
@@ -420,7 +420,7 @@ export function servicesRoutes(ctx: AppContext): Router {
       projectName,
       sessionStart,
       sessionEnd,
-      agents: teamAgents.map(a => ({
+      agents: crewAgents.map(a => ({
         id: a.id,
         role: a.role?.name ?? a.role?.id ?? 'unknown',
         model: a.model ?? 'unknown',

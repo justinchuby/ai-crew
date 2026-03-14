@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
 import { apiFetch } from '../../hooks/useApi';
-import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
 import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
@@ -143,7 +143,7 @@ export function SettingsPanel({ api }: Props) {
             type="range"
             aria-label="Maximum concurrent agents"
             min={1}
-            max={50}
+            max={1000}
             value={maxAgents}
             onChange={(e) => handleMaxAgentsChange(Number(e.target.value))}
             disabled={!config}
@@ -151,11 +151,11 @@ export function SettingsPanel({ api }: Props) {
           />
           <div className="flex justify-between text-[10px] text-th-text-muted mt-1">
             <span>1</span>
-            <span>10</span>
-            <span>20</span>
-            <span>30</span>
-            <span>40</span>
-            <span>50</span>
+            <span>200</span>
+            <span>400</span>
+            <span>600</span>
+            <span>800</span>
+            <span>1000</span>
           </div>
         </section>
       </div>

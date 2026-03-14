@@ -29,13 +29,13 @@ describe('DecisionLog', () => {
     expect(d.timestamp).toBeTruthy();
   });
 
-  it('returns all decisions in order', () => {
+  it('returns all decisions in order (newest first)', () => {
     log.add('a1', 'lead', 'Decision 1', 'Rationale 1');
     log.add('a1', 'lead', 'Decision 2', 'Rationale 2');
     log.add('a1', 'lead', 'Decision 3', 'Rationale 3');
     expect(log.getAll()).toHaveLength(3);
-    expect(log.getAll()[0].title).toBe('Decision 1');
-    expect(log.getAll()[2].title).toBe('Decision 3');
+    expect(log.getAll()[0].title).toBe('Decision 3');
+    expect(log.getAll()[2].title).toBe('Decision 1');
   });
 
   it('filters by agent ID', () => {
@@ -73,7 +73,7 @@ describe('DecisionLog', () => {
     log.add('a1', 'lead', 'D2', '', true);
     log.add('a1', 'lead', 'D3', '', true);
     expect(log.getNeedingConfirmation()).toHaveLength(2);
-    expect(log.getNeedingConfirmation()[0].title).toBe('D2');
+    expect(log.getNeedingConfirmation()[0].title).toBe('D3');
   });
 
   it('confirms a decision', () => {

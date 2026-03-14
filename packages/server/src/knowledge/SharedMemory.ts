@@ -2,7 +2,7 @@
  * SharedMemory — multi-agent knowledge sharing within a project.
  *
  * Wraps KnowledgeStore with agent-attribution, deduplication, and
- * access control. Agents publish discoveries that benefit the whole team.
+ * access control. Agents publish discoveries that benefit the whole crew.
  * Knowledge is project-scoped: all agents in a project share one pool.
  *
  * Design: entries are stored with a `shared:` key prefix and source
@@ -40,7 +40,7 @@ export interface SharedQueryOptions {
   includeSelf?: boolean;
 }
 
-export interface TeamInsight {
+export interface CrewInsight {
   totalEntries: number;
   contributors: string[];
   byCategory: Record<string, number>;
@@ -72,7 +72,7 @@ function isSharedKey(key: string): boolean {
   return key.startsWith(SHARED_PREFIX);
 }
 
-function userKey(key: string): string {
+function _userKey(key: string): string {
   return key.startsWith(SHARED_PREFIX) ? key.slice(SHARED_PREFIX.length) : key;
 }
 
@@ -89,7 +89,7 @@ export class SharedMemory {
   constructor(private readonly store: KnowledgeStore) {}
 
   /**
-   * Publish knowledge entries for the team.
+   * Publish knowledge entries for the crew.
    * Deduplicates by key: if another agent already shared the same key,
    * the entry is merged (confidence boosted, contributor list updated).
    */
@@ -198,9 +198,9 @@ export class SharedMemory {
   }
 
   /**
-   * Aggregated team knowledge: all shared entries with contributor stats.
+   * Aggregated crew knowledge: all shared entries with contributor stats.
    */
-  getTeamInsights(projectId: string): TeamInsight {
+  getCrewInsights(projectId: string): CrewInsight {
     const allEntries = this.store.getAll(projectId).filter(e => isSharedKey(e.key));
     const contributors = new Set<string>();
     const byCategory: Record<string, number> = {};

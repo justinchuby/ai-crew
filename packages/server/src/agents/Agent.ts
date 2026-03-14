@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { createHash } from 'crypto';
 import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent } from '../adapters/types.js';
 import type { Role } from './RoleRegistry.js';
-import type { ServerConfig } from '../config.js';
+import { FLIGHTDECK_STATE_DIR, type ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
@@ -136,7 +136,7 @@ export class Agent {
   public provider?: string;
   /** Adapter backend type (e.g. 'acp') */
   public backend?: string;
-  /** Organized artifact storage path (~/.flightdeck/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
+  /** Organized artifact storage path ($FLIGHTDECK_STATE_DIR/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
   public artifactDir?: string;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
@@ -305,11 +305,10 @@ ${crewSection}
 ${budgetSection}
 
 == SHARED WORKSPACE ==
-Your artifact directory: .flightdeck/shared/${this.role.id}-${this.id.slice(0, 8)}/
-Write reports, designs, and analysis files here. All crew members can read this directory.${this.artifactDir ? `\nOrganized storage: ${this.artifactDir}` : ''}
-Convention: .flightdeck/shared/<your-role>-<short-id>/<filename>
-Example: .flightdeck/shared/architect-a1b2c3d4/design-doc.md
-All team members have access to this directory. Create your subdirectory before writing files.
+Your artifact directory: ${this.artifactDir || `${FLIGHTDECK_STATE_DIR}/artifacts/${this.projectId || '_unscoped'}/sessions/${this.parentId || this.id}/${this.role.id}-${this.id.slice(0, 8)}/`}
+Write reports, designs, and analysis files here. All crew members can read this directory.
+Convention: Write files directly to your artifact directory shown above.
+All team members have access to all artifact directories under the same session.
 
 == COORDINATION RULES ==
 ⚠ CRITICAL: Flightdeck commands (AGENT_MESSAGE, COMPLETE_TASK, BROADCAST, LOCK_FILE, COMMIT, etc.) are NOT tool calls.

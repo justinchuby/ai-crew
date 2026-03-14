@@ -11,92 +11,6 @@ describe('Session Resume', () => {
     registry = new ProjectRegistry(db);
   });
 
-  describe('getResumableSessions', () => {
-    it('returns empty array when no projects exist', () => {
-      expect(registry.getResumableSessions()).toEqual([]);
-    });
-
-    it('excludes sessions that are still active', () => {
-      const project = registry.create('My Project');
-      registry.startSession(project.id, 'lead-1', 'Do work');
-      registry.setSessionId('lead-1', 'copilot-sess-1');
-      expect(registry.getResumableSessions()).toHaveLength(0);
-    });
-
-    it('excludes ended sessions without a Copilot sessionId', () => {
-      const project = registry.create('No Session');
-      registry.startSession(project.id, 'lead-2', 'Work');
-      registry.endSession('lead-2', 'completed');
-      expect(registry.getResumableSessions()).toHaveLength(0);
-    });
-
-    it('includes completed sessions with a Copilot sessionId', () => {
-      const project = registry.create('Resumable');
-      registry.startSession(project.id, 'lead-3', 'Build feature');
-      registry.setSessionId('lead-3', 'copilot-sess-3');
-      registry.endSession('lead-3', 'completed');
-
-      const sessions = registry.getResumableSessions();
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]).toMatchObject({
-        leadId: 'lead-3',
-        sessionId: 'copilot-sess-3',
-        task: 'Build feature',
-        status: 'completed',
-        projectName: 'Resumable',
-      });
-    });
-
-    it('includes crashed sessions with a Copilot sessionId', () => {
-      const project = registry.create('Crashed');
-      registry.startSession(project.id, 'lead-4', 'Risky work');
-      registry.setSessionId('lead-4', 'copilot-sess-4');
-      registry.endSession('lead-4', 'crashed');
-
-      const sessions = registry.getResumableSessions();
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0].status).toBe('crashed');
-    });
-
-    it('returns sessions from multiple projects', () => {
-      const p1 = registry.create('Project A');
-      const p2 = registry.create('Project B');
-
-      registry.startSession(p1.id, 'lead-a', 'Task A');
-      registry.setSessionId('lead-a', 'sess-a');
-      registry.endSession('lead-a', 'completed');
-
-      registry.startSession(p2.id, 'lead-b', 'Task B');
-      registry.setSessionId('lead-b', 'sess-b');
-      registry.endSession('lead-b', 'completed');
-
-      const sessions = registry.getResumableSessions();
-      expect(sessions).toHaveLength(2);
-      const names = sessions.map((s) => s.projectName);
-      expect(names).toContain('Project A');
-      expect(names).toContain('Project B');
-    });
-
-    it('orders by most recent first', () => {
-      const project = registry.create('Order Test');
-
-      registry.startSession(project.id, 'lead-x', 'First');
-      registry.setSessionId('lead-x', 'sess-x');
-      registry.endSession('lead-x', 'completed');
-
-      registry.startSession(project.id, 'lead-y', 'Second');
-      registry.setSessionId('lead-y', 'sess-y');
-      registry.endSession('lead-y', 'completed');
-
-      const sessions = registry.getResumableSessions();
-      expect(sessions).toHaveLength(2);
-      // Both sessions exist; order depends on startedAt (same-second inserts may have same timestamp)
-      const sessionIds = sessions.map((s) => s.sessionId);
-      expect(sessionIds).toContain('sess-x');
-      expect(sessionIds).toContain('sess-y');
-    });
-  });
-
   describe('getSessionById', () => {
     it('returns a session by its row ID', () => {
       const project = registry.create('Session Lookup');
@@ -114,42 +28,16 @@ describe('Session Resume', () => {
     });
   });
 
-  describe('getSessionByCopilotId', () => {
-    it('returns a session by its Copilot session ID', () => {
-      const project = registry.create('Copilot Lookup');
-      registry.startSession(project.id, 'lead-c', 'Copilot session');
-      registry.setSessionId('lead-c', 'copilot-abc-123');
-
-      const found = registry.getSessionByCopilotId('copilot-abc-123');
-      expect(found).toBeDefined();
-      expect(found!.leadId).toBe('lead-c');
-      expect(found!.task).toBe('Copilot session');
-    });
-
-    it('returns undefined for non-existent Copilot session ID', () => {
-      expect(registry.getSessionByCopilotId('nonexistent')).toBeUndefined();
-    });
-  });
-
   describe('resume flow integration', () => {
-    it('full lifecycle: create → start → set sessionId → end → find resumable → get by ID', () => {
-      // Create project and start a session
+    it('full lifecycle: create → start → set sessionId → end → get by ID → claim', () => {
       const project = registry.create('Full Lifecycle', 'Testing resume flow');
       registry.startSession(project.id, 'lead-lifecycle', 'Implement feature');
       registry.setSessionId('lead-lifecycle', 'copilot-lifecycle-session');
-
-      // Verify not resumable while active
-      expect(registry.getResumableSessions()).toHaveLength(0);
-
-      // End the session
       registry.endSession('lead-lifecycle', 'completed');
 
-      // Now it should be resumable
-      const resumable = registry.getResumableSessions();
-      expect(resumable).toHaveLength(1);
-
-      // Look it up by row ID (simulating the resume API)
-      const session = registry.getSessionById(resumable[0].id);
+      // Look it up by row ID
+      const sessions = registry.getSessions(project.id);
+      const session = registry.getSessionById(sessions[0].id);
       expect(session).toBeDefined();
       expect(session!.sessionId).toBe('copilot-lifecycle-session');
 
@@ -165,10 +53,7 @@ describe('Session Resume', () => {
       registry.setSessionId('agent-1', 'sess-dev');
       registry.endSession('agent-1', 'completed');
 
-      const sessions = registry.getResumableSessions();
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0].role).toBe('developer');
-
+      const sessions = registry.getSessions(project.id);
       const session = registry.getSessionById(sessions[0].id);
       expect(session!.role).toBe('developer');
     });
@@ -179,7 +64,7 @@ describe('Session Resume', () => {
       registry.setSessionId('lead-def', 'sess-lead');
       registry.endSession('lead-def', 'completed');
 
-      const sessions = registry.getResumableSessions();
+      const sessions = registry.getSessions(project.id);
       expect(sessions[0].role).toBe('lead');
     });
   });
@@ -191,7 +76,7 @@ describe('Session Resume', () => {
       registry.setSessionId('lead-claim', 'sess-claim');
       registry.endSession('lead-claim', 'completed');
 
-      const sessions = registry.getResumableSessions();
+      const sessions = registry.getSessions(project.id);
       expect(registry.claimSessionForResume(sessions[0].id)).toBe(true);
 
       // Verify status changed to 'resuming'
@@ -213,7 +98,7 @@ describe('Session Resume', () => {
       registry.setSessionId('lead-race', 'sess-race');
       registry.endSession('lead-race', 'completed');
 
-      const sessions = registry.getResumableSessions();
+      const sessions = registry.getSessions(project.id);
       // First claim succeeds
       expect(registry.claimSessionForResume(sessions[0].id)).toBe(true);
       // Second claim fails — already 'resuming'

@@ -192,27 +192,48 @@ export function useWebSocket() {
           pendingNewlineRef.current.add(msg.agentId);
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
+
+          // Update toolCalls[] (live state) — latest status per tool call, used
+          // by AgentCard/FleetOverview for "what is the agent doing right now?"
           const calls = existing?.toolCalls ?? [];
           const idx = calls.findIndex((tc) => tc.toolCallId === msg.toolCall.toolCallId);
           const updated = idx >= 0
             ? calls.map((tc, i) => (i === idx ? msg.toolCall : tc))
             : [...calls, msg.toolCall];
 
-          // Inject synthetic message into agent.messages so tool calls appear
-          // chronologically in AgentChatPanel. Only inject on new tool calls or
-          // status transitions (not duplicate updates for the same status).
+          // Append to messages[] (timeline) — chronological record for the chat
+          // panel. Only inject on new tool calls or status transitions (not
+          // duplicate updates for the same status). Carries toolStatus/toolKind
+          // so the renderer can show proper colors without cross-referencing.
           const tc = msg.toolCall;
           const prevTc = idx >= 0 ? calls[idx] : undefined;
           if (!prevTc || prevTc.status !== tc.status) {
             const msgs = [...(existing?.messages ?? [])];
             const statusIcon = tc.status === 'completed' ? '✓' : tc.status === 'cancelled' ? '✗' : '⟳';
             const title = typeof tc.title === 'string' ? tc.title : String(tc.title);
-            msgs.push({
-              type: 'text',
-              text: `${statusIcon} ${title}`,
-              sender: 'tool',
-              timestamp: Date.now(),
-            });
+
+            // Find existing message with same toolCallId and update in-place
+            const existingMsgIdx = msgs.findIndex(
+              (m) => m.sender === 'tool' && m.toolCallId === tc.toolCallId,
+            );
+
+            if (existingMsgIdx >= 0) {
+              msgs[existingMsgIdx] = {
+                ...msgs[existingMsgIdx],
+                text: `${statusIcon} ${title}`,
+                toolStatus: tc.status,
+              };
+            } else {
+              msgs.push({
+                type: 'text',
+                text: `${statusIcon} ${title}`,
+                sender: 'tool',
+                timestamp: Date.now(),
+                toolCallId: tc.toolCallId,
+                toolStatus: tc.status,
+                toolKind: tc.kind,
+              });
+            }
             updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
           } else {
             updateAgent(msg.agentId, { toolCalls: updated });

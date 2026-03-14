@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-import type { Alert, AlertSeverity, AlertAction } from '@flightdeck/shared';
+import type { Alert } from '@flightdeck/shared';
 export type { Alert, AlertSeverity, AlertAction } from '@flightdeck/shared';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -61,7 +61,9 @@ export class AlertEngine extends EventEmitter {
     };
     this.activityLedger.on('activity', this.boundActivityHandler);
 
-    this.checkTimer = setInterval(() => this.runChecks(), CHECK_INTERVAL_MS);
+    this.checkTimer = setInterval(() => {
+      try { this.runChecks(); } catch { /* individual checks are best-effort */ }
+    }, CHECK_INTERVAL_MS);
     // Run immediately on start
     this.runChecks();
     logger.info({ module: 'coordination', msg: 'AlertEngine started' });

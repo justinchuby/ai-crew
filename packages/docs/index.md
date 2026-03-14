@@ -9,22 +9,13 @@ hero:
       text: Get Started
       link: /guide/quickstart
 features:
-  - icon: 🚀
-    title: One Command to Launch
-    details: "Run `npm install -g @flightdeck-ai/flightdeck` once, then launch with `flightdeck` — no config needed. A real-time dashboard opens instantly where you watch agents work."
-  - icon: 🎯
+  - icon: 🤖
     title: AI Project Lead
-    details: An AI coordinator analyzes your task, picks the right specialists, delegates subtasks, reviews results, and synthesizes the final output.
-  - icon: ⌨️
-    title: "⌘K Command Palette"
-    details: "Fuzzy search across all entities, 30 natural language commands, AI-powered suggestions, and preview panel — all from one keyboard shortcut."
-  - icon: 💬
-    title: Virtualized Chat
-    details: High-performance chat with virtual scrolling for 1000+ messages. Pinned user message banners ensure important messages are never buried.
-  - icon: ⚡
-    title: Data Management
-    details: "Export sessions, manage projects, and control your data. Per-project tabs, cumulative flow diagrams, and bulk operations for managing multi-agent work."
+    details: A lead agent coordinates your crew — architects, developers, reviewers. See the whole team working in real-time with live status, task tracking, and progress updates.
+  - icon: 🔌
+    title: Supported Providers
+    details: Works with GitHub Copilot, Claude, Codex, and Gemini. Mix and match models across your crew — use the right model for each task.
   - icon: 📊
-    title: Canvas & Task DAG
-    details: Interactive node-graph of your agent crew with real-time status, communication edges, and conflict indicators.
+    title: Task DAG
+    details: Visual task dependency graph with real-time progress tracking. See which tasks are running, blocked, or complete across your entire crew.
 ---

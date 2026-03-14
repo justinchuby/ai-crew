@@ -293,14 +293,25 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
     );
   }
 
-  // Tool call messages render as compact inline indicators
+  // Tool call messages render as compact inline indicators with status colors
   if (sender === 'tool') {
     const text = typeof msg.text === 'string' ? msg.text : '';
+    const status = msg.toolStatus ?? 'in_progress';
+    const statusColors: Record<string, string> = {
+      pending: 'text-yellow-500',
+      in_progress: 'text-blue-400',
+      completed: 'text-emerald-500',
+      cancelled: 'text-gray-400',
+    };
+    const color = statusColors[status] || 'text-sky-400';
     return (
       <div className="flex items-center gap-1.5 py-0.5">
-        <span className="text-[11px] text-sky-500 dark:text-sky-400 truncate">
+        <span className={`text-[10px] ${color} truncate`}>
           🔧 {text.slice(0, 200)}
         </span>
+        {msg.toolKind && (
+          <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{msg.toolKind}</span>
+        )}
         {msg.timestamp && (
           <span className="text-[10px] text-th-text-muted shrink-0">
             {formatRelativeTime(new Date(msg.timestamp).toISOString())}

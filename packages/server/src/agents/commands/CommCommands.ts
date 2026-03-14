@@ -232,7 +232,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
       from: agent.id,
       fromRole: agent.role.name,
       to: 'all',
-      toRole: 'Team',
+      toRole: 'Crew',
       content: msg.content,
     });
     ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Broadcast to ${recipients.length} agents: ${msg.content.slice(0, 120)}`, {

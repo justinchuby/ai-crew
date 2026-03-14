@@ -9,7 +9,6 @@ import type { AgentManager } from '../agents/AgentManager.js';
 import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
 import type {
   InboundMessage,
-  OutboundMessage,
   ChatSession,
   MessagingAdapter,
   TelegramConfig,
@@ -100,17 +99,9 @@ export class IntegrationRouter {
 
   /** Initialize and start all configured adapters. */
   async start(): Promise<void> {
-    const config = this.configStore.current;
-    const telegramConfig = config.telegram;
-
-    if (telegramConfig?.enabled && telegramConfig.botToken) {
-      const tgConfig = {
-        ...telegramConfig,
-        // Prefer env var over config file for the bot token
-        botToken: process.env.TELEGRAM_BOT_TOKEN || telegramConfig.botToken,
-      };
-      await this.startTelegram(tgConfig);
-    }
+    // Telegram requires manual enablement each server start via
+    // PATCH /api/integrations/telegram { enabled: true } or the UI toggle.
+    // It will NOT auto-start even if config says enabled: true.
 
     // Start session cleanup timer
     this.sessionCleanupTimer = setInterval(() => this.cleanExpiredSessions(), 60_000);
@@ -312,6 +303,13 @@ export class IntegrationRouter {
   }
 
   private async startTelegram(config: TelegramConfig): Promise<void> {
+    // Stop any existing adapter to avoid 409 Conflict (two getUpdates)
+    const existing = this.adapters.get('telegram');
+    if (existing) {
+      await existing.stop();
+      this.adapters.delete('telegram');
+    }
+
     const adapter = new TelegramAdapter(config);
 
     // Register command handlers

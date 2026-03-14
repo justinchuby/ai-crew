@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
-import { Play, Loader2, Users, UserPlus, Sparkles, CheckCircle2, AlertTriangle, Plus } from 'lucide-react';
+import { Play, Loader2, Users, UserPlus, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ProvideFeedback } from '../ProvideFeedback';
 import type { SessionDetail, SessionAgent } from './SessionHistory';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -113,6 +113,7 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
           freshStart: mode === 'fresh',
           resumeAll: mode === 'resume-all',
           agents: mode === 'select' ? Array.from(selectedAgents) : undefined,
+          sessionId: lastSession.id,
         }),
       });
       onResume();

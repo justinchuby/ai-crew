@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
-import { eq, asc, and, inArray, lte } from 'drizzle-orm';
+import { eq, asc, desc, and, inArray, lte, sql } from 'drizzle-orm';
 import type { Database } from '../../db/database.js';
 import { decisions } from '../../db/schema.js';
 
-import { DECISION_CATEGORIES, type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
+import { type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 export { DECISION_CATEGORIES, type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 
 export interface BatchResult {
@@ -132,11 +132,14 @@ export class DecisionLog extends EventEmitter {
     return decision;
   }
 
+  // UI-facing methods use DESC (newest-first) for the decisions panel display.
+  // Agent-facing methods (getByAgent, getByAgents) use ASC for chronological context.
+
   getAll(): Decision[] {
     return this.db.drizzle
       .select()
       .from(decisions)
-      .orderBy(asc(decisions.createdAt))
+      .orderBy(desc(decisions.createdAt), sql`rowid DESC`)
       .all()
       .map(rowToDecision);
   }
@@ -167,7 +170,7 @@ export class DecisionLog extends EventEmitter {
       .select()
       .from(decisions)
       .where(eq(decisions.leadId, leadId))
-      .orderBy(asc(decisions.createdAt))
+      .orderBy(desc(decisions.createdAt), sql`rowid DESC`)
       .all()
       .map(rowToDecision);
   }
@@ -177,7 +180,7 @@ export class DecisionLog extends EventEmitter {
       .select()
       .from(decisions)
       .where(and(eq(decisions.needsConfirmation, 1), eq(decisions.status, 'recorded')))
-      .orderBy(asc(decisions.createdAt))
+      .orderBy(desc(decisions.createdAt), sql`rowid DESC`)
       .all()
       .map(rowToDecision);
   }

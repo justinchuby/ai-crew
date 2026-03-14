@@ -27,9 +27,9 @@ function renderPanel() {
 
 // ── Fixtures ──────────────────────────────────────────────
 
-const teamsData = {
-  teams: [
-    { teamId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
+const crewsData = {
+  crews: [
+    { crewId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
   ],
 };
 
@@ -114,14 +114,14 @@ const profileData = {
 };
 
 function setupMocks(overrides: Partial<{
-  teams: any;
+  crews: any;
   agents: any;
   profile: any;
   crewSummary: any;
 }> = {}) {
   mockApiFetch.mockImplementation((path: string) => {
     if (path === '/crews/summary') return Promise.resolve(overrides.crewSummary ?? crewSummaryData);
-    if (path === '/teams') return Promise.resolve(overrides.teams ?? teamsData);
+    if (path === '/crews') return Promise.resolve(overrides.crews ?? crewsData);
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
     return Promise.resolve({});
@@ -143,7 +143,7 @@ describe('CrewRoster', () => {
 
   it('shows error state on API failure', async () => {
     mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path === '/crews') return Promise.resolve(crewsData);
       return Promise.reject(new Error('Network error'));
     });
     renderPanel();
@@ -512,10 +512,10 @@ describe('CrewRoster', () => {
       updatedAt: '2026-03-07T15:00:00Z',
     };
     const multiTeamAgents = [...rosterAgents, leadAgent];
-    const multiTeamsData = {
-      teams: [
-        { teamId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
-        { teamId: 'team-alpha', agentCount: 1, roles: ['lead'] },
+    const multiCrewsData = {
+      crews: [
+        { crewId: 'default', agentCount: 3, roles: ['architect', 'developer', 'reviewer'] },
+        { crewId: 'team-alpha', agentCount: 1, roles: ['lead'] },
       ],
     };
     const multiCrewSummary = [
@@ -533,7 +533,7 @@ describe('CrewRoster', () => {
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/crews/summary') return Promise.resolve(multiCrewSummary);
-      if (path === '/teams') return Promise.resolve(multiTeamsData);
+      if (path === '/crews') return Promise.resolve(multiCrewsData);
       if (path.includes('/profile')) return Promise.resolve(profileData);
       if (path.includes('team-alpha') && path.includes('/agents'))
         return Promise.resolve(multiTeamAgents.filter(a => a.teamId === 'team-alpha'));
@@ -578,7 +578,7 @@ describe('CrewRoster', () => {
 
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/crews/summary') return Promise.resolve(crewSummaryData);
-      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path === '/crews') return Promise.resolve(crewsData);
       if (path.includes('/sessions/detail')) return Promise.resolve(sessionDetails);
       if (path.includes('/profile')) return Promise.resolve(profileData);
       if (path.includes('/agents')) return Promise.resolve(rosterAgents);
@@ -693,7 +693,7 @@ describe('CrewRoster', () => {
     mockApiFetch.mockImplementation((path: string, opts?: any) => {
       if (opts?.method === 'DELETE') return Promise.reject(new Error('Cannot delete active crew'));
       if (path === '/crews/summary') return Promise.resolve(inactiveSummary);
-      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path === '/crews') return Promise.resolve(crewsData);
       if (path.includes('/agents')) return Promise.resolve(inactiveAgents);
       return Promise.resolve({});
     });

@@ -36,7 +36,7 @@ type SortDir = 'asc' | 'desc';
 type StatusFilter = AgentStatus | 'all';
 
 interface CrewInfo {
-  teamId: string;
+  crewId: string;
   agentCount: number;
   roles: string[];
 }
@@ -75,7 +75,7 @@ interface AgentProfile {
   provider?: string;
   status: AgentStatus;
   liveStatus: LiveStatus;
-  teamId: string;
+  crewId: string;
   projectId: string | null;
   lastTaskSummary: string | null;
   createdAt: string;
@@ -89,7 +89,7 @@ interface AgentProfile {
 }
 
 interface HealthData {
-  teamId: string;
+  crewId: string;
   totalAgents: number;
   statusCounts: Record<string, number>;
   massFailurePaused: boolean;
@@ -97,7 +97,7 @@ interface HealthData {
 }
 
 interface CrewDetail {
-  teamId: string;
+  crewId: string;
   agentCount: number;
   agents: Array<{ agentId: string; role: string; model: string; status: string }>;
   knowledgeCount: number;
@@ -186,9 +186,9 @@ function AgentCard({ agent, selected, onSelect, onManage }: {
   );
 }
 
-function ProfilePanel({ agentId, teamId, onClose }: {
+function ProfilePanel({ agentId, crewId, onClose }: {
   agentId: string;
-  teamId: string;
+  crewId: string;
   onClose: () => void;
 }) {
   const [profile, setProfile] = useState<AgentProfile | null>(null);
@@ -197,11 +197,11 @@ function ProfilePanel({ agentId, teamId, onClose }: {
 
   useEffect(() => {
     setLoading(true);
-    apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
+    apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`)
       .then(data => setProfile(data))
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
-  }, [agentId, teamId]);
+  }, [agentId, crewId]);
 
   if (loading) {
     return (
@@ -330,16 +330,16 @@ function ProfilePanel({ agentId, teamId, onClose }: {
 // ── Main Component ────────────────────────────────────────
 
 export function CrewPage() {
-  const addToast = useToastStore(s => s.add);
+  const _addToast = useToastStore(s => s.add);
 
   // Data state
-  const [teams, setTeams] = useState<CrewInfo[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState('default');
+  const [crews, setCrews] = useState<CrewInfo[]>([]);
+  const [selectedCrew, setSelectedCrew] = useState('default');
   const [agents, setAgents] = useState<RosterAgent[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [teamDetail, setTeamDetail] = useState<CrewDetail | null>(null);
+  const [crewDetail, setCrewDetail] = useState<CrewDetail | null>(null);
 
   // UI state
   const [search, setSearch] = useState('');
@@ -352,27 +352,27 @@ export function CrewPage() {
 
   // ── Data fetching ────────────────────────────────────────
 
-  const fetchTeams = useCallback(async () => {
+  const fetchCrews = useCallback(async () => {
     try {
-      const data = await apiFetch<{ teams: CrewInfo[] }>('/teams');
-      setTeams(data.teams ?? []);
-      if (data.teams?.length && !data.teams.find(t => t.teamId === selectedTeam)) {
-        setSelectedTeam(data.teams[0].teamId);
+      const data = await apiFetch<{ crews: CrewInfo[] }>('/crews');
+      setCrews(data.crews ?? []);
+      if (data.crews?.length && !data.crews.find(t => t.crewId === selectedCrew)) {
+        setSelectedCrew(data.crews[0].crewId);
       }
     } catch { /* teams list is non-critical */ }
-  }, [selectedTeam]);
+  }, [selectedCrew]);
 
   const fetchData = useCallback(async () => {
     try {
       setError(null);
       const agentUrl = statusFilter === 'all'
-        ? `/teams/${selectedTeam}/agents`
-        : `/teams/${selectedTeam}/agents?status=${statusFilter}`;
+        ? `/crews/${selectedCrew}/agents`
+        : `/crews/${selectedCrew}/agents?status=${statusFilter}`;
 
       const [agentData, healthData, crewDetailData] = await Promise.allSettled([
         apiFetch<RosterAgent[]>(agentUrl),
-        apiFetch<HealthData>(`/teams/${encodeURIComponent(selectedTeam)}/health`),
-        apiFetch<CrewDetail>(`/teams/${encodeURIComponent(selectedTeam)}`),
+        apiFetch<HealthData>(`/crews/${encodeURIComponent(selectedCrew)}/health`),
+        apiFetch<CrewDetail>(`/crews/${encodeURIComponent(selectedCrew)}`),
       ]);
 
       if (agentData.status === 'fulfilled') {
@@ -394,15 +394,15 @@ export function CrewPage() {
       }
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
-      if (crewDetailData.status === 'fulfilled') setTeamDetail(crewDetailData.value);
+      if (crewDetailData.status === 'fulfilled') setCrewDetail(crewDetailData.value);
     } catch (err: any) {
       setError(err.message ?? 'Failed to load crew data');
     } finally {
       setLoading(false);
     }
-  }, [selectedTeam, statusFilter]);
+  }, [selectedCrew, statusFilter]);
 
-  useEffect(() => { fetchTeams(); }, [fetchTeams]);
+  useEffect(() => { fetchCrews(); }, [fetchCrews]);
   useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
 
   // Polling
@@ -487,15 +487,15 @@ export function CrewPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-th-text capitalize">{selectedTeam}</h1>
-                {teams.length > 1 && (
+                <h1 className="text-xl font-bold text-th-text capitalize">{selectedCrew}</h1>
+                {crews.length > 1 && (
                   <select
-                    value={selectedTeam}
-                    onChange={e => setSelectedTeam(e.target.value)}
+                    value={selectedCrew}
+                    onChange={e => setSelectedCrew(e.target.value)}
                     className="px-2 py-0.5 text-xs rounded bg-th-bg-alt border border-th-border text-th-text"
                   >
-                    {teams.map(t => (
-                      <option key={t.teamId} value={t.teamId}>{t.teamId}</option>
+                    {crews.map(t => (
+                      <option key={t.crewId} value={t.crewId}>{t.crewId}</option>
                     ))}
                   </select>
                 )}
@@ -518,23 +518,23 @@ export function CrewPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm" data-testid="crew-identity">
           <div>
             <span className="text-th-text-alt">Agents</span>
-            <p className="font-semibold text-th-text text-lg">{teamDetail?.agentCount ?? agents.length}</p>
+            <p className="font-semibold text-th-text text-lg">{crewDetail?.agentCount ?? agents.length}</p>
           </div>
           <div>
             <span className="text-th-text-alt">Knowledge</span>
-            <p className="font-semibold text-th-text text-lg">{teamDetail?.knowledgeCount ?? 0} entries</p>
+            <p className="font-semibold text-th-text text-lg">{crewDetail?.knowledgeCount ?? 0} entries</p>
           </div>
           <div>
             <span className="text-th-text-alt">Training</span>
             <p className="font-semibold text-th-text text-lg">
-              {teamDetail?.trainingSummary
-                ? `${teamDetail.trainingSummary.corrections ?? 0} corrections`
+              {crewDetail?.trainingSummary
+                ? `${crewDetail.trainingSummary.corrections ?? 0} corrections`
                 : '—'}
             </p>
           </div>
           <div>
             <span className="text-th-text-alt">Crew ID</span>
-            <p className="font-mono text-th-text text-sm">{selectedTeam}</p>
+            <p className="font-mono text-th-text text-sm">{selectedCrew}</p>
           </div>
         </div>
       </div>
@@ -629,7 +629,7 @@ export function CrewPage() {
               <div className="w-1/2">
                 <ProfilePanel
                   agentId={selectedAgent}
-                  teamId={selectedTeam}
+                  crewId={selectedCrew}
                   onClose={() => setSelectedAgent(null)}
                 />
               </div>
@@ -686,7 +686,7 @@ export function CrewPage() {
       {managingAgent && (
         <AgentLifecycle
           agentId={managingAgent}
-          teamId={selectedTeam}
+          crewId={selectedCrew}
           agent={health?.agents.find(a => a.agentId === managingAgent)}
           onClose={() => setManagingAgent(null)}
           onActionComplete={() => { fetchData(); setManagingAgent(null); }}

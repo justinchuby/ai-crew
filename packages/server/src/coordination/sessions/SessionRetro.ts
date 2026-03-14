@@ -99,16 +99,16 @@ export class SessionRetro {
   // ── Data collection ─────────────────────────────────────────────
 
   private buildRetroData(leadId: string): SessionRetroData {
-    const teamAgents = this.agentManager.getAll().filter(
+    const crewAgents = this.agentManager.getAll().filter(
       a => a.id === leadId || a.parentId === leadId,
     );
 
     const allEvents = this.activityLedger.getRecent(100_000);
-    const teamAgentIds = new Set(teamAgents.map(a => a.id));
-    const teamEvents = allEvents.filter(e => teamAgentIds.has(e.agentId));
+    const crewAgentIds = new Set(crewAgents.map(a => a.id));
+    const crewEvents = allEvents.filter(e => crewAgentIds.has(e.agentId));
 
-    const scorecards = teamAgents.map(agent => this.buildScorecard(agent, teamEvents));
-    const summary = this.buildSummary(leadId, teamAgents, teamEvents);
+    const scorecards = crewAgents.map(agent => this.buildScorecard(agent, crewEvents));
+    const summary = this.buildSummary(leadId, crewAgents, crewEvents);
     const bottlenecks = this.findBottlenecks(scorecards);
 
     return {
@@ -119,8 +119,8 @@ export class SessionRetro {
     };
   }
 
-  private buildScorecard(agent: any, teamEvents: any[]): AgentScorecard {
-    const agentEvents = teamEvents.filter(e => e.agentId === agent.id);
+  private buildScorecard(agent: any, crewEvents: any[]): AgentScorecard {
+    const agentEvents = crewEvents.filter(e => e.agentId === agent.id);
 
     // Count task-related events
     const tasksCompleted = agentEvents.filter(e => e.actionType === 'task_completed').length;
@@ -182,14 +182,14 @@ export class SessionRetro {
     };
   }
 
-  private buildSummary(leadId: string, teamAgents: any[], teamEvents: any[]): SessionSummary {
+  private buildSummary(leadId: string, crewAgents: any[], crewEvents: any[]): SessionSummary {
     // Time span
-    const timestamps = teamEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
+    const timestamps = crewEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
     const start = timestamps.length > 0 ? timestamps.reduce((a, b) => Math.min(a, b), Infinity) : Date.now();
     const end = timestamps.length > 0 ? timestamps.reduce((a, b) => Math.max(a, b), -Infinity) : Date.now();
 
     // Token totals
-    const totalTokens = teamAgents.reduce((sum, a) => sum + (a.contextWindowUsed ?? 0), 0);
+    const totalTokens = crewAgents.reduce((sum, a) => sum + (a.contextWindowUsed ?? 0), 0);
 
     // Decisions
     const decisions = this.decisionLog.getByLeadId(leadId);
@@ -208,9 +208,9 @@ export class SessionRetro {
         end: new Date(end).toISOString(),
         durationMs: end - start,
       },
-      totalAgents: teamAgents.length,
+      totalAgents: crewAgents.length,
       totalTokens,
-      totalEvents: teamEvents.length,
+      totalEvents: crewEvents.length,
       totalDecisions: decisions.length,
       decisionsConfirmed,
       decisionsRejected,

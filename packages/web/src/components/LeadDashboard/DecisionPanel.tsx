@@ -58,7 +58,7 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss
   const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
   useEffect(() => {
     requestAnimationFrame(() => {
-      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+      feedRef.current?.scrollTo({ top: 0 });
     });
   }, [decisions.length]);
 

@@ -3,8 +3,8 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Flightdeck',
   description: 'Multi-Agent Copilot CLI Orchestrator',
-  base: '/flightdeck/',
-  head: [['link', { rel: 'icon', href: '/flightdeck/favicon.ico' }]],
+  base: '/',
+  head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
   themeConfig: {
     logo: '/logo.svg',
     nav: [

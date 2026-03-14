@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, realpathSync, statSync, existsSync } from 'n
 import { join, normalize, sep, extname, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { logger } from '../utils/logger.js';
+import { FLIGHTDECK_STATE_DIR } from '../config.js';
 import type { AppContext } from './context.js';
 import { spawnLimiter } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
@@ -12,6 +13,7 @@ import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMemb
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 import { parseIntBounded } from '../utils/validation.js';
+import { resumeLeadSession, ResumeError } from './resumeHelper.js';
 
 const PROJECT_TITLE_MAX = 100;
 
@@ -76,7 +78,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro, costTracker } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro: _sessionRetro, costTracker } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -470,12 +472,12 @@ export function projectsRoutes(ctx: AppContext): Router {
         .from(chatGroupMembers)
         .where(eq(chatGroupMembers.groupName, g.name))
         .all()
-        .filter((m) => leadIds.includes(g.leadId));
+        .filter((_m) => leadIds.includes(g.leadId));
       const msgCount = _db.drizzle.select({ id: chatGroupMessages.id })
         .from(chatGroupMessages)
         .where(eq(chatGroupMessages.groupName, g.name))
         .all()
-        .filter((m) => true).length; // count via length
+        .filter((_m) => true).length; // count via length
       return {
         name: g.name,
         leadId: g.leadId,
@@ -629,13 +631,20 @@ export function projectsRoutes(ctx: AppContext): Router {
     const titleError = validateProjectTitle(projectName);
     if (titleError) return res.status(400).json({ error: `Could not derive project name: ${titleError}. Provide an explicit name.` });
 
-    // Gather metadata about what's in .flightdeck/
-    const hasShared = existsSync(join(flightdeckDir, 'shared'));
+    // Gather metadata about existing artifacts
+    const organizedArtifactDir = join(FLIGHTDECK_STATE_DIR, 'artifacts');
     const hasScreenshots = existsSync(join(flightdeckDir, 'screenshots'));
-    let sharedAgentCount = 0;
-    if (hasShared) {
+    let artifactSessionCount = 0;
+    if (existsSync(organizedArtifactDir)) {
       try {
-        sharedAgentCount = readdirSync(join(flightdeckDir, 'shared')).length;
+        // Count session dirs across all projects (informational only)
+        const projectDirs = readdirSync(organizedArtifactDir, { withFileTypes: true }).filter(e => e.isDirectory());
+        for (const pd of projectDirs) {
+          const sessionsDir = join(organizedArtifactDir, pd.name, 'sessions');
+          if (existsSync(sessionsDir)) {
+            artifactSessionCount += readdirSync(sessionsDir, { withFileTypes: true }).filter(e => e.isDirectory()).length;
+          }
+        }
       } catch { /* ignore */ }
     }
 
@@ -646,16 +655,14 @@ export function projectsRoutes(ctx: AppContext): Router {
       projectId: project.id,
       name: projectName,
       cwd: normalizedCwd,
-      hasShared,
-      sharedAgentCount,
+      artifactSessionCount,
     });
 
     res.status(201).json({
       ...project,
       imported: {
-        hasShared,
         hasScreenshots,
-        sharedAgentCount,
+        artifactSessionCount,
       },
     });
   });
@@ -701,7 +708,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({ ...briefing, formatted: projectRegistry.formatBriefing(briefing) });
   });
 
-  // Resume a project — starts a new lead session with project context + message history
+  // Resume a project — resumes a specific session (or the latest) with optional team respawn
   router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(String(req.params.id));
@@ -715,47 +722,47 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
     }
 
-    const role = roleRegistry.get('lead');
-    if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
-
-    const { task: requestTask, model, freshStart, resumeAll, agents: agentIds } = req.body;
+    const { task: requestTask, model, freshStart, resumeAll, agents: agentIds, sessionId: targetSessionId } = req.body;
     try {
-      // Find the last session's Copilot sessionId for resume continuity
+      // Find session to resume: use explicit sessionId if provided, otherwise latest
       const lastSessions = projectRegistry.getSessions(project.id);
-      const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
-
-      // Log diagnostic when attempting to resume a crashed session
-      if (!freshStart && lastSession?.status === 'crashed') {
-        logger.warn({ module: 'project', msg: 'Attempting resume of crashed session — SDK may or may not recover it', sessionId: lastSession.sessionId, projectId: project.id });
+      let lastSession = null;
+      if (!freshStart) {
+        if (targetSessionId != null) {
+          // Resume a specific session selected by the user
+          lastSession = lastSessions.find((s) => s.id === Number(targetSessionId)) ?? null;
+          if (!lastSession) return res.status(404).json({ error: 'Specified session not found for this project' });
+        } else {
+          lastSession = lastSessions.length > 0 ? lastSessions[0] : null;
+        }
+        if (!lastSession) {
+          return res.status(404).json({ error: 'No session found to resume. Use freshStart to create a new session.' });
+        }
       }
 
-      const resumeSessionId = lastSession
-        ? lastSession.sessionId ?? undefined
-        : undefined;
+      let agent: ReturnType<typeof agentManager.spawn>;
+      let task: string | undefined;
+      const isResume = !!lastSession;
 
-      // Preserve task from previous session if none provided
-      const task = requestTask || (lastSession ? lastSession.task : undefined);
-
-      const agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
-
-      // Verify the invariant: spawn must reuse the same agent ID on resume
-      if (lastSession && agent.id !== lastSession.leadId) {
-        logger.warn({ module: 'project', msg: 'Agent ID mismatch after resume spawn — invariant violation', expected: lastSession.leadId, actual: agent.id, sessionId: lastSession.id });
-      }
-
-      // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
       if (lastSession) {
-        projectRegistry.reactivateSession(lastSession.id, task, role.id);
+        // Resume existing session via shared helper (atomic claim, spawn, reactivate)
+        const result = resumeLeadSession(
+          { session: lastSession, project, task: requestTask, model },
+          { agentManager, roleRegistry, projectRegistry },
+        );
+        agent = result.agent;
+        task = result.task;
       } else {
+        // Fresh start (explicitly requested) — create new lead + new session
+        const role = roleRegistry.get('lead');
+        if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+        task = requestTask;
+        agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, undefined, undefined, { projectName: project.name, projectId: project.id });
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
       // Gather context from previous session
       const briefing = projectRegistry.buildBriefing(project.id);
-
-      // When resuming an existing session, send NO messages to agents.
-      // The lead picks up context from the restored ACP session.
-      const isResume = !!lastSession;
 
       // Send project briefing (fresh start only — resume gets context from ACP session)
       if (!isResume && briefing && briefing.sessions.length > 1) {
@@ -772,7 +779,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         const teamSize = agentIds?.length ?? (resumeAll && lastSession ? 6 : 0);
         const TASK_DELIVERY_DELAY_MS = 5000 + Math.ceil(teamSize / 3) * 2000;
         setTimeout(() => {
-          agent.sendMessage(task);
+          agent.sendMessage(task!);
         }, TASK_DELIVERY_DELAY_MS);
       }
 
@@ -840,13 +847,18 @@ export function projectsRoutes(ctx: AppContext): Router {
         // The crew roster is discoverable via QUERY_CREW.
       }
 
-      // Auto-spawn Secretary for DAG tracking — only if not already resumed from previous session
-      if (!secretaryResumed) {
+      // Auto-spawn Secretary for DAG tracking.
+      // Skip during resume — all agents should start idle. The lead will
+      // auto-spawn a secretary when it begins real work.
+      if (!secretaryResumed && !isResume) {
         agentManager.autoSpawnSecretary(agent);
       }
 
       res.status(201).json({ ...agent.toJSON(), respawning: respawnedCount });
     } catch (err: any) {
+      if (err instanceof ResumeError) {
+        return res.status(err.statusCode).json({ error: err.message });
+      }
       logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
       // Only expose rate-limit messages; sanitize all other errors
       const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');
@@ -1040,8 +1052,8 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   /**
    * GET /projects/:id/artifacts
-   * Returns markdown files from organized storage (~/.flightdeck/artifacts/) and
-   * legacy .flightdeck/shared/, grouped by agent directory and session.
+   * Returns markdown files from organized storage ($FLIGHTDECK_STATE_DIR/artifacts/),
+   * grouped by agent directory and session.
    */
   router.get('/projects/:id/artifacts', (req, res) => {
     if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
@@ -1049,7 +1061,8 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     type ArtifactFile = { name: string; path: string; ext: string; title: string; modifiedAt: string };
-    type ArtifactGroup = { agentDir: string; role: string; agentId: string; sessionId?: string; files: ArtifactFile[] };
+    type ArtifactSource = 'flightdeck' | 'copilot-session';
+    type ArtifactGroup = { agentDir: string; role: string; agentId: string; sessionId?: string; source: ArtifactSource; files: ArtifactFile[] };
 
     function readAgentDir(dirPath: string, dirName: string, basePath: string, sessionId?: string): ArtifactGroup | null {
       const parts = dirName.split('-');
@@ -1073,13 +1086,13 @@ export function projectsRoutes(ctx: AppContext): Router {
         }).sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
       } catch { /* skip unreadable */ }
       if (files.length === 0) return null;
-      return { agentDir: dirName, role, agentId, sessionId, files };
+      return { agentDir: dirName, role, agentId, sessionId, source: 'flightdeck' as ArtifactSource, files };
     }
 
     const groups: ArtifactGroup[] = [];
 
-    // Read from organized storage (~/.flightdeck/artifacts/{projectId}/sessions/)
-    const organizedDir = join(homedir(), '.flightdeck', 'artifacts', req.params.id, 'sessions');
+    // Read from organized storage (FLIGHTDECK_STATE_DIR/artifacts/{projectId}/sessions/)
+    const organizedDir = join(FLIGHTDECK_STATE_DIR, 'artifacts', req.params.id, 'sessions');
     if (existsSync(organizedDir)) {
       try {
         const sessionDirs = readdirSync(organizedDir, { withFileTypes: true }).filter(e => e.isDirectory());
@@ -1094,25 +1107,165 @@ export function projectsRoutes(ctx: AppContext): Router {
       } catch { /* ignore read errors */ }
     }
 
-    // Fallback: read from legacy in-repo path
-    const sharedDir = project.cwd ? join(project.cwd, '.flightdeck', 'shared') : null;
-    if (sharedDir) {
-      const result = resolveAndValidate(project.cwd!, '.flightdeck/shared');
-      if (result) {
+    // Read Copilot CLI session artifacts (plan.md, checkpoints/, files/, research/)
+    const copilotStateDir = join(homedir(), '.copilot', 'session-state');
+    const projectAgents = agentRoster?.getByProject(req.params.id) ?? [];
+    const seenSessions = new Set<string>();
+
+    for (const agent of projectAgents) {
+      if (!agent.sessionId || seenSessions.has(agent.sessionId)) continue;
+      seenSessions.add(agent.sessionId);
+
+      const sessionDir = join(copilotStateDir, agent.sessionId);
+      if (!existsSync(sessionDir)) continue;
+
+      const shortId = agent.agentId.slice(0, 8);
+      const agentDir = `${agent.role}-${shortId}`;
+      const sessionFiles: ArtifactFile[] = [];
+
+      // plan.md
+      const planPath = join(sessionDir, 'plan.md');
+      try {
+        if (existsSync(planPath)) {
+          const stat = statSync(planPath);
+          const content = readFileSync(planPath, 'utf-8');
+          const headingMatch = content.match(/^#\s+(.+)$/m);
+          const title = headingMatch ? headingMatch[1] : 'Plan';
+          sessionFiles.push({
+            name: 'plan.md', path: 'plan.md', ext: 'md',
+            title, modifiedAt: stat.mtime.toISOString(),
+          });
+        }
+      } catch { /* skip */ }
+
+      // Scan allowed subdirectories: checkpoints/, files/, research/
+      for (const subDir of ['checkpoints', 'files', 'research']) {
+        const dirPath = join(sessionDir, subDir);
         try {
-          const seenDirs = new Set(groups.map(g => g.agentDir));
-          const agentDirs = readdirSync(result.resolved, { withFileTypes: true })
-            .filter(e => e.isDirectory() && !seenDirs.has(e.name));
-          for (const dir of agentDirs) {
-            const group = readAgentDir(join(result.resolved, dir.name), dir.name, realpathSync(project.cwd!));
-            if (group) groups.push(group);
+          if (!existsSync(dirPath)) continue;
+          const entries = readdirSync(dirPath, { withFileTypes: true })
+            .filter(e => e.isFile() && !e.name.startsWith('.'));
+          for (const entry of entries) {
+            const filePath = join(dirPath, entry.name);
+            const stat = statSync(filePath);
+            let title = entry.name.replace(/\.[^.]+$/, '');
+            if (entry.name.endsWith('.md') || entry.name.endsWith('.mdx')) {
+              try {
+                const content = readFileSync(filePath, 'utf-8');
+                const headingMatch = content.match(/^#\s+(.+)$/m);
+                if (headingMatch) title = headingMatch[1];
+              } catch { /* use filename */ }
+            }
+            sessionFiles.push({
+              name: entry.name, path: `${subDir}/${entry.name}`,
+              ext: extname(entry.name).slice(1), title,
+              modifiedAt: stat.mtime.toISOString(),
+            });
           }
-        } catch { /* ignore */ }
+        } catch { /* skip */ }
+      }
+
+      if (sessionFiles.length > 0) {
+        sessionFiles.sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
+        groups.push({
+          agentDir, role: agent.role, agentId: agent.agentId,
+          sessionId: agent.sessionId, source: 'copilot-session',
+          files: sessionFiles,
+        });
       }
     }
 
     groups.sort((a, b) => a.role.localeCompare(b.role));
-    res.json({ groups, sharedPath: sharedDir || '' });
+    res.json({ groups, artifactBasePath: organizedDir });
+  });
+
+  /**
+   * GET /projects/:id/artifact-contents?path=<sessionId>/<role>-<shortId>/file.md
+   * Returns file content from organized artifact storage.
+   * Separate from file-contents because artifacts live outside project.cwd.
+   */
+  router.get('/projects/:id/artifact-contents', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!filePath || filePath.includes('\0') || filePath.includes('..')) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
+    const organizedDir = join(FLIGHTDECK_STATE_DIR, 'artifacts', req.params.id, 'sessions');
+    const resolved = join(organizedDir, filePath);
+    // Security: ensure resolved path stays within organizedDir
+    if (!normalize(resolved).startsWith(normalize(organizedDir) + sep)) {
+      return res.status(403).json({ error: 'Path outside artifact directory' });
+    }
+
+    try {
+      const stat = statSync(resolved);
+      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
+      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large' });
+      const content = readFileSync(resolved, 'utf-8');
+      res.json({ path: filePath, content, size: stat.size, ext: extname(filePath).slice(1) });
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+      res.status(400).json({ error: 'Cannot read file' });
+    }
+  });
+
+  /**
+   * GET /projects/:id/session-artifact?agentId=<id>&path=plan.md
+   * Returns file content from agent's Copilot CLI session directory.
+   * Security: only serves files matching the allowlist (plan.md, checkpoints/, files/, research/).
+   */
+  router.get('/projects/:id/session-artifact', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const agentId = typeof req.query.agentId === 'string' ? req.query.agentId : '';
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+
+    if (!agentId || !filePath) {
+      return res.status(400).json({ error: 'Missing agentId or path parameter' });
+    }
+    if (filePath.includes('\0') || filePath.includes('..')) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
+    // Look up agent's sessionId from roster
+    const agent = agentRoster?.getAgent(agentId);
+    if (!agent?.sessionId) return res.status(404).json({ error: 'Agent session not found' });
+
+    // Validate project scoping — agent must belong to this project
+    if (agent.projectId !== req.params.id) {
+      return res.status(403).json({ error: 'Agent not in this project' });
+    }
+
+    // Allowlist: only serve known safe paths
+    const ALLOWED_PREFIXES = ['plan.md', 'checkpoints/', 'files/', 'research/'];
+    if (!ALLOWED_PREFIXES.some(prefix => filePath === prefix || filePath.startsWith(prefix))) {
+      return res.status(403).json({ error: 'File not accessible' });
+    }
+
+    const sessionDir = join(homedir(), '.copilot', 'session-state', agent.sessionId);
+    const resolved = join(sessionDir, filePath);
+
+    // Security: ensure resolved path stays within session dir
+    if (!normalize(resolved).startsWith(normalize(sessionDir) + sep)) {
+      return res.status(403).json({ error: 'Path outside session directory' });
+    }
+
+    try {
+      const stat = statSync(resolved);
+      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
+      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large' });
+      const content = readFileSync(resolved, 'utf-8');
+      res.json({ path: filePath, content, size: stat.size, ext: extname(filePath).slice(1) });
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+      res.status(400).json({ error: 'Cannot read file' });
+    }
   });
 
   return router;
