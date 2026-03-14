@@ -52,11 +52,18 @@ export function tasksRoutes(ctx: AppContext): Router {
       const allTasks = taskDAG.getAll({ includeArchived });
       tasks = allTasks.filter(t => t.leadId === leadId);
     } else {
-      // Global scope (default): restrict to tasks whose lead is currently
-      // live in the AgentManager — prevents leaking tasks from old sessions.
+      // Global scope (default): when agents are live, restrict to tasks
+      // whose lead is in-memory to avoid leaking old session tasks.
+      // After a server restart (no live agents yet), return all tasks
+      // so the UI isn't empty while agents are reconnecting.
       const allTasks = taskDAG.getAll({ includeArchived });
-      const liveAgentIds = new Set(agentManager.getAll().map(a => a.id));
-      tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
+      const liveAgents = agentManager.getAll();
+      if (liveAgents.length > 0) {
+        const liveAgentIds = new Set(liveAgents.map(a => a.id));
+        tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
+      } else {
+        tasks = allTasks;
+      }
     }
 
     // Apply optional filters

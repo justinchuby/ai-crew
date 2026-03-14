@@ -114,7 +114,8 @@ export class AgentRosterRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
-  /** Get all agents for a specific session (uses idx_agent_roster_session index). */
+  /** Get all agents for a specific session (uses idx_agent_roster_session index).
+   *  Intended for future session-scoped views; keep even if currently unused. */
   getBySession(sessionId: string): AgentRecord[] {
     const rows = this.db.drizzle
       .select()
