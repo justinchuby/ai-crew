@@ -166,7 +166,7 @@
     "watch": "node esbuild.js --watch",
     "package": "vsce package --no-dependencies",
     "lint": "eslint src/",
-    "test": "cd ../.. && npx vitest run packages/vscode/src/__tests__/"
+    "test": "vitest run src/__tests__/"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
