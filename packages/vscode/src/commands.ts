@@ -90,20 +90,14 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       });
       if (!message) return;
 
-      try {
-        const res = await fetch(`${connection.serverUrl}/api/agents/${agentId}/message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: message }),
-        });
-        if (res.ok) {
-          outputChannel.appendLine(`Message sent to ${agentId.slice(0, 8)}`);
-          vscode.window.showInformationMessage('Flightdeck: Message sent');
-        } else {
-          vscode.window.showWarningMessage(`Flightdeck: Failed to send (${res.status})`);
-        }
-      } catch (err) {
-        vscode.window.showErrorMessage(`Flightdeck: ${err instanceof Error ? err.message : 'Send failed'}`);
+      const res = await connection.postJson(`/agents/${agentId}/message`, {
+        body: { text: message },
+      });
+      if (res.ok) {
+        outputChannel.appendLine(`Message sent to ${agentId.slice(0, 8)}`);
+        vscode.window.showInformationMessage('Flightdeck: Message sent');
+      } else {
+        vscode.window.showWarningMessage(`Flightdeck: Failed to send (${res.status})`);
       }
     }),
 
@@ -119,18 +113,12 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       );
       if (confirm !== 'Terminate') return;
 
-      try {
-        const res = await fetch(`${connection.serverUrl}/api/agents/${item.agentId}/terminate`, {
-          method: 'POST',
-        });
-        if (res.ok) {
-          outputChannel.appendLine(`Agent ${shortId} terminated`);
-          agentsProvider.refresh();
-        } else {
-          vscode.window.showWarningMessage(`Flightdeck: Failed to terminate (${res.status})`);
-        }
-      } catch (err) {
-        vscode.window.showErrorMessage(`Flightdeck: ${err instanceof Error ? err.message : 'Terminate failed'}`);
+      const res = await connection.postJson(`/agents/${item.agentId}/terminate`);
+      if (res.ok) {
+        outputChannel.appendLine(`Agent ${shortId} terminated`);
+        agentsProvider.refresh();
+      } else {
+        vscode.window.showWarningMessage(`Flightdeck: Failed to terminate (${res.status})`);
       }
     }),
 
@@ -147,20 +135,15 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
         return;
       }
 
-      try {
-        const res = await fetch(`${connection.serverUrl}/api/decisions/${decisionId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'accepted' }),
-        });
-        if (res.ok) {
-          outputChannel.appendLine(`Decision ${decisionId} approved`);
-          vscode.window.showInformationMessage('Flightdeck: Decision approved');
-        } else {
-          vscode.window.showWarningMessage(`Flightdeck: Failed to approve (${res.status})`);
-        }
-      } catch (err) {
-        vscode.window.showErrorMessage(`Flightdeck: ${err instanceof Error ? err.message : 'Approve failed'}`);
+      const res = await connection.postJson(`/decisions/${decisionId}`, {
+        method: 'PATCH',
+        body: { status: 'accepted' },
+      });
+      if (res.ok) {
+        outputChannel.appendLine(`Decision ${decisionId} approved`);
+        vscode.window.showInformationMessage('Flightdeck: Decision approved');
+      } else {
+        vscode.window.showWarningMessage(`Flightdeck: Failed to approve (${res.status})`);
       }
     }),
   ];

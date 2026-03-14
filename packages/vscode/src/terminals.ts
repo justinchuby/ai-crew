@@ -67,22 +67,13 @@ class AgentPseudoterminal implements vscode.Pseudoterminal {
     this.writeEmitter.fire(data);
   }
 
-  private async sendMessage(message: string): Promise<void> {
+  private async sendMessage(text: string): Promise<void> {
     this.writeEmitter.fire(`\x1b[90m→ Sending message...\x1b[0m\r\n`);
-    try {
-      const res = await fetch(
-        `${this.connection.serverUrl}/api/agents/${this.agentId}/message`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: message }),
-        },
-      );
-      if (!res.ok) {
-        this.writeEmitter.fire(`\x1b[31m✗ Failed to send (${res.status})\x1b[0m\r\n`);
-      }
-    } catch (err) {
-      this.writeEmitter.fire(`\x1b[31m✗ Error: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`);
+    const res = await this.connection.postJson(`/agents/${this.agentId}/message`, {
+      body: { text },
+    });
+    if (!res.ok) {
+      this.writeEmitter.fire(`\x1b[31m✗ Failed to send (${res.status})\x1b[0m\r\n`);
     }
   }
 
