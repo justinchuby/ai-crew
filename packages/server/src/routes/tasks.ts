@@ -43,7 +43,12 @@ export function tasksRoutes(ctx: AppContext): Router {
       }
       tasks = taskDAG.getTasksByProject(projectId, { includeArchived });
     } else {
-      tasks = taskDAG.getAll({ includeArchived });
+      // Global scope: filter to tasks belonging to the current session.
+      // dagTasks has no sessionId column, so we match tasks whose leadId
+      // corresponds to an agent that is currently live in the AgentManager.
+      const allTasks = taskDAG.getAll({ includeArchived });
+      const liveAgentIds = new Set(agentManager.getAll().map(a => a.id));
+      tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
     }
 
     // Apply optional filters

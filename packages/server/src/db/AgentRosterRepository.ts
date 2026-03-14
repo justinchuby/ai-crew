@@ -114,6 +114,26 @@ export class AgentRosterRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
+  /** Get all agents for a specific session (uses idx_agent_roster_session index). */
+  getBySession(sessionId: string): AgentRecord[] {
+    const rows = this.db.drizzle
+      .select()
+      .from(agentRoster)
+      .where(eq(agentRoster.sessionId, sessionId))
+      .all();
+    return rows.map((r) => this.rowToRecord(r));
+  }
+
+  /** Get agents matching both a project and session. */
+  getByProjectAndSession(projectId: string, sessionId: string): AgentRecord[] {
+    const rows = this.db.drizzle
+      .select()
+      .from(agentRoster)
+      .where(and(eq(agentRoster.projectId, projectId), eq(agentRoster.sessionId, sessionId)))
+      .all();
+    return rows.map((r) => this.rowToRecord(r));
+  }
+
   updateStatus(agentId: string, status: RosterAgentStatus): boolean {
     const result = this.db.drizzle
       .update(agentRoster)

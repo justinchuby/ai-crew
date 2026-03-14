@@ -32,9 +32,14 @@ export function agentsRoutes(ctx: AppContext): Router {
   // --- Agents ---
   router.get('/agents', (req, res) => {
     const projectId = req.query.projectId as string | undefined;
-    const agents = projectId
+    const sessionId = req.query.sessionId as string | undefined;
+    let agents = projectId
       ? agentManager.getByProject(projectId)
       : agentManager.getAll();
+    // Filter to a specific session when requested
+    if (sessionId) {
+      agents = agents.filter(a => a.sessionId === sessionId);
+    }
     res.json(agents.map((a) => a.toJSON()));
   });
 
