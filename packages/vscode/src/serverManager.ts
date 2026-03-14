@@ -111,26 +111,29 @@ export class ServerManager {
 
   /** Stop the running server process. */
   stop(): void {
-    if (!this._process) {
-      vscode.window.showInformationMessage('Flightdeck: No server process running');
+    if (!this._process || this._stopping) {
+      if (!this._process && !this._stopping) {
+        vscode.window.showInformationMessage('Flightdeck: No server process running');
+      }
       return;
     }
 
+    this._stopping = true;
     this._outputChannel.appendLine('Stopping server...');
 
+    const pid = this._process.pid;
+
     try {
-      // Send SIGTERM for graceful shutdown
       this._process.kill('SIGTERM');
     } catch {
       // Process may already be dead
     }
 
-    // Force kill after 5 seconds
-    const pid = this._process.pid;
+    // Force kill after 5 seconds if still alive
     if (pid) {
       setTimeout(() => {
         try {
-          process.kill(pid, 0); // check if alive
+          process.kill(pid, 0); // throws if dead
           process.kill(pid, 'SIGKILL');
           this._outputChannel.appendLine('Server force-killed after timeout');
         } catch {
@@ -139,9 +142,8 @@ export class ServerManager {
       }, 5000);
     }
 
-    this._process = null;
-    this._setRunning(false);
-    vscode.window.showInformationMessage('Flightdeck: Server stopped');
+    // Don't null this._process here — the 'exit' event handler does cleanup.
+    vscode.window.showInformationMessage('Flightdeck: Server stopping...');
   }
 
   // ── Private ───────────────────────────────────────────────────
