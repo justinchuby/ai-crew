@@ -47,6 +47,20 @@ jobs:
           done
           exit $DRIFT
 
+      - name: Build all packages
+        run: npm run build
+
+      - name: CLI smoke test
+        run: |
+          # Verify CLI entry point works
+          node bin/flightdeck.mjs --version
+          # Verify server dependencies resolve (catches missing packages like pino)
+          node -e "
+            import('./packages/server/dist/utils/logger.js')
+              .then(() => console.log('✓ Server imports resolve'))
+              .catch(e => { console.error('✗', e.message); process.exit(1); })
+          "
+
       - name: Unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
 

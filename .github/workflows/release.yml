@@ -30,6 +30,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: CLI smoke test
+        run: |
+          node bin/flightdeck.mjs --version
+          node -e "
+            import('./packages/server/dist/utils/logger.js')
+              .then(() => console.log('✓ Server imports resolve'))
+              .catch(e => { console.error('✗', e.message); process.exit(1); })
+          "
+
       - name: Run tests
         run: npm test
 
