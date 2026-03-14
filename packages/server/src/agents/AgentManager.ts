@@ -107,6 +107,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
   private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private idleNudgeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
   private autoRestart: boolean;
@@ -765,6 +766,33 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         // idle transition properly re-notifies the parent.
         if (status === 'running') {
           this.dispatcher.clearCompletionTracking(agent.id);
+          // Cancel any pending idle task nudge
+          const nudgeTimer = this.idleNudgeTimers.get(agent.id);
+          if (nudgeTimer) {
+            clearTimeout(nudgeTimer);
+            this.idleNudgeTimers.delete(agent.id);
+          }
+        }
+
+        // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
+        // tasks, send a reminder. Nudge once per idle period (not spam).
+        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+          if (!this.idleNudgeTimers.has(agent.id)) {
+            const timer = setTimeout(() => {
+              this.idleNudgeTimers.delete(agent.id);
+              if (agent.status !== 'idle') return;
+              const leadId = agent.parentId;
+              if (!leadId) return;
+              const dagTask = this.taskDAG.getTaskByAgent(leadId, agent.id);
+              if (dagTask && dagTask.dagStatus === 'running') {
+                agent.sendMessage(
+                  `[System] You have an uncompleted task: "${dagTask.title || dagTask.id}". ` +
+                  `Please mark it done with COMPLETE_TASK or report what is blocking you.`
+                );
+              }
+            }, 30_000);
+            this.idleNudgeTimers.set(agent.id, timer);
+          }
         }
 
         // Suppress the first idle notification for resumed agents — their prior

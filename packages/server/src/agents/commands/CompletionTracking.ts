@@ -59,9 +59,10 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
 
   // NOTE: We intentionally do NOT mark the delegation as completed here.
   // The agent's ACP state (running/idle) is the source of truth for display
-  // status. Delegation completion only happens on agent exit (see
-  // notifyParentOfCompletion). This prevents the UI from showing "completed"
-  // while the agent is still actively processing between idle/running cycles.
+  // status. Delegation completes when the agent explicitly calls COMPLETE_TASK
+  // or when the agent process exits (see notifyParentOfCompletion). This
+  // prevents the UI from showing "completed" while the agent is still
+  // actively processing between idle/running cycles.
 
   const rawOutput = agent.getTaskOutput(16000);
   const sentMessages = /⟦⟦\s*(AGENT_MESSAGE|BROADCAST|GROUP_MESSAGE|COMPLETE_TASK)\s*\{/.test(rawOutput);
