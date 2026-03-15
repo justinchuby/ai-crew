@@ -478,8 +478,8 @@ describe('CrewRoster', () => {
 
     fireEvent.click(screen.getByText('aa11bb22'));
     await waitFor(() => {
-      // Architect emoji from getRoleIcon
-      expect(screen.getByText('\u{1F3D7}')).toBeInTheDocument();
+      // Architect emoji from getRoleIcon (U+1F3D7 + U+FE0F variation selector)
+      expect(screen.getByText('\u{1F3D7}\u{FE0F}')).toBeInTheDocument();
     });
   });
 
