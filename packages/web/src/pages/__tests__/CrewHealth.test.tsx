@@ -171,4 +171,35 @@ describe('CrewHealth', () => {
       expect(screen.getByTestId('crew-health-empty')).toBeInTheDocument();
     });
   });
+
+  it('renders terminated and failed agent statuses', async () => {
+    mockApiFetch.mockResolvedValue(makeHealth({
+      agents: [
+        { agentId: 'a1', role: 'Dev', model: 'gpt-4', status: 'terminated', uptimeMs: 100_000_000 },
+        { agentId: 'a2', role: 'QA', model: 'gpt-4', status: 'failed', uptimeMs: 5000 },
+        { agentId: 'a3', role: 'Arch', model: 'gpt-4', status: 'unknown', uptimeMs: 7200000 },
+      ],
+    }));
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByText('Terminated')).toBeInTheDocument();
+      expect(screen.getByText('Failed')).toBeInTheDocument();
+      expect(screen.getByText('unknown')).toBeInTheDocument();
+      // days format
+      expect(screen.getByText('1.2d')).toBeInTheDocument();
+    });
+  });
+
+  it('opens AgentLifecycle when Manage button is clicked', async () => {
+    mockApiFetch.mockResolvedValue(makeHealth());
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByText('Developer')).toBeInTheDocument();
+    });
+    const manageBtn = screen.getByTestId('manage-agent-1');
+    fireEvent.click(manageBtn);
+    await waitFor(() => {
+      expect(screen.getByTestId('lifecycle-agent-1')).toBeInTheDocument();
+    });
+  });
 });
