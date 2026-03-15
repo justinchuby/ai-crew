@@ -407,7 +407,6 @@ export function CrewPage() {
   useEffect(() => { fetchCrews(); }, [fetchCrews]);
 
   // Fetch crew data on mount + when selection/filter changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [selectedCrew, statusFilter]);
 
   // Polling (silent — no loading spinner)

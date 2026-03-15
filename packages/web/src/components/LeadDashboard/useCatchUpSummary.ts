@@ -61,7 +61,6 @@ export function useCatchUpSummary(
     if (elapsed < 60_000) {
       snapshotRef.current = currentCounts;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agents, currentProject, selectedLeadId, catchUpSummary]);
 
   // Reset snapshot when switching projects

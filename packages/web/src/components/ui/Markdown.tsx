@@ -8,7 +8,7 @@
  * For short inline text (single line, no blocks), continue using
  * InlineMarkdown / InlineMarkdownWithMentions from utils/markdown.tsx.
  */
-import React, { useMemo, type JSX } from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
