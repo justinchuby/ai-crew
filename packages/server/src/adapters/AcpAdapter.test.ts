@@ -236,69 +236,30 @@ describe('AcpAdapter', () => {
       expect(sessionId).toBe('previous-session-id');
     });
 
-    it('falls back to newSession when loadSession fails', async () => {
+    it('throws when resume fails instead of falling back', async () => {
       setupSuccessfulStart();
       mockLoadSession.mockRejectedValue(new Error('session/load not supported'));
-      mockNewSession.mockResolvedValue({ sessionId: 'fallback-session-id' });
 
       const adapter = new AcpAdapter();
       const resumeFailedHandler = vi.fn();
       adapter.on('session_resume_failed', resumeFailedHandler);
 
-      const sessionId = await adapter.start({
+      await expect(adapter.start({
         ...DEFAULT_START_OPTS,
         sessionId: 'dead-session',
-      });
+      })).rejects.toThrow('Session resume failed: session/load not supported');
 
-      // Should have tried loadSession first
-      expect(mockLoadSession).toHaveBeenCalledWith({
-        sessionId: 'dead-session',
-        cwd: DEFAULT_START_OPTS.cwd,
-        mcpServers: [],
-      });
-      // Should have fallen back to newSession
-      expect(mockNewSession).toHaveBeenCalledWith({
-        cwd: DEFAULT_START_OPTS.cwd,
-        mcpServers: [],
-      });
-      // Should return the fallback session ID
-      expect(sessionId).toBe('fallback-session-id');
-      // Should have logged a warning
+      expect(mockNewSession).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({
         module: 'acp',
-        msg: 'Session resume failed — falling back to new session',
+        msg: 'Session resume failed',
         requestedSessionId: 'dead-session',
         error: 'session/load not supported',
       }));
-      // Should have emitted the event
       expect(resumeFailedHandler).toHaveBeenCalledWith({
         requestedSessionId: 'dead-session',
         error: 'session/load not supported',
       });
-      // Should flag resume as failed
-      expect(adapter.resumeFailed).toBe(true);
-    });
-
-    it('sets resumeFailed to false on normal start', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter();
-      await adapter.start(DEFAULT_START_OPTS);
-
-      expect(adapter.resumeFailed).toBe(false);
-    });
-
-    it('sets resumeFailed to false on successful resume', async () => {
-      setupSuccessfulStart();
-      mockLoadSession.mockResolvedValue({});
-
-      const adapter = new AcpAdapter();
-      await adapter.start({
-        ...DEFAULT_START_OPTS,
-        sessionId: 'valid-session',
-      });
-
-      expect(adapter.resumeFailed).toBe(false);
     });
 
     it('reads agent capabilities from initialize result', async () => {

@@ -168,21 +168,6 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
       agent._isResuming = false;
       return conn.prompt(initialPrompt);
     }
-
-    // Resume attempted but loadSession() failed — adapter fell back to a fresh
-    // session. Re-deliver the full task prompt so the agent has work to do.
-    if (conn.resumeFailed) {
-      logger.info({
-        module: 'agent-bridge',
-        msg: 'Resume fell back to new session — delivering task prompt',
-        agentId: agent.id,
-        role: agent.role.id,
-      });
-      agent._isResuming = false;
-      const fallbackPrompt = agent.buildFullPrompt();
-      return conn.prompt(fallbackPrompt);
-    }
-
     // Resumed agents have no initial prompt — they're waiting for input.
     // The provider may be continuing an in-flight prompt from the crashed
     // session — cancel it so the agent starts clean and idle.
