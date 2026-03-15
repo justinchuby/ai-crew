@@ -1,175 +1,287 @@
-// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useAppStore } from '../../../stores/appStore';
+import { useLeadStore } from '../../../stores/leadStore';
+import type { AgentInfo, Decision } from '../../../types';
+
+// ── Mocks ───────────────────────────────────────────────────────────
 
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return { ...actual, useNavigate: () => mockNavigate };
-});
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}));
 
-const mockApiFetch = vi.fn();
+let mockProjectId: string | null = 'proj-1';
+vi.mock('../../../contexts/ProjectContext', () => ({
+  useProjectId: () => mockProjectId,
+}));
+
+let mockProjects: Array<{ id: string; name: string; status: string; cwd?: string }> = [];
+vi.mock('../../../hooks/useProjects', () => ({
+  useProjects: () => ({ projects: mockProjects, loading: false }),
+}));
+
+const mockApiFetch = vi.fn().mockResolvedValue([]);
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-vi.mock('../../../hooks/useProjects', () => ({
-  useProjects: () => ({ projects: [{ id: 'p1', name: 'Test Project', cwd: '/home/test' }], refresh: vi.fn() }),
-}));
-
-vi.mock('../../../contexts/ProjectContext', () => ({
-  useProjectId: () => 'p1',
-}));
-
-// Mock child components to isolate OverviewPage
+// Simplify child components to avoid deep dependency trees
 vi.mock('../../SessionHistory', () => ({
-  SessionHistory: () => <div data-testid="session-history" />,
-  NewSessionDialog: () => null,
+  SessionHistory: ({ projectId }: { projectId: string }) => (
+    <div data-testid="session-history">history-{projectId}</div>
+  ),
+  NewSessionDialog: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="new-session-dialog">
+      <button onClick={onClose}>close-dialog</button>
+    </div>
+  ),
 }));
-vi.mock('../../SessionHistory/SessionHistory', () => ({
-  SessionHistory: () => <div data-testid="session-history" />,
-  NewSessionDialog: () => null,
-  default: () => <div data-testid="session-history" />,
-}));
-vi.mock('../../MissionControl/AlertsPanel', () => ({
-  detectAlerts: () => [],
-}));
+
 vi.mock('../TokenUsageSection', () => ({
-  TokenUsageSection: () => <div data-testid="token-usage" />,
+  TokenUsageSection: ({ projectId }: { projectId: string }) => (
+    <div data-testid="token-usage-section">tokens-{projectId}</div>
+  ),
 }));
+
 vi.mock('../../FleetOverview/FileLockPanel', () => ({
-  FileLockPanel: () => <div data-testid="file-locks" />,
+  FileLockPanel: () => <div data-testid="file-lock-panel" />,
 }));
-vi.mock('../../FleetOverview/FleetOverview', () => ({
-  FileLock: undefined,
+
+vi.mock('../../Shared', () => ({
+  DecisionFeedItem: ({ decision }: { decision: Decision }) => (
+    <div data-testid="decision-feed-item">{decision.title}</div>
+  ),
+  DecisionDetailModal: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="decision-detail-modal"><button onClick={onClose}>close</button></div>
+  ),
+  ActivityFeedItem: ({ entry }: { entry: { summary: string } }) => (
+    <div data-testid="activity-feed-item">{entry.summary}</div>
+  ),
+  ActivityDetailModal: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="activity-detail-modal"><button onClick={onClose}>close</button></div>
+  ),
 }));
+
 vi.mock('../../SectionErrorBoundary', () => ({
   SectionErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('../../Shared/SectionErrorBoundary', () => ({
-  SectionErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-vi.mock('../../Shared/DecisionFeedItem', () => ({
-  DecisionFeedItem: ({ decision }: { decision: { title: string } }) => <div>{decision.title}</div>,
-}));
-vi.mock('../../Shared/DecisionDetailModal', () => ({
-  DecisionDetailModal: () => null,
-  default: () => null,
-}));
-vi.mock('../../Shared/ActivityFeedItem', () => ({
-  ActivityFeedItem: ({ entry }: { entry: { summary: string } }) => <div>{entry.summary}</div>,
-}));
-vi.mock('../../Shared/ActivityDetailModal', () => ({
-  ActivityDetailModal: () => null,
-  default: () => null,
-}));
-vi.mock('../../Shared', () => ({
-  ActivityFeedItem: ({ entry }: { entry: { summary: string } }) => <div>{entry.summary}</div>,
-  DecisionFeedItem: ({ decision }: { decision: { title: string } }) => <div>{decision.title}</div>,
-  DecisionDetailModal: () => null,
-  ActivityDetailModal: () => null,
+
+vi.mock('../../MissionControl/AlertsPanel', () => ({
+  detectAlerts: vi.fn(() => []),
 }));
 
-// Mock stores
-const storeState: Record<string, unknown> = {
-  agents: [],
-  effectiveId: 'lead-1',
-  selectedLeadId: 'lead-1',
-  dagStatus: null,
-  projects: {
-    'lead-1': { dagStatus: null, decisions: [] },
-    'p1': { dagStatus: null, decisions: [] },
-  },
-};
-
-vi.mock('../../../stores/appStore', () => ({
-  useAppStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    typeof selector === 'function' ? selector(storeState) : storeState,
-}));
-
-vi.mock('../../../stores/leadStore', () => ({
-  useLeadStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    typeof selector === 'function' ? selector(storeState) : storeState,
-}));
-
+// Import after mocks
 import { OverviewPage } from '../OverviewPage';
+import { detectAlerts } from '../../MissionControl/AlertsPanel';
 
-function renderPage() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <OverviewPage />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
+  return {
+    id: 'agent-1',
+    role: { id: 'worker', name: 'Worker', icon: '🔧', description: '' },
+    status: 'running',
+    childIds: [],
+    createdAt: '2024-01-01T00:00:00Z',
+    outputPreview: '',
+    model: 'claude-sonnet',
+    projectId: 'proj-1',
+    ...overrides,
+  } as AgentInfo;
 }
+
+function resetStores() {
+  useAppStore.setState({ agents: [], connected: true, loading: false });
+  useLeadStore.setState({ projects: {}, selectedLeadId: null, drafts: {} });
+}
+
+// ── Tests ───────────────────────────────────────────────────────────
 
 describe('OverviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetStores();
+    mockProjectId = 'proj-1';
+    mockProjects = [{ id: 'proj-1', name: 'Test Project', status: 'active' }];
     mockApiFetch.mockResolvedValue([]);
-    storeState.agents = [];
-    storeState.effectiveId = 'lead-1';
-    storeState.selectedLeadId = 'lead-1';
-    storeState.dagStatus = null;
-    storeState.projects = {
-      'lead-1': { dagStatus: null, decisions: [] },
-      'p1': { dagStatus: null, decisions: [] },
-    };
   });
 
-  it('renders overview page container', () => {
-    renderPage();
+  it('renders empty state when no projects and no effectiveId', () => {
+    mockProjectId = '';
+    mockProjects = [];
+    useAppStore.setState({ agents: [] });
+
+    render(<OverviewPage />);
+    expect(screen.getByText(/No session data yet/i)).toBeInTheDocument();
+  });
+
+  it('renders overview page with quick status bar', () => {
+    useAppStore.setState({
+      agents: [
+        makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Lead', icon: '👑', description: '' }, status: 'running' }),
+        makeAgent({ id: 'worker-1' }),
+      ],
+    });
+
+    render(<OverviewPage />);
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
+    expect(screen.getByTestId('quick-status-bar')).toBeInTheDocument();
+    expect(screen.getByText('● Running')).toBeInTheDocument();
+    // "2 agents" appears in both status bar and session banner; verify at least one
+    expect(screen.getAllByText(/2 agents/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders session history section', () => {
-    renderPage();
-    expect(screen.getByTestId('session-history')).toBeInTheDocument();
+  it('shows "Stopped" when no active agents', () => {
+    useAppStore.setState({ agents: [] });
+    render(<OverviewPage />);
+    expect(screen.getByText('● Stopped')).toBeInTheDocument();
+    expect(screen.getByText(/0 agents/)).toBeInTheDocument();
+  });
+
+  it('shows active session banner with stop button when lead is running', () => {
+    const lead = makeAgent({
+      id: 'lead-1',
+      role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
+      status: 'running',
+      task: 'Build something cool',
+    });
+    useAppStore.setState({ agents: [lead] });
+
+    render(<OverviewPage />);
+    expect(screen.getByTestId('active-session-banner')).toBeInTheDocument();
+    expect(screen.getByText('Active Session')).toBeInTheDocument();
+    expect(screen.getByTestId('stop-session-btn')).toBeInTheDocument();
+  });
+
+  it('shows "New Session" button when no active lead', () => {
+    useAppStore.setState({ agents: [] });
+    render(<OverviewPage />);
+    expect(screen.getByTestId('no-session-controls')).toBeInTheDocument();
+    expect(screen.getByTestId('new-session-btn')).toBeInTheDocument();
+  });
+
+  it('opens new session dialog on button click', () => {
+    useAppStore.setState({ agents: [] });
+    render(<OverviewPage />);
+    fireEvent.click(screen.getByTestId('new-session-btn'));
+    expect(screen.getByTestId('new-session-dialog')).toBeInTheDocument();
+  });
+
+  it('shows task progress in status bar', () => {
+    const lead = makeAgent({
+      id: 'lead-1',
+      role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
+      status: 'running',
+    });
+    useAppStore.setState({ agents: [lead] });
+    useLeadStore.setState({
+      projects: {
+        'proj-1': {
+          dagStatus: {
+            tasks: [],
+            fileLockMap: {},
+            summary: { pending: 1, ready: 0, running: 2, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 0 },
+          },
+          decisions: [],
+          messages: [],
+          progress: null,
+          progressSummary: null,
+          progressHistory: [],
+          agentReports: [],
+          toolCalls: [],
+          activity: [],
+          comms: [],
+          groups: [],
+          groupMessages: {},
+          lastTextAt: 0,
+          pendingNewline: false,
+        },
+      },
+    });
+
+    render(<OverviewPage />);
+    expect(screen.getByText('3/6 tasks')).toBeInTheDocument();
+  });
+
+  it('displays decisions feed section', () => {
+    render(<OverviewPage />);
+    expect(screen.getByTestId('decisions-feed')).toBeInTheDocument();
+    expect(screen.getByText('Decisions')).toBeInTheDocument();
+  });
+
+  it('displays progress feed section', () => {
+    render(<OverviewPage />);
+    expect(screen.getByTestId('progress-feed')).toBeInTheDocument();
+    expect(screen.getByText('Recent Progress')).toBeInTheDocument();
   });
 
   it('renders token usage section', () => {
-    renderPage();
-    expect(screen.getByTestId('token-usage')).toBeInTheDocument();
+    render(<OverviewPage />);
+    expect(screen.getByTestId('token-usage-section')).toBeInTheDocument();
+    expect(screen.getByText('tokens-proj-1')).toBeInTheDocument();
   });
 
-  it('shows agent count when agents present', () => {
-    storeState.agents = [
-      { id: 'a1', role: { name: 'Dev' }, status: 'running', projectId: 'p1' },
-      { id: 'a2', role: { name: 'Tester' }, status: 'idle', projectId: 'p1' },
-    ];
-    renderPage();
-    expect(screen.getByText(/2/)).toBeInTheDocument();
+  it('renders session history section', () => {
+    render(<OverviewPage />);
+    expect(screen.getByTestId('session-history')).toBeInTheDocument();
   });
 
-  it('polls for decisions on mount', async () => {
-    mockApiFetch.mockResolvedValue([]);
-    renderPage();
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalled();
+  it('shows attention alerts when detectAlerts returns items', () => {
+    vi.mocked(detectAlerts).mockReturnValue([
+      {
+        id: 'alert-1',
+        severity: 'critical' as const,
+        icon: '🚨',
+        title: 'Agent failed',
+        detail: 'Agent worker-1 crashed',
+        timestamp: Date.now(),
+      },
+    ]);
+    useAppStore.setState({ agents: [makeAgent()] });
+
+    render(<OverviewPage />);
+    expect(screen.getByTestId('attention-items')).toBeInTheDocument();
+    expect(screen.getByText('Attention Required')).toBeInTheDocument();
+    expect(screen.getByText(/Agent failed/)).toBeInTheDocument();
+  });
+
+  it('shows project directory when project has cwd', () => {
+    mockProjects = [{ id: 'proj-1', name: 'Test', status: 'active', cwd: '/home/user/project' }];
+    render(<OverviewPage />);
+    expect(screen.getByTestId('project-directory')).toBeInTheDocument();
+    expect(screen.getByText('/home/user/project')).toBeInTheDocument();
+  });
+
+  it('navigates to session page when clicking active session banner', () => {
+    const lead = makeAgent({
+      id: 'lead-1',
+      role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
+      status: 'running',
     });
+    useAppStore.setState({ agents: [lead] });
+
+    render(<OverviewPage />);
+    fireEvent.click(screen.getByTestId('active-session-banner'));
+    expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
   });
 
-  it('shows stop button when session is active', () => {
-    storeState.agents = [{ id: 'a1', role: { name: 'Lead' }, status: 'running', projectId: 'p1' }];
-    storeState.effectiveId = 'a1';
-    renderPage();
-    const stopBtn = screen.queryByTitle(/stop/i) || screen.queryByText(/stop/i);
-    // May or may not have stop button depending on lead status
-    expect(document.body).toBeTruthy();
-  });
+  it('calls stop session API when stop button clicked', async () => {
+    const lead = makeAgent({
+      id: 'lead-1',
+      role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
+      status: 'running',
+    });
+    useAppStore.setState({ agents: [lead] });
 
-  it('renders with no agents', () => {
-    storeState.agents = [];
-    const { container } = renderPage();
-    expect(container).toBeTruthy();
-  });
+    render(<OverviewPage />);
+    fireEvent.click(screen.getByTestId('stop-session-btn'));
 
-  it('renders working directory', () => {
-    renderPage();
-    expect(screen.getByText(/\/home\/test/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/projects/proj-1/stop',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
   });
 });
