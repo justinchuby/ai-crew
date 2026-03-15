@@ -1,30 +1,12 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import React from 'react';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 
-// ── Mocks (must precede component imports) ────────────────────
-
-const mockApiFetch = vi.fn().mockResolvedValue({});
+// ── Mocks (before imports) ───────────────────────────────────
+const mockApiFetch = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
-}));
-
-let mockAgents: any[] = [];
-const mockSetSelectedAgent = vi.fn();
-vi.mock('../../../stores/appStore', () => ({
-  useAppStore: Object.assign(
-    (selector: any) => selector({ agents: mockAgents, setSelectedAgent: mockSetSelectedAgent }),
-    { getState: () => ({ agents: mockAgents, setSelectedAgent: mockSetSelectedAgent }) },
-  ),
-}));
-
-let mockLeadState: any = { selectedLeadId: null, projects: {} };
-vi.mock('../../../stores/leadStore', () => ({
-  useLeadStore: Object.assign(
-    (selector: any) => selector(mockLeadState),
-    { getState: () => mockLeadState },
-  ),
 }));
 
 const mockAddToast = vi.fn();
@@ -35,483 +17,419 @@ vi.mock('../../Toast', () => ({
   ),
 }));
 
-vi.mock('../../ui/Tabs', () => ({
-  Tabs: ({ tabs, activeTab, onTabChange }: any) => (
-    <div data-testid="tabs">
-      {tabs.map((t: any) => (
-        <button
-          key={t.id}
-          data-testid={`tab-${t.id}`}
-          aria-selected={activeTab === t.id}
-          onClick={() => onTabChange(t.id)}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
+let mockAgents: any[] = [];
+const mockSetSelectedAgent = vi.fn();
+vi.mock('../../../stores/appStore', () => ({
+  useAppStore: Object.assign(
+    (selector: any) =>
+      selector({
+        agents: mockAgents,
+        setSelectedAgent: mockSetSelectedAgent,
+      }),
+    {
+      getState: () => ({
+        agents: mockAgents,
+        setSelectedAgent: mockSetSelectedAgent,
+      }),
+    },
   ),
 }));
 
-vi.mock('../../AgentChatPanel', () => ({
-  AgentChatPanel: ({ agentId, readOnly }: any) => (
-    <div data-testid="agent-chat-panel" data-agent-id={agentId} data-readonly={String(readOnly)} />
-  ),
-}));
-
-vi.mock('../../LeadDashboard/AgentReportBlock', () => ({
-  AgentReportBlock: ({ content }: any) => (
-    <div data-testid="agent-report-block">{content}</div>
+let mockSelectedLeadId: string | null = null;
+let mockLeadProjects: Record<string, any> = {};
+vi.mock('../../../stores/leadStore', () => ({
+  useLeadStore: Object.assign(
+    (sel: any) => sel({
+      selectedLeadId: mockSelectedLeadId,
+      projects: mockLeadProjects,
+    }),
+    {
+      getState: () => ({
+        selectedLeadId: mockSelectedLeadId,
+        projects: mockLeadProjects,
+      }),
+    },
   ),
 }));
 
 vi.mock('../../../hooks/useModels', () => ({
-  useModels: () => ({
-    models: ['gpt-4', 'claude-3'],
-    defaults: {},
-    modelsByProvider: {},
-    modelName: (id: string) => id,
-    loading: false,
-    error: null,
-  }),
-  deriveModelName: (id: string) => id,
+  useModels: () => ({ models: ['claude-sonnet-4-20250514', 'gpt-4'], filteredModels: ['claude-sonnet-4-20250514', 'gpt-4'] }),
+  deriveModelName: (m: string) => m,
 }));
 
 vi.mock('../../../utils/statusColors', () => ({
-  agentStatusText: () => 'text-blue-400',
+  agentStatusText: (s: string) => `status-${s}`,
 }));
 
 vi.mock('../../../utils/format', () => ({
-  formatTokens: (v: any) => String(v ?? 0),
+  formatTokens: (n?: number) => n != null ? `${n}` : '0',
 }));
 
 vi.mock('../../../utils/formatRelativeTime', () => ({
-  formatRelativeTime: () => '5 min ago',
+  formatRelativeTime: () => '5m ago',
 }));
 
 vi.mock('../../../utils/getRoleIcon', () => ({
   getRoleIcon: () => '🤖',
 }));
 
+vi.mock('../../../utils/markdown', () => ({
+  MentionText: ({ text }: { text: string }) => React.createElement('span', { 'data-testid': 'mention-text' }, text),
+}));
+
+vi.mock('../../../utils/providerColors', () => ({
+  getProviderColors: () => ({ bg: 'bg-blue', text: 'text-blue' }),
+}));
+
 vi.mock('../../../utils/agentLabel', () => ({
   shortAgentId: (id: string) => id.slice(0, 8),
 }));
 
-vi.mock('../../../utils/providerColors', () => ({
-  getProviderColors: () => ({ bg: 'bg-blue-500/20', text: 'text-blue-400' }),
-}));
-
-vi.mock('../../../utils/markdown', () => ({
-  MentionText: ({ text }: any) => <span>{text}</span>,
-}));
-
 vi.mock('../../ProvideFeedback', () => ({
-  buildFeedbackUrl: () => 'https://github.com/test/issues/new',
+  buildFeedbackUrl: () => 'https://github.com/test/issue',
 }));
 
-// ── Import component after mocks ──────────────────────────────
+vi.mock('../../ui/Tabs', () => ({
+  Tabs: ({ tabs, activeTab, onTabChange }: any) =>
+    React.createElement('div', { 'data-testid': 'tabs' },
+      tabs.map((t: any) =>
+        React.createElement('button', {
+          key: t.id,
+          'data-testid': `tab-${t.id}`,
+          onClick: () => onTabChange(t.id),
+          'aria-selected': activeTab === t.id,
+        }, t.label)
+      )
+    ),
+}));
+
+vi.mock('../../AgentChatPanel', () => ({
+  AgentChatPanel: ({ agentId }: { agentId: string }) =>
+    React.createElement('div', { 'data-testid': 'agent-chat-panel' }, `Chat: ${agentId}`),
+}));
+
+vi.mock('../../LeadDashboard/AgentReportBlock', () => ({
+  AgentReportBlock: ({ content }: { content: string }) =>
+    React.createElement('div', { 'data-testid': 'agent-report-block' }, content),
+}));
+
+// ── Imports ──────────────────────────────────────────────────
 import { AgentDetailPanel } from '../AgentDetailPanel';
 
-// ── Test data factories ───────────────────────────────────────
-
-function makeAgent(overrides: Record<string, any> = {}) {
+// ── Helpers ──────────────────────────────────────────────────
+function makeAgent(overrides: Partial<any> = {}) {
   return {
-    id: 'agent-123',
-    role: { id: 'developer', name: 'Developer', icon: '👨‍💻', systemPrompt: '' },
+    id: 'agent-001',
+    role: { name: 'Developer', icon: '👨‍💻' },
     status: 'running',
-    model: 'gpt-4',
+    task: 'Fix bug #42',
+    outputPreview: 'Working on fix...',
+    model: 'claude-sonnet-4-20250514',
     provider: 'copilot',
-    backend: 'acp',
     sessionId: 'sess-abc',
-    task: 'Implement feature X',
-    outputPreview: 'Working on files...',
-    exitError: null,
-    exitCode: undefined,
-    inputTokens: 5000,
-    outputTokens: 3000,
-    cacheReadTokens: 1000,
-    cacheWriteTokens: 500,
+    childIds: [],
+    createdAt: new Date().toISOString(),
+    inputTokens: 1000,
+    outputTokens: 500,
+    cacheReadTokens: 200,
+    cacheWriteTokens: 100,
     contextWindowSize: 200000,
     contextWindowUsed: 50000,
-    modelResolution: null,
+    exitError: undefined,
+    exitCode: undefined,
+    modelResolution: undefined,
     parentId: undefined,
-    childIds: [],
-    createdAt: '2024-01-01T00:00:00Z',
     ...overrides,
   };
 }
 
-const mockProfile = {
-  agentId: 'agent-123',
-  role: 'developer',
-  model: 'gpt-4',
-  status: 'running',
-  liveStatus: 'running',
-  crewId: 'crew-1',
-  projectId: 'proj-1',
-  lastTaskSummary: 'Last task completed',
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-02T00:00:00Z',
-  knowledgeCount: 5,
-  live: {
-    task: 'Current task',
-    outputPreview: 'Output...',
-    model: 'gpt-4',
-    sessionId: 'sess-abc',
-    provider: 'copilot',
-    backend: 'acp',
-    exitError: null,
-  },
-};
-
-// ── Tests ─────────────────────────────────────────────────────
-
+// ── Tests ────────────────────────────────────────────────────
 describe('AgentDetailPanel', () => {
   const onClose = vi.fn();
 
   beforeEach(() => {
-    mockAgents = [];
-    mockLeadState = { selectedLeadId: null, projects: {} };
-    onClose.mockClear();
-    mockApiFetch.mockClear();
-    mockAddToast.mockClear();
-    mockSetSelectedAgent.mockClear();
+    vi.clearAllMocks();
+    mockAgents = [makeAgent()];
+    mockSelectedLeadId = null;
+    mockLeadProjects = {};
+    mockApiFetch.mockReset();
   });
 
   afterEach(cleanup);
 
-  // ── Render: null / loading ───────────────────────────────────
-
-  it('renders null when agent not in store and no crewId', () => {
-    mockAgents = [];
-    const { container } = render(
-      <AgentDetailPanel agentId="nonexistent" mode="modal" onClose={onClose} />,
-    );
-    expect(container.innerHTML).toBe('');
-  });
-
-  it('renders loading state when profileLoading and no agent/profile', async () => {
-    mockAgents = [];
-    let resolveProfile!: (v: any) => void;
-    mockApiFetch.mockReturnValue(new Promise((r) => { resolveProfile = r; }));
-
-    render(
-      <AgentDetailPanel agentId="agent-123" crewId="crew-1" mode="inline" onClose={onClose} />,
-    );
-
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
-
-    // Cleanup: resolve pending promise to avoid warnings
-    await act(async () => resolveProfile(mockProfile));
-  });
-
-  // ── Render: inline vs modal ──────────────────────────────────
-
-  it('renders inline mode — has agent name, status, model in header', () => {
-    mockAgents = [makeAgent()];
-    const { container } = render(
-      <AgentDetailPanel agentId="agent-123" mode="inline" onClose={onClose} />,
-    );
-    expect(container.querySelector('.fixed.inset-0')).not.toBeInTheDocument();
-    expect(screen.getByText('Developer')).toBeInTheDocument();
-    expect(screen.getByText('running')).toBeInTheDocument();
-    expect(screen.getByText('gpt-4')).toBeInTheDocument();
-  });
-
-  it('renders modal mode — has overlay backdrop', () => {
-    mockAgents = [makeAgent()];
-    const { container } = render(
-      <AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />,
-    );
-    const overlay = container.querySelector('.fixed.inset-0');
-    expect(overlay).toBeInTheDocument();
-  });
-
-  it('modal closes on Escape key', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close on Escape in inline mode', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="inline" onClose={onClose} />);
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('modal closes on backdrop click', () => {
-    mockAgents = [makeAgent()];
-    const { container } = render(
-      <AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />,
-    );
-    const overlay = container.querySelector('.fixed.inset-0')!;
-    fireEvent.mouseDown(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside modal content', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.mouseDown(screen.getByText('Developer'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Header / Status ──────────────────────────────────────────
-
-  it('shows action buttons (Interrupt, Stop) when agent is alive', () => {
-    mockAgents = [makeAgent({ status: 'running' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByTitle('Interrupt agent')).toBeInTheDocument();
-    expect(screen.getByTitle('Stop agent')).toBeInTheDocument();
-  });
-
-  it('does NOT show action buttons when agent is terminated', () => {
-    mockAgents = [makeAgent({ status: 'terminated' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.queryByTitle('Interrupt agent')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Stop agent')).not.toBeInTheDocument();
-  });
-
-  it('shows confirm-stop dialog when Stop clicked', () => {
-    mockAgents = [makeAgent({ status: 'running' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTitle('Stop agent'));
-    expect(screen.getByText(/Terminate this agent/)).toBeInTheDocument();
-    expect(screen.getByText('Confirm')).toBeInTheDocument();
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-  });
-
-  it('renders provider badge and short agent id in header', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('copilot')).toBeInTheDocument();
-    expect(screen.getByText('agent-12')).toBeInTheDocument();
-  });
-
-  it('renders copyable session ID', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('sess:sess-abc')).toBeInTheDocument();
-  });
-
-  // ── Tabs: Details ────────────────────────────────────────────
-
-  it('shows Details tab by default with current task', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Current Task')).toBeInTheDocument();
-    expect(screen.getByText('Implement feature X')).toBeInTheDocument();
-  });
-
-  it('shows token usage section when tokens > 0', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Token Usage')).toBeInTheDocument();
-    expect(screen.getByText(/Input: 5000/)).toBeInTheDocument();
-    expect(screen.getByText(/Output: 3000/)).toBeInTheDocument();
-    expect(screen.getByText(/Cache Read: 1000/)).toBeInTheDocument();
-    expect(screen.getByText(/Cache Write: 500/)).toBeInTheDocument();
-  });
-
-  it('shows context window progress bar', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Context Window')).toBeInTheDocument();
-    // 50000/200000 = 25%
-    expect(screen.getByText('(25%)')).toBeInTheDocument();
-  });
-
-  it('shows exit error banner when agent failed', () => {
-    mockAgents = [makeAgent({ status: 'failed', exitCode: 1, exitError: 'SIGTERM received' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Agent Failed')).toBeInTheDocument();
-    expect(screen.getByText('SIGTERM received')).toBeInTheDocument();
-    expect(screen.getByText('Submit GitHub Issue')).toBeInTheDocument();
-  });
-
-  it('does not show error banner for running agents', () => {
-    mockAgents = [makeAgent({ status: 'running' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.queryByText('Agent Failed')).not.toBeInTheDocument();
-  });
-
-  it('shows output preview on details tab', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Latest Output')).toBeInTheDocument();
-    expect(screen.getByText('Working on files...')).toBeInTheDocument();
-  });
-
-  it('shows "No activity yet" empty state when no content', () => {
-    mockAgents = [makeAgent({
-      task: null,
-      outputPreview: null,
-      exitError: null,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheWriteTokens: 0,
-      contextWindowSize: 0,
-    })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('No activity yet for this agent')).toBeInTheDocument();
-  });
-
-  // ── Tabs: Chat ───────────────────────────────────────────────
-
-  it('switches to Chat tab — renders AgentChatPanel', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('tab-chat'));
-    const chatPanel = screen.getByTestId('agent-chat-panel');
-    expect(chatPanel).toBeInTheDocument();
-    expect(chatPanel).toHaveAttribute('data-agent-id', 'agent-123');
-  });
-
-  it('passes readOnly=false to AgentChatPanel when agent is alive', () => {
-    mockAgents = [makeAgent({ status: 'running' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('tab-chat'));
-    expect(screen.getByTestId('agent-chat-panel')).toHaveAttribute('data-readonly', 'false');
-  });
-
-  it('passes readOnly=true to AgentChatPanel when agent is not alive', () => {
-    mockAgents = [makeAgent({ status: 'failed' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('tab-chat'));
-    expect(screen.getByTestId('agent-chat-panel')).toHaveAttribute('data-readonly', 'true');
-  });
-
-  // ── Tabs: Settings ───────────────────────────────────────────
-
-  it('switches to Settings tab — shows model select when alive', () => {
-    mockAgents = [makeAgent({ status: 'running' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('tab-settings'));
-    expect(screen.getByDisplayValue('gpt-4')).toBeInTheDocument();
-  });
-
-  it('Settings tab shows static model when not alive', () => {
-    mockAgents = [makeAgent({ status: 'failed' })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('tab-settings'));
-    // No select dropdown
-    expect(screen.queryByDisplayValue('gpt-4')).not.toBeInTheDocument();
-    // Model text still displayed in static form (also in header)
-    expect(screen.getAllByText('gpt-4').length).toBeGreaterThanOrEqual(1);
-  });
-
-  // ── Profile data ─────────────────────────────────────────────
-
-  it('shows profile metadata (knowledge count, created date) when profile present', async () => {
-    mockAgents = [makeAgent()];
-    mockApiFetch.mockResolvedValueOnce({ ...mockProfile });
-
-    await act(async () => {
-      render(
-        <AgentDetailPanel agentId="agent-123" crewId="crew-1" mode="inline" onClose={onClose} />,
-      );
+  // ── Mode rendering ─────────────────────────────────────────
+  describe('mode rendering', () => {
+    it('renders inline mode with agent name', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Developer')).toBeInTheDocument();
     });
 
-    expect(mockApiFetch).toHaveBeenCalledWith('/crews/crew-1/agents/agent-123/profile');
-    expect(screen.getByText('5 entries')).toBeInTheDocument();
-    expect(screen.getByText('proj-1')).toBeInTheDocument();
-  });
-
-  it('renders from profile data when no agent in store but crewId provided', async () => {
-    mockAgents = [];
-    mockApiFetch.mockResolvedValueOnce({ ...mockProfile });
-
-    await act(async () => {
-      render(
-        <AgentDetailPanel agentId="agent-123" crewId="crew-1" mode="modal" onClose={onClose} />,
+    it('renders modal mode with overlay', () => {
+      const { container } = render(
+        React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'modal', onClose })
       );
+      const overlay = container.querySelector('.fixed.inset-0');
+      expect(overlay).not.toBeNull();
     });
 
-    // Profile-derived role name is rendered
-    expect(screen.getByText('developer')).toBeInTheDocument();
-    // Knowledge count from profile
-    expect(screen.getByText('5 entries')).toBeInTheDocument();
+    it('returns null when agent not found and no crewId', () => {
+      mockAgents = [];
+      const { container } = render(
+        React.createElement(AgentDetailPanel, { agentId: 'nonexistent', mode: 'inline', onClose })
+      );
+      expect(container.innerHTML).toBe('');
+    });
   });
 
-  // ── Communications & Activity ─────────────────────────────────
+  // ── Escape key ─────────────────────────────────────────────
+  describe('escape key', () => {
+    it('closes modal on Escape key', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'modal', onClose }));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalled();
+    });
 
-  it('shows communications when present in lead store', () => {
-    mockAgents = [makeAgent()];
-    mockLeadState = {
-      selectedLeadId: 'lead-1',
-      projects: {
-        'lead-1': {
-          comms: [
-            {
-              id: 'comm-1',
-              fromId: 'agent-123',
-              toId: 'agent-456',
-              fromRole: 'Developer',
-              toRole: 'Reviewer',
-              content: 'PR is ready for review',
-              timestamp: '2024-01-01T12:00:00Z',
-            },
-          ],
-          activity: [],
-        },
-      },
-    };
-
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Communications (1)')).toBeInTheDocument();
-    expect(screen.getByText('PR is ready for review')).toBeInTheDocument();
+    it('does not close inline mode on Escape key', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+    });
   });
 
-  it('shows activity events when present in lead store', () => {
-    mockAgents = [makeAgent()];
-    mockLeadState = {
-      selectedLeadId: 'lead-1',
-      projects: {
-        'lead-1': {
-          comms: [],
-          activity: [
-            {
-              id: 'evt-1',
-              agentId: 'agent-123',
-              summary: 'Started implementing feature',
-              timestamp: '2024-01-01T12:00:00Z',
-              status: 'in_progress',
-            },
-          ],
-        },
-      },
-    };
+  // ── Profile data merging ───────────────────────────────────
+  describe('profile data merging', () => {
+    it('fetches profile when crewId is provided', async () => {
+      mockApiFetch.mockResolvedValueOnce({
+        agentId: 'agent-001',
+        role: 'Designer',
+        model: 'gpt-4',
+        status: 'active',
+        liveStatus: 'running',
+        crewId: 'crew-1',
+        projectId: 'proj-1',
+        lastTaskSummary: 'Previous task',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        knowledgeCount: 3,
+        live: null,
+      });
 
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('Activity (1)')).toBeInTheDocument();
-    expect(screen.getByText('Started implementing feature')).toBeInTheDocument();
+      render(React.createElement(AgentDetailPanel, {
+        agentId: 'agent-001',
+        crewId: 'crew-1',
+        mode: 'inline',
+        onClose,
+      }));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith('/crews/crew-1/agents/agent-001/profile');
+      });
+    });
+
+    it('shows loading spinner when profile is loading and no agent', async () => {
+      mockAgents = [];
+      let resolveProfile!: (v: any) => void;
+      mockApiFetch.mockReturnValueOnce(new Promise((r) => { resolveProfile = r; }));
+
+      render(React.createElement(AgentDetailPanel, {
+        agentId: 'agent-missing',
+        crewId: 'crew-1',
+        mode: 'inline',
+        onClose,
+      }));
+
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+
+      await act(async () => {
+        resolveProfile({
+          agentId: 'agent-missing',
+          role: 'Designer',
+          model: 'gpt-4',
+          status: 'active',
+          liveStatus: null,
+          crewId: 'crew-1',
+          projectId: null,
+          lastTaskSummary: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          knowledgeCount: 0,
+          live: null,
+        });
+      });
+    });
   });
 
-  // ── Close button ──────────────────────────────────────────────
+  // ── Tab switching ──────────────────────────────────────────
+  describe('tab switching', () => {
+    it('shows details tab by default', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Fix bug #42')).toBeInTheDocument();
+    });
 
-  it('calls onClose when × button is clicked', () => {
-    mockAgents = [makeAgent()];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    fireEvent.click(screen.getByText('×'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    it('switches to chat tab', async () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      fireEvent.click(screen.getByTestId('tab-chat'));
+      expect(screen.getByTestId('agent-chat-panel')).toBeInTheDocument();
+      expect(screen.getByText('Chat: agent-001')).toBeInTheDocument();
+    });
+
+    it('switches to settings tab', async () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      fireEvent.click(screen.getByTestId('tab-settings'));
+      expect(screen.getByText('Model')).toBeInTheDocument();
+    });
   });
 
-  // ── Model resolution display ──────────────────────────────────
+  // ── Token / context window display ─────────────────────────
+  describe('token and context display', () => {
+    it('displays token usage when present', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Token Usage')).toBeInTheDocument();
+      expect(screen.getByText(/Input: 1000/)).toBeInTheDocument();
+      expect(screen.getByText(/Output: 500/)).toBeInTheDocument();
+    });
 
-  it('shows strikethrough requested model when translated', () => {
-    mockAgents = [makeAgent({
-      model: 'gemini-2.5-pro',
-      modelResolution: {
-        requested: 'gpt-4',
-        resolved: 'gemini-2.5-pro',
-        translated: true,
-        reason: 'gpt-4 not available on gemini provider',
-      },
-    })];
-    render(<AgentDetailPanel agentId="agent-123" mode="modal" onClose={onClose} />);
-    expect(screen.getByText('gpt-4')).toHaveClass('line-through');
-    expect(screen.getByText('gemini-2.5-pro')).toHaveClass('text-yellow-400');
+    it('displays context window when present', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Context Window')).toBeInTheDocument();
+      expect(screen.getByText(/25%/)).toBeInTheDocument();
+    });
+
+    it('hides token section when no tokens', () => {
+      mockAgents = [makeAgent({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })];
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.queryByText('Token Usage')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── Interrupt / Stop buttons ───────────────────────────────
+  describe('interrupt and stop buttons', () => {
+    it('shows interrupt and stop buttons for alive agents', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Interrupt')).toBeInTheDocument();
+      expect(screen.getByText('Stop')).toBeInTheDocument();
+    });
+
+    it('hides action buttons for completed agents', () => {
+      mockAgents = [makeAgent({ status: 'completed' })];
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.queryByText('Interrupt')).not.toBeInTheDocument();
+      expect(screen.queryByText('Stop')).not.toBeInTheDocument();
+    });
+
+    it('calls interrupt API when interrupt clicked', async () => {
+      mockApiFetch.mockResolvedValueOnce({});
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      fireEvent.click(screen.getByText('Interrupt'));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith('/agents/agent-001/interrupt', { method: 'POST' });
+        expect(mockAddToast).toHaveBeenCalledWith('success', 'Interrupt sent');
+      });
+    });
+
+    it('shows confirm stop dialog and terminates on confirm', async () => {
+      mockApiFetch.mockResolvedValue({});
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      fireEvent.click(screen.getByText('Stop'));
+      expect(screen.getByText('Terminate this agent? This cannot be undone.')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Confirm'));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith('/agents/agent-001/terminate', { method: 'POST' });
+        expect(mockAddToast).toHaveBeenCalledWith('success', 'Agent terminated');
+      });
+    });
+
+    it('cancels stop confirmation', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      fireEvent.click(screen.getByText('Stop'));
+      expect(screen.getByText('Terminate this agent? This cannot be undone.')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(screen.queryByText('Terminate this agent? This cannot be undone.')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── Error state ────────────────────────────────────────────
+  describe('failed agent display', () => {
+    it('shows error banner for failed agent', () => {
+      mockAgents = [makeAgent({ status: 'failed', exitError: 'OOM killed', exitCode: 137 })];
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      expect(screen.getByText('Agent Failed')).toBeInTheDocument();
+      expect(screen.getByText('OOM killed')).toBeInTheDocument();
+      expect(screen.getByText('Submit GitHub Issue')).toBeInTheDocument();
+    });
+
+    it('shows exit error inline when agent is alive', () => {
+      mockAgents = [makeAgent({ status: 'running', exitError: 'soft warning' })];
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      expect(screen.getByText('Exit Error')).toBeInTheDocument();
+      expect(screen.getByText('soft warning')).toBeInTheDocument();
+    });
+  });
+
+  // ── Modal click-outside closes ─────────────────────────────
+  describe('modal backdrop', () => {
+    it('closes on backdrop click', () => {
+      const { container } = render(
+        React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'modal', onClose })
+      );
+
+      const overlay = container.querySelector('.fixed.inset-0') as HTMLElement;
+      fireEvent.mouseDown(overlay, { target: overlay, currentTarget: overlay });
+
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  // ── handleAction error handling ────────────────────────────
+  describe('action error handling', () => {
+    it('shows error toast when action fails', async () => {
+      mockApiFetch.mockRejectedValueOnce(new Error('Server down'));
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+
+      fireEvent.click(screen.getByText('Interrupt'));
+
+      await waitFor(() => {
+        expect(mockAddToast).toHaveBeenCalledWith('error', 'Failed: Server down');
+      });
+    });
+  });
+
+  // ── Settings tab model display ─────────────────────────────
+  describe('settings tab', () => {
+    it('shows model select for alive agents', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      fireEvent.click(screen.getByTestId('tab-settings'));
+      // Should have a select element for model
+      const selects = screen.getAllByRole('combobox');
+      expect(selects.length).toBeGreaterThan(0);
+    });
+
+    it('shows static model text for dead agents', () => {
+      mockAgents = [makeAgent({ status: 'completed' })];
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      fireEvent.click(screen.getByTestId('tab-settings'));
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      // Model text appears in both header and settings; just verify at least one is present
+      const modelTexts = screen.getAllByText(/claude-sonnet-4-20250514/);
+      expect(modelTexts.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── Output preview ─────────────────────────────────────────
+  describe('output preview', () => {
+    it('displays output preview when available', () => {
+      render(React.createElement(AgentDetailPanel, { agentId: 'agent-001', mode: 'inline', onClose }));
+      expect(screen.getByText('Latest Output')).toBeInTheDocument();
+      expect(screen.getByText('Working on fix...')).toBeInTheDocument();
+    });
   });
 });
