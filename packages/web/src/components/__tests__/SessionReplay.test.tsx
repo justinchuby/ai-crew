@@ -76,6 +76,53 @@ describe('useSessionReplay', () => {
     await waitFor(() => expect(result.current.currentTime).toBe(dur));
   });
 
+  it('play() resets currentTime to 0 when at end of duration', async () => {
+    mockApiFetch.mockResolvedValue(sampleKeyframes);
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
+    const dur = result.current.duration;
+
+    // Seek to end
+    result.current.seek(dur);
+    await waitFor(() => expect(result.current.currentTime).toBe(dur));
+
+    // Play should reset to 0
+    result.current.play();
+    await waitFor(() => expect(result.current.playing).toBe(true));
+    expect(result.current.currentTime).toBeLessThan(dur);
+  });
+
+  it('fetchStateAt silently catches errors', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url.includes('/keyframes')) return Promise.resolve(sampleKeyframes);
+      if (url.includes('/state')) return Promise.reject(new Error('Server down'));
+      return Promise.resolve({});
+    });
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
+    result.current.seek(5000);
+    await waitFor(() => expect(result.current.currentTime).toBe(5000));
+    expect(result.current.worldState).toBeNull();
+  });
+
+  it('uses MIN_SESSION_DURATION_MS for very short sessions', async () => {
+    mockApiFetch.mockResolvedValue({
+      keyframes: [
+        { timestamp: '2026-03-05T10:00:00.000Z', label: 'Start', type: 'milestone' },
+        { timestamp: '2026-03-05T10:00:00.100Z', label: 'End', type: 'milestone' },
+      ],
+    });
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.duration).toBe(1000);
+  });
+
+  it('converts non-Error query errors to string', async () => {
+    mockApiFetch.mockRejectedValue('raw string error');
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.error).toBe('raw string error'));
+  });
+
   it('resets currentTime and playing when leadId changes', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
     const wrapper = createWrapper();

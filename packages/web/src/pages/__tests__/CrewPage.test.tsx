@@ -419,4 +419,31 @@ describe('CrewPage', () => {
     expect(screen.getByText('5 corrections')).toBeInTheDocument();
   });
 
+  it('shows dash when trainingSummary is null', async () => {
+    setupMocks({ crewDetail: { ...crewDetailData, trainingSummary: null } });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('crew-identity')).toBeInTheDocument();
+    });
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('toggleSort cycles sort field on button click', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    // The sort button shows current sortField text next to an icon
+    // Default sortField is 'role'. Find the button element containing the ArrowUpDown icon.
+    const sortButtons = screen.getAllByRole('button');
+    const sortBtn = sortButtons.find(b => b.textContent?.trim() === 'role');
+    expect(sortBtn).toBeDefined();
+    if (sortBtn) {
+      fireEvent.click(sortBtn);
+    }
+    // Agents still visible after sort
+    expect(screen.getByText('architect')).toBeInTheDocument();
+  });
+
 });

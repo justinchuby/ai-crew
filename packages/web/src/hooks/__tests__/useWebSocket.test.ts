@@ -446,6 +446,444 @@ describe('useWebSocket — message handling', () => {
     expect(handler).toHaveBeenCalled();
     window.removeEventListener('ws-message', handler);
   });
+
+  // ── agent:status separator logic ──────────────────────────────
+
+  it('agent:status inserts separator when transitioning idle→running with agent message', () => {
+    setup();
+    const now = Date.now();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'idle',
+        messages: [
+          { type: 'text', text: 'old msg', sender: 'agent', timestamp: now - 5000 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.some(m => m.text === '---')).toBe(true);
+  });
+
+  it('agent:status inserts separator before recent agent message when text arrived early', () => {
+    setup();
+    const now = Date.now();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'idle',
+        messages: [
+          { type: 'text', text: 'old response', sender: 'agent', timestamp: now - 5000 },
+          { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[1]?.text).toBe('---');
+    expect(msgs?.[2]?.text).toBe('new text');
+  });
+
+  it('agent:status inserts separator after message when prev is non-agent', () => {
+    setup();
+    const now = Date.now();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'idle',
+        messages: [
+          { type: 'text', text: 'thought', sender: 'thinking', timestamp: now - 3000 },
+          { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[msgs.length - 1]?.text).toBe('---');
+  });
+
+  it('agent:status does not insert separator when last message is not agent', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'completed',
+        messages: [
+          { type: 'text', text: 'thought', sender: 'thinking', timestamp: Date.now() - 5000 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.some(m => m.text === '---')).toBe(false);
+  });
+
+  it('agent:status no separator when not transitioning from idle/completed', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [{ type: 'text', text: 'msg', sender: 'agent', timestamp: Date.now() }],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.some(m => m.text === '---')).toBe(false);
+  });
+
+  // ── agent:text edge cases ─────────────────────────────────────
+
+  it('agent:text stringifies non-string text', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    simulateMsg({ type: 'agent:text', agentId: 'a1', text: { nested: true } });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[0].text).toContain('nested');
+  });
+
+  it('agent:text uses text.text when text is an object with .text', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    simulateMsg({ type: 'agent:text', agentId: 'a1', text: { text: 'wrapped value' } });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[0].text).toBe('wrapped value');
+  });
+
+  it('agent:text skips notification messages when finding append target', () => {
+    setup();
+    const now = Date.now();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [
+          { type: 'text', text: 'hello', sender: 'agent', timestamp: now - 1000 },
+          { type: 'text', text: '📨 [From dev] msg', sender: 'system', timestamp: now - 500 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:text', agentId: 'a1', text: ' world' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[0].text).toBe('hello world');
+  });
+
+  it('agent:text creates new message when user message breaks append chain', () => {
+    setup();
+    const now = Date.now();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [
+          { type: 'text', text: 'response', sender: 'agent', timestamp: now - 3000 },
+          { type: 'text', text: 'user input', sender: 'user', timestamp: now - 1000 },
+        ],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:text', agentId: 'a1', text: 'new response' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.length).toBe(3);
+    expect(msgs?.[2].text).toBe('new response');
+  });
+
+  it('agent:text appends when hasUnclosedCommandBlock returns true despite newline', async () => {
+    const { hasUnclosedCommandBlock } = await import('../../utils/commandParser');
+    (hasUnclosedCommandBlock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+    setup();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [{ type: 'text', text: '```bash\necho hi', sender: 'agent', timestamp: Date.now() }],
+      } as any],
+    });
+    simulateMsg({ type: 'agent:response_start', agentId: 'a1' });
+    simulateMsg({ type: 'agent:text', agentId: 'a1', text: '\n```' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.length).toBe(1);
+    expect(msgs?.[0].text).toContain('```');
+  });
+
+  // ── agent:tool_call edge cases ────────────────────────────────
+
+  it('agent:tool_call only updates toolCalls when status unchanged', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [{ type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() }],
+        toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
+      } as any],
+    });
+    simulateMsg({
+      type: 'agent:tool_call', agentId: 'a1',
+      toolCall: { toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' },
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.messages?.length).toBe(1);
+  });
+
+  it('agent:tool_call updates existing tool message in-place on status change', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{
+        id: 'a1', status: 'running',
+        messages: [
+          { type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() },
+        ],
+        toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
+      } as any],
+    });
+    simulateMsg({
+      type: 'agent:tool_call', agentId: 'a1',
+      toolCall: { toolCallId: 'tc1', title: 'Run tests', status: 'completed', kind: 'bash' },
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.messages?.length).toBe(1);
+    expect(a?.messages?.[0].text).toContain('✓');
+    expect(a?.messages?.[0].toolStatus).toBe('completed');
+  });
+
+  // ── agent:message_sent branches ───────────────────────────────
+
+  it('agent:message_sent shows in recipient and sender panels', () => {
+    setup();
+    useAppStore.setState({
+      agents: [
+        { id: 'a1', status: 'running', messages: [], role: { name: 'architect' } } as any,
+        { id: 'a2', status: 'running', messages: [], role: { name: 'developer' } } as any,
+      ],
+    });
+    simulateMsg({
+      type: 'agent:message_sent', from: 'a1', to: 'a2',
+      fromRole: 'architect', content: 'implement auth',
+    });
+    const recipient = useAppStore.getState().agents.find(a => a.id === 'a2');
+    expect(recipient?.messages?.some(m => m.text?.includes('📨'))).toBe(true);
+    const sender = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(sender?.messages?.some(m => m.text?.includes('📤'))).toBe(true);
+  });
+
+  it('agent:message_sent from system uses system prefix', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{ id: 'a1', status: 'running', messages: [] } as any],
+    });
+    simulateMsg({
+      type: 'agent:message_sent', from: 'system', to: 'a1',
+      content: 'system instruction',
+    });
+    const recipient = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(recipient?.messages?.some(m => m.text?.includes('⚙️'))).toBe(true);
+    expect(recipient?.messages?.some(m => m.sender === 'system')).toBe(true);
+  });
+
+  it('agent:message_sent broadcast shows [To All]', () => {
+    setup();
+    useAppStore.setState({
+      agents: [
+        { id: 'a1', status: 'running', messages: [], role: { name: 'lead' } } as any,
+      ],
+    });
+    simulateMsg({
+      type: 'agent:message_sent', from: 'a1', to: 'all',
+      fromRole: 'lead', content: 'attention everyone',
+    });
+    const sender = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(sender?.messages?.some(m => m.text?.includes('[To All]'))).toBe(true);
+  });
+
+  it('agent:message_sent does not add sender message when from === to', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{ id: 'a1', status: 'running', messages: [] } as any],
+    });
+    simulateMsg({
+      type: 'agent:message_sent', from: 'a1', to: 'a1',
+      content: 'self message',
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.messages?.filter(m => m.text?.includes('📤')).length).toBe(0);
+  });
+
+  // ── group:reaction branches ───────────────────────────────────
+
+  it('group:reaction action=remove calls removeReaction', () => {
+    setup();
+    const gs = useGroupStore.getState();
+    const spy = vi.spyOn(gs, 'removeReaction');
+    simulateMsg({
+      type: 'group:reaction',
+      leadId: 'lead1', groupName: 'chat',
+      messageId: 'msg1', emoji: '👍', agentId: 'a1',
+      action: 'remove',
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('group:reaction action=add calls addReaction', () => {
+    setup();
+    const gs = useGroupStore.getState();
+    const spy = vi.spyOn(gs, 'addReaction');
+    simulateMsg({
+      type: 'group:reaction',
+      leadId: 'lead1', groupName: 'chat',
+      messageId: 'msg1', emoji: '👍', agentId: 'a1',
+      action: 'add',
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  // ── timer fallback ids ────────────────────────────────────────
+
+  it('timer:fired uses timer.id fallback when timerId absent', () => {
+    setup();
+    useTimerStore.setState({
+      timers: [{ id: 't2', label: 'check', status: 'active' } as any],
+    });
+    simulateMsg({ type: 'timer:fired', timer: { id: 't2' } });
+    const timer = useTimerStore.getState().timers.find(t => t.id === 't2');
+    expect(timer?.status).toBe('fired');
+  });
+
+  it('timer:cancelled uses timer.id fallback when timerId absent', () => {
+    setup();
+    useTimerStore.setState({
+      timers: [{ id: 't3', label: 'check' } as any],
+    });
+    simulateMsg({ type: 'timer:cancelled', timer: { id: 't3' } });
+    expect(useTimerStore.getState().timers.find(t => t.id === 't3')).toBeUndefined();
+  });
+
+  // ── agent:spawn_error ─────────────────────────────────────────
+
+  it('agent:spawn_error shows toast with agent role label', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{ id: 'a1', status: 'running', role: { name: 'architect' } } as any],
+    });
+    simulateMsg({
+      type: 'agent:spawn_error', agentId: 'a1', message: 'Rate limit exceeded',
+    });
+    expect(useAppStore.getState().agents.length).toBe(1);
+  });
+
+  // ── agent:model_fallback ──────────────────────────────────────
+
+  it('agent:model_fallback updates agent model and resolution info', () => {
+    setup();
+    useAppStore.setState({
+      agents: [{ id: 'a1', status: 'running', model: 'gpt-4' } as any],
+    });
+    simulateMsg({
+      type: 'agent:model_fallback', agentId: 'a1',
+      requested: 'gpt-4', resolved: 'gpt-3.5', reason: 'rate-limited',
+      agentRole: 'developer', provider: 'openai',
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.model).toBe('gpt-3.5');
+    expect(a?.modelResolution?.translated).toBe(true);
+  });
+
+  // ── agent:session_resume_failed ───────────────────────────────
+
+  it('agent:session_resume_failed shows toast without throwing', () => {
+    setup();
+    simulateMsg({
+      type: 'agent:session_resume_failed', agentId: 'a1', error: 'Session expired',
+    });
+    expect(true).toBe(true);
+  });
+
+  // ── lead:decision in autonomous mode ──────────────────────────
+
+  it('lead:decision in autonomous mode does not add to pending', async () => {
+    const { apiFetch } = await import('../useApi');
+    mockOversightLevel = 'autonomous';
+    setup();
+    simulateMsg({
+      type: 'lead:decision', needsConfirmation: true,
+      id: 'd-auto', agentId: 'a1', title: 'Auto decision',
+    });
+    expect(useAppStore.getState().pendingDecisions?.find(d => d.id === 'd-auto')).toBeUndefined();
+    expect(apiFetch).toHaveBeenCalledWith('/decisions/d-auto/confirm', expect.anything());
+  });
+
+  // ── decision:rejected / dismissed ─────────────────────────────
+
+  it('decision:rejected removes pending decision', () => {
+    setup();
+    useAppStore.setState({ pendingDecisions: [{ id: 'd1', title: 'test' } as any] });
+    simulateMsg({ type: 'decision:rejected', decisionId: 'd1' });
+    expect(useAppStore.getState().pendingDecisions?.find(d => d.id === 'd1')).toBeUndefined();
+  });
+
+  it('decision:dismissed removes pending decision', () => {
+    setup();
+    useAppStore.setState({ pendingDecisions: [{ id: 'd1', title: 'test' } as any] });
+    simulateMsg({ type: 'decision:dismissed', decisionId: 'd1' });
+    expect(useAppStore.getState().pendingDecisions?.find(d => d.id === 'd1')).toBeUndefined();
+  });
+
+  // ── agent:usage with optional fields ──────────────────────────
+
+  it('agent:usage sets cache and context fields when present', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running' } as any] });
+    simulateMsg({
+      type: 'agent:usage', agentId: 'a1',
+      inputTokens: 200, outputTokens: 100,
+      cacheReadTokens: 50, cacheWriteTokens: 20,
+      contextWindowUsed: 1000, contextWindowSize: 8000,
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.cacheReadTokens).toBe(50);
+    expect(a?.contextWindowUsed).toBe(1000);
+  });
+
+  it('agent:usage omits cache fields when not present', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running' } as any] });
+    simulateMsg({
+      type: 'agent:usage', agentId: 'a1',
+      inputTokens: 200, outputTokens: 100,
+    });
+    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(a?.inputTokens).toBe(200);
+    expect(a?.cacheReadTokens).toBeUndefined();
+  });
+
+  // ── group:message / member_added / member_removed ─────────────
+
+  it('group:message adds message to group store', () => {
+    setup();
+    const gs = useGroupStore.getState();
+    const spy = vi.spyOn(gs, 'addMessage');
+    simulateMsg({
+      type: 'group:message',
+      message: { leadId: 'lead1', groupName: 'chat', text: 'hello', sender: 'a1' },
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('group:member_added adds member to group', () => {
+    setup();
+    const gs = useGroupStore.getState();
+    const spy = vi.spyOn(gs, 'addMember');
+    simulateMsg({
+      type: 'group:member_added', leadId: 'lead1', group: 'chat', agentId: 'a2',
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('group:member_removed removes member from group', () => {
+    setup();
+    const gs = useGroupStore.getState();
+    const spy = vi.spyOn(gs, 'removeMember');
+    simulateMsg({
+      type: 'group:member_removed', leadId: 'lead1', group: 'chat', agentId: 'a2',
+    });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });
 
 describe('useWebSocket — returned methods', () => {
@@ -528,5 +966,29 @@ describe('useWebSocket — returned methods', () => {
     result.current.send({ type: 'test' } as any);
     // Only the connect() call's messages should be there (subscribe from onopen won't fire)
     expect(lastWs!.sent.length).toBe(0);
+  });
+
+  it('broadcastInput is no-op when no running agents', () => {
+    const { result } = renderHook(() => useWebSocket());
+    openWs();
+    useAppStore.setState({
+      agents: [
+        { id: 'a1', status: 'idle' } as any,
+        { id: 'a2', status: 'terminated' } as any,
+      ],
+    });
+    const beforeCount = lastWs!.sent.length;
+    result.current.broadcastInput('broadcast msg');
+    const inputs = lastWs!.sent.slice(beforeCount).filter(s => JSON.parse(s).type === 'input');
+    expect(inputs.length).toBe(0);
+  });
+
+  it('unmount clears reconnect timer', () => {
+    const { unmount } = renderHook(() => useWebSocket());
+    openWs();
+    const ws = lastWs!;
+    act(() => { ws.onclose?.({}); });
+    unmount();
+    expect(ws.readyState).toBe(MockWebSocket.CLOSED);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { CrewHealth, type CrewHealthData, type AgentHealthInfo } from '../CrewHealth';
 
 const mockApiFetch = vi.fn();
@@ -115,6 +115,60 @@ describe('CrewHealth', () => {
     fireEvent.click(screen.getByText('Refresh'));
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalled();
+    });
+  });
+
+  it('shows clone indicator for cloned agents', async () => {
+    const agents: AgentHealthInfo[] = [
+      { agentId: 'agent-1', role: 'Developer', model: 'gpt-4', status: 'running', uptimeMs: 60000, clonedFromId: 'original-1' },
+    ];
+    mockApiFetch.mockResolvedValue(makeHealth({ agents }));
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByText('🧬')).toBeInTheDocument();
+    });
+  });
+
+  it('shows healthy connection status when not paused', async () => {
+    mockApiFetch.mockResolvedValue(makeHealth({ massFailurePaused: false }));
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByTestId('connection-status')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Agent server healthy')).toBeInTheDocument();
+  });
+
+  it('shows paused connection status when mass failure detected', async () => {
+    mockApiFetch.mockResolvedValue(makeHealth({ massFailurePaused: true }));
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByTestId('connection-status')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Spawning paused')).toBeInTheDocument();
+  });
+
+  it('refreshes on ws-message team:agent_cloned event', async () => {
+    mockApiFetch.mockResolvedValue(makeHealth());
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
+    });
+    const callCount = mockApiFetch.mock.calls.length;
+    act(() => {
+      window.dispatchEvent(new MessageEvent('ws-message', {
+        data: JSON.stringify({ type: 'team:agent_cloned' }),
+      }));
+    });
+    await waitFor(() => {
+      expect(mockApiFetch.mock.calls.length).toBeGreaterThan(callCount);
+    });
+  });
+
+  it('shows "no crew" error as friendly empty state', async () => {
+    mockApiFetch.mockRejectedValue(new Error('no crew exists'));
+    render(<CrewHealth />);
+    await waitFor(() => {
+      expect(screen.getByTestId('crew-health-empty')).toBeInTheDocument();
     });
   });
 });
