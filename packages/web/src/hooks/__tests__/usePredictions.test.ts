@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { apiFetch } from '../useApi';
-import { usePredictions } from '../usePredictions';
+import { usePredictions, usePredictionAccuracy, usePredictionConfig } from '../usePredictions';
 
 vi.mock('../useApi', () => ({
   apiFetch: vi.fn(),
@@ -148,5 +148,187 @@ describe('usePredictions', () => {
       await vi.advanceTimersByTimeAsync(15000);
     });
     expect(mockApiFetch).toHaveBeenCalledTimes(callCount);
+  });
+
+  it('refetch re-fetches predictions on demand', async () => {
+    const data = [fakePrediction('p1')];
+    mockApiFetch.mockResolvedValue(data);
+
+    const { result } = renderHook(() => usePredictions());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.predictions).toEqual(data);
+
+    const newData = [fakePrediction('p2'), fakePrediction('p3')];
+    mockApiFetch.mockResolvedValue(newData);
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(result.current.predictions).toEqual(newData);
+  });
+
+  it('dismiss silently handles API errors without removing prediction', async () => {
+    mockApiFetch.mockResolvedValue([fakePrediction('p1')]);
+
+    const { result } = renderHook(() => usePredictions());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.predictions).toHaveLength(1);
+
+    mockApiFetch.mockRejectedValue(new Error('dismiss failed'));
+
+    await act(async () => {
+      await result.current.dismiss('p1');
+    });
+
+    // Prediction still present since dismiss API call failed
+    expect(result.current.predictions).toHaveLength(1);
+    expect(result.current.predictions[0].id).toBe('p1');
+  });
+});
+
+// ── usePredictionAccuracy ────────────────────────────────────────────────
+
+describe('usePredictionAccuracy', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockApiFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns null initially', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => usePredictionAccuracy());
+    expect(result.current).toBeNull();
+  });
+
+  it('fetches accuracy data on mount', async () => {
+    const accuracy = { total: 50, correct: 40, avoided: 5, wrong: 5, accuracy: 0.8 };
+    mockApiFetch.mockResolvedValueOnce(accuracy);
+
+    const { result } = renderHook(() => usePredictionAccuracy());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/predictions/accuracy');
+    expect(result.current).toEqual(accuracy);
+  });
+
+  it('returns null on fetch error', async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error('Network error'));
+
+    const { result } = renderHook(() => usePredictionAccuracy());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current).toBeNull();
+  });
+});
+
+// ── usePredictionConfig ──────────────────────────────────────────────────
+
+describe('usePredictionConfig', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockApiFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const sampleConfig = {
+    enabled: true,
+    refreshIntervalMs: 30000,
+    minConfidence: 60,
+    minDataPoints: 3,
+    enabledTypes: {},
+  };
+
+  it('returns null config initially', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => usePredictionConfig());
+    expect(result.current.config).toBeNull();
+    expect(typeof result.current.saveConfig).toBe('function');
+  });
+
+  it('fetches config on mount', async () => {
+    mockApiFetch.mockResolvedValueOnce(sampleConfig);
+
+    const { result } = renderHook(() => usePredictionConfig());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/predictions/config');
+    expect(result.current.config).toEqual(sampleConfig);
+  });
+
+  it('returns null config on fetch error', async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error('fail'));
+
+    const { result } = renderHook(() => usePredictionConfig());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.config).toBeNull();
+  });
+
+  it('saveConfig sends PUT and updates state', async () => {
+    mockApiFetch.mockResolvedValueOnce(sampleConfig);
+
+    const { result } = renderHook(() => usePredictionConfig());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const updated = { ...sampleConfig, enabled: false };
+    mockApiFetch.mockResolvedValueOnce(updated);
+
+    await act(async () => {
+      await result.current.saveConfig({ enabled: false });
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/predictions/config', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: false }),
+    });
+    expect(result.current.config).toEqual(updated);
+  });
+
+  it('saveConfig silently handles errors without changing config', async () => {
+    mockApiFetch.mockResolvedValueOnce(sampleConfig);
+
+    const { result } = renderHook(() => usePredictionConfig());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    mockApiFetch.mockRejectedValueOnce(new Error('Server error'));
+
+    await act(async () => {
+      await result.current.saveConfig({ minConfidence: 90 });
+    });
+
+    // Config remains unchanged
+    expect(result.current.config).toEqual(sampleConfig);
   });
 });
