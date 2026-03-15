@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { ProvidersSection } from '../ProvidersSection';
 
 // ── Mocks ─────────────────────────────────────────────────
@@ -213,7 +213,7 @@ describe('ProvidersSection', () => {
       .mockResolvedValueOnce(MOCK_CONFIGS)
       .mockResolvedValueOnce(MOCK_RANKING)
       .mockRejectedValueOnce(new Error('status timeout'));
-    render(<ProvidersSection />);
+    await act(async () => { render(<ProvidersSection />); });
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });

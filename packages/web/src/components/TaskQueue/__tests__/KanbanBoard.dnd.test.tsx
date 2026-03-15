@@ -375,7 +375,7 @@ describe('KanbanBoard DnD', () => {
       ];
       render(<KanbanBoard dagStatus={makeDagStatus(tasks)} projectId="proj-1" />);
 
-      act(() => {
+      await act(async () => {
         capturedHandlers.onDragEnd?.({
           active: { id: 'task-b' },
           over: { id: 'task-a' },

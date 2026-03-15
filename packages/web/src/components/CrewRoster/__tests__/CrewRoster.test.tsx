@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { CrewRoster } from '../CrewRoster';
 
@@ -154,7 +154,7 @@ describe('CrewRoster', () => {
 
   it('renders roster with agent cards', async () => {
     setupMocks();
-    renderPanel();
+    await act(async () => { renderPanel(); });
     await waitFor(() => {
       expect(screen.getByText('architect')).toBeInTheDocument();
     });
