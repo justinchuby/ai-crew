@@ -375,6 +375,8 @@ describe('KanbanBoard DnD', () => {
       ];
       render(<KanbanBoard dagStatus={makeDagStatus(tasks)} projectId="proj-1" />);
 
+      // Suppress expected warning from priority update failure
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       await act(async () => {
         capturedHandlers.onDragEnd?.({
           active: { id: 'task-b' },
@@ -389,6 +391,7 @@ describe('KanbanBoard DnD', () => {
           expect.objectContaining({ method: 'PATCH' }),
         );
       });
+      spy.mockRestore();
     });
   });
 });

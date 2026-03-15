@@ -146,6 +146,9 @@ describe('AgentHeatmap', () => {
 describe('OverviewPage rendering', () => {
   it('renders overview page without project tabs', async () => {
     const { OverviewPage } = await import('../OverviewPage/OverviewPage');
+    // Suppress expected warnings from TokenUsageSection fetch failure (no base URL in test)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await act(async () => {
       render(
         <ProjectContext.Provider value={{ projectId: 'proj-1' }}>
@@ -159,5 +162,7 @@ describe('OverviewPage rendering', () => {
     const page = await screen.findByTestId('overview-page');
     expect(page).toBeTruthy();
     expect(screen.queryByTestId('project-tabs')).toBeNull();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });

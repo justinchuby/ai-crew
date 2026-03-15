@@ -213,6 +213,8 @@ describe('ProvidersSection', () => {
       .mockResolvedValueOnce(MOCK_CONFIGS)
       .mockResolvedValueOnce(MOCK_RANKING)
       .mockRejectedValueOnce(new Error('status timeout'));
+    // Suppress expected warning from ProvidersSection error path
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await act(async () => { render(<ProvidersSection />); });
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -220,6 +222,7 @@ describe('ProvidersSection', () => {
     // Cards render — toggles work even without status
     expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
     expect(screen.getByTestId('toggle-copilot')).toBeInTheDocument();
+    spy.mockRestore();
   });
 
   it('does not show preview badge for Codex', async () => {

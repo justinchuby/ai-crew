@@ -154,12 +154,15 @@ describe('CrewRoster', () => {
 
   it('renders roster with agent cards', async () => {
     setupMocks();
+    // Suppress expected DOM-nesting warning (button > button in AgentRow session-id copy)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await act(async () => { renderPanel(); });
     await waitFor(() => {
       expect(screen.getByText('architect')).toBeInTheDocument();
     });
     expect(screen.getByText('developer')).toBeInTheDocument();
     expect(screen.getByText('reviewer')).toBeInTheDocument();
+    spy.mockRestore();
   });
 
   it('shows agent IDs in short form', async () => {
