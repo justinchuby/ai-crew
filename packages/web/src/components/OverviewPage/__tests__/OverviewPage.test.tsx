@@ -49,14 +49,14 @@ vi.mock('../../FleetOverview/FileLockPanel', () => ({
 }));
 
 vi.mock('../../Shared', () => ({
-  DecisionFeedItem: ({ decision }: { decision: Decision }) => (
-    <div data-testid="decision-feed-item">{decision.title}</div>
+  DecisionFeedItem: ({ decision, onClick }: { decision: Decision; onClick: () => void }) => (
+    <div data-testid="decision-feed-item" onClick={onClick}>{decision.title}</div>
   ),
   DecisionDetailModal: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="decision-detail-modal"><button onClick={onClose}>close</button></div>
   ),
-  ActivityFeedItem: ({ entry }: { entry: { summary: string } }) => (
-    <div data-testid="activity-feed-item">{entry.summary}</div>
+  ActivityFeedItem: ({ entry, onClick }: { entry: { summary: string }; onClick: () => void }) => (
+    <div data-testid="activity-feed-item" onClick={onClick}>{entry.summary}</div>
   ),
   ActivityDetailModal: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="activity-detail-modal"><button onClick={onClose}>close</button></div>
@@ -283,5 +283,177 @@ describe('OverviewPage', () => {
         expect.objectContaining({ method: 'POST' }),
       );
     });
+  });
+
+  // ── File Locks ──────────────────────────────────────────────────
+
+  it('renders file lock panel when locks exist', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/status')) {
+        return Promise.resolve({ locks: [{ agentId: 'a1', filePath: 'src/foo.ts', acquiredAt: '2024-01-01' }] });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('file-lock-panel')).toBeInTheDocument();
+    });
+  });
+
+  // ── Decisions feed with interaction ─────────────────────────────
+
+  it('renders decision feed items from API data', async () => {
+    const decisions = [
+      { id: 'd1', title: 'Use TypeScript', status: 'recorded', needsConfirmation: true, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+      { id: 'd2', title: 'Use React', status: 'recorded', needsConfirmation: false, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId('decision-feed-item').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('opens decision detail modal on decision click', async () => {
+    const decisions = [
+      { id: 'd1', title: 'Use TypeScript', status: 'recorded', needsConfirmation: true, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('decision-feed-item')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('decision-feed-item'));
+    expect(screen.getByTestId('decision-detail-modal')).toBeInTheDocument();
+  });
+
+  it('closes decision detail modal on close button', async () => {
+    const decisions = [
+      { id: 'd1', title: 'Use TypeScript', status: 'recorded', needsConfirmation: true, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('decision-feed-item')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('decision-feed-item'));
+    expect(screen.getByTestId('decision-detail-modal')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('close'));
+    expect(screen.queryByTestId('decision-detail-modal')).not.toBeInTheDocument();
+  });
+
+  it('shows "No decisions yet" when no decisions exist', () => {
+    render(<OverviewPage />);
+    expect(screen.getByText('No decisions yet')).toBeInTheDocument();
+  });
+
+  it('shows "No progress events yet" when no activity exists', () => {
+    render(<OverviewPage />);
+    expect(screen.getByText('No progress events yet')).toBeInTheDocument();
+  });
+
+  // ── Activity feed with interaction ──────────────────────────────
+
+  it('renders activity feed items from API data', async () => {
+    const activities = [
+      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Built auth module')).toBeInTheDocument();
+  });
+
+  it('opens activity detail modal on activity click', async () => {
+    const activities = [
+      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('activity-feed-item'));
+    expect(screen.getByTestId('activity-detail-modal')).toBeInTheDocument();
+  });
+
+  it('closes activity detail modal on close button', async () => {
+    const activities = [
+      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('activity-feed-item'));
+    expect(screen.getByTestId('activity-detail-modal')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('close'));
+    expect(screen.queryByTestId('activity-detail-modal')).not.toBeInTheDocument();
+  });
+
+  // ── New session dialog ──────────────────────────────────────────
+
+  it('closes new session dialog via close button', () => {
+    useAppStore.setState({ agents: [] });
+    render(<OverviewPage />);
+    fireEvent.click(screen.getByTestId('new-session-btn'));
+    expect(screen.getByTestId('new-session-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('close-dialog'));
+    expect(screen.queryByTestId('new-session-dialog')).not.toBeInTheDocument();
+  });
+
+  // ── Actionable decisions priority ────────────────────────────────
+
+  it('prioritizes actionable decisions over all decisions in feed', async () => {
+    const decisions = [
+      { id: 'd1', title: 'Actionable', status: 'recorded', needsConfirmation: true, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+      { id: 'd2', title: 'Informational', status: 'recorded', needsConfirmation: false, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+
+    render(<OverviewPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Actionable')).toBeInTheDocument();
+    });
+    // Only actionable decisions shown (not the informational one)
+    expect(screen.queryByText('Informational')).not.toBeInTheDocument();
   });
 });
