@@ -42,7 +42,12 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
   }, []);
 
   useEffect(() => {
-    if (liveAgentCount > 0) return;
+    if (liveAgentCount > 0) {
+      // Live agents available — clear stale derived data
+      setAgents([]);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
