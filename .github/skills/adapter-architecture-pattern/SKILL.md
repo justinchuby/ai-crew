@@ -85,7 +85,7 @@ try {
 } catch (err) {
   // Emits 'session_resume_failed' for observability, then throws.
   // Does NOT fall back to newSession() — the UI should show the error.
-  throw new Error(`Session resume failed: ${err.message}`);
+  throw new Error(`Session resume failed: ${err instanceof Error ? err.message : String(err)}`);
 }
 ```
 
