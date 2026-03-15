@@ -230,7 +230,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.lockRegistry.on('lock:expired', ({ filePath, agentId }: { filePath: string; agentId: string }) => {
       const agent = this.agents.get(agentId);
       if (agent && (agent.status === 'running' || agent.status === 'idle')) {
-        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired and was released. Re-acquire it if you still need it.`);
+        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired after the TTL timeout. If you still need it, reacquire with LOCK_FILE.`);
       }
     });
 
