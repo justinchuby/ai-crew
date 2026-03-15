@@ -151,9 +151,11 @@ export class WebSocketServer {
     this.track(agentManager, 'agent:status', (data: AgentManagerEvents['agent:status']) => {
       const agentId = data.agentId;
       const projectId = this.resolveAgentProjectId(agentId);
-      // 'running' status bypasses throttle — UI should reflect active agents immediately.
-      // Other statuses (idle, etc.) are throttled to reduce rapid churn.
-      if (data.status === 'running') {
+      // Only 'idle' is throttled — it benefits from churn reduction since agents
+      // rapidly cycle idle↔running between prompt turns. All other transitions
+      // (creating→running, idle→running, →completed, →failed, →terminated)
+      // bypass the throttle so the UI reflects state changes immediately.
+      if (data.status !== 'idle') {
         const existingTimer = this.statusThrottleTimers.get(agentId);
         if (existingTimer) {
           clearTimeout(existingTimer);

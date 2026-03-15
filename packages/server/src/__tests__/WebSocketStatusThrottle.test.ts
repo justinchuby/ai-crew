@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Tests the WebSocketServer status throttle logic:
- * - 'running' status bypasses the throttle and broadcasts immediately
- * - Other statuses (idle, etc.) are throttled with 500ms buffer
- * - 'running' cancels any pending throttled status flush
+ * - Only 'idle' status is throttled (500ms buffer) to reduce rapid churn
+ * - All other statuses (running, creating, completed, failed, terminated)
+ *   bypass the throttle and broadcast immediately
+ * - Non-idle transitions cancel any pending throttled idle flush
  *
  * This mirrors the core logic from WebSocketServer.wireAgentEvents 'agent:status' handler
  * to enable focused unit testing without full WS server setup.
@@ -24,7 +25,7 @@ class StatusThrottleHandler {
   handleStatus(agentId: string, status: string): void {
     const data: StatusMessage = { type: 'agent:status', agentId, status };
 
-    if (status === 'running') {
+    if (status !== 'idle') {
       const existingTimer = this.statusThrottleTimers.get(agentId);
       if (existingTimer) {
         clearTimeout(existingTimer);
@@ -159,5 +160,37 @@ describe('WebSocket agent:status throttle', () => {
     vi.advanceTimersByTime(500);
     const idleBroadcasts = handler.broadcasts.filter(b => b.status === 'idle');
     expect(idleBroadcasts).toHaveLength(1);
+  });
+
+  // All non-idle statuses bypass the throttle
+  it.each(['running', 'creating', 'completed', 'failed', 'terminated'] as const)(
+    '%s status bypasses the throttle and broadcasts immediately',
+    (status) => {
+      handler.handleStatus('agent-1', status);
+      expect(handler.broadcasts).toHaveLength(1);
+      expect(handler.broadcasts[0].status).toBe(status);
+    },
+  );
+
+  it('creating→running transition broadcasts both immediately', () => {
+    handler.handleStatus('agent-1', 'creating');
+    handler.handleStatus('agent-1', 'running');
+
+    expect(handler.broadcasts).toHaveLength(2);
+    expect(handler.broadcasts[0].status).toBe('creating');
+    expect(handler.broadcasts[1].status).toBe('running');
+  });
+
+  it('terminal statuses (completed, failed, terminated) cancel pending idle', () => {
+    handler.handleStatus('agent-1', 'idle');
+    expect(handler.broadcasts).toHaveLength(0);
+
+    handler.handleStatus('agent-1', 'completed');
+    expect(handler.broadcasts).toHaveLength(1);
+    expect(handler.broadcasts[0].status).toBe('completed');
+
+    // Idle should NOT fire after terminal status
+    vi.advanceTimersByTime(600);
+    expect(handler.broadcasts).toHaveLength(1);
   });
 });
