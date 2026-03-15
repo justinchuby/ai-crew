@@ -120,14 +120,11 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     if (opts.sessionId) {
       // Try to resume an existing session (supported by some providers)
       try {
-        await withTimeout(
-          this.connection!.loadSession({
-            sessionId: opts.sessionId,
-            cwd: opts.cwd || process.cwd(),
-            mcpServers: [],
-          }),
-          SDK_TIMEOUT_MS, 'loadSession',
-        );
+        await this.connection!.loadSession({
+          sessionId: opts.sessionId,
+          cwd: opts.cwd || process.cwd(),
+          mcpServers: [],
+        });
         sessionId = opts.sessionId;
       } catch (err) {
         // Resume failed — do NOT fall back to a new session.
